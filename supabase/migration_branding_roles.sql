@@ -48,5 +48,40 @@ create policy "Admins can insert app settings"
     )
   );
 
--- Storage for logos (create bucket 'branding' as public in dashboard)
--- insert into storage.buckets (id, name, public) values ('branding', 'branding', true);
+-- Storage for logos
+-- Create the bucket as public in the Supabase dashboard (Storage → New bucket → name: branding, public: true)
+-- or uncomment and run:
+-- insert into storage.buckets (id, name, public) values ('branding', 'branding', true)
+--   on conflict (id) do nothing;
+
+-- Policies on storage.objects (required for uploads; upsert needs INSERT + SELECT + UPDATE)
+drop policy if exists "Admins can upload branding" on storage.objects;
+drop policy if exists "Admins can update branding" on storage.objects;
+drop policy if exists "Admins can read branding" on storage.objects;
+drop policy if exists "Public can read branding" on storage.objects;
+
+create policy "Admins can upload branding"
+  on storage.objects for insert
+  to authenticated
+  with check (
+    bucket_id = 'branding'
+    and exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Admins can update branding"
+  on storage.objects for update
+  to authenticated
+  using (
+    bucket_id = 'branding'
+    and exists (
+      select 1 from public.profiles
+      where id = auth.uid() and role = 'admin'
+    )
+  );
+
+create policy "Public can read branding"
+  on storage.objects for select
+  using (bucket_id = 'branding');
