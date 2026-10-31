@@ -8,15 +8,15 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Travel Expense Tracker",
   description: "Scan receipts, track business travel expenses, and generate reports",
-  manifest: "/manifest.json",
+  manifest: "/api/manifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
     title: "Expenses",
   },
   icons: {
-    icon: "/icon-192.png",
-    apple: "/apple-touch-icon.png",
+    icon: "/api/icon",
+    apple: "/api/icon",
   },
 };
 
