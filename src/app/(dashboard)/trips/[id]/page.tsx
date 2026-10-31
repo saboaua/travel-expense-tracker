@@ -34,14 +34,33 @@ export default async function TripDetailPage({
     .eq("trip_id", id)
     .order("expense_date", { ascending: false });
 
-  const sameCurrency = (expenses || []).filter(
-    (e) => (e.currency || trip.currency) === trip.currency
-  );
-  const localTotal = sameCurrency.reduce((sum, e) => sum + Number(e.amount), 0);
-  const usdTotal = (expenses || []).reduce(
-    (sum, e) => sum + Number(e.amount_usd ?? (e.currency === "USD" || !e.currency ? e.amount : 0)),
-    0
-  );
+  const list = expenses || [];
+
+  // Full converted total in USD (uses frozen amount_usd when present)
+  const usdTotal = list.reduce((sum, e) => {
+    const usd =
+      e.amount_usd != null
+        ? Number(e.amount_usd)
+        : e.currency === "USD" || !e.currency
+          ? Number(e.amount)
+          : 0;
+    return sum + usd;
+  }, 0);
+
+  // Original-currency totals for non-USD expenses
+  const otherByCurrency: Record<string, number> = {};
+  list.forEach((e) => {
+    const code = (e.currency || trip.currency || "USD").toUpperCase();
+    if (code !== "USD") {
+      otherByCurrency[code] = (otherByCurrency[code] || 0) + Number(e.amount);
+    }
+  });
+
+  const otherCurrencies = Object.entries(otherByCurrency);
+  // Prefer the largest other-currency total for the second card
+  const primaryOther = otherCurrencies.length
+    ? otherCurrencies.reduce((best, cur) => (cur[1] > best[1] ? cur : best))
+    : null;
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
@@ -92,20 +111,47 @@ export default async function TripDetailPage({
             <p className="text-2xl font-bold">{formatCurrency(usdTotal, "USD")}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <p className="text-sm text-muted-foreground">In {trip.currency}</p>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(localTotal, trip.currency)}</p>
-          </CardContent>
-        </Card>
+
+        {primaryOther ? (
+          <Card>
+            <CardHeader className="pb-2">
+              <p className="text-sm text-muted-foreground">
+                {otherCurrencies.length > 1 ? "Other currencies" : `In ${primaryOther[0]}`}
+              </p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {formatCurrency(primaryOther[1], primaryOther[0])}
+              </p>
+              {otherCurrencies.length > 1 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  {otherCurrencies.map(([c, a]) => `${c} ${formatCurrency(a, c)}`).join(" \u00b7 ")}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader className="pb-2">
+              <p className="text-sm text-muted-foreground">In {trip.currency || "USD"}</p>
+            </CardHeader>
+            <CardContent>
+              <p className="text-2xl font-bold">
+                {formatCurrency(
+                  list.reduce((s, e) => s + Number(e.amount), 0),
+                  trip.currency || "USD"
+                )}
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader className="pb-2">
             <p className="text-sm text-muted-foreground">Expenses</p>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{expenses?.length || 0}</p>
+            <p className="text-2xl font-bold">{list.length}</p>
           </CardContent>
         </Card>
       </div>
@@ -118,7 +164,7 @@ export default async function TripDetailPage({
           </Link>
         </CardHeader>
         <CardContent>
-          <ExpenseList expenses={expenses || []} currency={trip.currency} tripId={id} />
+          <ExpenseList expenses={list} currency={trip.currency} tripId={id} />
         </CardContent>
       </Card>
     </div>
