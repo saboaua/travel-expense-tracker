@@ -61,7 +61,6 @@ export default function SettingsPage() {
     loadTelegram();
   }, [supabase]);
 
-  // Poll while a link is waiting to be used
   useEffect(() => {
     if (!status?.link || status.linked) return;
     const id = setInterval(loadTelegram, 4000);
@@ -116,7 +115,6 @@ export default function SettingsPage() {
         expires: data.expires,
         link: data.link,
       }));
-      // Open Telegram immediately — best practice is the deep link, not a typed code
       window.open(data.link, "_blank", "noopener,noreferrer");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create link");
@@ -220,11 +218,13 @@ export default function SettingsPage() {
 
             {status?.linked ? (
               <div className="flex flex-wrap gap-2">
-                <Button asChild>
-                  <a href={status.botUrl} target="_blank" rel="noreferrer">
-                    <ExternalLink className="h-4 w-4 mr-2" />
-                    Open chatbot
-                  </a>
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={() => window.open(status.botUrl, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open chatbot
                 </Button>
                 <Button variant="outline" onClick={disconnect} disabled={linking}>
                   Disconnect
@@ -232,7 +232,8 @@ export default function SettingsPage() {
               </div>
             ) : (
               <>
-                <Button onClick={enableTelegram} disabled={linking}>
+                <Button onClick={enableTelegram} disabled={linking} className="gap-2">
+                  <Send className="h-4 w-4" />
                   {linking ? "Creating link\u2026" : "Enable Telegram"}
                 </Button>
 
@@ -242,14 +243,17 @@ export default function SettingsPage() {
                       Tap Start in Telegram to finish linking. This link expires in 15 minutes and works once.
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      <Button asChild size="sm">
-                        <a href={status.link} target="_blank" rel="noreferrer">
-                          <ExternalLink className="h-4 w-4 mr-2" />
-                          Open chatbot
-                        </a>
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => window.open(status.link!, "_blank", "noopener,noreferrer")}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open chatbot
                       </Button>
-                      <Button type="button" size="sm" variant="outline" onClick={copyLink}>
-                        {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                      <Button type="button" size="sm" variant="outline" className="gap-2" onClick={copyLink}>
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                         {copied ? "Copied" : "Copy link"}
                       </Button>
                     </div>
