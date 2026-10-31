@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { logAudit } from "@/lib/audit";
+import { canAssignRole, canCreateUsers, type UserRole } from "@/lib/roles";
 
 export async function POST(request: Request) {
   try {
@@ -20,12 +21,14 @@ export async function POST(request: Request) {
       .eq("id", user.id)
       .single();
 
-    if (profile?.role !== "admin") {
+    const myRole = (profile?.role as UserRole) || "user";
+
+    if (!canCreateUsers(myRole)) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     const body = await request.json();
-    const { email, password, firstName, lastName, role } = body;
+    let { email, password, firstName, lastName, role } = body;
 
     if (!email || !password) {
       return NextResponse.json(
@@ -34,11 +37,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Assistants can only create regular users
+    if (!canAssignRole(myRole)) {
+      role = "user";
+    } else if (!["user", "assistant", "admin"].includes(role)) {
+      role = "user";
+    }
+
     if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
       return NextResponse.json(
         {
           error:
-            "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is not set. Add it in Vercel environment variables.",
+            "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is not set.",
         },
         { status: 500 }
       );
@@ -83,7 +93,7 @@ export async function POST(request: Request) {
       first_name: firstName || null,
       last_name: lastName || null,
       full_name: fullName,
-      role: role === "admin" ? "admin" : "user",
+      role,
       must_change_password: true,
       updated_at: new Date().toISOString(),
     });
@@ -92,7 +102,6 @@ export async function POST(request: Request) {
       console.error("Profile upsert failed:", profileError);
     }
 
-    // Audit trail
     await logAudit({
       actorId: user.id,
       actorEmail: profile?.email || user.email,
@@ -101,9 +110,10 @@ export async function POST(request: Request) {
       entityId: newUser.user.id,
       details: {
         email,
-        role: role === "admin" ? "admin" : "user",
+        role,
         first_name: firstName,
         last_name: lastName,
+        created_by_role: myRole,
       },
     });
 

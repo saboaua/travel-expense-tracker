@@ -5,7 +5,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserPlus, Copy, Check, Shield, User, Mail } from "lucide-react";
+import { UserPlus, Copy, Check, Shield, User, Mail, UserCog } from "lucide-react";
+import type { UserRole } from "@/lib/roles";
+import { canAssignRole } from "@/lib/roles";
 
 interface ManagedUser {
   id: string;
@@ -19,7 +21,6 @@ interface ManagedUser {
 }
 
 function generateTempPassword(): string {
-  // Readable temporary password: 3 words of random consonants+vowels + number
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
   let result = "";
   for (let i = 0; i < 12; i++) {
@@ -35,21 +36,37 @@ export default function AdminUsersPage() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [myRole, setMyRole] = useState<UserRole>("user");
 
-  // Form
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [role, setRole] = useState<"user" | "admin">("user");
+  const [role, setRole] = useState<UserRole>("user");
   const [tempPassword, setTempPassword] = useState("");
+  const [createdEmail, setCreatedEmail] = useState("");
   const [showCredentials, setShowCredentials] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const loadUsers = async () => {
     setLoading(true);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (user) {
+      const { data: me } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single();
+      if (me?.role) setMyRole(me.role as UserRole);
+    }
+
     const { data, error } = await supabase
       .from("profiles")
-      .select("id, email, first_name, last_name, full_name, role, must_change_password, created_at")
+      .select(
+        "id, email, first_name, last_name, full_name, role, must_change_password, created_at"
+      )
       .order("created_at", { ascending: false });
 
     if (!error && data) {
@@ -69,11 +86,11 @@ export default function AdminUsersPage() {
     setSuccess(null);
     setShowCredentials(false);
 
+    // Assistants can only create regular users
+    const assignedRole = canAssignRole(myRole) ? role : "user";
     const password = generateTempPassword();
 
     try {
-      // Create user via Supabase Auth Admin API requires service role.
-      // For security we use a server action / API route instead of client-side service key.
       const res = await fetch("/api/admin/create-user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -82,7 +99,7 @@ export default function AdminUsersPage() {
           password,
           firstName,
           lastName,
-          role,
+          role: assignedRole,
         }),
       });
 
@@ -93,6 +110,7 @@ export default function AdminUsersPage() {
       }
 
       setTempPassword(password);
+      setCreatedEmail(email);
       setShowCredentials(true);
       setSuccess(`User ${email} created successfully`);
       setEmail("");
@@ -108,17 +126,16 @@ export default function AdminUsersPage() {
     }
   };
 
-  const copyCredentials = () => {
-    const text = `Login: ${email || "(see form)"}\nTemporary password: ${tempPassword}\n\nYou will be asked to set a new password on first login.`;
-    navigator.clipboard.writeText(
-      `Email: ${users[0]?.email || email}\nTemporary password: ${tempPassword}\n\nOn first login you must set a new password.`
-    );
-    // Better: copy the last created
-    navigator.clipboard.writeText(
-      `Email: ${email || "(check list)"}\nTemporary password: ${tempPassword}\n\nYou will be required to change this password when you first sign in.`
-    );
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const roleBadge = (r: string) => {
+    if (r === "admin") return "bg-indigo-100 text-indigo-700";
+    if (r === "assistant") return "bg-violet-100 text-violet-700";
+    return "bg-slate-100 text-slate-600";
+  };
+
+  const roleIcon = (r: string) => {
+    if (r === "admin") return <Shield className="h-4 w-4 text-indigo-600" />;
+    if (r === "assistant") return <UserCog className="h-4 w-4 text-violet-600" />;
+    return <User className="h-4 w-4 text-muted-foreground" />;
   };
 
   return (
@@ -130,7 +147,6 @@ export default function AdminUsersPage() {
         </p>
       </div>
 
-      {/* Create user */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -138,7 +154,12 @@ export default function AdminUsersPage() {
             Create User
           </CardTitle>
           <CardDescription>
-            A temporary password is generated. Share it securely — the user must change it on first login.
+            A temporary password is generated. The user must change it on first login.
+            {!canAssignRole(myRole) && (
+              <span className="block mt-1 text-amber-700">
+                As Assistant you can only create regular Users (not Admin or Assistant).
+              </span>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -173,17 +194,26 @@ export default function AdminUsersPage() {
               />
             </div>
 
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as "user" | "admin")}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                <option value="user">User</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
+            {canAssignRole(myRole) ? (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Role</label>
+                <select
+                  value={role}
+                  onChange={(e) => setRole(e.target.value as UserRole)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="user">User — Dashboard, Trips, Reports, Profile, Settings</option>
+                  <option value="assistant">
+                    Assistant — Same as User + create users (not roles)
+                  </option>
+                  <option value="admin">Admin — Full access</option>
+                </select>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                New accounts will be created as <strong>User</strong>.
+              </p>
+            )}
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
@@ -195,12 +225,11 @@ export default function AdminUsersPage() {
             {showCredentials && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
                 <p className="text-sm font-medium text-amber-900">
-                  Share these credentials securely (e.g. password manager or private message).
-                  Do not send them over insecure channels.
+                  Share these credentials securely. Do not send over insecure channels.
                 </p>
                 <div className="bg-white rounded-md border p-3 font-mono text-sm space-y-1">
                   <p>
-                    <span className="text-muted-foreground">Email:</span> {email || "—"}
+                    <span className="text-muted-foreground">Email:</span> {createdEmail}
                   </p>
                   <p>
                     <span className="text-muted-foreground">Temp password:</span>{" "}
@@ -214,7 +243,7 @@ export default function AdminUsersPage() {
                   className="gap-2"
                   onClick={() => {
                     navigator.clipboard.writeText(
-                      `Email: ${email}\nTemporary password: ${tempPassword}\n\nYou must set a new password when you first sign in.`
+                      `Email: ${createdEmail}\nTemporary password: ${tempPassword}\n\nYou must set a new password when you first sign in.`
                     );
                     setCopied(true);
                     setTimeout(() => setCopied(false), 2000);
@@ -241,7 +270,6 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
 
-      {/* Users list */}
       <Card>
         <CardHeader>
           <CardTitle>All users</CardTitle>
@@ -269,11 +297,7 @@ export default function AdminUsersPage() {
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        {u.role === "admin" ? (
-                          <Shield className="h-4 w-4 text-indigo-600" />
-                        ) : (
-                          <User className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        {roleIcon(u.role)}
                       </div>
                       <div className="min-w-0">
                         <p className="font-medium truncate">{name}</p>
@@ -289,13 +313,7 @@ export default function AdminUsersPage() {
                           Must change password
                         </span>
                       )}
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          u.role === "admin"
-                            ? "bg-indigo-100 text-indigo-700"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${roleBadge(u.role)}`}>
                         {u.role}
                       </span>
                     </div>
