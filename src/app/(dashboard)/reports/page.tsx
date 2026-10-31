@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileText, Download, Calendar } from "lucide-react";
+import { FileText, Download, Calendar, Archive } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
 
 export default async function ReportsPage() {
@@ -12,11 +12,11 @@ export default async function ReportsPage() {
   } = await supabase.auth.getUser();
 
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 
-  // Fetch trips for current year
   const { data: trips } = await supabase
     .from("trips")
-    .select("*, expenses(amount, category)")
+    .select("*, expenses(amount, category, expense_date)")
     .eq("user_id", user?.id)
     .gte("start_date", `${currentYear}-01-01`)
     .lte("start_date", `${currentYear}-12-31`)
@@ -32,7 +32,19 @@ export default async function ReportsPage() {
       return sum + tripTotal;
     }, 0) || 0;
 
-  // Category breakdown
+  // Monthly totals
+  const monthlyTotals: Record<string, number> = {};
+  trips?.forEach((trip) => {
+    trip.expenses?.forEach(
+      (e: { amount: number; expense_date: string }) => {
+        const m = e.expense_date?.slice(0, 7);
+        if (m) monthlyTotals[m] = (monthlyTotals[m] || 0) + Number(e.amount);
+      }
+    );
+  });
+
+  const thisMonthTotal = monthlyTotals[currentMonth] || 0;
+
   const categoryTotals: Record<string, number> = {};
   trips?.forEach((trip) => {
     trip.expenses?.forEach((e: { amount: number; category: string | null }) => {
@@ -41,43 +53,51 @@ export default async function ReportsPage() {
     });
   });
 
+  const sortedMonths = Object.keys(monthlyTotals).sort().reverse();
+
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Reports</h1>
         <p className="text-muted-foreground mt-1">
-          Generate expense reports for accounting
+          Yearly, monthly, and per-trip expense reports for accounting
         </p>
       </div>
 
-      {/* Yearly Summary */}
+      {/* Yearly */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             <div>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-5 w-5" />
                 {currentYear} Yearly Summary
               </CardTitle>
-              <CardDescription>
-                All business travel expenses this year
-              </CardDescription>
+              <CardDescription>All business travel this year</CardDescription>
             </div>
-            <Button variant="outline" className="gap-2" disabled>
-              <Download className="h-4 w-4" />
-              Export (soon)
-            </Button>
+            <a href={`/api/export/year/${currentYear}/excel`}>
+              <Button variant="outline" className="gap-2">
+                <Download className="h-4 w-4" />
+                Export Excel
+              </Button>
+            </a>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="flex items-baseline gap-2">
-            <span className="text-3xl font-bold">{formatCurrency(yearlyTotal)}</span>
-            <span className="text-muted-foreground">total</span>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Year total</p>
+              <p className="text-3xl font-bold">{formatCurrency(yearlyTotal)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">This month</p>
+              <p className="text-3xl font-bold">{formatCurrency(thisMonthTotal)}</p>
+            </div>
           </div>
 
           {Object.keys(categoryTotals).length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium">By Category</p>
+              <p className="text-sm font-medium">By category</p>
               {Object.entries(categoryTotals)
                 .sort(([, a], [, b]) => b - a)
                 .map(([cat, total]) => (
@@ -94,15 +114,42 @@ export default async function ReportsPage() {
         </CardContent>
       </Card>
 
-      {/* Per-trip reports */}
+      {/* Monthly breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Monthly breakdown ({currentYear})</CardTitle>
+          <CardDescription>Totals by expense date month</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {sortedMonths.length === 0 ? (
+            <p className="text-muted-foreground text-sm py-4 text-center">
+              No expenses this year yet
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {sortedMonths.map((m) => (
+                <div
+                  key={m}
+                  className="flex justify-between text-sm py-2 border-b last:border-0"
+                >
+                  <span className="font-medium">{m}</span>
+                  <span>{formatCurrency(monthlyTotals[m])}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Per-trip */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <FileText className="h-5 w-5" />
-            Trip Reports
+            Trip reports
           </CardTitle>
           <CardDescription>
-            Download individual trip reports with receipts
+            Download Excel or ZIP (Excel + receipt images) per trip
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -122,7 +169,7 @@ export default async function ReportsPage() {
                 return (
                   <div
                     key={trip.id}
-                    className="flex items-center justify-between p-4 rounded-lg border"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-lg border"
                   >
                     <div>
                       <p className="font-medium">{trip.name}</p>
@@ -131,12 +178,25 @@ export default async function ReportsPage() {
                         {formatCurrency(total, trip.currency)}
                       </p>
                     </div>
-                    <Link href={`/trips/${trip.id}/report`}>
-                      <Button variant="outline" size="sm" className="gap-2">
-                        <Download className="h-4 w-4" />
-                        Report
-                      </Button>
-                    </Link>
+                    <div className="flex gap-2">
+                      <a href={`/api/export/trip/${trip.id}/excel`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Download className="h-4 w-4" />
+                          Excel
+                        </Button>
+                      </a>
+                      <a href={`/api/export/trip/${trip.id}/zip`}>
+                        <Button variant="outline" size="sm" className="gap-2">
+                          <Archive className="h-4 w-4" />
+                          ZIP
+                        </Button>
+                      </a>
+                      <Link href={`/trips/${trip.id}`}>
+                        <Button variant="ghost" size="sm">
+                          Open
+                        </Button>
+                      </Link>
+                    </div>
                   </div>
                 );
               })}

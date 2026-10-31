@@ -1,0 +1,109 @@
+import { NextResponse } from "next/server";
+import { createClient } from "@/lib/supabase/server";
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { buildTripWorkbook } from "@/lib/export";
+import JSZip from "jszip";
+
+export async function GET(
+  _request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { data: trip } = await supabase
+    .from("trips")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
+  if (!trip) {
+    return NextResponse.json({ error: "Trip not found" }, { status: 404 });
+  }
+
+  const { data: expenses } = await supabase
+    .from("expenses")
+    .select("*")
+    .eq("trip_id", id)
+    .order("expense_date", { ascending: true });
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("full_name, first_name, last_name, company_name")
+    .eq("id", user.id)
+    .single();
+
+  const userName =
+    [profile?.first_name, profile?.last_name].filter(Boolean).join(" ") ||
+    profile?.full_name ||
+    undefined;
+
+  const excelBuffer = await buildTripWorkbook({
+    id: trip.id,
+    name: trip.name,
+    start_date: trip.start_date,
+    end_date: trip.end_date,
+    currency: trip.currency,
+    status: trip.status,
+    expenses: expenses || [],
+    userName,
+    companyName: profile?.company_name || undefined,
+  });
+
+  const zip = new JSZip();
+  const safeName = trip.name.replace(/[^a-z0-9-_]/gi, "_");
+  zip.file(`${safeName}_expenses.xlsx`, Buffer.from(excelBuffer));
+
+  const receiptsFolder = zip.folder("receipts");
+
+  // Use service role if available for storage download; else user client
+  const storageClient =
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? createServiceClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!,
+          { auth: { autoRefreshToken: false, persistSession: false } }
+        )
+      : supabase;
+
+  for (const exp of expenses || []) {
+    if (!exp.receipt_path) continue;
+    try {
+      const { data, error } = await storageClient.storage
+        .from("receipts")
+        .download(exp.receipt_path);
+
+      if (error || !data) continue;
+
+      const ext = exp.receipt_path.split(".").pop() || "jpg";
+      const datePart = exp.expense_date || "unknown";
+      const merchantPart = (exp.merchant || "receipt")
+        .replace(/[^a-z0-9-_]/gi, "_")
+        .slice(0, 30);
+      const fileName = `${datePart}_${merchantPart}_${exp.id.slice(0, 8)}.${ext}`;
+
+      const arrayBuffer = await data.arrayBuffer();
+      receiptsFolder?.file(fileName, arrayBuffer);
+    } catch {
+      // skip failed receipt
+    }
+  }
+
+  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  const zipName = `${safeName}_export.zip`;
+
+  return new NextResponse(zipBuffer, {
+    headers: {
+      "Content-Type": "application/zip",
+      "Content-Disposition": `attachment; filename="${zipName}"`,
+    },
+  });
+}

@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Download, Camera } from "lucide-react";
+import { ArrowLeft, Plus, Download, Camera, Archive } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ExpenseList } from "@/components/expenses/expense-list";
 
@@ -48,7 +48,6 @@ export default async function TripDetailPage({
         Back to trips
       </Link>
 
-      {/* Trip Header */}
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-1">
@@ -68,13 +67,19 @@ export default async function TripDetailPage({
             {trip.end_date && ` – ${formatDate(trip.end_date)}`}
           </p>
         </div>
-        <div className="flex gap-2">
-          <Link href={`/trips/${id}/report`}>
+        <div className="flex flex-wrap gap-2">
+          <a href={`/api/export/trip/${id}/excel`}>
             <Button variant="outline" className="gap-2">
               <Download className="h-4 w-4" />
-              Report
+              Excel
             </Button>
-          </Link>
+          </a>
+          <a href={`/api/export/trip/${id}/zip`}>
+            <Button variant="outline" className="gap-2">
+              <Archive className="h-4 w-4" />
+              ZIP
+            </Button>
+          </a>
           <Link href={`/trips/${id}/add-expense`}>
             <Button className="gap-2">
               <Camera className="h-4 w-4" />
@@ -84,7 +89,6 @@ export default async function TripDetailPage({
         </div>
       </div>
 
-      {/* Summary */}
       <div className="grid grid-cols-2 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -106,7 +110,6 @@ export default async function TripDetailPage({
         </Card>
       </div>
 
-      {/* Expenses List */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Expenses</CardTitle>
