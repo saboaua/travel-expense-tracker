@@ -30,14 +30,34 @@ export async function GET(request: Request) {
     if (!user) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
     const url = new URL(request.url);
-    const days = Number(url.searchParams.get("days") || 7);
-    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    const from = url.searchParams.get("from");
+    const to = url.searchParams.get("to");
+    const eventType = url.searchParams.get("eventType");
+    const severity = url.searchParams.get("severity");
+    const action = url.searchParams.get("action");
+    const entityType = url.searchParams.get("entityType");
+    const email = url.searchParams.get("email");
+    const ip = url.searchParams.get("ip");
+
+    const since = from ? new Date(from + "T00:00:00").toISOString() : new Date(Date.now() - 7 * 86400000).toISOString();
+    const until = to ? new Date(to + "T23:59:59.999").toISOString() : null;
     const supabase = adminClient();
 
-    const [events, audits] = await Promise.all([
-      supabase.from("security_events").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(200),
-      supabase.from("audit_logs").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(200),
-    ]);
+    let eventsQuery = supabase.from("security_events").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(500);
+    let auditsQuery = supabase.from("audit_logs").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(500);
+    if (until) {
+      eventsQuery = eventsQuery.lte("created_at", until);
+      auditsQuery = auditsQuery.lte("created_at", until);
+    }
+    if (eventType) eventsQuery = eventsQuery.eq("event_type", eventType);
+    if (severity) eventsQuery = eventsQuery.eq("severity", severity);
+    if (email) eventsQuery = eventsQuery.ilike("email_attempted", `%${email}%`);
+    if (ip) eventsQuery = eventsQuery.ilike("ip_address", `%${ip}%`);
+    if (action) auditsQuery = auditsQuery.ilike("action", `%${action}%`);
+    if (entityType) auditsQuery = auditsQuery.eq("entity_type", entityType);
+    if (email) auditsQuery = auditsQuery.ilike("actor_email", `%${email}%`);
+
+    const [events, audits] = await Promise.all([eventsQuery, auditsQuery]);
 
     return NextResponse.json({
       events: events.data || [],
