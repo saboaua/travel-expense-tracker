@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -13,8 +13,28 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [appName, setAppName] = useState("Travel Expense Tracker");
+  const [primaryColor, setPrimaryColor] = useState("#4f46e5");
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    async function loadBranding() {
+      const { data } = await supabase
+        .from("app_settings")
+        .select("app_name, logo_url, primary_color")
+        .eq("id", 1)
+        .single();
+
+      if (data) {
+        if (data.app_name) setAppName(data.app_name);
+        if (data.logo_url) setLogoUrl(data.logo_url);
+        if (data.primary_color) setPrimaryColor(data.primary_color);
+      }
+    }
+    loadBranding();
+  }, [supabase]);
 
   const reportLoginEvent = async (
     success: boolean,
@@ -54,7 +74,6 @@ export default function LoginPage() {
     }
 
     await reportLoginEvent(true, { userId: data.user?.id });
-
     router.push("/");
     router.refresh();
   };
@@ -64,14 +83,29 @@ export default function LoginPage() {
       <div className="w-full max-w-[420px]">
         <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
           <div className="flex justify-center mb-6">
-            <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
-              <Plane className="h-7 w-7 text-white" strokeWidth={2} />
-            </div>
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={logoUrl}
+                alt={appName}
+                className="h-14 w-14 object-contain rounded-xl"
+              />
+            ) : (
+              <div
+                className="h-14 w-14 rounded-xl flex items-center justify-center shadow-lg"
+                style={{
+                  backgroundColor: primaryColor,
+                  boxShadow: `0 10px 15px -3px ${primaryColor}40`,
+                }}
+              >
+                <Plane className="h-7 w-7 text-white" strokeWidth={2} />
+              </div>
+            )}
           </div>
 
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-              Travel Expense Tracker
+              {appName}
             </h1>
             <p className="text-slate-500 mt-2 text-sm">
               Sign in to manage your business travel expenses
@@ -93,7 +127,13 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+                  style={
+                    {
+                      // @ts-expect-error css var
+                      "--tw-ring-color": `${primaryColor}66`,
+                    } as React.CSSProperties
+                  }
                 />
               </div>
             </div>
@@ -112,7 +152,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full h-11 pl-10 pr-11 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                  className="w-full h-11 pl-10 pr-11 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all"
                 />
                 <button
                   type="button"
@@ -120,11 +160,7 @@ export default function LoginPage() {
                   className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
                   tabIndex={-1}
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
@@ -135,13 +171,15 @@ export default function LoginPage() {
                   type="checkbox"
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  className="h-4 w-4 rounded border-slate-300"
+                  style={{ accentColor: primaryColor }}
                 />
                 <span className="text-sm text-slate-600">Remember me</span>
               </label>
               <Link
                 href="/forgot-password"
-                className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+                className="text-sm font-medium hover:opacity-80 transition-opacity"
+                style={{ color: primaryColor }}
               >
                 Forgot password?
               </Link>
@@ -156,7 +194,11 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+              className="w-full h-11 rounded-xl text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
+              style={{
+                backgroundColor: primaryColor,
+                boxShadow: `0 10px 15px -3px ${primaryColor}40`,
+              }}
             >
               {loading ? (
                 "Signing in..."

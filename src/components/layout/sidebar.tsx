@@ -9,28 +9,17 @@ import {
   FileText,
   Settings,
   LogOut,
-  Receipt,
   User,
   Shield,
   Users,
   Activity,
+  Palette,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
-
-const baseNavItems = [
-  { href: "/", label: "Dashboard", icon: Home },
-  { href: "/trips", label: "Trips", icon: Plane },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/profile", label: "Profile", icon: User },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
-
-const adminNavItems = [
-  { href: "/admin/users", label: "Users", icon: Users },
-  { href: "/admin/security", label: "Security", icon: Activity },
-];
+import type { UserRole } from "@/lib/roles";
+import { canCreateUsers, canManageBranding, canViewSecurity } from "@/lib/roles";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -38,13 +27,35 @@ export function Sidebar() {
   const supabase = createClient();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [role, setRole] = useState<UserRole>("user");
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [appName, setAppName] = useState("Expense Tracker");
+  const [primaryColor, setPrimaryColor] = useState("#4f46e5");
 
   useEffect(() => {
-    async function loadUser() {
+    async function load() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
+
+      const { data: settings } = await supabase
+        .from("app_settings")
+        .select("app_name, logo_url, primary_color")
+        .eq("id", 1)
+        .single();
+
+      if (settings) {
+        setAppName(settings.app_name || "Expense Tracker");
+        setLogoUrl(settings.logo_url);
+        if (settings.primary_color) {
+          setPrimaryColor(settings.primary_color);
+          document.documentElement.style.setProperty(
+            "--brand-primary",
+            settings.primary_color
+          );
+        }
+      }
+
       if (!user) return;
 
       const { data } = await supabase
@@ -61,12 +72,12 @@ export function Sidebar() {
           "User";
         setDisplayName(name);
         setAvatarUrl(data.avatar_url);
-        setIsAdmin(data.role === "admin");
+        setRole((data.role as UserRole) || "user");
       } else {
         setDisplayName(user.email?.split("@")[0] || "User");
       }
     }
-    loadUser();
+    load();
   }, [supabase, pathname]);
 
   const handleLogout = async () => {
@@ -75,12 +86,50 @@ export function Sidebar() {
     router.refresh();
   };
 
+  const userNav = [
+    { href: "/", label: "Dashboard", icon: Home },
+    { href: "/trips", label: "Trips", icon: Plane },
+    { href: "/reports", label: "Reports", icon: FileText },
+    { href: "/profile", label: "Profile", icon: User },
+    { href: "/settings", label: "Settings", icon: Settings },
+  ];
+
+  const adminNav = [
+    ...(canCreateUsers(role)
+      ? [{ href: "/admin/users", label: "Users", icon: Users }]
+      : []),
+    ...(canViewSecurity(role)
+      ? [{ href: "/admin/security", label: "Security", icon: Activity }]
+      : []),
+    ...(canManageBranding(role)
+      ? [{ href: "/admin/branding", label: "Branding", icon: Palette }]
+      : []),
+  ];
+
+  const roleLabel =
+    role === "admin" ? "Admin" : role === "assistant" ? "Assistant" : null;
+
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">
       <div className="flex flex-col flex-1 min-h-0">
-        <div className="flex items-center h-16 px-6 border-b gap-2">
-          <Receipt className="h-6 w-6 text-primary" />
-          <span className="font-semibold text-lg">Expense Tracker</span>
+        {/* Logo + app name */}
+        <div className="flex items-center h-16 px-4 border-b gap-2.5">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={logoUrl}
+              alt=""
+              className="h-8 w-8 object-contain rounded shrink-0"
+            />
+          ) : (
+            <div
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0"
+              style={{ backgroundColor: primaryColor }}
+            >
+              TE
+            </div>
+          )}
+          <span className="font-semibold text-base truncate">{appName}</span>
         </div>
 
         <Link
@@ -104,13 +153,13 @@ export function Sidebar() {
               {displayName || "Loading..."}
             </p>
             <p className="text-xs text-muted-foreground">
-              {isAdmin ? "Admin · View profile" : "View profile"}
+              {roleLabel ? `${roleLabel} · Profile` : "View profile"}
             </p>
           </div>
         </Link>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {baseNavItems.map((item) => {
+          {userNav.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
@@ -123,9 +172,10 @@ export function Sidebar() {
                 className={cn(
                   "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                   isActive
-                    ? "bg-primary text-primary-foreground"
+                    ? "text-white"
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
+                style={isActive ? { backgroundColor: primaryColor } : undefined}
               >
                 <Icon className="h-5 w-5" />
                 {item.label}
@@ -133,15 +183,15 @@ export function Sidebar() {
             );
           })}
 
-          {isAdmin && (
+          {adminNav.length > 0 && (
             <>
               <div className="pt-4 pb-2 px-3">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Shield className="h-3 w-3" />
-                  Admin
+                  {role === "admin" ? "Admin" : "Management"}
                 </p>
               </div>
-              {adminNavItems.map((item) => {
+              {adminNav.map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 const Icon = item.icon;
 
@@ -152,9 +202,10 @@ export function Sidebar() {
                     className={cn(
                       "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
                       isActive
-                        ? "bg-primary text-primary-foreground"
+                        ? "text-white"
                         : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                     )}
+                    style={isActive ? { backgroundColor: primaryColor } : undefined}
                   >
                     <Icon className="h-5 w-5" />
                     {item.label}
