@@ -7,6 +7,8 @@ export interface OcrResult {
   rawText: string;
 }
 
+export type OcrImageSource = File | string | Uint8Array | ArrayBuffer;
+
 function parseAmount(text: string): number | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
@@ -84,7 +86,7 @@ function parseMerchant(text: string): string | null {
 }
 
 export async function runReceiptOcr(
-  imageSource: File | string | Buffer
+  imageSource: OcrImageSource
 ): Promise<OcrResult> {
   const Tesseract = (await import("tesseract.js")).default;
 
