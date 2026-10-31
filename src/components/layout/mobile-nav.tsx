@@ -3,34 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import {
-  Home,
-  Plane,
-  FileText,
-  User,
-  Menu,
-  X,
-  Settings,
-  Users,
-  Activity,
-  Palette,
-  Send,
-  Shield,
-  LogOut,
-  Coins,
-} from "lucide-react";
+import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Palette, Send, Shield, LogOut, Coins } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
-import {
-  canCreateUsers,
-  canManageBranding,
-  canManageCurrencies,
-  canManageTelegram,
-  canViewSecurity,
-} from "@/lib/roles";
+import { canCreateUsers, canManageBranding, canManageCurrencies, canManageTelegram, canViewSecurity } from "@/lib/roles";
 
 const mainItems = [
   { href: "/", label: "Home", icon: Home },
@@ -46,15 +25,11 @@ export function MobileNav() {
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>("user");
 
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
+  useEffect(() => { setOpen(false); }, [pathname]);
 
   useEffect(() => {
     async function loadRole() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (data?.role) setRole(data.role as UserRole);
@@ -63,6 +38,7 @@ export function MobileNav() {
   }, [supabase]);
 
   const logout = async () => {
+    await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await supabase.auth.signOut();
     setOpen(false);
     router.push("/login");
@@ -87,40 +63,29 @@ export function MobileNav() {
           <div className="absolute bottom-16 left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <p className="font-semibold">Menu</p>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-md text-muted-foreground" aria-label="Close">
-                <X className="h-5 w-5" />
-              </button>
+              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-md text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
-
             <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium", pathname.startsWith("/settings") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
-              <Settings className="h-5 w-5" />
-              Settings
+              <Settings className="h-5 w-5" /> Settings
             </Link>
-
             {adminItems.length > 0 && (
               <div className="space-y-1">
-                <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Shield className="h-3 w-3" />
-                  {role === "admin" ? "Admin" : "Management"}
-                </p>
+                <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>
                 {adminItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname.startsWith(item.href);
                   return (
                     <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
-                      <Icon className="h-5 w-5" />
-                      {item.label}
+                      <Icon className="h-5 w-5" /> {item.label}
                     </Link>
                   );
                 })}
               </div>
             )}
-
             <div className="border-t pt-3 space-y-1">
               <ThemeToggle className="w-full justify-start gap-3" />
               <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-red-600 hover:text-red-600" onClick={logout}>
-                <LogOut className="h-5 w-5" />
-                Sign out
+                <LogOut className="h-5 w-5" /> Sign out
               </Button>
             </div>
           </div>
@@ -134,15 +99,12 @@ export function MobileNav() {
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors", isActive ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground")}>
-                <Icon className="h-5 w-5" />
-                <span>{item.label}</span>
+                <Icon className="h-5 w-5" /> <span>{item.label}</span>
               </Link>
             );
           })}
-
           <button type="button" onClick={() => setOpen((v) => !v)} className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors", open || menuActive ? "text-primary font-medium" : "text-muted-foreground")}>
-            <Menu className="h-5 w-5" />
-            <span>Menu</span>
+            <Menu className="h-5 w-5" /> <span>Menu</span>
           </button>
         </div>
       </nav>
