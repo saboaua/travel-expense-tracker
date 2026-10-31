@@ -16,23 +16,45 @@ export default function LoginPage() {
   const router = useRouter();
   const supabase = createClient();
 
+  const reportLoginEvent = async (
+    success: boolean,
+    opts?: { userId?: string; errorMessage?: string }
+  ) => {
+    try {
+      await fetch("/api/auth/login-event", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          success,
+          email,
+          userId: opts?.userId,
+          errorMessage: opts?.errorMessage,
+        }),
+      });
+    } catch {
+      // non-blocking
+    }
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
+      await reportLoginEvent(false, { errorMessage: error.message });
       setError(error.message);
       setLoading(false);
       return;
     }
 
-    // Middleware will redirect to /change-password if must_change_password is true
+    await reportLoginEvent(true, { userId: data.user?.id });
+
     router.push("/");
     router.refresh();
   };
@@ -147,7 +169,6 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* No public signup — accounts are created by admins only */}
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
               Need an account? Contact your administrator.
