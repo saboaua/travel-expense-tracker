@@ -22,6 +22,9 @@ const CATEGORIES = [
   "Other",
 ];
 
+const selectClass =
+  "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
+
 export default function AddExpensePage() {
   const params = useParams();
   const tripId = params.id as string;
@@ -37,9 +40,7 @@ export default function AddExpensePage() {
   const [rate, setRate] = useState("1");
   const [rateSource, setRateSource] = useState("manual");
   const [category, setCategory] = useState("Meals");
-  const [expenseDate, setExpenseDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);
@@ -47,14 +48,9 @@ export default function AddExpensePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase
-      .from("trips")
-      .select("currency")
-      .eq("id", tripId)
-      .single()
-      .then(({ data }) => {
-        if (data?.currency) setCurrency(data.currency);
-      });
+    supabase.from("trips").select("currency").eq("id", tripId).single().then(({ data }) => {
+      if (data?.currency) setCurrency(data.currency);
+    });
   }, [supabase, tripId]);
 
   useEffect(() => {
@@ -93,7 +89,6 @@ export default function AddExpensePage() {
     try {
       const result = await runReceiptOcr(selected);
       const filled: string[] = [];
-
       if (result.merchant && !merchant) {
         setMerchant(result.merchant);
         filled.push("merchant");
@@ -106,7 +101,6 @@ export default function AddExpensePage() {
         setExpenseDate(result.date);
         filled.push("date");
       }
-
       setOcrNote(
         filled.length > 0
           ? `Auto-filled: ${filled.join(", ")}. Please verify before saving.`
@@ -140,7 +134,6 @@ export default function AddExpensePage() {
     e.preventDefault();
     setLoading(true);
     setError(null);
-
     try {
       const {
         data: { user },
@@ -184,11 +177,8 @@ export default function AddExpensePage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-lg mx-auto">
-      <Link
-        href={`/trips/${tripId}`}
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
+    <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
+      <Link href={`/trips/${tripId}`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4" />
         Back to trip
       </Link>
@@ -196,9 +186,7 @@ export default function AddExpensePage() {
       <Card>
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>
-          <CardDescription>
-            Take a photo \u2014 we'll try to read merchant, amount, and date automatically
-          </CardDescription>
+          <CardDescription>Take a photo \u2014 we'll try to read merchant, amount, and date automatically</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -206,16 +194,9 @@ export default function AddExpensePage() {
               <label className="text-sm font-medium">Receipt Photo</label>
               {preview ? (
                 <div className="relative">
-                  <img
-                    src={preview}
-                    alt="Receipt preview"
-                    className="w-full rounded-lg border max-h-64 object-contain bg-muted"
-                  />
-                  <button
-                    type="button"
-                    onClick={clearImage}
-                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white"
-                  >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={preview} alt="Receipt preview" className="w-full rounded-lg border max-h-64 object-contain bg-muted" />
+                  <button type="button" onClick={clearImage} className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white">
                     <X className="h-4 w-4" />
                   </button>
                   {ocrLoading && (
@@ -237,7 +218,7 @@ export default function AddExpensePage() {
                         fileInputRef.current.click();
                       }
                     }}
-                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5"
                   >
                     <Camera className="h-7 w-7 text-primary" />
                     <span className="text-sm font-medium text-primary">Take Photo</span>
@@ -250,20 +231,14 @@ export default function AddExpensePage() {
                         fileInputRef.current.click();
                       }
                     }}
-                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed hover:bg-accent transition-colors"
+                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed"
                   >
                     <Upload className="h-7 w-7 text-muted-foreground" />
                     <span className="text-sm font-medium">Upload</span>
                   </button>
                 </div>
               )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               {ocrNote && (
                 <p className="text-xs text-muted-foreground flex items-start gap-1.5">
                   <ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />
@@ -277,19 +252,14 @@ export default function AddExpensePage() {
               <Input id="merchant" placeholder="e.g. Hotel Hilton" value={merchant} onChange={(e) => setMerchant(e.target.value)} />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-2 min-w-0">
                 <label htmlFor="amount" className="text-sm font-medium">Amount *</label>
-                <Input id="amount" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
+                <Input id="amount" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required className="w-full min-w-0" />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 min-w-0">
                 <label htmlFor="currency" className="text-sm font-medium">Currency</label>
-                <select
-                  id="currency"
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
+                <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectClass}>
                   {CURRENCIES.map((c) => (
                     <option key={c.code} value={c.code}>{c.code}</option>
                   ))}
@@ -319,19 +289,25 @@ export default function AddExpensePage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="date" className="text-sm font-medium">Date *</label>
-                <Input id="date" type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} required />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="category" className="text-sm font-medium">Category</label>
-                <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="space-y-2">
+              <label htmlFor="date" className="text-sm font-medium">Date *</label>
+              <Input
+                id="date"
+                type="date"
+                value={expenseDate}
+                onChange={(e) => setExpenseDate(e.target.value)}
+                required
+                className="w-full min-w-0"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="category" className="text-sm font-medium">Category</label>
+              <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
 
             <div className="space-y-2">
