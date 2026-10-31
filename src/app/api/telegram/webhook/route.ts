@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import {
   answerCallback,
   downloadFile,
+  getBotConfig,
   getFile,
   sendMessage,
 } from "@/lib/telegram";
@@ -20,28 +21,24 @@ function admin() {
 }
 
 export async function POST(request: Request) {
-  const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
-  if (secret) {
-    const header = request.headers.get("x-telegram-bot-api-secret-token");
-    if (header !== secret) {
-      return NextResponse.json({ ok: false }, { status: 401 });
-    }
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    return NextResponse.json({ ok: true });
   }
 
-  if (!process.env.TELEGRAM_BOT_TOKEN || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-    return NextResponse.json({ ok: true });
+  const config = await getBotConfig();
+  if (!config) return NextResponse.json({ ok: true });
+
+  if (config.secret) {
+    const header = request.headers.get("x-telegram-bot-api-secret-token");
+    if (header !== config.secret) {
+      return NextResponse.json({ ok: false }, { status: 401 });
+    }
   }
 
   const update = await request.json();
   const supabase = admin();
 
-  const { data: settings } = await supabase
-    .from("app_settings")
-    .select("telegram_enabled")
-    .eq("id", 1)
-    .single();
-
-  if (!settings?.telegram_enabled) {
+  if (!config.enabled) {
     const chatId =
       update.message?.chat?.id || update.callback_query?.message?.chat?.id;
     if (chatId) {
@@ -98,7 +95,7 @@ async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
   if (!profile) {
     await sendMessage(
       chatId,
-      "This Telegram account is not linked yet.\n\nOpen the web app \u2192 Settings \u2192 Connect Telegram, then send the code here."
+      "This Telegram account is not linked yet.\n\nOpen the web app \u2192 Settings \u2192 Enable Telegram, then open the link."
     );
     return;
   }
