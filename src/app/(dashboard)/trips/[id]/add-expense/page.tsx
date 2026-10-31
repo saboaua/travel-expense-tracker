@@ -7,7 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Camera, Upload, X } from "lucide-react";
+import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
+import { runReceiptOcr } from "@/lib/ocr";
 
 const CATEGORIES = [
   "Meals",
@@ -36,9 +37,43 @@ export default function AddExpensePage() {
   );
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const runOcrOnFile = async (selected: File) => {
+    setOcrLoading(true);
+    setOcrNote(null);
+    try {
+      const result = await runReceiptOcr(selected);
+      let filled: string[] = [];
+
+      if (result.merchant && !merchant) {
+        setMerchant(result.merchant);
+        filled.push("merchant");
+      }
+      if (result.amount != null && !amount) {
+        setAmount(result.amount.toFixed(2));
+        filled.push("amount");
+      }
+      if (result.date) {
+        setExpenseDate(result.date);
+        filled.push("date");
+      }
+
+      if (filled.length > 0) {
+        setOcrNote(`Auto-filled: ${filled.join(", ")}. Please verify before saving.`);
+      } else {
+        setOcrNote("Could not detect fields automatically. Enter details manually.");
+      }
+    } catch {
+      setOcrNote("OCR failed. Enter details manually.");
+    } finally {
+      setOcrLoading(false);
+    }
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
 
@@ -46,11 +81,15 @@ export default function AddExpensePage() {
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(selected);
+
+    // Auto-run OCR
+    await runOcrOnFile(selected);
   };
 
   const clearImage = () => {
     setFile(null);
     setPreview(null);
+    setOcrNote(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -68,7 +107,6 @@ export default function AddExpensePage() {
 
       let receiptPath: string | null = null;
 
-      // Upload receipt image if present
       if (file) {
         const ext = file.name.split(".").pop() || "jpg";
         const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
@@ -84,7 +122,6 @@ export default function AddExpensePage() {
         receiptPath = fileName;
       }
 
-      // Create expense record
       const { error: insertError } = await supabase.from("expenses").insert({
         trip_id: tripId,
         user_id: user.id,
@@ -121,12 +158,11 @@ export default function AddExpensePage() {
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>
           <CardDescription>
-            Take a photo of the receipt or enter details manually
+            Take a photo — we&apos;ll try to read merchant, amount, and date automatically
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Camera / Upload */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt Photo</label>
               {preview ? (
@@ -143,6 +179,14 @@ export default function AddExpensePage() {
                   >
                     <X className="h-4 w-4" />
                   </button>
+                  {ocrLoading && (
+                    <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
+                      <div className="bg-white rounded-lg px-4 py-3 flex items-center gap-2 text-sm">
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Reading receipt...
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -181,6 +225,24 @@ export default function AddExpensePage() {
                 onChange={handleFileChange}
                 className="hidden"
               />
+              {ocrNote && (
+                <p className="text-xs text-muted-foreground flex items-start gap-1.5">
+                  <ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  {ocrNote}
+                </p>
+              )}
+              {file && !ocrLoading && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={() => file && runOcrOnFile(file)}
+                >
+                  <ScanText className="h-4 w-4" />
+                  Re-scan receipt
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -259,7 +321,7 @@ export default function AddExpensePage() {
               <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
             )}
 
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="w-full" disabled={loading || ocrLoading}>
               {loading ? "Saving..." : "Save Expense"}
             </Button>
           </form>
