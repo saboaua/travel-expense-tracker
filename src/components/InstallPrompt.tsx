@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Download, X } from "lucide-react";
+import { Download, X, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface BeforeInstallPromptEvent extends Event {
@@ -13,9 +13,7 @@ const DISMISS_KEY = "pwa-install-dismissed";
 
 function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
-  // Android / desktop installed
   if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  // iOS installed
   if ((navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
   return false;
 }
@@ -27,25 +25,23 @@ function isMobile(): boolean {
 
 function isIos(): boolean {
   if (typeof navigator === "undefined") return false;
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent) && !(window as any).MSStream;
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
 export function InstallPrompt() {
   const [show, setShow] = useState(false);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [ios, setIos] = useState(false);
+  const [hint, setHint] = useState<string | null>(null);
 
   useEffect(() => {
-    // Already added to home screen — never show
     if (isStandalone()) return;
-    // Only on phones
     if (!isMobile()) return;
-    // User previously dismissed
     if (localStorage.getItem(DISMISS_KEY) === "1") return;
 
-    setIos(isIos());
+    const iosDevice = isIos();
+    setIos(iosDevice);
 
-    // Register service worker (needed for installability on Chromium)
     if ("serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {});
     }
@@ -58,12 +54,9 @@ export function InstallPrompt() {
 
     window.addEventListener("beforeinstallprompt", onBeforeInstall);
 
-    // iOS has no beforeinstallprompt — show manual instructions
-    if (isIos()) {
-      setShow(true);
-    }
+    // Show banner even if the browser never fires beforeinstallprompt
+    setShow(true);
 
-    // If already installed, hide
     const onInstalled = () => {
       setShow(false);
       setDeferred(null);
@@ -82,13 +75,27 @@ export function InstallPrompt() {
   };
 
   const install = async () => {
-    if (!deferred) return;
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    setDeferred(null);
-    if (outcome === "accepted") {
-      setShow(false);
+    setHint(null);
+
+    if (ios) {
+      setHint("Tap the Share button (square with arrow) at the bottom of Safari, then tap \u201cAdd to Home Screen\u201d.");
+      return;
     }
+
+    if (deferred) {
+      try {
+        await deferred.prompt();
+        const { outcome } = await deferred.userChoice;
+        setDeferred(null);
+        if (outcome === "accepted") setShow(false);
+      } catch {
+        setHint("Open the browser menu (\u22ee or \u22ef) and choose \u201cInstall app\u201d or \u201cAdd to Home screen\u201d.");
+      }
+      return;
+    }
+
+    // No native prompt available (common until SW is ready, or on some browsers)
+    setHint("Open the browser menu (\u22ee or \u22ef) and choose \u201cInstall app\u201d or \u201cAdd to Home screen\u201d.");
   };
 
   if (!show) return null;
@@ -98,14 +105,15 @@ export function InstallPrompt() {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Download className="h-5 w-5 text-primary" />
+            {ios ? <Share className="h-5 w-5 text-primary" /> : <Download className="h-5 w-5 text-primary" />}
           </div>
           <div>
             <p className="font-medium text-sm">Add to Home Screen</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {ios
-                ? "Tap the Share button, then \u201cAdd to Home Screen\u201d."
-                : "Install the app for quick access and a full-screen experience."}
+              {hint ||
+                (ios
+                  ? "Tap below for steps, or use the Share button."
+                  : "Install the app for quick access and a full-screen experience.")}
             </p>
           </div>
         </div>
@@ -118,11 +126,9 @@ export function InstallPrompt() {
           <X className="h-4 w-4" />
         </button>
       </div>
-      {!ios && deferred && (
-        <Button size="sm" onClick={install} className="w-full">
-          Add to Home Screen
-        </Button>
-      )}
+      <Button size="sm" onClick={install} className="w-full">
+        {ios ? "How to add" : deferred ? "Add to Home Screen" : "Add to Home Screen"}
+      </Button>
     </div>
   );
 }
