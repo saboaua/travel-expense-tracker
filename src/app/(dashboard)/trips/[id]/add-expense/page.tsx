@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
 import { runReceiptOcr } from "@/lib/ocr";
+import { compressReceiptImage } from "@/lib/compress-image";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
@@ -104,11 +105,20 @@ export default function AddExpensePage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
-    setFile(selected);
+
+    setOcrLoading(true);
+    let processed = selected;
+    try {
+      processed = await compressReceiptImage(selected);
+    } catch {
+      // fall back to original if compression fails
+    }
+
+    setFile(processed);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
-    reader.readAsDataURL(selected);
-    await runOcrOnFile(selected);
+    reader.readAsDataURL(processed);
+    await runOcrOnFile(processed);
   };
 
   const clearImage = () => {
@@ -201,6 +211,7 @@ export default function AddExpensePage() {
               )}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               {ocrNote && <p className="text-xs text-muted-foreground flex items-start gap-1.5"><ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{ocrNote}</p>}
+              <p className="text-xs text-muted-foreground">Photos are automatically resized for storage and print quality.</p>
             </div>
 
             <div className="space-y-2">

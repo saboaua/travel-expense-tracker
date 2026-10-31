@@ -11,6 +11,7 @@ import { ArrowLeft, Camera, Trash2, Upload, X } from "lucide-react";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
+import { compressReceiptImage } from "@/lib/compress-image";
 
 const CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -64,11 +65,17 @@ export default function EditExpensePage() {
 
   const usd = amount && !Number.isNaN(Number(amount)) && !Number.isNaN(Number(rate)) ? toUsd(Number(amount), Number(rate)) : null;
 
-  const pickFile = (file: File) => {
-    setNewFile(file);
+  const pickFile = async (file: File) => {
+    let processed = file;
+    try {
+      processed = await compressReceiptImage(file);
+    } catch {
+      // keep original
+    }
+    setNewFile(processed);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
-    reader.readAsDataURL(file);
+    reader.readAsDataURL(processed);
   };
 
   const clearNew = () => {
@@ -163,6 +170,7 @@ export default function EditExpensePage() {
                   <button type="button" onClick={() => { fileInputRef.current?.removeAttribute("capture"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-md border text-sm"><Upload className="h-4 w-4" /> Upload new</button>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) pickFile(file); }} />
+                <p className="text-xs text-muted-foreground">New photos are resized automatically.</p>
               </div>
 
               <div className="space-y-2">
