@@ -128,12 +128,6 @@ export default function LoginPage() {
                   required
                   autoComplete="email"
                   className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                  style={
-                    {
-                      // @ts-expect-error css var
-                      "--tw-ring-color": `${primaryColor}66`,
-                    } as React.CSSProperties
-                  }
                 />
               </div>
             </div>
