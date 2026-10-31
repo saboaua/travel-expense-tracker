@@ -16,6 +16,23 @@ type CookieToSet = {
   };
 };
 
+/** Paths that must stay public (no login redirect). */
+const PUBLIC_PREFIXES = [
+  "/login",
+  "/signup",
+  "/forgot-password",
+  "/reset-password",
+  "/auth",
+  "/api/telegram/",
+  "/api/manifest",
+  "/api/icon",
+  "/api/fx",
+];
+
+function isPublic(pathname: string) {
+  return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -51,13 +68,15 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+
+  // Public routes (webhook, login, icons, etc.) must never be redirected
+  if (isPublic(pathname)) {
+    return supabaseResponse;
+  }
+
   // Protect dashboard routes
-  if (
-    !user &&
-    !request.nextUrl.pathname.startsWith("/login") &&
-    !request.nextUrl.pathname.startsWith("/signup") &&
-    !request.nextUrl.pathname.startsWith("/auth")
-  ) {
+  if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     return NextResponse.redirect(url);
@@ -66,8 +85,7 @@ export async function updateSession(request: NextRequest) {
   // Redirect logged-in users away from auth pages
   if (
     user &&
-    (request.nextUrl.pathname.startsWith("/login") ||
-      request.nextUrl.pathname.startsWith("/signup"))
+    (pathname.startsWith("/login") || pathname.startsWith("/signup"))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
