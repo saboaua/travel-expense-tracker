@@ -99,7 +99,9 @@ export async function GET(
   const zipBytes = await zip.generateAsync({ type: "uint8array" });
   const zipName = `${safeName}_export.zip`;
 
-  return new NextResponse(new Blob([zipBytes]), {
+  // new Uint8Array(...) produces Uint8Array<ArrayBuffer>, which is a valid BlobPart
+  // (plain Uint8Array from JSZip is typed as Uint8Array<ArrayBufferLike> under TS 5.9+)
+  return new NextResponse(new Blob([new Uint8Array(zipBytes)]), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${zipName}"`,
