@@ -8,9 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
-import { CURRENCIES } from "@/lib/currencies";
+import { useCurrencies } from "@/lib/use-currencies";
 
 export default function NewTripPage() {
+  const currencies = useCurrencies();
   const [name, setName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
@@ -61,11 +62,8 @@ export default function NewTripPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-lg mx-auto">
-      <Link
-        href="/trips"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
+    <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
+      <Link href="/trips" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4" />
         Back to trips
       </Link>
@@ -78,85 +76,37 @@ export default function NewTripPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
-                Trip Name *
-              </label>
-              <Input
-                id="name"
-                placeholder="e.g. Berlin Conference Oct 2026"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label htmlFor="startDate" className="text-sm font-medium">
-                  Start Date *
-                </label>
-                <Input
-                  id="startDate"
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <label htmlFor="endDate" className="text-sm font-medium">
-                  End Date
-                </label>
-                <Input
-                  id="endDate"
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </div>
+              <label htmlFor="name" className="text-sm font-medium">Trip Name *</label>
+              <Input id="name" placeholder="e.g. Berlin Conference Oct 2026" value={name} onChange={(e) => setName(e.target.value)} required />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="currency" className="text-sm font-medium">
-                Default currency
-              </label>
-              <select
-                id="currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {CURRENCIES.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.code} \u2014 {c.name}
-                  </option>
+              <label htmlFor="startDate" className="text-sm font-medium">Start Date *</label>
+              <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} required className="w-full min-w-0" />
+            </div>
+            <div className="space-y-2">
+              <label htmlFor="endDate" className="text-sm font-medium">End Date</label>
+              <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} className="w-full min-w-0" />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="currency" className="text-sm font-medium">Default currency</label>
+              <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {currencies.map((c) => (
+                  <option key={c.code} value={c.code}>{c.code} \u2014 {c.name}</option>
                 ))}
               </select>
-              <p className="text-xs text-muted-foreground">
-                Each expense can still use a different currency. Totals are also shown in USD.
-              </p>
+              <p className="text-xs text-muted-foreground">Each expense can still use a different currency. Totals are also shown in USD.</p>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="notes" className="text-sm font-medium">
-                Notes
-              </label>
-              <textarea
-                id="notes"
-                placeholder="Optional notes about this trip..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
+              <label htmlFor="notes" className="text-sm font-medium">Notes</label>
+              <textarea id="notes" placeholder="Optional notes about this trip..." value={notes} onChange={(e) => setNotes(e.target.value)} className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create Trip"}
-            </Button>
+            <Button type="submit" className="w-full" disabled={loading}>{loading ? "Creating..." : "Create Trip"}</Button>
           </form>
         </CardContent>
       </Card>
