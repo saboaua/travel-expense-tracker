@@ -25,9 +25,7 @@ export default async function TripDetailPage({
     .eq("user_id", user?.id)
     .single();
 
-  if (!trip) {
-    notFound();
-  }
+  if (!trip) notFound();
 
   const { data: expenses } = await supabase
     .from("expenses")
@@ -35,15 +33,18 @@ export default async function TripDetailPage({
     .eq("trip_id", id)
     .order("expense_date", { ascending: false });
 
-  const total =
-    expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+  const sameCurrency = (expenses || []).filter(
+    (e) => (e.currency || trip.currency) === trip.currency
+  );
+  const localTotal = sameCurrency.reduce((sum, e) => sum + Number(e.amount), 0);
+  const usdTotal = (expenses || []).reduce(
+    (sum, e) => sum + Number(e.amount_usd ?? (e.currency === "USD" || !e.currency ? e.amount : 0)),
+    0
+  );
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
-      <Link
-        href="/trips"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-      >
+      <Link href="/trips" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
         Back to trips
       </Link>
@@ -52,52 +53,45 @@ export default async function TripDetailPage({
         <div>
           <div className="flex items-center gap-3 mb-1">
             <h1 className="text-2xl md:text-3xl font-bold">{trip.name}</h1>
-            <span
-              className={`text-xs px-2 py-0.5 rounded-full ${
-                trip.status === "active"
-                  ? "bg-green-100 text-green-700"
-                  : "bg-gray-100 text-gray-600"
-              }`}
-            >
+            <span className={`text-xs px-2 py-0.5 rounded-full ${
+              trip.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+            }`}>
               {trip.status}
             </span>
           </div>
           <p className="text-muted-foreground">
             {formatDate(trip.start_date)}
-            {trip.end_date && ` – ${formatDate(trip.end_date)}`}
+            {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <a href={`/api/export/trip/${id}/excel`}>
-            <Button variant="outline" className="gap-2">
-              <Download className="h-4 w-4" />
-              Excel
-            </Button>
+            <Button variant="outline" className="gap-2"><Download className="h-4 w-4" /> Excel</Button>
           </a>
           <a href={`/api/export/trip/${id}/zip`}>
-            <Button variant="outline" className="gap-2">
-              <Archive className="h-4 w-4" />
-              ZIP
-            </Button>
+            <Button variant="outline" className="gap-2"><Archive className="h-4 w-4" /> ZIP</Button>
           </a>
           <Link href={`/trips/${id}/add-expense`}>
-            <Button className="gap-2">
-              <Camera className="h-4 w-4" />
-              Add Expense
-            </Button>
+            <Button className="gap-2"><Camera className="h-4 w-4" /> Add Expense</Button>
           </Link>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
-            <p className="text-sm text-muted-foreground">Total Spent</p>
+            <p className="text-sm text-muted-foreground">Total in USD</p>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">
-              {formatCurrency(total, trip.currency)}
-            </p>
+            <p className="text-2xl font-bold">{formatCurrency(usdTotal, "USD")}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <p className="text-sm text-muted-foreground">In {trip.currency}</p>
+          </CardHeader>
+          <CardContent>
+            <p className="text-2xl font-bold">{formatCurrency(localTotal, trip.currency)}</p>
           </CardContent>
         </Card>
         <Card>
@@ -114,10 +108,7 @@ export default async function TripDetailPage({
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>Expenses</CardTitle>
           <Link href={`/trips/${id}/add-expense`}>
-            <Button size="sm" className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add
-            </Button>
+            <Button size="sm" className="gap-2"><Plus className="h-4 w-4" /> Add</Button>
           </Link>
         </CardHeader>
         <CardContent>
