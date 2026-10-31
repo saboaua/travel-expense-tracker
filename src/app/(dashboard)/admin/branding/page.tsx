@@ -7,6 +7,15 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Palette, Upload, ImageIcon } from "lucide-react";
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (err && typeof err === "object" && "message" in err) {
+    const m = (err as { message?: unknown }).message;
+    if (typeof m === "string") return m;
+  }
+  return "Save failed";
+}
+
 export default function AdminBrandingPage() {
   const supabase = createClient();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -60,7 +69,7 @@ export default function AdminBrandingPage() {
       const url = `${publicUrl}?t=${Date.now()}`;
       setLogoUrl(url);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(getErrorMessage(err) || "Upload failed");
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -78,24 +87,35 @@ export default function AdminBrandingPage() {
         data: { user },
       } = await supabase.auth.getUser();
 
-      const { error: err } = await supabase.from("app_settings").upsert({
-        id: 1,
+      if (!user) throw new Error("Not signed in");
+
+      // Prefer update (row is created by migration). Fall back to insert if missing.
+      const { data: existing } = await supabase
+        .from("app_settings")
+        .select("id")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const payload = {
         app_name: appName,
         logo_url: logoUrl,
         primary_color: primaryColor,
         updated_at: new Date().toISOString(),
-        updated_by: user?.id || null,
-      });
+        updated_by: user.id,
+      };
+
+      const { error: err } = existing
+        ? await supabase.from("app_settings").update(payload).eq("id", 1)
+        : await supabase.from("app_settings").insert({ id: 1, ...payload });
 
       if (err) throw err;
 
-      // Apply CSS variable live
       document.documentElement.style.setProperty("--brand-primary", primaryColor);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -193,7 +213,6 @@ export default function AdminBrandingPage() {
               </p>
             </div>
 
-            {/* Preview */}
             <div className="rounded-xl border p-4 bg-slate-50">
               <p className="text-xs text-muted-foreground mb-2">Preview</p>
               <div className="flex items-center gap-2">
