@@ -4,13 +4,13 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -37,57 +37,159 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Travel Expense Tracker</CardTitle>
-          <CardDescription>Sign in to manage your business travel expenses</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
+      <div className="w-full max-w-[420px]">
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
+          {/* Logo */}
+          <div className="flex justify-center mb-6">
+            <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+              <Plane className="h-7 w-7 text-white" strokeWidth={2} />
+            </div>
+          </div>
+
+          {/* Title */}
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Travel Expense Tracker
+            </h1>
+            <p className="text-slate-500 mt-2 text-sm">
+              Sign in to manage your business travel expenses
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleLogin} className="space-y-5">
+            {/* Email */}
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="block text-sm font-medium text-slate-700">
                 Email
               </label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@company.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                autoComplete="email"
-              />
+              <div className="relative">
+                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  id="email"
+                  type="email"
+                  placeholder="you@company.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoComplete="email"
+                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <label htmlFor="password" className="text-sm font-medium">
+
+            {/* Password */}
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password
               </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="current-password"
-              />
+              <div className="relative">
+                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                  className="w-full h-11 pl-10 pr-11 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
             </div>
+
+            {/* Remember + Forgot */}
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-600">Remember me</span>
+              </label>
+              <Link
+                href="/forgot-password"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
+              <div className="text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
+                {error}
+              </div>
             )}
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Signing in..." : "Sign In"}
-            </Button>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full h-11 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                "Signing in..."
+              ) : (
+                <>
+                  Sign In
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </button>
           </form>
-          <p className="mt-6 text-center text-sm text-muted-foreground">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="text-primary font-medium hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </CardContent>
-      </Card>
+
+          {/* Divider + Sign up */}
+          <div className="mt-8 pt-6 border-t border-slate-100 text-center">
+            <p className="text-sm text-slate-500">
+              Don&apos;t have an account?{" "}
+              <Link
+                href="/signup"
+                className="font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
+              >
+                Sign up
+              </Link>
+            </p>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-6 flex items-center justify-center gap-3 text-xs text-slate-400">
+          <span className="flex items-center gap-1">
+            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+            256-bit SSL Encrypted
+          </span>
+          <span>·</span>
+          <Link href="#" className="hover:text-slate-600 transition-colors">
+            Privacy Policy
+          </Link>
+          <span>·</span>
+          <Link href="#" className="hover:text-slate-600 transition-colors">
+            Contact Support
+          </Link>
+        </div>
+      </div>
     </div>
   );
 }
