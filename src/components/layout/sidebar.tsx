@@ -4,31 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home,
-  Plane,
-  FileText,
-  Settings,
-  LogOut,
-  User,
-  Shield,
-  Users,
-  Activity,
-  Palette,
-  Send,
-  Coins,
+  Home, Plane, FileText, Settings, LogOut, User, Shield, Users, Activity, Palette, Send, Coins,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
-import {
-  canCreateUsers,
-  canManageBranding,
-  canManageCurrencies,
-  canManageTelegram,
-  canViewSecurity,
-} from "@/lib/roles";
+import { canCreateUsers, canManageBranding, canManageCurrencies, canManageTelegram, canViewSecurity } from "@/lib/roles";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -43,16 +26,8 @@ export function Sidebar() {
 
   useEffect(() => {
     async function load() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      const { data: settings } = await supabase
-        .from("app_settings")
-        .select("app_name, logo_url, primary_color")
-        .eq("id", 1)
-        .single();
-
+      const { data: { user } } = await supabase.auth.getUser();
+      const { data: settings } = await supabase.from("app_settings").select("app_name, logo_url, primary_color").eq("id", 1).single();
       if (settings) {
         setAppName(settings.app_name || "Expense Tracker");
         setLogoUrl(settings.logo_url);
@@ -61,21 +36,10 @@ export function Sidebar() {
           document.documentElement.style.setProperty("--brand-primary", settings.primary_color);
         }
       }
-
       if (!user) return;
-
-      const { data } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, full_name, avatar_url, role")
-        .eq("id", user.id)
-        .single();
-
+      const { data } = await supabase.from("profiles").select("first_name, last_name, full_name, avatar_url, role").eq("id", user.id).single();
       if (data) {
-        const name =
-          [data.first_name, data.last_name].filter(Boolean).join(" ") ||
-          data.full_name ||
-          user.email?.split("@")[0] ||
-          "User";
+        const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || data.full_name || user.email?.split("@")[0] || "User";
         setDisplayName(name);
         setAvatarUrl(data.avatar_url);
         setRole((data.role as UserRole) || "user");
@@ -87,6 +51,7 @@ export function Sidebar() {
   }, [supabase, pathname]);
 
   const handleLogout = async () => {
+    await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();
@@ -118,9 +83,7 @@ export function Sidebar() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="h-8 w-8 object-contain rounded shrink-0" />
           ) : (
-            <div className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: primaryColor }}>
-              TE
-            </div>
+            <div className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: primaryColor }}>TE</div>
           )}
           <span className="font-semibold text-base truncate">{appName}</span>
         </div>
@@ -146,27 +109,21 @@ export function Sidebar() {
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
-                <Icon className="h-5 w-5" />
-                {item.label}
+                <Icon className="h-5 w-5" /> {item.label}
               </Link>
             );
           })}
-
           {adminNav.length > 0 && (
             <>
               <div className="pt-4 pb-2 px-3">
-                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                  <Shield className="h-3 w-3" />
-                  {role === "admin" ? "Admin" : "Management"}
-                </p>
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>
               </div>
               {adminNav.map((item) => {
                 const isActive = pathname.startsWith(item.href);
                 const Icon = item.icon;
                 return (
                   <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
-                    <Icon className="h-5 w-5" />
-                    {item.label}
+                    <Icon className="h-5 w-5" /> {item.label}
                   </Link>
                 );
               })}
@@ -177,8 +134,7 @@ export function Sidebar() {
         <div className="p-3 border-t space-y-1">
           <ThemeToggle className="w-full justify-start gap-3" />
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
-            <LogOut className="h-5 w-5" />
-            Sign out
+            <LogOut className="h-5 w-5" /> Sign out
           </Button>
         </div>
       </div>
