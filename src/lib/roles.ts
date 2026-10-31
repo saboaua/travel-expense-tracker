@@ -14,6 +14,7 @@ export function canAccessPath(role: UserRole, path: string): boolean {
     if (path.startsWith("/admin/security")) return false;
     if (path.startsWith("/admin/branding")) return false;
     if (path.startsWith("/admin/telegram")) return false;
+    if (path.startsWith("/admin/currencies")) return false;
     if (path.startsWith("/admin")) return true;
     return isUserPath(path);
   }
@@ -43,6 +44,10 @@ export function canManageBranding(role: UserRole): boolean {
 }
 
 export function canManageTelegram(role: UserRole): boolean {
+  return role === "admin";
+}
+
+export function canManageCurrencies(role: UserRole): boolean {
   return role === "admin";
 }
 
