@@ -8,6 +8,7 @@ import {
   sendMessage,
 } from "@/lib/telegram";
 import { runReceiptOcr } from "@/lib/ocr";
+import { rateToUsd, toUsd } from "@/lib/currencies";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -258,7 +259,7 @@ async function listRecent(
 ) {
   const { data } = await supabase
     .from("expenses")
-    .select("merchant, amount, expense_date, category")
+    .select("merchant, amount, currency, expense_date, category")
     .eq("user_id", userId)
     .order("created_at", { ascending: false })
     .limit(5);
@@ -270,7 +271,7 @@ async function listRecent(
 
   const lines = data.map(
     (e) =>
-      `\u2022 ${e.expense_date} \u2014 ${e.merchant || "Receipt"} \u2014 ${e.amount} (${e.category || "Other"})`
+      `\u2022 ${e.expense_date} \u2014 ${e.merchant || "Receipt"} \u2014 ${e.amount} ${e.currency || ""} (${e.category || "Other"})`
   );
   await sendMessage(chatId, lines.join("\n"));
 }
@@ -287,7 +288,7 @@ async function startReceipt(
 ) {
   const { data: trips } = await supabase
     .from("trips")
-    .select("id, name")
+    .select("id, name, currency")
     .eq("user_id", profile.id)
     .eq("status", "active")
     .order("start_date", { ascending: false });
@@ -324,7 +325,8 @@ async function startReceipt(
     supabase,
     chatId,
     { ...profile, telegram_default_trip_id: preferred.id },
-    { file_id: file.fileId, file_name: file.fileName, mime: file.mime }
+    { file_id: file.fileId, file_name: file.fileName, mime: file.mime },
+    preferred.currency || "USD"
   );
 }
 
@@ -332,7 +334,8 @@ async function saveReceipt(
   supabase: ReturnType<typeof admin>,
   chatId: number,
   profile: { id: string; telegram_default_trip_id?: string | null },
-  file: { file_id: string; file_name?: string | null; mime?: string | null }
+  file: { file_id: string; file_name?: string | null; mime?: string | null },
+  currency = "USD"
 ) {
   const tripId = profile.telegram_default_trip_id;
   if (!tripId) {
@@ -374,12 +377,22 @@ async function saveReceipt(
 
   const expenseDate = date || new Date().toISOString().slice(0, 10);
   const finalAmount = amount ?? 0;
+  let rate = currency === "USD" ? 1 : 0;
+  try {
+    rate = await rateToUsd(currency);
+  } catch {
+    rate = currency === "USD" ? 1 : 0;
+  }
+  const usd = toUsd(finalAmount, rate);
 
   const { error: insErr } = await supabase.from("expenses").insert({
     trip_id: tripId,
     user_id: profile.id,
     merchant,
     amount: finalAmount,
+    currency,
+    exchange_rate: rate,
+    amount_usd: usd,
     category: "Other",
     expense_date: expenseDate,
     notes:
@@ -402,10 +415,11 @@ async function saveReceipt(
     [
       `Saved on <b>${trip?.name || "trip"}</b>`,
       merchant ? `Merchant: ${merchant}` : "Merchant: not detected",
-      amount != null ? `Amount: ${amount.toFixed(2)}` : "Amount: not detected (saved as 0)",
+      amount != null ? `Amount: ${amount.toFixed(2)} ${currency}` : "Amount: not detected (saved as 0)",
+      currency !== "USD" ? `USD: ${usd.toFixed(2)}` : "",
       `Date: ${expenseDate}`,
       "",
-      "Open the web app to correct category or amount if needed.",
-    ].join("\n")
+      "Open the web app to correct category, currency, or amount if needed.",
+    ].filter(Boolean).join("\n")
   );
 }
