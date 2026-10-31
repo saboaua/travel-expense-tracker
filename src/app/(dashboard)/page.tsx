@@ -5,50 +5,49 @@ import { Button } from "@/components/ui/button";
 import { Plane, Plus, Receipt, TrendingUp } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
+type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
+
+function usdOf(e: Expense) {
+  if (e.amount_usd != null) return Number(e.amount_usd);
+  if (!e.currency || e.currency === "USD") return Number(e.amount);
+  return 0;
+}
+
 export default async function DashboardPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // Fetch profile
   const { data: profile } = await supabase
     .from("profiles")
     .select("*")
     .eq("id", user?.id)
     .single();
 
-  // Fetch active trips
   const { data: trips } = await supabase
     .from("trips")
-    .select("*, expenses(amount)")
+    .select("*, expenses(amount, amount_usd, currency)")
     .eq("user_id", user?.id)
     .order("start_date", { ascending: false })
     .limit(5);
 
-  // Calculate totals
   const { data: allExpenses } = await supabase
     .from("expenses")
-    .select("amount")
+    .select("amount, amount_usd, currency")
     .eq("user_id", user?.id);
 
-  const totalSpent =
-    allExpenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-  const activeTrips =
-    trips?.filter((t) => t.status === "active").length || 0;
+  const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
+  const activeTrips = trips?.filter((t) => t.status === "active").length || 0;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold">
             Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
           </h1>
-          <p className="text-muted-foreground mt-1">
-            Track your business travel expenses
-          </p>
+          <p className="text-muted-foreground mt-1">Track your business travel expenses</p>
         </div>
         <Link href="/trips/new">
           <Button className="w-full sm:w-auto gap-2">
@@ -58,7 +57,6 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardHeader className="pb-2">
@@ -75,11 +73,11 @@ export default async function DashboardPage() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Receipt className="h-4 w-4" />
-              Total Expenses
+              Total in USD
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(totalSpent)}</p>
+            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
           </CardContent>
         </Card>
         <Card className="col-span-2 md:col-span-1">
@@ -90,12 +88,11 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(totalSpent)}</p>
+            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Recent Trips */}
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
@@ -103,9 +100,7 @@ export default async function DashboardPage() {
             <CardDescription>Your latest business travels</CardDescription>
           </div>
           <Link href="/trips">
-            <Button variant="outline" size="sm">
-              View all
-            </Button>
+            <Button variant="outline" size="sm">View all</Button>
           </Link>
         </CardHeader>
         <CardContent>
@@ -124,11 +119,7 @@ export default async function DashboardPage() {
             <div className="space-y-3">
               {trips.map((trip) => {
                 const tripTotal =
-                  trip.expenses?.reduce(
-                    (sum: number, e: { amount: number }) => sum + Number(e.amount),
-                    0
-                  ) || 0;
-
+                  trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
                 return (
                   <Link
                     key={trip.id}
@@ -139,18 +130,14 @@ export default async function DashboardPage() {
                       <p className="font-medium">{trip.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(trip.start_date)}
-                        {trip.end_date && ` – ${formatDate(trip.end_date)}`}
+                        {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(tripTotal, trip.currency)}</p>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          trip.status === "active"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-gray-100 text-gray-600"
-                        }`}
-                      >
+                      <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        trip.status === "active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"
+                      }`}>
                         {trip.status}
                       </span>
                     </div>
