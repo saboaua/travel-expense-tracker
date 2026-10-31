@@ -19,16 +19,6 @@ function admin() {
   );
 }
 
-const CATEGORIES = [
-  "Meals",
-  "Transport",
-  "Lodging",
-  "Fuel",
-  "Office Supplies",
-  "Entertainment",
-  "Other",
-];
-
 export async function POST(request: Request) {
   const secret = process.env.TELEGRAM_WEBHOOK_SECRET;
   if (secret) {
@@ -47,7 +37,7 @@ export async function POST(request: Request) {
 
   const { data: settings } = await supabase
     .from("app_settings")
-    .select("telegram_enabled, telegram_bot_username")
+    .select("telegram_enabled")
     .eq("id", 1)
     .single();
 
@@ -108,19 +98,19 @@ async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
   if (!profile) {
     await sendMessage(
       chatId,
-      "This Telegram account is not linked yet.\n\nOpen the web app → Settings → Connect Telegram, then send the code here."
+      "This Telegram account is not linked yet.\n\nOpen the web app \u2192 Settings \u2192 Connect Telegram, then send the code here."
     );
     return;
   }
 
-  if (text === "/help" || text === "/start") {
+  if (text === "/help") {
     await sendMessage(
       chatId,
       [
         "Send a photo or PDF of a receipt to log it.",
-        "/trips — list active trips and set a default",
-        "/recent — last expenses",
-        "/help — this message",
+        "/trips \u2014 list active trips and set a default",
+        "/recent \u2014 last expenses",
+        "/help \u2014 this message",
       ].join("\n")
     );
     return;
@@ -139,13 +129,10 @@ async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
   const photo = message.photo?.[message.photo.length - 1];
   const doc = message.document;
   if (photo || doc) {
-    const fileId = photo?.file_id || doc?.file_id;
-    const mime = doc?.mime_type || "image/jpeg";
-    const fileName = doc?.file_name || "receipt.jpg";
     await startReceipt(supabase, chatId, profile, {
-      fileId,
-      mime,
-      fileName,
+      fileId: photo?.file_id || doc?.file_id,
+      mime: doc?.mime_type || "image/jpeg",
+      fileName: doc?.file_name || "receipt.jpg",
     });
     return;
   }
@@ -177,7 +164,12 @@ async function handleCallback(supabase: ReturnType<typeof admin>, cq: any) {
 
     if (pending) {
       await supabase.from("telegram_pending").delete().eq("telegram_id", fromId);
-      await saveReceipt(supabase, chatId, { ...profile, telegram_default_trip_id: tripId }, pending);
+      await saveReceipt(
+        supabase,
+        chatId,
+        { ...profile, telegram_default_trip_id: tripId },
+        pending
+      );
     } else {
       await sendMessage(chatId, "Default trip updated. Send a receipt whenever you are ready.");
     }
@@ -200,7 +192,10 @@ async function linkAccount(
     await sendMessage(chatId, "That code is invalid. Generate a new one in Settings.");
     return;
   }
-  if (profile.telegram_link_expires && new Date(profile.telegram_link_expires) < new Date()) {
+  if (
+    profile.telegram_link_expires &&
+    new Date(profile.telegram_link_expires) < new Date()
+  ) {
     await sendMessage(chatId, "That code expired. Generate a new one in Settings.");
     return;
   }
@@ -236,7 +231,7 @@ async function listTrips(
 ) {
   const { data: trips } = await supabase
     .from("trips")
-    .select("id, name, status, start_date")
+    .select("id, name")
     .eq("user_id", profile.id)
     .eq("status", "active")
     .order("start_date", { ascending: false })
@@ -251,7 +246,7 @@ async function listTrips(
     reply_markup: {
       inline_keyboard: trips.map((t) => [
         {
-          text: `${t.id === profile.telegram_default_trip_id ? "✓ " : ""}${t.name}`,
+          text: `${t.id === profile.telegram_default_trip_id ? "\u2713 " : ""}${t.name}`,
           callback_data: `trip:${t.id}`,
         },
       ]),
@@ -278,7 +273,7 @@ async function listRecent(
 
   const lines = data.map(
     (e) =>
-      `• ${e.expense_date} — ${e.merchant || "Receipt"} — ${e.amount} (${e.category || "Other"})`
+      `\u2022 ${e.expense_date} \u2014 ${e.merchant || "Receipt"} \u2014 ${e.amount} (${e.category || "Other"})`
   );
   await sendMessage(chatId, lines.join("\n"));
 }
@@ -286,7 +281,11 @@ async function listRecent(
 async function startReceipt(
   supabase: ReturnType<typeof admin>,
   chatId: number,
-  profile: { id: string; telegram_default_trip_id?: string | null },
+  profile: {
+    id: string;
+    telegram_id: number;
+    telegram_default_trip_id?: string | null;
+  },
   file: { fileId: string; mime: string; fileName: string }
 ) {
   const { data: trips } = await supabase
@@ -307,33 +306,12 @@ async function startReceipt(
 
   if (!preferred) {
     await supabase.from("telegram_pending").upsert({
-      telegram_id: (await supabase
-        .from("profiles")
-        .select("telegram_id")
-        .eq("id", profile.id)
-        .single()).data?.telegram_id,
+      telegram_id: profile.telegram_id,
       file_id: file.fileId,
       file_name: file.fileName,
       mime: file.mime,
       created_at: new Date().toISOString(),
     });
-
-    // Fix: we already have profile but telegram_id is on the row. Re-fetch.
-    const { data: full } = await supabase
-      .from("profiles")
-      .select("telegram_id")
-      .eq("id", profile.id)
-      .single();
-
-    if (full?.telegram_id) {
-      await supabase.from("telegram_pending").upsert({
-        telegram_id: full.telegram_id,
-        file_id: file.fileId,
-        file_name: file.fileName,
-        mime: file.mime,
-        created_at: new Date().toISOString(),
-      });
-    }
 
     await sendMessage(chatId, "Which trip is this receipt for?", {
       reply_markup: {
@@ -345,11 +323,12 @@ async function startReceipt(
     return;
   }
 
-  await saveReceipt(supabase, chatId, { ...profile, telegram_default_trip_id: preferred.id }, {
-    file_id: file.fileId,
-    file_name: file.fileName,
-    mime: file.mime,
-  });
+  await saveReceipt(
+    supabase,
+    chatId,
+    { ...profile, telegram_default_trip_id: preferred.id },
+    { file_id: file.fileId, file_name: file.fileName, mime: file.mime }
+  );
 }
 
 async function saveReceipt(
@@ -364,19 +343,17 @@ async function saveReceipt(
     return;
   }
 
-  await sendMessage(chatId, "Reading receipt…");
+  await sendMessage(chatId, "Reading receipt\u2026");
 
   const info = await getFile(file.file_id);
   const buf = await downloadFile(info.file_path);
   const ext = (file.file_name || info.file_path).split(".").pop() || "jpg";
   const path = `${profile.id}/${tripId}/${Date.now()}.${ext}`;
 
-  const { error: upErr } = await supabase.storage
-    .from("receipts")
-    .upload(path, buf, {
-      contentType: file.mime || "image/jpeg",
-      upsert: false,
-    });
+  const { error: upErr } = await supabase.storage.from("receipts").upload(path, buf, {
+    contentType: file.mime || "image/jpeg",
+    upsert: false,
+  });
   if (upErr) throw upErr;
 
   let merchant: string | null = null;
@@ -404,7 +381,10 @@ async function saveReceipt(
     amount: finalAmount,
     category: "Other",
     expense_date: expenseDate,
-    notes: amount == null ? "Imported from Telegram — amount not detected" : "Imported from Telegram",
+    notes:
+      amount == null
+        ? "Imported from Telegram \u2014 amount not detected"
+        : "Imported from Telegram",
     receipt_path: path,
     ocr_raw: raw ? { text: raw.slice(0, 4000) } : null,
   });
