@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
 import { runReceiptOcr } from "@/lib/ocr";
+import { CURRENCIES, toUsd } from "@/lib/currencies";
+import { formatCurrency } from "@/lib/utils";
 
 const CATEGORIES = [
   "Meals",
@@ -31,6 +33,9 @@ export default function AddExpensePage() {
   const [file, setFile] = useState<File | null>(null);
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
+  const [currency, setCurrency] = useState("USD");
+  const [rate, setRate] = useState("1");
+  const [rateSource, setRateSource] = useState("manual");
   const [category, setCategory] = useState("Meals");
   const [expenseDate, setExpenseDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -41,12 +46,53 @@ export default function AddExpensePage() {
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    supabase
+      .from("trips")
+      .select("currency")
+      .eq("id", tripId)
+      .single()
+      .then(({ data }) => {
+        if (data?.currency) setCurrency(data.currency);
+      });
+  }, [supabase, tripId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadRate() {
+      if (currency === "USD") {
+        setRate("1");
+        setRateSource("usd");
+        return;
+      }
+      try {
+        const res = await fetch(`/api/fx?from=${currency}`);
+        const data = await res.json();
+        if (!cancelled && res.ok && typeof data.rate === "number") {
+          setRate(String(data.rate));
+          setRateSource("market");
+        }
+      } catch {
+        if (!cancelled) setRateSource("manual");
+      }
+    }
+    loadRate();
+    return () => {
+      cancelled = true;
+    };
+  }, [currency]);
+
+  const usd =
+    amount && !Number.isNaN(Number(amount)) && !Number.isNaN(Number(rate))
+      ? toUsd(Number(amount), Number(rate))
+      : null;
+
   const runOcrOnFile = async (selected: File) => {
     setOcrLoading(true);
     setOcrNote(null);
     try {
       const result = await runReceiptOcr(selected);
-      let filled: string[] = [];
+      const filled: string[] = [];
 
       if (result.merchant && !merchant) {
         setMerchant(result.merchant);
@@ -61,11 +107,11 @@ export default function AddExpensePage() {
         filled.push("date");
       }
 
-      if (filled.length > 0) {
-        setOcrNote(`Auto-filled: ${filled.join(", ")}. Please verify before saving.`);
-      } else {
-        setOcrNote("Could not detect fields automatically. Enter details manually.");
-      }
+      setOcrNote(
+        filled.length > 0
+          ? `Auto-filled: ${filled.join(", ")}. Please verify before saving.`
+          : "Could not detect fields automatically. Enter details manually."
+      );
     } catch {
       setOcrNote("OCR failed. Enter details manually.");
     } finally {
@@ -76,13 +122,10 @@ export default function AddExpensePage() {
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
     if (!selected) return;
-
     setFile(selected);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(selected);
-
-    // Auto-run OCR
     await runOcrOnFile(selected);
   };
 
@@ -102,44 +145,40 @@ export default function AddExpensePage() {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
       if (!user) throw new Error("Not authenticated");
 
       let receiptPath: string | null = null;
-
       if (file) {
         const ext = file.name.split(".").pop() || "jpg";
         const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
-
         const { error: uploadError } = await supabase.storage
           .from("receipts")
-          .upload(fileName, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
+          .upload(fileName, file, { cacheControl: "3600", upsert: false });
         if (uploadError) throw uploadError;
         receiptPath = fileName;
       }
 
+      const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
+      const amountNum = parseFloat(amount);
       const { error: insertError } = await supabase.from("expenses").insert({
         trip_id: tripId,
         user_id: user.id,
         merchant: merchant || null,
-        amount: parseFloat(amount),
+        amount: amountNum,
+        currency,
+        exchange_rate: rateNum,
+        amount_usd: toUsd(amountNum, rateNum),
         category,
         expense_date: expenseDate,
         notes: notes || null,
         receipt_path: receiptPath,
       });
-
       if (insertError) throw insertError;
 
       router.push(`/trips/${tripId}`);
       router.refresh();
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Something went wrong";
-      setError(message);
+      setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
     }
   };
@@ -158,7 +197,7 @@ export default function AddExpensePage() {
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>
           <CardDescription>
-            Take a photo — we&apos;ll try to read merchant, amount, and date automatically
+            Take a photo \u2014 we'll try to read merchant, amount, and date automatically
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -231,95 +270,76 @@ export default function AddExpensePage() {
                   {ocrNote}
                 </p>
               )}
-              {file && !ocrLoading && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="gap-2"
-                  onClick={() => file && runOcrOnFile(file)}
-                >
-                  <ScanText className="h-4 w-4" />
-                  Re-scan receipt
-                </Button>
-              )}
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="merchant" className="text-sm font-medium">
-                Merchant
-              </label>
-              <Input
-                id="merchant"
-                placeholder="e.g. Hotel Hilton"
-                value={merchant}
-                onChange={(e) => setMerchant(e.target.value)}
-              />
+              <label htmlFor="merchant" className="text-sm font-medium">Merchant</label>
+              <Input id="merchant" placeholder="e.g. Hotel Hilton" value={merchant} onChange={(e) => setMerchant(e.target.value)} />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label htmlFor="amount" className="text-sm font-medium">
-                  Amount *
-                </label>
-                <Input
-                  id="amount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                  value={amount}
-                  onChange={(e) => setAmount(e.target.value)}
-                  required
-                />
+                <label htmlFor="amount" className="text-sm font-medium">Amount *</label>
+                <Input id="amount" type="number" step="0.01" min="0" placeholder="0.00" value={amount} onChange={(e) => setAmount(e.target.value)} required />
               </div>
               <div className="space-y-2">
-                <label htmlFor="date" className="text-sm font-medium">
-                  Date *
-                </label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={expenseDate}
-                  onChange={(e) => setExpenseDate(e.target.value)}
-                  required
-                />
+                <label htmlFor="currency" className="text-sm font-medium">Currency</label>
+                <select
+                  id="currency"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  {CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>{c.code}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="category" className="text-sm font-medium">
-                Category
+              <label htmlFor="rate" className="text-sm font-medium">
+                Rate to USD {rateSource === "market" ? "(today\u2019s rate)" : ""}
               </label>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              >
-                {CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>
-                    {cat}
-                  </option>
-                ))}
-              </select>
+              <Input
+                id="rate"
+                type="number"
+                step="0.000001"
+                min="0"
+                value={rate}
+                onChange={(e) => {
+                  setRate(e.target.value);
+                  setRateSource("manual");
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                1 {currency} = {rate || "0"} USD
+                {usd != null && ` \u00b7 ${formatCurrency(usd, "USD")}`}
+                {currency === "AWG" && " \u00b7 AWG uses the 1.79 peg"}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="date" className="text-sm font-medium">Date *</label>
+                <Input id="date" type="date" value={expenseDate} onChange={(e) => setExpenseDate(e.target.value)} required />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="category" className="text-sm font-medium">Category</label>
+                <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="notes" className="text-sm font-medium">
-                Notes
-              </label>
-              <Input
-                id="notes"
-                placeholder="Optional notes..."
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+              <label htmlFor="notes" className="text-sm font-medium">Notes</label>
+              <Input id="notes" placeholder="Optional notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
-            )}
+            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={loading || ocrLoading}>
               {loading ? "Saving..." : "Save Expense"}
