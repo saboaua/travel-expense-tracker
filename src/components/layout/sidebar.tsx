@@ -1,8 +1,9 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, Settings, LogOut, Receipt } from "lucide-react";
+import { Home, Plane, FileText, Settings, LogOut, Receipt, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,6 +12,7 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/trips", label: "Trips", icon: Plane },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
@@ -18,6 +20,36 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
+  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadUser() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, full_name, avatar_url")
+        .eq("id", user.id)
+        .single();
+
+      if (data) {
+        const name =
+          [data.first_name, data.last_name].filter(Boolean).join(" ") ||
+          data.full_name ||
+          user.email?.split("@")[0] ||
+          "User";
+        setDisplayName(name);
+        setAvatarUrl(data.avatar_url);
+      } else {
+        setDisplayName(user.email?.split("@")[0] || "User");
+      }
+    }
+    loadUser();
+  }, [supabase, pathname]);
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -32,6 +64,32 @@ export function Sidebar() {
           <Receipt className="h-6 w-6 text-primary" />
           <span className="font-semibold text-lg">Expense Tracker</span>
         </div>
+
+        {/* User profile summary */}
+        <Link
+          href="/profile"
+          className="flex items-center gap-3 px-4 py-3 border-b hover:bg-accent transition-colors"
+        >
+          <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
+            {avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={avatarUrl}
+                alt={displayName || "User"}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <User className="h-4 w-4 text-muted-foreground" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium truncate">
+              {displayName || "Loading..."}
+            </p>
+            <p className="text-xs text-muted-foreground">View profile</p>
+          </div>
+        </Link>
+
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const isActive =
