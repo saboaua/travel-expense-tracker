@@ -5,7 +5,16 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Send } from "lucide-react";
+import { Check, Copy, ExternalLink, Send } from "lucide-react";
+
+type TelegramStatus = {
+  linked: boolean;
+  bot: string;
+  botUrl: string;
+  code: string | null;
+  expires: string | null;
+  link: string | null;
+};
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -15,11 +24,20 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [telegramEnabled, setTelegramEnabled] = useState(false);
-  const [telegramLinked, setTelegramLinked] = useState(false);
-  const [link, setLink] = useState<string | null>(null);
-  const [code, setCode] = useState<string | null>(null);
+  const [featureOn, setFeatureOn] = useState(false);
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [linking, setLinking] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function loadTelegram() {
+    const res = await fetch("/api/telegram/link");
+    if (!res.ok) {
+      setFeatureOn(false);
+      return;
+    }
+    setFeatureOn(true);
+    setStatus(await res.json());
+  }
 
   useEffect(() => {
     async function loadProfile() {
@@ -30,25 +48,25 @@ export default function SettingsPage() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("full_name, company_name, telegram_id")
+        .select("full_name, company_name")
         .eq("id", user.id)
         .single();
 
       if (data) {
         setFullName(data.full_name || "");
         setCompanyName(data.company_name || "");
-        setTelegramLinked(!!data.telegram_id);
       }
-
-      const { data: settings } = await supabase
-        .from("app_settings")
-        .select("telegram_enabled")
-        .eq("id", 1)
-        .single();
-      setTelegramEnabled(!!settings?.telegram_enabled);
     }
     loadProfile();
+    loadTelegram();
   }, [supabase]);
+
+  // Poll while a link is waiting to be used
+  useEffect(() => {
+    if (!status?.link || status.linked) return;
+    const id = setInterval(loadTelegram, 4000);
+    return () => clearInterval(id);
+  }, [status?.link, status?.linked]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,26 +93,50 @@ export default function SettingsPage() {
         updated_at: new Date().toISOString(),
       });
 
-    if (error) {
-      setError(error.message);
-    } else {
+    if (error) setError(error.message);
+    else {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     }
     setLoading(false);
   };
 
-  const connectTelegram = async () => {
+  const enableTelegram = async () => {
     setLinking(true);
     setError(null);
     try {
       const res = await fetch("/api/telegram/link", { method: "POST" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Could not create link");
-      setCode(data.code);
-      setLink(data.link);
+      setStatus((prev) => ({
+        linked: prev?.linked || false,
+        bot: data.bot,
+        botUrl: `https://t.me/${data.bot}`,
+        code: data.code,
+        expires: data.expires,
+        link: data.link,
+      }));
+      // Open Telegram immediately — best practice is the deep link, not a typed code
+      window.open(data.link, "_blank", "noopener,noreferrer");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not create link");
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!status?.link) return;
+    await navigator.clipboard.writeText(status.link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const disconnect = async () => {
+    setLinking(true);
+    try {
+      await fetch("/api/telegram/link", { method: "DELETE" });
+      await loadTelegram();
     } finally {
       setLinking(false);
     }
@@ -155,7 +197,7 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {telegramEnabled && (
+      {featureOn && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -163,26 +205,58 @@ export default function SettingsPage() {
               Telegram
             </CardTitle>
             <CardDescription>
-              Upload receipts by messaging the bot — no need to open the app
+              Enable it to get a personal link that opens the chatbot
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm">
-              Status: {telegramLinked ? "Linked" : "Not linked"}
+              Status:{" "}
+              {status?.linked ? (
+                <span className="text-green-600 font-medium">Connected</span>
+              ) : (
+                <span className="text-muted-foreground">Not connected</span>
+              )}
             </p>
-            <Button type="button" variant="outline" onClick={connectTelegram} disabled={linking}>
-              {linking ? "Creating code…" : telegramLinked ? "Relink Telegram" : "Connect Telegram"}
-            </Button>
-            {code && link && (
-              <div className="text-sm space-y-2 rounded-md bg-muted p-3">
-                <p>Code (15 min): <span className="font-mono font-semibold">{code}</span></p>
-                <a href={link} className="text-primary underline break-all" target="_blank" rel="noreferrer">
-                  Open bot and link
-                </a>
-                <p className="text-muted-foreground">
-                  Or open the bot and send <span className="font-mono">/start {code}</span>
-                </p>
+
+            {status?.linked ? (
+              <div className="flex flex-wrap gap-2">
+                <Button asChild>
+                  <a href={status.botUrl} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-4 w-4 mr-2" />
+                    Open chatbot
+                  </a>
+                </Button>
+                <Button variant="outline" onClick={disconnect} disabled={linking}>
+                  Disconnect
+                </Button>
               </div>
+            ) : (
+              <>
+                <Button onClick={enableTelegram} disabled={linking}>
+                  {linking ? "Creating link\u2026" : "Enable Telegram"}
+                </Button>
+
+                {status?.link && (
+                  <div className="text-sm space-y-3 rounded-md bg-muted p-3">
+                    <p>
+                      Tap Start in Telegram to finish linking. This link expires in 15 minutes and works once.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm">
+                        <a href={status.link} target="_blank" rel="noreferrer">
+                          <ExternalLink className="h-4 w-4 mr-2" />
+                          Open chatbot
+                        </a>
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" onClick={copyLink}>
+                        {copied ? <Check className="h-4 w-4 mr-2" /> : <Copy className="h-4 w-4 mr-2" />}
+                        {copied ? "Copied" : "Copy link"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground break-all">{status.link}</p>
+                  </div>
+                )}
+              </>
             )}
           </CardContent>
         </Card>
