@@ -1,0 +1,118 @@
+import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { headers } from "next/headers";
+
+function getServiceClient() {
+  return createServiceClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: { autoRefreshToken: false, persistSession: false },
+    }
+  );
+}
+
+export async function getRequestMeta() {
+  const h = await headers();
+  const forwarded = h.get("x-forwarded-for");
+  const ip =
+    forwarded?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    h.get("cf-connecting-ip") ||
+    "unknown";
+  const userAgent = h.get("user-agent") || "unknown";
+  const origin = h.get("origin") || h.get("referer") || "unknown";
+  const country = h.get("x-vercel-ip-country") || h.get("cf-ipcountry") || null;
+
+  return { ip, userAgent, origin, country };
+}
+
+export async function logAudit(params: {
+  actorId?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  entityType?: string;
+  entityId?: string;
+  details?: Record<string, unknown>;
+}) {
+  try {
+    const meta = await getRequestMeta();
+    const supabase = getServiceClient();
+
+    await supabase.from("audit_logs").insert({
+      actor_id: params.actorId || null,
+      actor_email: params.actorEmail || null,
+      action: params.action,
+      entity_type: params.entityType || null,
+      entity_id: params.entityId || null,
+      details: params.details || {},
+      ip_address: meta.ip,
+      user_agent: meta.userAgent,
+      origin: meta.origin,
+    });
+  } catch (err) {
+    console.error("[audit] failed to write log", err);
+  }
+}
+
+export async function logSecurityEvent(params: {
+  eventType: string;
+  severity?: "info" | "warning" | "critical";
+  emailAttempted?: string | null;
+  userId?: string | null;
+  details?: Record<string, unknown>;
+}) {
+  try {
+    const meta = await getRequestMeta();
+    const supabase = getServiceClient();
+
+    await supabase.from("security_events").insert({
+      event_type: params.eventType,
+      severity: params.severity || "info",
+      email_attempted: params.emailAttempted || null,
+      user_id: params.userId || null,
+      ip_address: meta.ip,
+      user_agent: meta.userAgent,
+      origin: meta.origin,
+      country: meta.country,
+      details: params.details || {},
+    });
+  } catch (err) {
+    console.error("[security] failed to write event", err);
+  }
+}
+
+/** Check recent failed logins from same IP for brute-force signal */
+export async function checkBruteForce(ip: string, email?: string) {
+  const supabase = getServiceClient();
+  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString(); // 15 min window
+
+  const { count } = await supabase
+    .from("security_events")
+    .select("*", { count: "exact", head: true })
+    .eq("event_type", "login_failed")
+    .eq("ip_address", ip)
+    .gte("created_at", since);
+
+  const failures = count || 0;
+
+  if (failures >= 10) {
+    await logSecurityEvent({
+      eventType: "brute_force",
+      severity: "critical",
+      emailAttempted: email,
+      details: { failures_in_15min: failures, ip },
+    });
+    return { blocked: true, failures };
+  }
+
+  if (failures >= 5) {
+    await logSecurityEvent({
+      eventType: "brute_force",
+      severity: "warning",
+      emailAttempted: email,
+      details: { failures_in_15min: failures, ip },
+    });
+  }
+
+  return { blocked: false, failures };
+}
