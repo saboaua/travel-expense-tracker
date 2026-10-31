@@ -7,6 +7,9 @@ interface Expense {
   id: string;
   merchant: string | null;
   amount: number;
+  currency?: string | null;
+  exchange_rate?: number | null;
+  amount_usd?: number | null;
   category: string | null;
   expense_date: string;
   notes: string | null;
@@ -34,30 +37,41 @@ export function ExpenseList({ expenses, currency }: ExpenseListProps) {
 
   return (
     <div className="space-y-3">
-      {expenses.map((expense) => (
-        <div
-          key={expense.id}
-          className="flex items-center justify-between p-4 rounded-lg border"
-        >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
-              <Receipt className="h-5 w-5 text-primary" />
+      {expenses.map((expense) => {
+        const code = expense.currency || currency || "USD";
+        const usd = expense.amount_usd != null ? Number(expense.amount_usd) : null;
+        return (
+          <div
+            key={expense.id}
+            className="flex items-center justify-between p-4 rounded-lg border"
+          >
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                <Receipt className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-medium truncate">
+                  {expense.merchant || "Unknown merchant"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {formatDate(expense.expense_date)}
+                  {expense.category && ` \u00b7 ${expense.category}`}
+                </p>
+              </div>
             </div>
-            <div className="min-w-0">
-              <p className="font-medium truncate">
-                {expense.merchant || "Unknown merchant"}
+            <div className="text-right shrink-0 ml-4">
+              <p className="font-semibold">
+                {formatCurrency(Number(expense.amount), code)}
               </p>
-              <p className="text-sm text-muted-foreground">
-                {formatDate(expense.expense_date)}
-                {expense.category && ` · ${expense.category}`}
-              </p>
+              {usd != null && code !== "USD" && (
+                <p className="text-xs text-muted-foreground">
+                  {formatCurrency(usd, "USD")}
+                </p>
+              )}
             </div>
           </div>
-          <p className="font-semibold shrink-0 ml-4">
-            {formatCurrency(Number(expense.amount), currency)}
-          </p>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
