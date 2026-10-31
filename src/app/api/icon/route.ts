@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,6 +36,6 @@ export async function GET() {
     // fall through to default
   }
 
-  // Fallback to static icon
-  return NextResponse.redirect(new URL("/icon-512.png", process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"));
+  const fallback = new URL("/icon-512.png", request.url);
+  return NextResponse.redirect(fallback);
 }
