@@ -19,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
 import {
   canCreateUsers,
@@ -224,7 +225,8 @@ export function Sidebar() {
           )}
         </nav>
 
-        <div className="p-3 border-t">
+        <div className="p-3 border-t space-y-1">
+          <ThemeToggle className="w-full justify-start gap-3" />
           <Button
             variant="ghost"
             className="w-full justify-start gap-3"
