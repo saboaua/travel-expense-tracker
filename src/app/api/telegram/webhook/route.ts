@@ -197,6 +197,15 @@ async function startReceipt(
   });
 }
 
+async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error("timeout")), ms)
+    ),
+  ]);
+}
+
 async function saveReceipt(
   supabase: ReturnType<typeof admin>,
   chatId: number,
@@ -208,60 +217,81 @@ async function saveReceipt(
 
   await sendMessage(chatId, "Reading receipt\u2026");
 
-  const { data: trip } = await supabase.from("trips").select("name, currency").eq("id", tripId).single();
-  const currency = trip?.currency || "USD";
-
-  const info = await getFile(file.file_id);
-  const buf = await downloadFile(info.file_path);
-  const mime = file.mime || "image/jpeg";
-  const name = file.file_name || "receipt.jpg";
-  const ext = name.split(".").pop() || info.file_path.split(".").pop() || "jpg";
-  const path = `${profile.id}/${tripId}/${Date.now()}.${ext}`;
-
-  const { error: upErr } = await supabase.storage.from("receipts").upload(path, buf, { contentType: mime, upsert: false });
-  if (upErr) throw upErr;
-
-  let merchant: string | null = null;
-  let amount: number | null = null;
-  let date: string | null = null;
-  let raw = "";
   try {
-    const ocr = await runReceiptOcr(new File([new Uint8Array(buf)], name, { type: mime }));
-    merchant = ocr.merchant;
-    amount = ocr.amount;
-    date = ocr.date;
-    raw = ocr.rawText;
-  } catch {}
+    const { data: trip } = await supabase.from("trips").select("name, currency").eq("id", tripId).single();
+    const currency = trip?.currency || "USD";
 
-  const expenseDate = date || new Date().toISOString().slice(0, 10);
-  const finalAmount = amount ?? 0;
-  let rate = currency === "USD" ? 1 : 0;
-  try { rate = await rateToUsd(currency); } catch {}
-  const usd = toUsd(finalAmount, rate);
+    const info = await getFile(file.file_id);
+    const buf = await downloadFile(info.file_path);
+    const mime = file.mime || "image/jpeg";
+    const name = file.file_name || "receipt.jpg";
+    const ext = name.split(".").pop() || info.file_path.split(".").pop() || "jpg";
+    const path = `${profile.id}/${tripId}/${Date.now()}.${ext}`;
 
-  const { error: insErr } = await supabase.from("expenses").insert({
-    trip_id: tripId,
-    user_id: profile.id,
-    merchant,
-    amount: finalAmount,
-    currency,
-    exchange_rate: rate,
-    amount_usd: usd,
-    category: "Other",
-    expense_date: expenseDate,
-    notes: amount == null ? "Imported from Telegram \u2014 amount not detected" : "Imported from Telegram",
-    receipt_path: path,
-    ocr_raw: raw ? { text: raw.slice(0, 4000) } : null,
-  });
-  if (insErr) throw insErr;
+    const { error: upErr } = await supabase.storage.from("receipts").upload(path, buf, { contentType: mime, upsert: false });
+    if (upErr) throw upErr;
 
-  await sendMessage(chatId, [
-    `Saved on <b>${trip?.name || "trip"}</b>`,
-    merchant ? `Merchant: ${merchant}` : "Merchant: not detected",
-    amount != null ? `Amount: ${amount.toFixed(2)} ${currency}` : "Amount: not detected (saved as 0)",
-    currency !== "USD" ? `USD: ${usd.toFixed(2)}` : "",
-    `Date: ${expenseDate}`,
-    "",
-    "Open the web app to correct category, currency, or amount if needed.",
-  ].filter(Boolean).join("\n"));
+    let merchant: string | null = null;
+    let amount: number | null = null;
+    let date: string | null = null;
+    let raw = "";
+    let ocrNote = "";
+
+    try {
+      const ocr = await withTimeout(
+        runReceiptOcr(new File([new Uint8Array(buf)], name, { type: mime })),
+        25000
+      );
+      merchant = ocr.merchant;
+      amount = ocr.amount;
+      date = ocr.date;
+      raw = ocr.rawText;
+    } catch (e) {
+      ocrNote = e instanceof Error && e.message === "timeout"
+        ? "OCR timed out"
+        : "OCR failed";
+    }
+
+    const expenseDate = date || new Date().toISOString().slice(0, 10);
+    const finalAmount = amount ?? 0;
+    let rate = currency === "USD" ? 1 : 0;
+    try { rate = await rateToUsd(currency); } catch {}
+    const usd = toUsd(finalAmount, rate);
+
+    const notes = [
+      "Imported from Telegram",
+      amount == null ? "amount not detected" : "",
+      ocrNote,
+    ].filter(Boolean).join(" \u2014 ");
+
+    const { error: insErr } = await supabase.from("expenses").insert({
+      trip_id: tripId,
+      user_id: profile.id,
+      merchant,
+      amount: finalAmount,
+      currency,
+      exchange_rate: rate,
+      amount_usd: usd,
+      category: "Other",
+      expense_date: expenseDate,
+      notes,
+      receipt_path: path,
+      ocr_raw: raw ? { text: raw.slice(0, 4000) } : null,
+    });
+    if (insErr) throw insErr;
+
+    await sendMessage(chatId, [
+      `Saved on <b>${trip?.name || "trip"}</b>`,
+      merchant ? `Merchant: ${merchant}` : "Merchant: not detected",
+      amount != null ? `Amount: ${amount.toFixed(2)} ${currency}` : "Amount: not detected (saved as 0)",
+      currency !== "USD" ? `USD: ${usd.toFixed(2)}` : "",
+      `Date: ${expenseDate}`,
+      ocrNote ? `Note: ${ocrNote}` : "",
+      "",
+      "Open the web app to correct category, currency, or amount if needed.",
+    ].filter(Boolean).join("\n"));
+  } catch (err) {
+    console.error("saveReceipt", err);
+    await sendMessage(chatId, "Could not save the receipt. Please try again or upload it in the web app.").catch(() => {});
+  }
 }
