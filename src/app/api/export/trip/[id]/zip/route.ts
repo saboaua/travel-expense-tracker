@@ -64,7 +64,6 @@ export async function GET(
 
   const receiptsFolder = zip.folder("receipts");
 
-  // Use service role if available for storage download; else user client
   const storageClient =
     process.env.SUPABASE_SERVICE_ROLE_KEY
       ? createServiceClient(
@@ -97,7 +96,7 @@ export async function GET(
     }
   }
 
-  const zipBuffer = await zip.generateAsync({ type: "nodebuffer" });
+  const zipBuffer = await zip.generateAsync({ type: "uint8array" });
   const zipName = `${safeName}_export.zip`;
 
   return new NextResponse(zipBuffer, {
