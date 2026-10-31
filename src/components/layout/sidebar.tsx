@@ -3,17 +3,31 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, Settings, LogOut, Receipt, User } from "lucide-react";
+import {
+  Home,
+  Plane,
+  FileText,
+  Settings,
+  LogOut,
+  Receipt,
+  User,
+  Shield,
+  Users,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 
-const navItems = [
+const baseNavItems = [
   { href: "/", label: "Dashboard", icon: Home },
   { href: "/trips", label: "Trips", icon: Plane },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/profile", label: "Profile", icon: User },
   { href: "/settings", label: "Settings", icon: Settings },
+];
+
+const adminNavItems = [
+  { href: "/admin/users", label: "Users", icon: Users },
 ];
 
 export function Sidebar() {
@@ -22,6 +36,7 @@ export function Sidebar() {
   const supabase = createClient();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     async function loadUser() {
@@ -32,7 +47,7 @@ export function Sidebar() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("first_name, last_name, full_name, avatar_url")
+        .select("first_name, last_name, full_name, avatar_url, role")
         .eq("id", user.id)
         .single();
 
@@ -44,6 +59,7 @@ export function Sidebar() {
           "User";
         setDisplayName(name);
         setAvatarUrl(data.avatar_url);
+        setIsAdmin(data.role === "admin");
       } else {
         setDisplayName(user.email?.split("@")[0] || "User");
       }
@@ -65,7 +81,6 @@ export function Sidebar() {
           <span className="font-semibold text-lg">Expense Tracker</span>
         </div>
 
-        {/* User profile summary */}
         <Link
           href="/profile"
           className="flex items-center gap-3 px-4 py-3 border-b hover:bg-accent transition-colors"
@@ -86,12 +101,14 @@ export function Sidebar() {
             <p className="text-sm font-medium truncate">
               {displayName || "Loading..."}
             </p>
-            <p className="text-xs text-muted-foreground">View profile</p>
+            <p className="text-xs text-muted-foreground">
+              {isAdmin ? "Admin · View profile" : "View profile"}
+            </p>
           </div>
         </Link>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+          {baseNavItems.map((item) => {
             const isActive =
               pathname === item.href ||
               (item.href !== "/" && pathname.startsWith(item.href));
@@ -113,7 +130,39 @@ export function Sidebar() {
               </Link>
             );
           })}
+
+          {isAdmin && (
+            <>
+              <div className="pt-4 pb-2 px-3">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Shield className="h-3 w-3" />
+                  Admin
+                </p>
+              </div>
+              {adminNavItems.map((item) => {
+                const isActive = pathname.startsWith(item.href);
+                const Icon = item.icon;
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+                      isActive
+                        ? "bg-primary text-primary-foreground"
+                        : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                    )}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </>
+          )}
         </nav>
+
         <div className="p-3 border-t">
           <Button
             variant="ghost"

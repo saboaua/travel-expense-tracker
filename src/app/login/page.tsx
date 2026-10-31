@@ -32,6 +32,7 @@ export default function LoginPage() {
       return;
     }
 
+    // Middleware will redirect to /change-password if must_change_password is true
     router.push("/");
     router.refresh();
   };
@@ -39,16 +40,13 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-[420px]">
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
-          {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
               <Plane className="h-7 w-7 text-white" strokeWidth={2} />
             </div>
           </div>
 
-          {/* Title */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Travel Expense Tracker
@@ -58,9 +56,7 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Form */}
           <form onSubmit={handleLogin} className="space-y-5">
-            {/* Email */}
             <div className="space-y-1.5">
               <label htmlFor="email" className="block text-sm font-medium text-slate-700">
                 Email
@@ -80,7 +76,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Password */}
             <div className="space-y-1.5">
               <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 Password
@@ -112,7 +107,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Remember + Forgot */}
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -137,7 +131,6 @@ export default function LoginPage() {
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}
@@ -154,21 +147,14 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Divider + Sign up */}
+          {/* No public signup — accounts are created by admins only */}
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-500">
-              Don&apos;t have an account?{" "}
-              <Link
-                href="/signup"
-                className="font-medium text-indigo-600 hover:text-indigo-700 transition-colors"
-              >
-                Sign up
-              </Link>
+              Need an account? Contact your administrator.
             </p>
           </div>
         </div>
 
-        {/* Footer */}
         <div className="mt-6 flex items-center justify-center gap-3 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
