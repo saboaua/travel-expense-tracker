@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Plus, Download, Camera, Archive, Pencil } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ExpenseList } from "@/components/expenses/expense-list";
+import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
 
 export default async function TripDetailPage({
   params,
@@ -79,6 +80,8 @@ export default async function TripDetailPage({
           </Link>
         </div>
       </div>
+
+      <TripStatusToggle tripId={id} status={trip.status} />
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
