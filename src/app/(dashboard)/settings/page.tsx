@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Send } from "lucide-react";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -13,6 +14,12 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [telegramEnabled, setTelegramEnabled] = useState(false);
+  const [telegramLinked, setTelegramLinked] = useState(false);
+  const [link, setLink] = useState<string | null>(null);
+  const [code, setCode] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
 
   useEffect(() => {
     async function loadProfile() {
@@ -23,14 +30,22 @@ export default function SettingsPage() {
 
       const { data } = await supabase
         .from("profiles")
-        .select("*")
+        .select("full_name, company_name, telegram_id")
         .eq("id", user.id)
         .single();
 
       if (data) {
         setFullName(data.full_name || "");
         setCompanyName(data.company_name || "");
+        setTelegramLinked(!!data.telegram_id);
       }
+
+      const { data: settings } = await supabase
+        .from("app_settings")
+        .select("telegram_enabled")
+        .eq("id", 1)
+        .single();
+      setTelegramEnabled(!!settings?.telegram_enabled);
     }
     loadProfile();
   }, [supabase]);
@@ -69,12 +84,28 @@ export default function SettingsPage() {
     setLoading(false);
   };
 
+  const connectTelegram = async () => {
+    setLinking(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not create link");
+      setCode(data.code);
+      setLink(data.link);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not create link");
+    } finally {
+      setLinking(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-8 max-w-lg mx-auto space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
         <p className="text-muted-foreground mt-1">
-          Customize your profile and branding
+          Profile and Telegram receipt upload
         </p>
       </div>
 
@@ -124,20 +155,38 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Branding</CardTitle>
-          <CardDescription>
-            Logo and theme customization (coming soon)
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">
-            Logo upload and color theme selection will be available in the next update.
-            These settings will appear on generated Excel reports.
-          </p>
-        </CardContent>
-      </Card>
+      {telegramEnabled && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Telegram
+            </CardTitle>
+            <CardDescription>
+              Upload receipts by messaging the bot — no need to open the app
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              Status: {telegramLinked ? "Linked" : "Not linked"}
+            </p>
+            <Button type="button" variant="outline" onClick={connectTelegram} disabled={linking}>
+              {linking ? "Creating code…" : telegramLinked ? "Relink Telegram" : "Connect Telegram"}
+            </Button>
+            {code && link && (
+              <div className="text-sm space-y-2 rounded-md bg-muted p-3">
+                <p>Code (15 min): <span className="font-mono font-semibold">{code}</span></p>
+                <a href={link} className="text-primary underline break-all" target="_blank" rel="noreferrer">
+                  Open bot and link
+                </a>
+                <p className="text-muted-foreground">
+                  Or open the bot and send <span className="font-mono">/start {code}</span>
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
