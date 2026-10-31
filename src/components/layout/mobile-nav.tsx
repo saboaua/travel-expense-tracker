@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Home,
   Plane,
@@ -16,9 +16,12 @@ import {
   Palette,
   Send,
   Shield,
+  LogOut,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
 import {
   canCreateUsers,
@@ -36,6 +39,7 @@ const mainItems = [
 
 export function MobileNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>("user");
@@ -61,6 +65,13 @@ export function MobileNav() {
     }
     loadRole();
   }, [supabase]);
+
+  const logout = async () => {
+    await supabase.auth.signOut();
+    setOpen(false);
+    router.push("/login");
+    router.refresh();
+  };
 
   const adminItems = [
     ...(canCreateUsers(role)
@@ -143,6 +154,19 @@ export function MobileNav() {
                 })}
               </div>
             )}
+
+            <div className="border-t pt-3 space-y-1">
+              <ThemeToggle className="w-full justify-start gap-3" />
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full justify-start gap-3 text-red-600 hover:text-red-600"
+                onClick={logout}
+              >
+                <LogOut className="h-5 w-5" />
+                Sign out
+              </Button>
+            </div>
           </div>
         </div>
       )}
