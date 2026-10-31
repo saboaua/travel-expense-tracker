@@ -13,6 +13,7 @@ import {
   User,
   Shield,
   Users,
+  Activity,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +29,7 @@ const baseNavItems = [
 
 const adminNavItems = [
   { href: "/admin/users", label: "Users", icon: Users },
+  { href: "/admin/security", label: "Security", icon: Activity },
 ];
 
 export function Sidebar() {

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { logAudit } from "@/lib/audit";
 
 export async function POST(request: Request) {
   try {
-    // 1. Verify the caller is an authenticated admin
     const supabase = await createClient();
     const {
       data: { user },
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
 
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role")
+      .select("role, email")
       .eq("id", user.id)
       .single();
 
@@ -24,7 +24,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // 2. Parse body
     const body = await request.json();
     const { email, password, firstName, lastName, role } = body;
 
@@ -45,7 +44,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // 3. Create user with service role (never expose this key to the client)
     const adminClient = createServiceClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -61,7 +59,7 @@ export async function POST(request: Request) {
       await adminClient.auth.admin.createUser({
         email,
         password,
-        email_confirm: true, // skip email confirmation for admin-created users
+        email_confirm: true,
         user_metadata: {
           full_name: [firstName, lastName].filter(Boolean).join(" ") || null,
           first_name: firstName || null,
@@ -77,7 +75,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "User creation failed" }, { status: 500 });
     }
 
-    // 4. Ensure profile exists with role + must_change_password
     const fullName = [firstName, lastName].filter(Boolean).join(" ") || null;
 
     const { error: profileError } = await adminClient.from("profiles").upsert({
@@ -92,9 +89,23 @@ export async function POST(request: Request) {
     });
 
     if (profileError) {
-      // User was created in Auth; profile write failed — still report success with warning
       console.error("Profile upsert failed:", profileError);
     }
+
+    // Audit trail
+    await logAudit({
+      actorId: user.id,
+      actorEmail: profile?.email || user.email,
+      action: "user.created",
+      entityType: "user",
+      entityId: newUser.user.id,
+      details: {
+        email,
+        role: role === "admin" ? "admin" : "user",
+        first_name: firstName,
+        last_name: lastName,
+      },
+    });
 
     return NextResponse.json({
       success: true,
