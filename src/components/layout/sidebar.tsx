@@ -14,12 +14,18 @@ import {
   Users,
   Activity,
   Palette,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/roles";
-import { canCreateUsers, canManageBranding, canViewSecurity } from "@/lib/roles";
+import {
+  canCreateUsers,
+  canManageBranding,
+  canManageTelegram,
+  canViewSecurity,
+} from "@/lib/roles";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -104,6 +110,9 @@ export function Sidebar() {
     ...(canManageBranding(role)
       ? [{ href: "/admin/branding", label: "Branding", icon: Palette }]
       : []),
+    ...(canManageTelegram(role)
+      ? [{ href: "/admin/telegram", label: "Telegram", icon: Send }]
+      : []),
   ];
 
   const roleLabel =
@@ -112,7 +121,6 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">
       <div className="flex flex-col flex-1 min-h-0">
-        {/* Logo + app name */}
         <div className="flex items-center h-16 px-4 border-b gap-2.5">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
