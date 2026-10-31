@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Plus, Download, Camera, Archive } from "lucide-react";
+import { ArrowLeft, Plus, Download, Camera, Archive, Pencil } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ExpenseList } from "@/components/expenses/expense-list";
 
@@ -43,7 +43,7 @@ export default async function TripDetailPage({
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
       <Link href="/trips" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />
         Back to trips
@@ -65,6 +65,9 @@ export default async function TripDetailPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href={`/trips/${id}/edit`}>
+            <Button variant="outline" className="gap-2"><Pencil className="h-4 w-4" /> Edit</Button>
+          </Link>
           <a href={`/api/export/trip/${id}/excel`}>
             <Button variant="outline" className="gap-2"><Download className="h-4 w-4" /> Excel</Button>
           </a>
