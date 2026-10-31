@@ -1,0 +1,270 @@
+"use client";
+
+import { useState, useRef } from "react";
+import { useRouter, useParams } from "next/navigation";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowLeft, Camera, Upload, X } from "lucide-react";
+
+const CATEGORIES = [
+  "Meals",
+  "Transport",
+  "Lodging",
+  "Fuel",
+  "Office Supplies",
+  "Entertainment",
+  "Other",
+];
+
+export default function AddExpensePage() {
+  const params = useParams();
+  const tripId = params.id as string;
+  const router = useRouter();
+  const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [merchant, setMerchant] = useState("");
+  const [amount, setAmount] = useState("");
+  const [category, setCategory] = useState("Meals");
+  const [expenseDate, setExpenseDate] = useState(
+    new Date().toISOString().split("T")[0]
+  );
+  const [notes, setNotes] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    if (!selected) return;
+
+    setFile(selected);
+    const reader = new FileReader();
+    reader.onload = () => setPreview(reader.result as string);
+    reader.readAsDataURL(selected);
+  };
+
+  const clearImage = () => {
+    setFile(null);
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) throw new Error("Not authenticated");
+
+      let receiptPath: string | null = null;
+
+      // Upload receipt image if present
+      if (file) {
+        const ext = file.name.split(".").pop() || "jpg";
+        const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("receipts")
+          .upload(fileName, file, {
+            cacheControl: "3600",
+            upsert: false,
+          });
+
+        if (uploadError) throw uploadError;
+        receiptPath = fileName;
+      }
+
+      // Create expense record
+      const { error: insertError } = await supabase.from("expenses").insert({
+        trip_id: tripId,
+        user_id: user.id,
+        merchant: merchant || null,
+        amount: parseFloat(amount),
+        category,
+        expense_date: expenseDate,
+        notes: notes || null,
+        receipt_path: receiptPath,
+      });
+
+      if (insertError) throw insertError;
+
+      router.push(`/trips/${tripId}`);
+      router.refresh();
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Something went wrong";
+      setError(message);
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="p-4 md:p-8 max-w-lg mx-auto">
+      <Link
+        href={`/trips/${tripId}`}
+        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
+      >
+        <ArrowLeft className="h-4 w-4" />
+        Back to trip
+      </Link>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Add Expense</CardTitle>
+          <CardDescription>
+            Take a photo of the receipt or enter details manually
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Camera / Upload */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Receipt Photo</label>
+              {preview ? (
+                <div className="relative">
+                  <img
+                    src={preview}
+                    alt="Receipt preview"
+                    className="w-full rounded-lg border max-h-64 object-contain bg-muted"
+                  />
+                  <button
+                    type="button"
+                    onClick={clearImage}
+                    className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.setAttribute("capture", "environment");
+                        fileInputRef.current.click();
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed border-primary/40 bg-primary/5 hover:bg-primary/10 transition-colors"
+                  >
+                    <Camera className="h-7 w-7 text-primary" />
+                    <span className="text-sm font-medium text-primary">Take Photo</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.removeAttribute("capture");
+                        fileInputRef.current.click();
+                      }
+                    }}
+                    className="flex flex-col items-center justify-center gap-2 h-28 rounded-lg border-2 border-dashed hover:bg-accent transition-colors"
+                  >
+                    <Upload className="h-7 w-7 text-muted-foreground" />
+                    <span className="text-sm font-medium">Upload</span>
+                  </button>
+                </div>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="merchant" className="text-sm font-medium">
+                Merchant
+              </label>
+              <Input
+                id="merchant"
+                placeholder="e.g. Hotel Hilton"
+                value={merchant}
+                onChange={(e) => setMerchant(e.target.value)}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="amount" className="text-sm font-medium">
+                  Amount *
+                </label>
+                <Input
+                  id="amount"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  required
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="date" className="text-sm font-medium">
+                  Date *
+                </label>
+                <Input
+                  id="date"
+                  type="date"
+                  value={expenseDate}
+                  onChange={(e) => setExpenseDate(e.target.value)}
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="category" className="text-sm font-medium">
+                Category
+              </label>
+              <select
+                id="category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                {CATEGORIES.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="notes" className="text-sm font-medium">
+                Notes
+              </label>
+              <Input
+                id="notes"
+                placeholder="Optional notes..."
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+              />
+            </div>
+
+            {error && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
+            )}
+
+            <Button type="submit" className="w-full" disabled={loading}>
+              {loading ? "Saving..." : "Save Expense"}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
