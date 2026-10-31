@@ -347,11 +347,13 @@ async function saveReceipt(
 
   const info = await getFile(file.file_id);
   const buf = await downloadFile(info.file_path);
-  const ext = (file.file_name || info.file_path).split(".").pop() || "jpg";
+  const mime = file.mime || "image/jpeg";
+  const name = file.file_name || "receipt.jpg";
+  const ext = name.split(".").pop() || info.file_path.split(".").pop() || "jpg";
   const path = `${profile.id}/${tripId}/${Date.now()}.${ext}`;
 
   const { error: upErr } = await supabase.storage.from("receipts").upload(path, buf, {
-    contentType: file.mime || "image/jpeg",
+    contentType: mime,
     upsert: false,
   });
   if (upErr) throw upErr;
@@ -362,7 +364,9 @@ async function saveReceipt(
   let raw = "";
 
   try {
-    const ocr = await runReceiptOcr(Buffer.from(buf));
+    const bytes = new Uint8Array(buf);
+    const ocrFile = new File([bytes], name, { type: mime });
+    const ocr = await runReceiptOcr(ocrFile);
     merchant = ocr.merchant;
     amount = ocr.amount;
     date = ocr.date;
