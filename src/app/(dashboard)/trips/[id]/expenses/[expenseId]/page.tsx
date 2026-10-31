@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, Camera, Trash2, Upload, X } from "lucide-react";
 import { CURRENCIES, toUsd } from "@/lib/currencies";
 import { formatCurrency } from "@/lib/utils";
 
@@ -27,6 +27,7 @@ export default function EditExpensePage() {
   const expenseId = params.expenseId as string;
   const router = useRouter();
   const supabase = createClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [loaded, setLoaded] = useState(false);
   const [merchant, setMerchant] = useState("");
@@ -36,6 +37,10 @@ export default function EditExpensePage() {
   const [category, setCategory] = useState("Other");
   const [expenseDate, setExpenseDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [receiptPath, setReceiptPath] = useState<string | null>(null);
+  const [receiptUrl, setReceiptUrl] = useState<string | null>(null);
+  const [newFile, setNewFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,7 +51,7 @@ export default function EditExpensePage() {
       .eq("id", expenseId)
       .eq("trip_id", tripId)
       .single()
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error || !data) {
           setError(error?.message || "Expense not found");
           setLoaded(true);
@@ -59,6 +64,14 @@ export default function EditExpensePage() {
         setCategory(data.category || "Other");
         setExpenseDate(data.expense_date || "");
         setNotes(data.notes || "");
+        setReceiptPath(data.receipt_path || null);
+
+        if (data.receipt_path) {
+          const { data: signed } = await supabase.storage
+            .from("receipts")
+            .createSignedUrl(data.receipt_path, 60 * 30);
+          if (signed?.signedUrl) setReceiptUrl(signed.signedUrl);
+        }
         setLoaded(true);
       });
   }, [supabase, expenseId, tripId]);
@@ -68,34 +81,66 @@ export default function EditExpensePage() {
       ? toUsd(Number(amount), Number(rate))
       : null;
 
+  const pickFile = (file: File) => {
+    setNewFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const clearNew = () => {
+    setNewFile(null);
+    setPreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setError(null);
-    const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
-    const amountNum = parseFloat(amount);
-    const { error } = await supabase
-      .from("expenses")
-      .update({
-        merchant: merchant || null,
-        amount: amountNum,
-        currency,
-        exchange_rate: rateNum,
-        amount_usd: toUsd(amountNum, rateNum),
-        category,
-        expense_date: expenseDate,
-        notes: notes || null,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", expenseId);
 
-    if (error) {
-      setError(error.message);
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not authenticated");
+
+      let nextPath = receiptPath;
+      if (newFile) {
+        const ext = newFile.name.split(".").pop() || "jpg";
+        const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
+        const { error: uploadError } = await supabase.storage
+          .from("receipts")
+          .upload(fileName, newFile, { cacheControl: "3600", upsert: false });
+        if (uploadError) throw uploadError;
+        nextPath = fileName;
+      }
+
+      const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
+      const amountNum = parseFloat(amount);
+      const { error } = await supabase
+        .from("expenses")
+        .update({
+          merchant: merchant || null,
+          amount: amountNum,
+          currency,
+          exchange_rate: rateNum,
+          amount_usd: toUsd(amountNum, rateNum),
+          category,
+          expense_date: expenseDate,
+          notes: notes || null,
+          receipt_path: nextPath,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", expenseId);
+      if (error) throw error;
+
+      router.push(`/trips/${tripId}`);
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
       setSaving(false);
-      return;
     }
-    router.push(`/trips/${tripId}`);
-    router.refresh();
   };
 
   const remove = async () => {
@@ -111,6 +156,8 @@ export default function EditExpensePage() {
     router.refresh();
   };
 
+  const shownImage = preview || receiptUrl;
+
   return (
     <div className="p-4 md:p-8 max-w-lg mx-auto">
       <Link
@@ -124,13 +171,83 @@ export default function EditExpensePage() {
       <Card>
         <CardHeader>
           <CardTitle>Edit Expense</CardTitle>
-          <CardDescription>Change the details or delete this entry</CardDescription>
+          <CardDescription>Change the details, replace the receipt, or delete this entry</CardDescription>
         </CardHeader>
         <CardContent>
           {!loaded ? (
             <p className="text-sm text-muted-foreground">Loading\u2026</p>
           ) : (
             <form onSubmit={save} className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Receipt</label>
+                {shownImage ? (
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={shownImage}
+                      alt="Receipt"
+                      className="w-full rounded-lg border max-h-80 object-contain bg-muted"
+                    />
+                    {preview && (
+                      <button
+                        type="button"
+                        onClick={clearNew}
+                        className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white"
+                        aria-label="Cancel new receipt"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                    {preview && (
+                      <p className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-1 rounded">
+                        New receipt \u2014 save to keep it
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No receipt uploaded yet.</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.setAttribute("capture", "environment");
+                        fileInputRef.current.click();
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 h-10 rounded-md border text-sm"
+                  >
+                    <Camera className="h-4 w-4" />
+                    Take photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (fileInputRef.current) {
+                        fileInputRef.current.removeAttribute("capture");
+                        fileInputRef.current.click();
+                      }
+                    }}
+                    className="flex items-center justify-center gap-2 h-10 rounded-md border text-sm"
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload new
+                  </button>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) pickFile(file);
+                  }}
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-medium">Merchant</label>
                 <Input value={merchant} onChange={(e) => setMerchant(e.target.value)} />
