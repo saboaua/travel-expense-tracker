@@ -96,10 +96,10 @@ export async function GET(
     }
   }
 
-  const zipBuffer = await zip.generateAsync({ type: "uint8array" });
+  const zipBytes = await zip.generateAsync({ type: "uint8array" });
   const zipName = `${safeName}_export.zip`;
 
-  return new NextResponse(zipBuffer, {
+  return new NextResponse(new Blob([zipBytes]), {
     headers: {
       "Content-Type": "application/zip",
       "Content-Disposition": `attachment; filename="${zipName}"`,

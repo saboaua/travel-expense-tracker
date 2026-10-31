@@ -57,9 +57,9 @@ export async function GET(
   });
 
   const filename = `${trip.name.replace(/[^a-z0-9-_]/gi, "_")}_expenses.xlsx`;
-  const body = new Uint8Array(buffer as ArrayBuffer);
+  const bytes = new Uint8Array(buffer as ArrayBuffer);
 
-  return new NextResponse(body, {
+  return new NextResponse(new Blob([bytes]), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

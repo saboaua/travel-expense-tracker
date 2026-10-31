@@ -55,9 +55,9 @@ export async function GET(
     companyName: profile?.company_name || undefined,
   });
 
-  const body = new Uint8Array(buffer as ArrayBuffer);
+  const bytes = new Uint8Array(buffer as ArrayBuffer);
 
-  return new NextResponse(body, {
+  return new NextResponse(new Blob([bytes]), {
     headers: {
       "Content-Type":
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
