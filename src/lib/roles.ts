@@ -10,15 +10,14 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 export function canAccessPath(role: UserRole, path: string): boolean {
   if (role === "admin") return true;
 
-  // Assistant: same as user + user management (create users only)
   if (role === "assistant") {
     if (path.startsWith("/admin/security")) return false;
     if (path.startsWith("/admin/branding")) return false;
-    if (path.startsWith("/admin")) return true; // users page
+    if (path.startsWith("/admin/telegram")) return false;
+    if (path.startsWith("/admin")) return true;
     return isUserPath(path);
   }
 
-  // Regular user
   if (path.startsWith("/admin")) return false;
   return isUserPath(path);
 }
@@ -27,7 +26,6 @@ function isUserPath(path: string): boolean {
   if (path === "/" || path.startsWith("/trips")) return true;
   if (path.startsWith("/profile")) return true;
   if (path.startsWith("/settings")) return true;
-  // Reports can stay for users or be admin-only — keep for users
   if (path.startsWith("/reports")) return true;
   return false;
 }
@@ -41,6 +39,10 @@ export function canAssignRole(role: UserRole): boolean {
 }
 
 export function canManageBranding(role: UserRole): boolean {
+  return role === "admin";
+}
+
+export function canManageTelegram(role: UserRole): boolean {
   return role === "admin";
 }
 
