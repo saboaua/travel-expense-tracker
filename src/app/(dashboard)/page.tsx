@@ -1,1 +1,234 @@
-PLACEHOLDER_DASHBOARD
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/server";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Plane, Receipt, TrendingUp, MapPin } from "lucide-react";
+import { formatCurrency, formatDate } from "@/lib/utils";
+
+type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
+
+function usdOf(e: Expense) {
+  if (e.amount_usd != null) return Number(e.amount_usd);
+  if (!e.currency || e.currency === "USD") return Number(e.amount);
+  return 0;
+}
+
+export default async function DashboardPage() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", user?.id)
+    .single();
+
+  const { data: trips } = await supabase
+    .from("trips")
+    .select("*, expenses(amount, amount_usd, currency)")
+    .eq("user_id", user?.id)
+    .order("start_date", { ascending: true });
+
+  const { data: allExpenses } = await supabase
+    .from("expenses")
+    .select("amount, amount_usd, currency")
+    .eq("user_id", user?.id);
+
+  const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
+  const activeTripsList = (trips || []).filter((t) => t.status === "active");
+  const completedTripsList = (trips || []).filter((t) => t.status === "completed");
+  const activeCount = activeTripsList.length;
+
+  // Featured = soonest active trip (or the one starting next)
+  const featured = activeTripsList[0] || null;
+  const otherActive = activeTripsList.slice(1);
+
+  return (
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+      <div>
+        <h1 className="text-2xl md:text-3xl font-bold">
+          Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
+        </h1>
+        <p className="text-muted-foreground mt-1">Track your business travel expenses</p>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+              <Plane className="h-4 w-4" />
+              Active Trips
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{activeCount}</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+              <Receipt className="h-4 w-4" />
+              Total in USD
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
+          </CardContent>
+        </Card>
+        <Card className="col-span-2 md:col-span-1">
+          <CardHeader className="pb-2">
+            <CardDescription className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              This Year
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Active Trips */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Active Trips</CardTitle>
+            <CardDescription>Your ongoing and upcoming travels</CardDescription>
+          </div>
+          <Link href="/trips">
+            <Button variant="outline" size="sm">View all</Button>
+          </Link>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {activeTripsList.length === 0 ? (
+            <div className="text-center py-8">
+              <Plane className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+              <p className="text-muted-foreground">No active trips</p>
+            </div>
+          ) : (
+            <>
+              {featured && (
+                <Link href={`/trips/${featured.id}`} className="block group">
+                  <div className="relative overflow-hidden rounded-xl border bg-muted">
+                    <div
+                      className="h-40 md:h-48 bg-cover bg-center"
+                      style={{
+                        backgroundImage: featured.destination
+                          ? `linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.55)), url(https://images.unsplash.com/photo-1518546305927-5a555bb7020d?auto=format&fit=crop&w=1400&q=80)`
+                          : "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
+                      }}
+                    />
+                    <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          {featured.destination && (
+                            <p className="text-sm flex items-center gap-1 opacity-90">
+                              <MapPin className="h-3.5 w-3.5" />
+                              {featured.destination}
+                            </p>
+                          )}
+                          <h3 className="text-xl font-semibold mt-0.5">{featured.name}</h3>
+                          <p className="text-sm opacity-90">
+                            {formatDate(featured.start_date)}
+                            {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
+                          </p>
+                        </div>
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/90 text-white shrink-0">
+                          Upcoming
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Link>
+              )}
+
+              {otherActive.map((trip) => {
+                const tripTotal =
+                  trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
+                return (
+                  <Link
+                    key={trip.id}
+                    href={`/trips/${trip.id}`}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{trip.name}</p>
+                      {trip.destination && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {trip.destination}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(trip.start_date)}
+                        {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
+                        active
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Completed Trips */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Completed Trips</CardTitle>
+            <CardDescription>Past business travels and archived expenses</CardDescription>
+          </div>
+          <Link href="/trips">
+            <Button variant="outline" size="sm">View archive</Button>
+          </Link>
+        </CardHeader>
+        <CardContent>
+          {completedTripsList.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4 text-center">No completed trips yet</p>
+          ) : (
+            <div className="space-y-3">
+              {completedTripsList.map((trip) => {
+                const tripTotal =
+                  trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
+                return (
+                  <Link
+                    key={trip.id}
+                    href={`/trips/${trip.id}`}
+                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                  >
+                    <div>
+                      <p className="font-medium">{trip.name}</p>
+                      {trip.destination && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1">
+                          <MapPin className="h-3 w-3" /> {trip.destination}
+                        </p>
+                      )}
+                      <p className="text-sm text-muted-foreground">
+                        {formatDate(trip.start_date)}
+                        {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        completed
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
