@@ -52,7 +52,7 @@ export function MobileNav() {
     ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: Settings }] : []),
   ];
 
-  const menuActive = pathname.startsWith("/settings") || pathname.startsWith("/admin");
+  const menuActive = pathname.startsWith("/admin");
 
   return (
     <>
@@ -64,9 +64,6 @@ export function MobileNav() {
               <p className="font-semibold">Menu</p>
               <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-md text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
-            <Link href="/settings" className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium", pathname.startsWith("/settings") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
-              <Settings className="h-5 w-5" /> Settings
-            </Link>
             {adminItems.length > 0 && (
               <div className="space-y-1">
                 <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>

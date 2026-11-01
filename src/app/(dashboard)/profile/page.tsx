@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, User, Plane, Receipt } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { Camera, User, Send, Check, Copy, ExternalLink, Key } from "lucide-react";
 
 interface Profile {
   id: string;
@@ -20,15 +18,14 @@ interface Profile {
   avatar_url: string | null;
 }
 
-interface TripSummary {
-  id: string;
-  name: string;
-  start_date: string;
-  end_date: string | null;
-  currency: string;
-  status: string;
-  expenses: { amount: number }[];
-}
+type TelegramStatus = {
+  linked: boolean;
+  bot: string;
+  botUrl: string;
+  code: string | null;
+  expires: string | null;
+  link: string | null;
+};
 
 export default function ProfilePage() {
   const supabase = createClient();
@@ -41,11 +38,34 @@ export default function ProfilePage() {
   const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [activeTrips, setActiveTrips] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Password
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [pwLoading, setPwLoading] = useState(false);
+  const [pwSaved, setPwSaved] = useState(false);
+  const [pwError, setPwError] = useState<string | null>(null);
+
+  // Telegram
+  const [featureOn, setFeatureOn] = useState(false);
+  const [status, setStatus] = useState<TelegramStatus | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [tgError, setTgError] = useState<string | null>(null);
+
+  async function loadTelegram() {
+    const res = await fetch("/api/telegram/link");
+    if (!res.ok) {
+      setFeatureOn(false);
+      return;
+    }
+    setFeatureOn(true);
+    setStatus(await res.json());
+  }
 
   useEffect(() => {
     async function load() {
@@ -71,19 +91,16 @@ export default function ProfilePage() {
       } else {
         setEmail(user.email || "");
       }
-
-      // Active trips with expenses
-      const { data: trips } = await supabase
-        .from("trips")
-        .select("id, name, start_date, end_date, currency, status, expenses(amount)")
-        .eq("user_id", user.id)
-        .eq("status", "active")
-        .order("start_date", { ascending: false });
-
-      setActiveTrips((trips as TripSummary[]) || []);
     }
     load();
+    loadTelegram();
   }, [supabase]);
+
+  useEffect(() => {
+    if (!status?.link || status.linked) return;
+    const id = setInterval(loadTelegram, 4000);
+    return () => clearInterval(id);
+  }, [status?.link, status?.linked]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -114,7 +131,6 @@ export default function ProfilePage() {
         data: { publicUrl },
       } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
-      // Cache bust
       const urlWithTs = `${publicUrl}?t=${Date.now()}`;
 
       const { error: updateError } = await supabase
@@ -174,23 +190,86 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    setPwSaved(false);
+
+    if (newPassword.length < 6) {
+      setPwError("Password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPwError("Passwords do not match");
+      return;
+    }
+
+    setPwLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      setPwSaved(true);
+      setNewPassword("");
+      setConfirmPassword("");
+      setTimeout(() => setPwSaved(false), 4000);
+    } catch (err: unknown) {
+      setPwError(err instanceof Error ? err.message : "Failed to update password");
+    } finally {
+      setPwLoading(false);
+    }
+  };
+
+  const enableTelegram = async () => {
+    setLinking(true);
+    setTgError(null);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not create link");
+      setStatus((prev) => ({
+        linked: prev?.linked || false,
+        bot: data.bot,
+        botUrl: `https://t.me/${data.bot}`,
+        code: data.code,
+        expires: data.expires,
+        link: data.link,
+      }));
+      window.open(data.link, "_blank", "noopener,noreferrer");
+    } catch (err: unknown) {
+      setTgError(err instanceof Error ? err.message : "Could not create link");
+    } finally {
+      setLinking(false);
+    }
+  };
+
+  const copyLink = async () => {
+    if (!status?.link) return;
+    await navigator.clipboard.writeText(status.link);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const disconnect = async () => {
+    setLinking(true);
+    try {
+      await fetch("/api/telegram/link", { method: "DELETE" });
+      await loadTelegram();
+    } finally {
+      setLinking(false);
+    }
+  };
+
   const displayName =
     [firstName, lastName].filter(Boolean).join(" ") ||
     profile?.full_name ||
     "Your Profile";
-
-  const totalActiveExpenses = activeTrips.reduce((sum, trip) => {
-    const tripTotal =
-      trip.expenses?.reduce((s, e) => s + Number(e.amount), 0) || 0;
-    return sum + tripTotal;
-  }, 0);
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Profile</h1>
         <p className="text-muted-foreground mt-1">
-          Manage your personal information and view current trips
+          Manage your personal information, password, and integrations
         </p>
       </div>
 
@@ -337,72 +416,135 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Current trip expenses overview */}
+      {/* Password change */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Plane className="h-5 w-5" />
-            Current Trip Expenses
+            <Key className="h-5 w-5" />
+            Change Password
           </CardTitle>
-          <CardDescription>
-            Overview of your active business travels
-          </CardDescription>
+          <CardDescription>Update your account password</CardDescription>
         </CardHeader>
         <CardContent>
-          {activeTrips.length === 0 ? (
-            <div className="text-center py-8">
-              <Receipt className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground mb-4">No active trips</p>
-              <Link href="/trips/new">
-                <Button variant="outline" size="sm">
-                  Start a new trip
-                </Button>
-              </Link>
+          <form onSubmit={handlePasswordChange} className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="newPassword" className="text-sm font-medium">
+                New Password
+              </label>
+              <Input
+                id="newPassword"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="At least 6 characters"
+                autoComplete="new-password"
+              />
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-baseline justify-between pb-3 border-b">
-                <span className="text-sm text-muted-foreground">
-                  Total across active trips
-                </span>
-                <span className="text-xl font-bold">
-                  {formatCurrency(totalActiveExpenses)}
-                </span>
-              </div>
-
-              {activeTrips.map((trip) => {
-                const tripTotal =
-                  trip.expenses?.reduce(
-                    (s, e) => s + Number(e.amount),
-                    0
-                  ) || 0;
-
-                return (
-                  <Link
-                    key={trip.id}
-                    href={`/trips/${trip.id}`}
-                    className="flex items-center justify-between p-3 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium">{trip.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(trip.start_date)}
-                        {trip.end_date && ` – ${formatDate(trip.end_date)}`}
-                        {" · "}
-                        {trip.expenses?.length || 0} expense
-                        {(trip.expenses?.length || 0) !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                    <p className="font-semibold">
-                      {formatCurrency(tripTotal, trip.currency)}
-                    </p>
-                  </Link>
-                );
-              })}
+            <div className="space-y-2">
+              <label htmlFor="confirmPassword" className="text-sm font-medium">
+                Confirm New Password
+              </label>
+              <Input
+                id="confirmPassword"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repeat new password"
+                autoComplete="new-password"
+              />
             </div>
-          )}
+
+            {pwError && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{pwError}</p>
+            )}
+            {pwSaved && (
+              <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+                Password updated successfully
+              </p>
+            )}
+
+            <Button type="submit" disabled={pwLoading}>
+              {pwLoading ? "Updating..." : "Update Password"}
+            </Button>
+          </form>
         </CardContent>
       </Card>
+
+      {/* Telegram */}
+      {featureOn && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5" />
+              Telegram
+            </CardTitle>
+            <CardDescription>
+              Enable it to get a personal link that opens the chatbot for receipt uploads
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm">
+              Status:{" "}
+              {status?.linked ? (
+                <span className="text-green-600 font-medium">Connected</span>
+              ) : (
+                <span className="text-muted-foreground">Not connected</span>
+              )}
+            </p>
+
+            {status?.linked ? (
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  className="gap-2"
+                  onClick={() => window.open(status.botUrl, "_blank", "noopener,noreferrer")}
+                >
+                  <ExternalLink className="h-4 w-4" />
+                  Open chatbot
+                </Button>
+                <Button variant="outline" onClick={disconnect} disabled={linking}>
+                  Disconnect
+                </Button>
+              </div>
+            ) : (
+              <>
+                <Button onClick={enableTelegram} disabled={linking} className="gap-2">
+                  <Send className="h-4 w-4" />
+                  {linking ? "Creating link\u2026" : "Enable Telegram"}
+                </Button>
+
+                {status?.link && (
+                  <div className="text-sm space-y-3 rounded-md bg-muted p-3">
+                    <p>
+                      Tap Start in Telegram to finish linking. This link expires in 15 minutes and works once.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => window.open(status.link!, "_blank", "noopener,noreferrer")}
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        Open chatbot
+                      </Button>
+                      <Button type="button" size="sm" variant="outline" className="gap-2" onClick={copyLink}>
+                        {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                        {copied ? "Copied" : "Copy link"}
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground break-all">{status.link}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {tgError && (
+              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{tgError}</p>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
