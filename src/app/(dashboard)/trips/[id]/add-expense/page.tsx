@@ -14,7 +14,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 
-const CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
+const FALLBACK_CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function AddExpensePage() {
@@ -39,12 +39,22 @@ export default function AddExpensePage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
 
   useEffect(() => {
     supabase.from("trips").select("currency").eq("id", tripId).single().then(({ data }) => {
       if (data?.currency) setCurrency(data.currency);
     });
   }, [supabase, tripId]);
+
+  useEffect(() => {
+    supabase.from("categories").select("name").eq("enabled", true).order("sort_order").then(({ data }) => {
+      if (data && data.length > 0) {
+        setCategories(data.map((c) => c.name));
+        if (!data.some((c) => c.name === "Meals")) setCategory(data[0].name);
+      }
+    });
+  }, [supabase]);
 
   useEffect(() => {
     let cancelled = false;
@@ -246,7 +256,7 @@ export default function AddExpensePage() {
             <div className="space-y-2">
               <label htmlFor="category" className="text-sm font-medium">Category</label>
               <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
               </select>
             </div>
 
