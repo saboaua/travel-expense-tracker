@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette, Coins, Send, Tag, Users } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, Briefcase } from "lucide-react";
 
 const sections = [
   {
@@ -19,9 +19,15 @@ const sections = [
   },
   {
     href: "/admin/categories",
-    title: "Categories",
-    description: "Manage expense categories used across the app.",
+    title: "Receipt Categories",
+    description: "Manage expense categories used when adding receipts.",
     icon: Tag,
+  },
+  {
+    href: "/admin/travel-categories",
+    title: "Travel Categories",
+    description: "Manage the trip types offered when creating a trip.",
+    icon: Briefcase,
   },
   {
     href: "/admin/telegram",
@@ -43,7 +49,7 @@ export default function AdminSettingsPage() {
       <div>
         <h1 className="text-2xl md:text-3xl font-bold">Global Settings</h1>
         <p className="text-muted-foreground mt-1">
-          Configure branding, currencies, categories, Telegram, and users.
+          Configure branding, currencies, receipt and travel categories, Telegram, and users.
         </p>
       </div>
 

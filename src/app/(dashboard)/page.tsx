@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plane, Receipt, TrendingUp, MapPin } from "lucide-react";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatCurrency, formatDate, todayISO, daysBetween } from "@/lib/utils";
+import { getDestinationInfo } from "@/lib/destination";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
 
@@ -37,13 +38,35 @@ export default async function DashboardPage() {
     .eq("user_id", user?.id);
 
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
-  const activeTripsList = (trips || []).filter((t) => t.status === "active");
-  const completedTripsList = (trips || []).filter((t) => t.status === "completed");
-  const activeCount = activeTripsList.length;
+  const today = todayISO();
+  const endOf = (t: { start_date: string; end_date: string | null }) => t.end_date || t.start_date;
+  const byStart = (x: { start_date: string }, y: { start_date: string }) => x.start_date.localeCompare(y.start_date);
 
-  // Featured = soonest active trip (or the one starting next)
-  const featured = activeTripsList[0] || null;
-  const otherActive = activeTripsList.slice(1);
+  const activeAll = (trips || []).filter((t) => t.status === "active");
+  const completedTripsList = (trips || [])
+    .filter((t) => t.status === "completed")
+    .sort((x, y) => y.start_date.localeCompare(x.start_date));
+  const activeCount = activeAll.length;
+
+  // Order: in progress now, then upcoming (soonest first), then trips that ended but are still open.
+  const ongoing = activeAll.filter((t) => t.start_date <= today && endOf(t) >= today).sort(byStart);
+  const upcoming = activeAll.filter((t) => t.start_date > today).sort(byStart);
+  const ended = activeAll.filter((t) => endOf(t) < today).sort((x, y) => byStart(y, x));
+  const activeTripsList = [...ongoing, ...upcoming, ...ended];
+
+  // Featured = the soonest trip that is in progress or coming up
+  const featured = ongoing[0] || upcoming[0] || null;
+  const otherActive = activeTripsList.filter((t) => t.id !== featured?.id);
+  const destinationInfo = featured ? await getDestinationInfo(featured.destination) : null;
+
+  const tripState = (t: { start_date: string; end_date: string | null }) => {
+    if (t.start_date > today) {
+      const d = daysBetween(today, t.start_date);
+      return { label: d === 1 ? "Upcoming \u00b7 tomorrow" : `Upcoming \u00b7 in ${d} days`, cls: "bg-blue-100 text-blue-700" };
+    }
+    if (endOf(t) >= today) return { label: "In progress", cls: "bg-green-100 text-green-700" };
+    return { label: "Ended \u00b7 mark completed", cls: "bg-amber-100 text-amber-700" };
+  };
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
@@ -95,7 +118,7 @@ export default async function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Active Trips</CardTitle>
-            <CardDescription>Your ongoing and upcoming travels</CardDescription>
+            <CardDescription>Your current and upcoming travels, soonest first</CardDescription>
           </div>
           <Link href="/trips">
             <Button variant="outline" size="sm">View all</Button>
@@ -111,35 +134,54 @@ export default async function DashboardPage() {
             <>
               {featured && (
                 <Link href={`/trips/${featured.id}`} className="block group">
-                  <div className="relative overflow-hidden rounded-xl border bg-muted">
-                    <div
-                      className="h-40 md:h-48 bg-cover bg-center"
-                      style={{
-                        backgroundImage: featured.destination
-                          ? `linear-gradient(to bottom, rgba(0,0,0,0.15), rgba(0,0,0,0.55)), url(https://images.unsplash.com/photo-1518546305927-5a555bb7020d?auto=format&fit=crop&w=1400&q=80)`
-                          : "linear-gradient(135deg, #0f172a 0%, #1e293b 100%)",
-                      }}
-                    />
-                    <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          {featured.destination && (
-                            <p className="text-sm flex items-center gap-1 opacity-90">
-                              <MapPin className="h-3.5 w-3.5" />
-                              {featured.destination}
+                  <div className="overflow-hidden rounded-xl border bg-card">
+                    <div className="relative h-44 md:h-56 bg-gradient-to-br from-slate-900 to-slate-700">
+                      {destinationInfo?.imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={destinationInfo.imageUrl}
+                          alt={featured.destination || featured.name}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/65" />
+                      <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
+                        <div className="flex items-end justify-between gap-3">
+                          <div className="min-w-0">
+                            {featured.destination && (
+                              <p className="text-sm flex items-center gap-1 opacity-90">
+                                <MapPin className="h-3.5 w-3.5 shrink-0" />
+                                <span className="truncate">{featured.destination}</span>
+                              </p>
+                            )}
+                            <h3 className="text-xl font-semibold mt-0.5 truncate">{featured.name}</h3>
+                            <p className="text-sm opacity-90">
+                              {formatDate(featured.start_date)}
+                              {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
                             </p>
-                          )}
-                          <h3 className="text-xl font-semibold mt-0.5">{featured.name}</h3>
-                          <p className="text-sm opacity-90">
-                            {formatDate(featured.start_date)}
-                            {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
-                          </p>
+                          </div>
+                          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${tripState(featured).cls}`}>
+                            {tripState(featured).label}
+                          </span>
                         </div>
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/90 text-white shrink-0">
-                          Upcoming
-                        </span>
                       </div>
                     </div>
+                    {(destinationInfo?.summary || featured.category) && (
+                      <div className="p-4 space-y-2">
+                        {featured.category && (
+                          <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                            {featured.category}
+                          </span>
+                        )}
+                        {destinationInfo?.summary && (
+                          <p className="text-sm text-muted-foreground line-clamp-3">
+                            {destinationInfo.summary}
+                            <span className="text-xs opacity-70"> (Wikipedia)</span>
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </Link>
               )}
@@ -167,8 +209,8 @@ export default async function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700">
-                        active
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${tripState(trip).cls}`}>
+                        {tripState(trip).label}
                       </span>
                     </div>
                   </Link>

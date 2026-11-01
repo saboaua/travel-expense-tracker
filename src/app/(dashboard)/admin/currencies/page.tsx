@@ -94,7 +94,7 @@ export default function AdminCurrenciesPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading\u2026</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             rows.map((row) => (
               <div key={row.code} className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_72px_1fr_120px] gap-3 items-center border rounded-lg p-3">

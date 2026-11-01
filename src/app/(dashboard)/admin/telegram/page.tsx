@@ -85,7 +85,7 @@ export default function AdminTelegramPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {loading ? (
-            <p className="text-sm text-muted-foreground">Loading\u2026</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             <>
               <label className="flex items-center gap-3 text-sm">

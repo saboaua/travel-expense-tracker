@@ -8,13 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
+import { CategoryButtons } from "@/components/ui/category-buttons";
+import { useExpenseCategories } from "@/lib/use-categories";
 import { runReceiptOcr } from "@/lib/ocr";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 
-const FALLBACK_CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function AddExpensePage() {
@@ -39,7 +40,7 @@ export default function AddExpensePage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
+  const categories = useExpenseCategories();
 
   useEffect(() => {
     supabase.from("trips").select("currency").eq("id", tripId).single().then(({ data }) => {
@@ -48,13 +49,8 @@ export default function AddExpensePage() {
   }, [supabase, tripId]);
 
   useEffect(() => {
-    supabase.from("categories").select("name").eq("enabled", true).order("sort_order").then(({ data }) => {
-      if (data && data.length > 0) {
-        setCategories(data.map((c) => c.name));
-        if (!data.some((c) => c.name === "Meals")) setCategory(data[0].name);
-      }
-    });
-  }, [supabase]);
+    if (categories.length > 0 && !categories.some((c) => c.name === category)) setCategory(categories[0].name);
+  }, [categories, category]);
 
   useEffect(() => {
     let cancelled = false;
@@ -188,7 +184,7 @@ export default function AddExpensePage() {
       <Card>
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>
-          <CardDescription>Take a photo \u2014 we'll try to read merchant, amount, and date automatically</CardDescription>
+          <CardDescription>Take a photo — we'll try to read merchant, amount, and date automatically</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -254,10 +250,8 @@ export default function AddExpensePage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="category" className="text-sm font-medium">Category</label>
-              <select id="category" value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-              </select>
+              <label className="text-sm font-medium">Category</label>
+              <CategoryButtons options={categories} value={category} onChange={setCategory} />
             </div>
 
             <div className="space-y-2">

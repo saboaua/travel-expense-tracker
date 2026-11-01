@@ -1,24 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Users, Building2, MapPin, FileText } from "lucide-react";
+import { ArrowLeft, } from "lucide-react";
+import { CategoryButtons } from "@/components/ui/category-buttons";
+import { useTravelCategories } from "@/lib/use-categories";
 import Link from "next/link";
 import { useCurrencies } from "@/lib/use-currencies";
 
-const TRAVEL_CATEGORIES = [
-  { value: "Client Meeting", icon: Users },
-  { value: "Conference", icon: Building2 },
-  { value: "Strategy Session", icon: MapPin },
-  { value: "Internal Review", icon: FileText },
-] as const;
-
 export default function NewTripPage() {
   const currencies = useCurrencies();
+  const travelCategories = useTravelCategories();
   const [name, setName] = useState("");
   const [destination, setDestination] = useState("");
   const [category, setCategory] = useState<string>("Client Meeting");
@@ -30,6 +26,13 @@ export default function NewTripPage() {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
+
+  // Default to the first admin-defined travel category
+  useEffect(() => {
+    if (travelCategories.length > 0 && !travelCategories.some((c) => c.name === category)) {
+      setCategory(travelCategories[0].name);
+    }
+  }, [travelCategories, category]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,28 +97,12 @@ export default function NewTripPage() {
             <div className="space-y-2">
               <label htmlFor="destination" className="text-sm font-medium">Destination</label>
               <Input id="destination" placeholder="e.g. Panama City, Panama" value={destination} onChange={(e) => setDestination(e.target.value)} />
-              <p className="text-xs text-muted-foreground">Shown on the dashboard (e.g. Panama City from Nov 17 \u2013 Nov 20).</p>
+              <p className="text-xs text-muted-foreground">Shown on the dashboard (e.g. Panama City from Nov 17 – Nov 20).</p>
             </div>
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Travel Category</label>
-              <div className="flex flex-wrap gap-2">
-                {TRAVEL_CATEGORIES.map(({ value, icon: Icon }) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setCategory(value)}
-                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      category === value
-                        ? "border-primary bg-primary text-primary-foreground"
-                        : "border-input bg-background hover:bg-accent"
-                    }`}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {value}
-                  </button>
-                ))}
-              </div>
+              <CategoryButtons options={travelCategories} value={category} onChange={setCategory} />
             </div>
 
             <div className="space-y-2">
@@ -131,7 +118,7 @@ export default function NewTripPage() {
               <label htmlFor="currency" className="text-sm font-medium">Default currency</label>
               <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
                 {currencies.map((c) => (
-                  <option key={c.code} value={c.code}>{c.code} \u2014 {c.name}</option>
+                  <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
                 ))}
               </select>
               <p className="text-xs text-muted-foreground">Each expense can still use a different currency. Totals are also shown in USD.</p>

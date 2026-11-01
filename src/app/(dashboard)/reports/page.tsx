@@ -156,7 +156,7 @@ export default async function ReportsPage() {
                     <div>
                       <p className="font-medium">{trip.name}</p>
                       <p className="text-sm text-muted-foreground">
-                        {trip.expenses?.length || 0} expenses \u00b7 {formatCurrency(total, "USD")}
+                        {trip.expenses?.length || 0} expenses · {formatCurrency(total, "USD")}
                       </p>
                     </div>
                     <div className="flex gap-2">

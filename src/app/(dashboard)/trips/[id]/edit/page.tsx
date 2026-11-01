@@ -7,18 +7,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Trash2, Users, Building2, MapPin, FileText } from "lucide-react";
+import { ArrowLeft, Trash2, } from "lucide-react";
+import { CategoryButtons } from "@/components/ui/category-buttons";
+import { useTravelCategories } from "@/lib/use-categories";
 import { useCurrencies } from "@/lib/use-currencies";
-
-const TRAVEL_CATEGORIES = [
-  { value: "Client Meeting", icon: Users },
-  { value: "Conference", icon: Building2 },
-  { value: "Strategy Session", icon: MapPin },
-  { value: "Internal Review", icon: FileText },
-] as const;
 
 export default function EditTripPage() {
   const currencies = useCurrencies();
+  const travelCategories = useTravelCategories();
   const params = useParams();
   const tripId = params.id as string;
   const router = useRouter();
@@ -105,7 +101,7 @@ export default function EditTripPage() {
         </CardHeader>
         <CardContent>
           {!loaded ? (
-            <p className="text-sm text-muted-foreground">Loading\u2026</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
@@ -120,23 +116,7 @@ export default function EditTripPage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Travel Category</label>
-                <div className="flex flex-wrap gap-2">
-                  {TRAVEL_CATEGORIES.map(({ value, icon: Icon }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setCategory(value)}
-                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                        category === value
-                          ? "border-primary bg-primary text-primary-foreground"
-                          : "border-input bg-background hover:bg-accent"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4" />
-                      {value}
-                    </button>
-                  ))}
-                </div>
+                <CategoryButtons options={travelCategories} value={category} onChange={setCategory} />
               </div>
 
               <div className="space-y-2">
@@ -150,7 +130,7 @@ export default function EditTripPage() {
               <div className="space-y-2">
                 <label htmlFor="currency" className="text-sm font-medium">Default currency</label>
                 <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm">
-                  {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} \u2014 {c.name}</option>)}
+                  {currencies.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.name}</option>)}
                 </select>
               </div>
               <div className="space-y-2">

@@ -8,12 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Camera, Trash2, Upload, X } from "lucide-react";
+import { CategoryButtons } from "@/components/ui/category-buttons";
+import { useExpenseCategories } from "@/lib/use-categories";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
 
-const FALLBACK_CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function EditExpensePage() {
@@ -31,7 +32,7 @@ export default function EditExpensePage() {
   const [currency, setCurrency] = useState("USD");
   const [rate, setRate] = useState("1");
   const [category, setCategory] = useState("Other");
-  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
+  const categories = useExpenseCategories();
   const [expenseDate, setExpenseDate] = useState("");
   const [notes, setNotes] = useState("");
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
@@ -40,14 +41,6 @@ export default function EditExpensePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    supabase.from("categories").select("name").eq("enabled", true).order("sort_order").then(({ data }) => {
-      if (data && data.length > 0) {
-        setCategories(data.map((c) => c.name));
-      }
-    });
-  }, [supabase]);
 
   useEffect(() => {
     supabase.from("expenses").select("*").eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
@@ -161,7 +154,7 @@ export default function EditExpensePage() {
         </CardHeader>
         <CardContent>
           {!loaded ? (
-            <p className="text-sm text-muted-foreground">Loading\u2026</p>
+            <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             <form onSubmit={save} className="space-y-4">
               <div className="space-y-2">
@@ -171,7 +164,7 @@ export default function EditExpensePage() {
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={shownImage} alt="Receipt" className="w-full rounded-lg border max-h-80 object-contain bg-muted" />
                     {preview && <button type="button" onClick={clearNew} className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white" aria-label="Cancel new receipt"><X className="h-4 w-4" /></button>}
-                    {preview && <p className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-1 rounded">New receipt \u2014 save to keep it</p>}
+                    {preview && <p className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-1 rounded">New receipt — save to keep it</p>}
                   </div>
                 ) : <p className="text-sm text-muted-foreground">No receipt uploaded yet.</p>}
                 <div className="grid grid-cols-2 gap-2">
@@ -213,9 +206,7 @@ export default function EditExpensePage() {
 
               <div className="space-y-2">
                 <label className="text-sm font-medium">Category</label>
-                <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                  {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
-                </select>
+                <CategoryButtons options={categories} value={category} onChange={setCategory} />
               </div>
 
               <div className="space-y-2">
