@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette, Coins, Send, Tag, Users, Briefcase } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, Briefcase, LifeBuoy } from "lucide-react";
 
 const sections = [
   {
     href: "/admin/branding",
     title: "Branding",
-    description: "App name, logo, and primary color.",
+    description: "App name, logo and size, primary color, privacy policy, and support email.",
     icon: Palette,
   },
   {
@@ -28,6 +28,12 @@ const sections = [
     title: "Travel Categories",
     description: "Manage the trip types offered when creating a trip.",
     icon: Briefcase,
+  },
+  {
+    href: "/admin/support",
+    title: "Support Requests",
+    description: "Messages sent from the login screen contact form.",
+    icon: LifeBuoy,
   },
   {
     href: "/admin/telegram",

@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette, Upload, ImageIcon } from "lucide-react";
+import { Palette, Upload, ImageIcon, Plane } from "lucide-react";
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -23,6 +23,9 @@ export default function AdminBrandingPage() {
   const [appName, setAppName] = useState("Travel Expense Tracker");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
+  const [logoSize, setLogoSize] = useState(56);
+  const [privacyPolicy, setPrivacyPolicy] = useState("");
+  const [supportEmail, setSupportEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -40,6 +43,9 @@ export default function AdminBrandingPage() {
         setAppName(data.app_name || "Travel Expense Tracker");
         setLogoUrl(data.logo_url);
         setPrimaryColor(data.primary_color || "#4f46e5");
+        setLogoSize(data.login_logo_size || 56);
+        setPrivacyPolicy(data.privacy_policy || "");
+        setSupportEmail(data.support_email || "");
       }
     }
     load();
@@ -100,6 +106,9 @@ export default function AdminBrandingPage() {
         app_name: appName,
         logo_url: logoUrl,
         primary_color: primaryColor,
+        login_logo_size: logoSize,
+        privacy_policy: privacyPolicy.trim() || null,
+        support_email: supportEmail.trim() || null,
         updated_at: new Date().toISOString(),
         updated_by: user.id,
       };
@@ -115,7 +124,12 @@ export default function AdminBrandingPage() {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
     } catch (err: unknown) {
-      setError(getErrorMessage(err));
+      const msg = getErrorMessage(err);
+      setError(
+        /column|schema cache/i.test(msg)
+          ? `${msg}. Run supabase/migration_login_support.sql in the Supabase SQL Editor, then try again.`
+          : msg
+      );
     } finally {
       setLoading(false);
     }
@@ -133,6 +147,7 @@ export default function AdminBrandingPage() {
         </p>
       </div>
 
+      <form onSubmit={handleSave} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Logo</CardTitle>
@@ -170,9 +185,42 @@ export default function AdminBrandingPage() {
                 onChange={handleLogoUpload}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                PNG, JPG, SVG or WebP. Square works best.
+                PNG, JPG, SVG or WebP. Wide logos are fine.
               </p>
             </div>
+          </div>
+
+          <div className="space-y-2 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <label htmlFor="logo-size" className="text-sm font-medium">
+                Login screen logo size
+              </label>
+              <span className="text-sm text-muted-foreground tabular-nums">{logoSize}px</span>
+            </div>
+            <input
+              id="logo-size"
+              type="range"
+              min={32}
+              max={200}
+              step={4}
+              value={logoSize}
+              onChange={(e) => setLogoSize(Number(e.target.value))}
+              className="w-full"
+            />
+            <div className="flex min-h-[120px] items-center justify-center rounded-xl border bg-slate-50 p-4">
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt="Login logo preview" style={{ height: logoSize, width: "auto", maxWidth: "100%" }} className="object-contain" />
+              ) : (
+                <div
+                  className="flex items-center justify-center rounded-xl"
+                  style={{ height: logoSize, width: logoSize, backgroundColor: primaryColor }}
+                >
+                  <Plane className="text-white" style={{ height: logoSize * 0.5, width: logoSize * 0.5 }} />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">Height of the logo on the login screen (32 to 200 px). Width follows the image.</p>
           </div>
         </CardContent>
       </Card>
@@ -182,7 +230,7 @@ export default function AdminBrandingPage() {
           <CardTitle>App name & color</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSave} className="space-y-4">
+          <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">App name</label>
               <Input
@@ -238,21 +286,62 @@ export default function AdminBrandingPage() {
               </button>
             </div>
 
-            {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
-            )}
-            {saved && (
-              <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
-                Branding saved. Refresh the page to see it everywhere.
-              </p>
-            )}
-
-            <Button type="submit" disabled={loading}>
-              {loading ? "Saving..." : "Save branding"}
-            </Button>
-          </form>
+          </div>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Privacy policy & support</CardTitle>
+          <CardDescription>
+            Shown from the login screen. &quot;Privacy Policy&quot; opens /privacy with the text below, and &quot;Contact
+            Support&quot; opens /contact, a form whose messages appear under Global Settings &rarr; Support Requests.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <label htmlFor="privacy" className="text-sm font-medium">
+              Privacy policy text
+            </label>
+            <textarea
+              id="privacy"
+              value={privacyPolicy}
+              onChange={(e) => setPrivacyPolicy(e.target.value)}
+              rows={12}
+              placeholder="Paste or write your privacy policy here. Line breaks are kept."
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+            />
+            <p className="text-xs text-muted-foreground">Plain text. Leave empty to show &quot;not published yet&quot;.</p>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="support-email" className="text-sm font-medium">
+              Support email
+            </label>
+            <Input
+              id="support-email"
+              type="email"
+              value={supportEmail}
+              onChange={(e) => setSupportEmail(e.target.value)}
+              placeholder="support@company.com"
+            />
+            <p className="text-xs text-muted-foreground">
+              Shown on the contact page. If the server has a RESEND_API_KEY, new messages are also emailed here.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+      {saved && (
+        <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+          Branding saved. Refresh the page to see it everywhere.
+        </p>
+      )}
+
+      <Button type="submit" disabled={loading}>
+        {loading ? "Saving..." : "Save branding"}
+      </Button>
+      </form>
     </div>
   );
 }

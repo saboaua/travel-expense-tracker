@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public routes that don't need further checks
-  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth"];
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support"];
   if (publicPaths.some((p) => path.startsWith(p))) {
     return response;
   }

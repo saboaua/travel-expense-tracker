@@ -18,6 +18,7 @@ export function canAccessPath(role: UserRole, path: string): boolean {
     if (path.startsWith("/admin/categories")) return false;
     if (path.startsWith("/admin/travel-categories")) return false;
     if (path.startsWith("/admin/settings")) return false;
+    if (path.startsWith("/admin/support")) return false;
     if (path.startsWith("/admin")) return true;
     return isUserPath(path);
   }

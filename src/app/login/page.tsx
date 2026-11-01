@@ -20,6 +20,7 @@ export default function LoginPage() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [appName, setAppName] = useState("Travel Expense Tracker");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
+  const [logoSize, setLogoSize] = useState(56);
   const router = useRouter();
   const supabase = createClient();
 
@@ -29,16 +30,23 @@ export default function LoginPage() {
 
   useEffect(() => {
     async function loadBranding() {
-      const { data } = await supabase
+      let { data } = await supabase
         .from("app_settings")
-        .select("app_name, logo_url, primary_color")
+        .select("app_name, logo_url, primary_color, login_logo_size")
         .eq("id", 1)
         .single();
+
+      if (!data) {
+        // login_logo_size column missing (migration not run yet): fall back to the basics
+        const basic = await supabase.from("app_settings").select("app_name, logo_url, primary_color").eq("id", 1).single();
+        data = basic.data as typeof data;
+      }
 
       if (data) {
         if (data.app_name) setAppName(data.app_name);
         if (data.logo_url) setLogoUrl(data.logo_url);
         if (data.primary_color) setPrimaryColor(data.primary_color);
+        if (data.login_logo_size) setLogoSize(Number(data.login_logo_size));
       }
     }
     loadBranding();
@@ -120,17 +128,20 @@ export default function LoginPage() {
               <img
                 src={logoUrl}
                 alt={appName}
-                className="h-14 w-14 object-contain rounded-xl"
+                style={{ height: logoSize, width: "auto", maxWidth: "100%" }}
+                className="object-contain"
               />
             ) : (
               <div
-                className="h-14 w-14 rounded-xl flex items-center justify-center shadow-lg"
+                className="rounded-xl flex items-center justify-center shadow-lg"
                 style={{
+                  height: logoSize,
+                  width: logoSize,
                   backgroundColor: primaryColor,
                   boxShadow: `0 10px 15px -3px ${primaryColor}40`,
                 }}
               >
-                <Plane className="h-7 w-7 text-white" strokeWidth={2} />
+                <Plane className="text-white" style={{ height: logoSize * 0.5, width: logoSize * 0.5 }} strokeWidth={2} />
               </div>
             )}
           </div>
@@ -256,11 +267,11 @@ export default function LoginPage() {
             256-bit SSL Encrypted
           </span>
           <span>·</span>
-          <Link href="#" className="hover:text-slate-600 transition-colors">
+          <Link href="/privacy" className="hover:text-slate-600 transition-colors">
             Privacy Policy
           </Link>
           <span>·</span>
-          <Link href="#" className="hover:text-slate-600 transition-colors">
+          <Link href="/contact" className="hover:text-slate-600 transition-colors">
             Contact Support
           </Link>
         </div>
