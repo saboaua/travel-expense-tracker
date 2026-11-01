@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home, Plane, FileText, Settings, LogOut, User, Shield, Users, Activity, Palette, Send, Coins,
+  Home, Plane, FileText, Settings, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
-import { canCreateUsers, canManageBranding, canManageCurrencies, canManageTelegram, canViewSecurity } from "@/lib/roles";
+import { canCreateUsers, canViewSecurity, canManageAppSettings } from "@/lib/roles";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -68,9 +68,7 @@ export function Sidebar() {
   const adminNav = [
     ...(canCreateUsers(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
     ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageBranding(role) ? [{ href: "/admin/branding", label: "Branding", icon: Palette }] : []),
-    ...(canManageCurrencies(role) ? [{ href: "/admin/currencies", label: "Currencies", icon: Coins }] : []),
-    ...(canManageTelegram(role) ? [{ href: "/admin/telegram", label: "Telegram", icon: Send }] : []),
+    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "App Settings", icon: SettingsIcon }] : []),
   ];
 
   const roleLabel = role === "admin" ? "Admin" : role === "assistant" ? "Assistant" : null;
