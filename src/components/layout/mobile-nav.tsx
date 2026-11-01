@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Palette, Send, Shield, LogOut, Coins } from "lucide-react";
+import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Shield, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
-import { canCreateUsers, canManageBranding, canManageCurrencies, canManageTelegram, canViewSecurity } from "@/lib/roles";
+import { canCreateUsers, canViewSecurity, canManageAppSettings } from "@/lib/roles";
 
 const mainItems = [
   { href: "/", label: "Home", icon: Home },
@@ -48,9 +48,7 @@ export function MobileNav() {
   const adminItems = [
     ...(canCreateUsers(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
     ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageBranding(role) ? [{ href: "/admin/branding", label: "Branding", icon: Palette }] : []),
-    ...(canManageCurrencies(role) ? [{ href: "/admin/currencies", label: "Currencies", icon: Coins }] : []),
-    ...(canManageTelegram(role) ? [{ href: "/admin/telegram", label: "Telegram", icon: Send }] : []),
+    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "App Settings", icon: Settings }] : []),
   ];
 
   const menuActive = pathname.startsWith("/settings") || pathname.startsWith("/admin");
