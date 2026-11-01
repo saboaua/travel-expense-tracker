@@ -18,6 +18,8 @@ create table if not exists public.trips (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.profiles(id) on delete cascade,
   name text not null,
+  destination text,
+  category text,
   start_date date not null,
   end_date date,
   currency text not null default 'USD',
@@ -47,6 +49,7 @@ create table if not exists public.expenses (
 -- Indexes
 create index if not exists idx_trips_user_id on public.trips(user_id);
 create index if not exists idx_trips_start_date on public.trips(start_date);
+create index if not exists idx_trips_status on public.trips(status);
 create index if not exists idx_expenses_trip_id on public.expenses(trip_id);
 create index if not exists idx_expenses_user_id on public.expenses(user_id);
 create index if not exists idx_expenses_expense_date on public.expenses(expense_date);
