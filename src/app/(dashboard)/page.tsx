@@ -2,11 +2,11 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plane, Receipt, TrendingUp, MapPin } from "lucide-react";
+import { Plane, Receipt, TrendingUp, MapPin, Clock } from "lucide-react";
 import { formatCurrency, formatDate, todayISO, daysBetween } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
 
-type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
+type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
 function usdOf(e: Expense) {
   if (e.amount_usd != null) return Number(e.amount_usd);
@@ -34,11 +34,13 @@ export default async function DashboardPage() {
 
   const { data: allExpenses } = await supabase
     .from("expenses")
-    .select("amount, amount_usd, currency")
+    .select("amount, amount_usd, currency, expense_date")
     .eq("user_id", user?.id);
 
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
+  const yearTotal =
+    allExpenses?.filter((e) => (e.expense_date || "").startsWith(today.slice(0, 4))).reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const endOf = (t: { start_date: string; end_date: string | null }) => t.end_date || t.start_date;
   const byStart = (x: { start_date: string }, y: { start_date: string }) => x.start_date.localeCompare(y.start_date);
 
@@ -57,16 +59,18 @@ export default async function DashboardPage() {
   // Featured = in progress, else the soonest upcoming, else the latest trip that has passed
   // but is still active (receipts can keep coming in until it is marked completed)
   const featured = ongoing[0] || upcoming[0] || ended[0] || null;
-  const otherActive = activeTripsList.filter((t) => t.id !== featured?.id);
   const destinationInfo = featured ? await getDestinationInfo(featured.destination) : null;
 
-  const tripState = (t: { start_date: string; end_date: string | null }) => {
+  const isPassed = (t: { start_date: string; end_date: string | null }) => endOf(t) < today;
+
+  // Badge on the hero photo
+  const heroBadge = (t: { start_date: string; end_date: string | null }) => {
     if (t.start_date > today) {
       const d = daysBetween(today, t.start_date);
-      return { label: d === 1 ? "Upcoming \u00b7 tomorrow" : `Upcoming \u00b7 in ${d} days`, cls: "bg-blue-100 text-blue-700" };
+      return { label: `Upcoming \u00b7 ${d} day${d !== 1 ? "s" : ""} left`, cls: "bg-emerald-500 text-white" };
     }
-    if (endOf(t) >= today) return { label: "In progress", cls: "bg-green-100 text-green-700" };
-    return { label: "Trip passed \u00b7 still active", cls: "bg-slate-100 text-slate-700" };
+    if (!isPassed(t)) return { label: "In progress", cls: "bg-blue-500 text-white" };
+    return { label: "Passed", cls: "bg-amber-500 text-white" };
   };
 
   return (
@@ -109,7 +113,7 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
+            <p className="text-3xl font-bold">{formatCurrency(yearTotal, "USD")}</p>
           </CardContent>
         </Card>
       </div>
@@ -119,7 +123,7 @@ export default async function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Active Trips</CardTitle>
-            <CardDescription>Stays here until you mark the trip completed</CardDescription>
+            <CardDescription>Your ongoing and upcoming travels</CardDescription>
           </div>
           <Link href="/trips">
             <Button variant="outline" size="sm">View all</Button>
@@ -134,85 +138,70 @@ export default async function DashboardPage() {
           ) : (
             <>
               {featured && (
-                <Link href={`/trips/${featured.id}`} className="block group">
-                  <div className="overflow-hidden rounded-xl border bg-card">
-                    <div className="relative h-44 md:h-56 bg-gradient-to-br from-slate-900 to-slate-700">
-                      {destinationInfo?.imageUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={destinationInfo.imageUrl}
-                          alt={featured.destination || featured.name}
-                          className="absolute inset-0 h-full w-full object-cover"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 to-black/65" />
-                      <div className="absolute inset-0 flex flex-col justify-end p-4 text-white">
-                        <div className="flex items-end justify-between gap-3">
-                          <div className="min-w-0">
-                            {featured.destination && (
-                              <p className="text-sm flex items-center gap-1 opacity-90">
-                                <MapPin className="h-3.5 w-3.5 shrink-0" />
-                                <span className="truncate">{featured.destination}</span>
-                              </p>
-                            )}
-                            <h3 className="text-xl font-semibold mt-0.5 truncate">{featured.name}</h3>
-                            <p className="text-sm opacity-90">
-                              {formatDate(featured.start_date)}
-                              {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
-                            </p>
-                          </div>
-                          <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${tripState(featured).cls}`}>
-                            {tripState(featured).label}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    {(destinationInfo?.summary || featured.category) && (
-                      <div className="p-4 space-y-2">
-                        {featured.category && (
-                          <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                            {featured.category}
-                          </span>
-                        )}
-                        {destinationInfo?.summary && (
-                          <p className="text-sm text-muted-foreground line-clamp-3">
-                            {destinationInfo.summary}
-                            <span className="text-xs opacity-70"> (Wikipedia)</span>
-                          </p>
-                        )}
-                      </div>
+                <Link href={`/trips/${featured.id}`} className="block">
+                  <div className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-slate-800 to-slate-600 md:h-52">
+                    {destinationInfo?.imageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={destinationInfo.imageUrl}
+                        alt={featured.destination || featured.name}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        referrerPolicy="no-referrer"
+                      />
                     )}
+                    <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/70" />
+                    <span
+                      className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold shadow ${heroBadge(featured).cls}`}
+                    >
+                      <Clock className="h-3 w-3" />
+                      {heroBadge(featured).label}
+                    </span>
+                    <div className="absolute inset-x-0 bottom-0 p-4 text-white">
+                      {featured.destination && (
+                        <p className="flex items-center gap-1 text-xs opacity-90">
+                          <MapPin className="h-3 w-3 shrink-0" />
+                          <span className="truncate">{featured.destination}</span>
+                        </p>
+                      )}
+                      <h3 className="mt-0.5 truncate text-xl font-semibold">{featured.name}</h3>
+                      <p className="text-sm opacity-90">
+                        {formatDate(featured.start_date)}
+                        {featured.end_date && ` - ${formatDate(featured.end_date)}`}
+                      </p>
+                    </div>
                   </div>
                 </Link>
               )}
 
-              {otherActive.map((trip) => {
+              {activeTripsList.map((trip) => {
                 const tripTotal =
                   trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
                 return (
                   <Link
                     key={trip.id}
                     href={`/trips/${trip.id}`}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
+                    className="flex items-center justify-between gap-3 rounded-xl border p-4 transition-colors hover:bg-accent"
                   >
-                    <div>
-                      <p className="font-medium">{trip.name}</p>
-                      {trip.destination && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3 w-3" /> {trip.destination}
-                        </p>
-                      )}
+                    <div className="min-w-0">
+                      <p className="truncate font-semibold">{trip.name}</p>
                       <p className="text-sm text-muted-foreground">
                         {formatDate(trip.start_date)}
                         {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 space-y-1 text-right">
                       <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${tripState(trip).cls}`}>
-                        {tripState(trip).label}
-                      </span>
+                      <div className="flex justify-end gap-1.5">
+                        {isPassed(trip) && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                            <Clock className="h-3 w-3" />
+                            Passed
+                          </span>
+                        )}
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                          active
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 );
