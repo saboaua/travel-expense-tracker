@@ -46,9 +46,10 @@ export function MobileNav() {
   };
 
   const adminItems = [
-    ...(canCreateUsers(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
+    // Users is under Global Settings for admins; assistants still get a direct link
+    ...(canCreateUsers(role) && !canManageAppSettings(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
     ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "App Settings", icon: Settings }] : []),
+    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: Settings }] : []),
   ];
 
   const menuActive = pathname.startsWith("/settings") || pathname.startsWith("/admin");

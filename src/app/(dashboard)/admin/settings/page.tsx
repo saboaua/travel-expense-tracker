@@ -41,9 +41,9 @@ export default function AdminSettingsPage() {
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">App Settings</h1>
+        <h1 className="text-2xl md:text-3xl font-bold">Global Settings</h1>
         <p className="text-muted-foreground mt-1">
-          Configure branding, currencies, categories, Telegram, and user roles.
+          Configure branding, currencies, categories, Telegram, and users.
         </p>
       </div>
 

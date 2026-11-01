@@ -66,9 +66,10 @@ export function Sidebar() {
   ];
 
   const adminNav = [
-    ...(canCreateUsers(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
+    // Users is under Global Settings for admins; assistants still get a direct link
+    ...(canCreateUsers(role) && !canManageAppSettings(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
     ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "App Settings", icon: SettingsIcon }] : []),
+    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: SettingsIcon }] : []),
   ];
 
   const roleLabel = role === "admin" ? "Admin" : role === "assistant" ? "Assistant" : null;
