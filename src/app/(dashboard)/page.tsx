@@ -54,8 +54,9 @@ export default async function DashboardPage() {
   const ended = activeAll.filter((t) => endOf(t) < today).sort((x, y) => byStart(y, x));
   const activeTripsList = [...ongoing, ...upcoming, ...ended];
 
-  // Featured = the soonest trip that is in progress or coming up
-  const featured = ongoing[0] || upcoming[0] || null;
+  // Featured = in progress, else the soonest upcoming, else the latest trip that has passed
+  // but is still active (receipts can keep coming in until it is marked completed)
+  const featured = ongoing[0] || upcoming[0] || ended[0] || null;
   const otherActive = activeTripsList.filter((t) => t.id !== featured?.id);
   const destinationInfo = featured ? await getDestinationInfo(featured.destination) : null;
 
@@ -65,7 +66,7 @@ export default async function DashboardPage() {
       return { label: d === 1 ? "Upcoming \u00b7 tomorrow" : `Upcoming \u00b7 in ${d} days`, cls: "bg-blue-100 text-blue-700" };
     }
     if (endOf(t) >= today) return { label: "In progress", cls: "bg-green-100 text-green-700" };
-    return { label: "Ended \u00b7 mark completed", cls: "bg-amber-100 text-amber-700" };
+    return { label: "Trip passed \u00b7 still active", cls: "bg-slate-100 text-slate-700" };
   };
 
   return (
@@ -118,7 +119,7 @@ export default async function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Active Trips</CardTitle>
-            <CardDescription>Your current and upcoming travels, soonest first</CardDescription>
+            <CardDescription>Stays here until you mark the trip completed</CardDescription>
           </div>
           <Link href="/trips">
             <Button variant="outline" size="sm">View all</Button>
