@@ -56,6 +56,7 @@ export default function ChangePasswordPage() {
           .from("profiles")
           .update({
             must_change_password: false,
+            temp_password_expires_at: null,
             updated_at: new Date().toISOString(),
           })
           .eq("id", user.id);

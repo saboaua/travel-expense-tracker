@@ -5,6 +5,10 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
+import { isTempPasswordExpired } from "@/lib/temp-password-config";
+
+const EXPIRED_MESSAGE =
+  "Your temporary password has expired. Please ask an administrator to generate a new one.";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -18,6 +22,10 @@ export default function LoginPage() {
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
   const router = useRouter();
   const supabase = createClient();
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("expired") === "1") setError(EXPIRED_MESSAGE);
+  }, []);
 
   useEffect(() => {
     async function loadBranding() {
@@ -71,6 +79,30 @@ export default function LoginPage() {
       setError(error.message);
       setLoading(false);
       return;
+    }
+
+    // Temporary passwords stop working after their expiry window
+    if (data.user) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("must_change_password")
+        .eq("id", data.user.id)
+        .single();
+      let expiresAt: string | null = null;
+      if (prof?.must_change_password) {
+        const { data: exp } = await supabase
+          .from("profiles")
+          .select("temp_password_expires_at")
+          .eq("id", data.user.id)
+          .single();
+        expiresAt = (exp?.temp_password_expires_at as string | null) ?? null;
+      }
+      if (isTempPasswordExpired(prof?.must_change_password, expiresAt)) {
+        await supabase.auth.signOut();
+        setError(EXPIRED_MESSAGE);
+        setLoading(false);
+        return;
+      }
     }
 
     await reportLoginEvent(true, { userId: data.user?.id });

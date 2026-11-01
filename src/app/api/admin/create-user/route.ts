@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { logAudit } from "@/lib/audit";
 import { canAssignRole, canCreateUsers, type UserRole } from "@/lib/roles";
+import { generateTempPassword, tempPasswordWindow } from "@/lib/temp-password";
 
 export async function POST(request: Request) {
   try {
@@ -28,14 +29,16 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    let { email, password, firstName, lastName, role } = body;
+    let { email, firstName, lastName, role } = body;
+    email = typeof email === "string" ? email.trim().toLowerCase() : "";
 
-    if (!email || !password) {
-      return NextResponse.json(
-        { error: "Email and password are required" },
-        { status: 400 }
-      );
+    if (!email) {
+      return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
+
+    // The temporary password is always generated on the server (secure RNG)
+    const password = generateTempPassword();
+    const { issuedAt, expiresAt } = tempPasswordWindow();
 
     // Assistants can only create regular users
     if (!canAssignRole(myRole)) {
@@ -87,7 +90,7 @@ export async function POST(request: Request) {
 
     const fullName = [firstName, lastName].filter(Boolean).join(" ") || null;
 
-    const { error: profileError } = await adminClient.from("profiles").upsert({
+    const baseProfile = {
       id: newUser.user.id,
       email,
       first_name: firstName || null,
@@ -96,7 +99,17 @@ export async function POST(request: Request) {
       role,
       must_change_password: true,
       updated_at: new Date().toISOString(),
+    };
+    let { error: profileError } = await adminClient.from("profiles").upsert({
+      ...baseProfile,
+      temp_password_issued_at: issuedAt,
+      temp_password_expires_at: expiresAt,
     });
+    if (profileError) {
+      // Fall back without the expiry columns (migration_temp_password.sql not run yet)
+      const retry = await adminClient.from("profiles").upsert(baseProfile);
+      profileError = retry.error;
+    }
 
     if (profileError) {
       console.error("Profile upsert failed:", profileError);
@@ -114,13 +127,19 @@ export async function POST(request: Request) {
         first_name: firstName,
         last_name: lastName,
         created_by_role: myRole,
+        temp_password_expires_at: expiresAt,
       },
-    });
+    }).catch((e) => console.error("Audit log failed:", e));
 
     return NextResponse.json({
       success: true,
       userId: newUser.user.id,
       email,
+      tempPassword: password,
+      expiresAt,
+      warning: profileError
+        ? `Account created, but the profile row could not be saved (${profileError.message}). Run the latest SQL migrations in Supabase.`
+        : undefined,
     });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal error";
