@@ -13,7 +13,7 @@ import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
 
-const CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
+const FALLBACK_CATEGORIES = ["Meals", "Transport", "Lodging", "Fuel", "Office Supplies", "Entertainment", "Other"];
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function EditExpensePage() {
@@ -31,6 +31,7 @@ export default function EditExpensePage() {
   const [currency, setCurrency] = useState("USD");
   const [rate, setRate] = useState("1");
   const [category, setCategory] = useState("Other");
+  const [categories, setCategories] = useState<string[]>(FALLBACK_CATEGORIES);
   const [expenseDate, setExpenseDate] = useState("");
   const [notes, setNotes] = useState("");
   const [receiptPath, setReceiptPath] = useState<string | null>(null);
@@ -39,6 +40,14 @@ export default function EditExpensePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.from("categories").select("name").eq("enabled", true).order("sort_order").then(({ data }) => {
+      if (data && data.length > 0) {
+        setCategories(data.map((c) => c.name));
+      }
+    });
+  }, [supabase]);
 
   useEffect(() => {
     supabase.from("expenses").select("*").eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
@@ -205,7 +214,7 @@ export default function EditExpensePage() {
               <div className="space-y-2">
                 <label className="text-sm font-medium">Category</label>
                 <select value={category} onChange={(e) => setCategory(e.target.value)} className={selectClass}>
-                  {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
+                  {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
 
