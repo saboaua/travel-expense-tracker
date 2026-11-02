@@ -110,16 +110,18 @@ export function Sidebar() {
         </nav>
 
         <div className="p-3 border-t space-y-1">
+          {/* Compact profile icon + role above dark mode (avoids repeating the welcome header avatar) */}
           <Link
             href="/profile"
             title="Your profile"
             className={cn(
-              "flex h-10 w-full items-center justify-start gap-3 rounded-md px-4 text-sm font-medium transition-colors",
+              "flex h-10 w-full items-center justify-start gap-3 rounded-md px-3 text-sm font-medium transition-colors",
               pathname.startsWith("/profile") ? "text-white" : "hover:bg-accent hover:text-accent-foreground"
             )}
             style={pathname.startsWith("/profile") ? { backgroundColor: primaryColor } : undefined}
           >
-            <User className="h-5 w-5" /> {roleLabel || "Profile"}
+            <User className="h-5 w-5 shrink-0" />
+            <span className="truncate">{roleLabel || "Profile"}</span>
           </Link>
           <ThemeToggle className="w-full justify-start gap-3" />
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>

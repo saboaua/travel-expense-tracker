@@ -14,16 +14,9 @@ type Props = {
   initials: string;
   avatarUrl: string | null;
   activeCount: number;
-  pill: { text: string; tone: "upcoming" | "progress" | "passed" } | null;
   /** Active trips, the most likely receipt target first */
   trips: HeaderTrip[];
 };
-
-const PILL_TONE = {
-  upcoming: { box: "border-emerald-200 bg-emerald-50 text-emerald-800", dot: "bg-emerald-500" },
-  progress: { box: "border-blue-200 bg-blue-50 text-blue-800", dot: "bg-blue-500" },
-  passed: { box: "border-amber-200 bg-amber-50 text-amber-800", dot: "bg-amber-500" },
-} as const;
 
 function greetingFor(hour: number) {
   if (hour < 12) return "Good morning";
@@ -31,7 +24,7 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, pill, trips }: Props) {
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips }: Props) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [greeting, setGreeting] = useState("Welcome back");
@@ -85,24 +78,14 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, p
   return (
     <>
       <div className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
-        <div className="flex items-center justify-between gap-3">
-          {pill ? (
-            <span className={`inline-flex min-w-0 items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold ${PILL_TONE[pill.tone].box}`}>
-              <span className={`h-2 w-2 shrink-0 rounded-full ${PILL_TONE[pill.tone].dot}`} />
-              <span className="truncate">{pill.text}</span>
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-2 rounded-full border bg-muted px-3 py-1 text-xs font-semibold text-muted-foreground">
-              <span className="h-2 w-2 rounded-full bg-slate-400" /> No active trips
-            </span>
-          )}
+        <div className="flex items-center justify-end gap-3">
           <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Your receipts and trips are saved to the cloud as you go" : "You are offline. Changes will not save until you reconnect."}>
             {online ? <ShieldCheck className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {online ? "Auto-Sync ON" : "Offline"}
           </span>
         </div>
 
-        <div className="mt-4 flex items-center gap-4">
+        <div className="mt-2 flex items-center gap-4">
           <Link href="/profile" className="relative shrink-0" aria-label="Open your profile">
             <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary text-lg font-semibold text-primary-foreground">
               {avatarUrl ? (
