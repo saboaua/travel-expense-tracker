@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Plane, Receipt, TrendingUp, MapPin, Clock } from "lucide-react";
 import { formatCurrency, formatDate, todayISO, daysBetween } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
+import { WeatherCard } from "@/components/WeatherCard";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -82,7 +83,7 @@ export default async function DashboardPage() {
         <p className="text-muted-foreground mt-1">Track your business travel expenses</p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
@@ -91,7 +92,7 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{activeCount}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{activeCount}</p>
           </CardContent>
         </Card>
         <Card>
@@ -102,10 +103,10 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
           </CardContent>
         </Card>
-        <Card className="col-span-2 md:col-span-1">
+        <Card>
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <TrendingUp className="h-4 w-4" />
@@ -113,9 +114,10 @@ export default async function DashboardPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{formatCurrency(yearTotal, "USD")}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(yearTotal, "USD")}</p>
           </CardContent>
         </Card>
+        <WeatherCard />
       </div>
 
       {/* Active Trips */}
