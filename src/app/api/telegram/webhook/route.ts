@@ -7,8 +7,9 @@ import {
   getFile,
   sendMessage,
 } from "@/lib/telegram";
-import { runReceiptOcr } from "@/lib/ocr";
-import { rateToUsd, toUsd } from "@/lib/currencies";
+import { runReceiptOcr, type OcrResult } from "@/lib/ocr";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractReceiptWithClaude } from "@/lib/ocr-ai";
+import { CURRENCIES, rateToUsd, toUsd } from "@/lib/currencies";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -234,17 +235,37 @@ async function saveReceipt(
     let merchant: string | null = null;
     let amount: number | null = null;
     let date: string | null = null;
+    let detectedCurrency: string | null = null;
+    let detectedCategory: string | null = null;
     let raw = "";
     let ocrNote = "";
+    let usedAi = false;
+
+    const { data: catRows } = await supabase.from("categories").select("name").eq("enabled", true);
+    const categoryNames = (catRows || []).map((c: { name: string }) => c.name);
+    const hints = { currency, categories: categoryNames };
 
     try {
-      const ocr = await withTimeout(
-        runReceiptOcr(new File([new Uint8Array(buf)], name, { type: mime })),
-        25000
-      );
+      let ocr: OcrResult | null = null;
+      if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
+        try {
+          ocr = await withTimeout(extractReceiptWithClaude({ data: new Uint8Array(buf), mime }, hints), 25000);
+          usedAi = true;
+        } catch (aiErr) {
+          console.error("telegram AI OCR failed, falling back", aiErr instanceof Error ? aiErr.message : aiErr);
+        }
+      }
+      if (!ocr) {
+        ocr = await withTimeout(
+          runReceiptOcr(new File([new Uint8Array(buf)], name, { type: mime }), hints),
+          25000
+        );
+      }
       merchant = ocr.merchant;
       amount = ocr.amount;
       date = ocr.date;
+      detectedCurrency = ocr.currency;
+      detectedCategory = ocr.category;
       raw = ocr.rawText;
     } catch (e) {
       ocrNote = e instanceof Error && e.message === "timeout"
@@ -254,8 +275,17 @@ async function saveReceipt(
 
     const expenseDate = date || new Date().toISOString().slice(0, 10);
     const finalAmount = amount ?? 0;
-    let rate = currency === "USD" ? 1 : 0;
-    try { rate = await rateToUsd(currency); } catch {}
+
+    // Use the currency printed on the receipt when AI read one that the app supports
+    let finalCurrency = currency;
+    if (usedAi && detectedCurrency && detectedCurrency !== currency) {
+      const { data: curRows } = await supabase.from("currencies").select("code").eq("enabled", true);
+      const supported = curRows && curRows.length > 0 ? curRows.map((c: { code: string }) => c.code) : CURRENCIES.map((c) => c.code);
+      if (supported.includes(detectedCurrency)) finalCurrency = detectedCurrency;
+    }
+
+    let rate = finalCurrency === "USD" ? 1 : 0;
+    try { rate = await rateToUsd(finalCurrency); } catch {}
     const usd = toUsd(finalAmount, rate);
 
     const notes = [
@@ -269,22 +299,23 @@ async function saveReceipt(
       user_id: profile.id,
       merchant,
       amount: finalAmount,
-      currency,
+      currency: finalCurrency,
       exchange_rate: rate,
       amount_usd: usd,
-      category: "Other",
+      category: detectedCategory || "Other",
       expense_date: expenseDate,
       notes,
       receipt_path: path,
-      ocr_raw: raw ? { text: raw.slice(0, 4000) } : null,
+      ocr_raw: raw ? { text: raw.slice(0, 4000), source: usedAi ? "ai" : "tesseract" } : null,
     });
     if (insErr) throw insErr;
 
     await sendMessage(chatId, [
       `Saved on <b>${trip?.name || "trip"}</b>`,
       merchant ? `Merchant: ${merchant}` : "Merchant: not detected",
-      amount != null ? `Amount: ${amount.toFixed(2)} ${currency}` : "Amount: not detected (saved as 0)",
-      currency !== "USD" ? `USD: ${usd.toFixed(2)}` : "",
+      amount != null ? `Amount: ${amount.toFixed(2)} ${finalCurrency}` : "Amount: not detected (saved as 0)",
+      finalCurrency !== "USD" ? `USD: ${usd.toFixed(2)}` : "",
+      detectedCategory ? `Category: ${detectedCategory}` : "",
       `Date: ${expenseDate}`,
       ocrNote ? `Note: ${ocrNote}` : "",
       "",

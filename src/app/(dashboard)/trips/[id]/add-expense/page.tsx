@@ -10,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
-import { runReceiptOcr } from "@/lib/ocr";
+import { extractReceipt } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
@@ -86,7 +86,10 @@ export default function AddExpensePage() {
     setOcrLoading(true);
     setOcrNote(null);
     try {
-      const result = await runReceiptOcr(selected);
+      const result = await extractReceipt(selected, {
+        currency,
+        categories: categories.map((c) => c.name),
+      });
       const filled: string[] = [];
       if (result.merchant && !merchant) {
         setMerchant(result.merchant);
@@ -100,7 +103,24 @@ export default function AddExpensePage() {
         setExpenseDate(result.date);
         filled.push("date");
       }
-      setOcrNote(filled.length > 0 ? `Auto-filled: ${filled.join(", ")}. Please verify before saving.` : "Could not detect fields automatically. Enter details manually.");
+      // Only switch currency to one the app supports (the rate loads automatically)
+      if (result.currency && result.currency !== currency && currencies.some((c) => c.code === result.currency)) {
+        setCurrency(result.currency);
+        filled.push(`currency (${result.currency})`);
+      }
+      const matchedCategory = result.category
+        ? categories.find((c) => c.name.toLowerCase() === result.category!.toLowerCase())
+        : null;
+      if (matchedCategory) {
+        setCategory(matchedCategory.name);
+        filled.push("category");
+      }
+      const how = result.source === "ai" ? "AI" : "basic OCR";
+      setOcrNote(
+        filled.length > 0
+          ? `Auto-filled (${how}): ${filled.join(", ")}. Please verify before saving.`
+          : "Could not detect fields automatically. Enter details manually."
+      );
     } catch {
       setOcrNote("OCR failed. Enter details manually.");
     } finally {
