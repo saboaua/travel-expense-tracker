@@ -45,3 +45,45 @@ export async function compressReceiptImage(
   const base = file.name.replace(/\.[^.]+$/, "") || "receipt";
   return new File([blob], `${base}.jpg`, { type: "image/jpeg", lastModified: Date.now() });
 }
+
+/**
+ * Profile photos: center-crop to a square, shrink to at most `size` px and save as JPEG.
+ * A 12 MP phone photo becomes roughly 30-80 KB. Transparent areas are filled white
+ * because JPEG has no alpha channel.
+ */
+export async function compressAvatarImage(
+  file: File,
+  options: { size?: number; quality?: number } = {}
+): Promise<File> {
+  const size = options.size ?? 512;
+  const quality = options.quality ?? 0.85;
+
+  if (!file.type.startsWith("image/")) throw new Error("Please choose an image file.");
+
+  // Respects the photo's EXIF rotation so portraits are not saved sideways
+  const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+  const side = Math.min(bitmap.width, bitmap.height);
+  const sx = Math.round((bitmap.width - side) / 2);
+  const sy = Math.round((bitmap.height - side) / 2);
+  const out = Math.min(side, size);
+
+  const canvas = document.createElement("canvas");
+  canvas.width = out;
+  canvas.height = out;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    bitmap.close();
+    throw new Error("Could not process this image.");
+  }
+
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(0, 0, out, out);
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(bitmap, sx, sy, side, side, 0, 0, out, out);
+  bitmap.close();
+
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  if (!blob) throw new Error("Could not process this image.");
+
+  return new File([blob], "avatar.jpg", { type: "image/jpeg", lastModified: Date.now() });
+}

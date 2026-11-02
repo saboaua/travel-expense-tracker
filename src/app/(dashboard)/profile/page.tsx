@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { compressAvatarImage } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -115,17 +116,40 @@ export default function ProfilePage() {
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
 
-      const ext = file.name.split(".").pop() || "jpg";
+      // Shrink and compress before upload so we never store a multi-megabyte original
+      let processed: File;
+      try {
+        processed = await compressAvatarImage(file);
+      } catch (compressErr) {
+        // Formats the browser cannot decode (e.g. HEIC on some browsers): only allow small originals
+        if (file.size > 500 * 1024) {
+          throw new Error(
+            compressErr instanceof Error && compressErr.message.startsWith("Please")
+              ? compressErr.message
+              : "This image format could not be processed. Please choose a JPG, PNG or WebP photo."
+          );
+        }
+        processed = file;
+      }
+
+      const ext = processed.type === "image/jpeg" ? "jpg" : processed.name.split(".").pop() || "jpg";
       const filePath = `${user.id}/avatar.${ext}`;
 
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, file, {
+        .upload(filePath, processed, {
           cacheControl: "3600",
           upsert: true,
+          contentType: processed.type || undefined,
         });
 
       if (uploadError) throw uploadError;
+
+      // Best effort: remove older full-size copies saved under other extensions
+      const stale = ["png", "jpeg", "webp", "heic", "gif"]
+        .map((x) => `${user.id}/avatar.${x}`)
+        .filter((x) => x !== filePath);
+      supabase.storage.from("avatars").remove(stale).catch(() => {});
 
       const {
         data: { publicUrl },
