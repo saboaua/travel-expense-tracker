@@ -1,6 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { canCreateUsers, type UserRole } from "@/lib/roles";
+import { getRequestMeta } from "@/lib/audit";
+import { writeSecurityEvent } from "@/lib/security-log";
 
 /** Verifies the caller is an admin/assistant and returns a service-role client. */
 export async function requireUserManager() {
@@ -12,7 +14,16 @@ export async function requireUserManager() {
 
   const { data: profile } = await supabase.from("profiles").select("role, email").eq("id", user.id).single();
   const myRole = (profile?.role as UserRole) || "user";
-  if (!canCreateUsers(myRole)) return { error: "Forbidden", status: 403 as const };
+  if (!canCreateUsers(myRole)) {
+    await writeSecurityEvent(await getRequestMeta(), {
+      eventType: "access_denied",
+      severity: "warning",
+      emailAttempted: user.email,
+      userId: user.id,
+      details: { api: "user management", role: myRole },
+    });
+    return { error: "Forbidden", status: 403 as const };
+  }
 
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
     return { error: "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY is not set.", status: 500 as const };

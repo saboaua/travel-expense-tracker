@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
-import { logSecurityEvent } from "@/lib/audit";
+import { logSecurityEvent, getRequestMeta } from "@/lib/audit";
+import { writeSecurityEvent } from "@/lib/security-log";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,16 @@ async function requireAdmin() {
   } = await supabase.auth.getUser();
   if (!user) return null;
   const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (data?.role !== "admin") return null;
+  if (data?.role !== "admin") {
+    await writeSecurityEvent(await getRequestMeta(), {
+      eventType: "access_denied",
+      severity: "warning",
+      emailAttempted: user.email,
+      userId: user.id,
+      details: { api: "security log", role: data?.role || "unknown" },
+    });
+    return null;
+  }
   return user;
 }
 

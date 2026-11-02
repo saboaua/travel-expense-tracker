@@ -208,6 +208,11 @@ export default function ProfilePage() {
     try {
       const { error } = await supabase.auth.updateUser({ password: newPassword });
       if (error) throw error;
+      fetch("/api/auth/password-changed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "profile" }),
+      }).catch(() => {});
       setPwSaved(true);
       setNewPassword("");
       setConfirmPassword("");

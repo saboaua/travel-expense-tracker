@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
-import { isTempPasswordExpired } from "@/lib/temp-password-config";
 
 const EXPIRED_MESSAGE =
   "Your temporary password has expired. Please ask an administrator to generate a new one.";
@@ -52,70 +51,31 @@ export default function LoginPage() {
     loadBranding();
   }, [supabase]);
 
-  const reportLoginEvent = async (
-    success: boolean,
-    opts?: { userId?: string; errorMessage?: string }
-  ) => {
-    try {
-      await fetch("/api/auth/login-event", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          success,
-          email,
-          userId: opts?.userId,
-          errorMessage: opts?.errorMessage,
-        }),
-      });
-    } catch {
-      // non-blocking
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json().catch(() => ({}));
 
-    if (error) {
-      await reportLoginEvent(false, { errorMessage: error.message });
-      setError(error.message);
-      setLoading(false);
-      return;
-    }
-
-    // Temporary passwords stop working after their expiry window
-    if (data.user) {
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("must_change_password")
-        .eq("id", data.user.id)
-        .single();
-      let expiresAt: string | null = null;
-      if (prof?.must_change_password) {
-        const { data: exp } = await supabase
-          .from("profiles")
-          .select("temp_password_expires_at")
-          .eq("id", data.user.id)
-          .single();
-        expiresAt = (exp?.temp_password_expires_at as string | null) ?? null;
-      }
-      if (isTempPasswordExpired(prof?.must_change_password, expiresAt)) {
-        await supabase.auth.signOut();
-        setError(EXPIRED_MESSAGE);
+      if (!res.ok) {
+        setError(data.error || "Could not sign in. Please try again.");
         setLoading(false);
         return;
       }
-    }
 
-    await reportLoginEvent(true, { userId: data.user?.id });
-    router.push("/");
-    router.refresh();
+      router.push("/");
+      router.refresh();
+    } catch {
+      setError("Network error. Please try again.");
+      setLoading(false);
+    }
   };
 
   return (

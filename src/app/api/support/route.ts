@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
+import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
+import { scanFields } from "@/lib/suspicious-input";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +18,12 @@ export async function POST(request: Request) {
 
   // Honeypot: real people never fill this hidden field. Pretend success so bots move on.
   if (typeof body.website === "string" && body.website.trim() !== "") {
+    await writeSecurityEvent(metaFromRequest(request), {
+      eventType: "support_spam",
+      severity: "warning",
+      emailAttempted: typeof body.email === "string" ? body.email.slice(0, 120) : null,
+      details: { reason: "honeypot filled" },
+    });
     return NextResponse.json({ success: true });
   }
 
@@ -30,6 +38,17 @@ export async function POST(request: Request) {
   if (subject.length > 150) return NextResponse.json({ error: "Subject is too long." }, { status: 400 });
   if (message.length < 10) return NextResponse.json({ error: "Please describe your question (at least 10 characters)." }, { status: 400 });
   if (message.length > 4000) return NextResponse.json({ error: "Message is too long (4000 characters max)." }, { status: 400 });
+
+  const meta = metaFromRequest(request);
+  const hits = scanFields({ name, email, subject, message });
+  if (hits.length) {
+    await writeSecurityEvent(meta, {
+      eventType: "suspicious_input",
+      severity: "warning",
+      emailAttempted: email.slice(0, 120),
+      details: { endpoint: "support", hits },
+    });
+  }
 
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return NextResponse.json({ error: "Support form is not configured yet." }, { status: 500 });
@@ -49,6 +68,12 @@ export async function POST(request: Request) {
     .eq("ip", ip)
     .gte("created_at", since);
   if ((count ?? 0) >= 5) {
+    await writeSecurityEvent(meta, {
+      eventType: "rate_limit",
+      severity: "warning",
+      emailAttempted: email.slice(0, 120),
+      details: { endpoint: "support", messages_last_hour: count },
+    });
     return NextResponse.json({ error: "Too many messages. Please try again later." }, { status: 429 });
   }
 

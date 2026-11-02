@@ -52,7 +52,7 @@ export default function ChangePasswordPage() {
       } = await supabase.auth.getUser();
 
       if (user) {
-        await supabase
+        const { error: clearErr } = await supabase
           .from("profiles")
           .update({
             must_change_password: false,
@@ -60,7 +60,20 @@ export default function ChangePasswordPage() {
             updated_at: new Date().toISOString(),
           })
           .eq("id", user.id);
+        if (clearErr) {
+          // Expiry column missing (migration not run yet): clear the flag alone
+          await supabase
+            .from("profiles")
+            .update({ must_change_password: false, updated_at: new Date().toISOString() })
+            .eq("id", user.id);
+        }
       }
+
+      fetch("/api/auth/password-changed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ source: "first_login" }),
+      }).catch(() => {});
 
       router.push("/");
       router.refresh();

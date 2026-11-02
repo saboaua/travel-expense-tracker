@@ -46,6 +46,13 @@ function eventLabel(type: string) {
     login_failed: "Login failed",
     logout: "Logout",
     brute_force: "Brute force detected",
+    login_blocked: "Login blocked (lockout)",
+    suspicious_input: "Suspicious input",
+    access_denied: "Access denied",
+    temp_password_expired: "Expired temp password used",
+    password_changed: "Password changed",
+    support_spam: "Support form spam",
+    rate_limit: "Rate limit hit",
   };
   return map[type] || type;
 }
@@ -133,6 +140,10 @@ export default function AdminSecurityPage() {
     failed: events.filter((e) => e.event_type === "login_failed").length,
     success: events.filter((e) => e.event_type === "login_success").length,
     brute: events.filter((e) => e.event_type === "brute_force").length,
+    blocked: events.filter((e) => e.event_type === "login_blocked").length,
+    suspicious: events.filter((e) => e.event_type === "suspicious_input").length,
+    denied: events.filter((e) => e.event_type === "access_denied").length,
+    pwChanges: events.filter((e) => e.event_type === "password_changed").length,
     ips: new Set(events.map((e) => e.ip_address).filter(Boolean)).size,
   };
 
@@ -167,6 +178,13 @@ export default function AdminSecurityPage() {
         <Card><CardHeader className="pb-2"><CardDescription>Successful logins</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold text-green-600">{stats.success}</p></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardDescription>Brute-force alerts</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold text-red-600">{stats.brute}</p></CardContent></Card>
         <Card><CardHeader className="pb-2"><CardDescription>Unique IPs</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold">{stats.ips}</p></CardContent></Card>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card><CardHeader className="pb-2"><CardDescription>Blocked logins</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold text-red-600">{stats.blocked}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardDescription>Suspicious input</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold text-amber-600">{stats.suspicious}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardDescription>Access denied</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold text-amber-600">{stats.denied}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardDescription>Password changes</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold">{stats.pwChanges}</p></CardContent></Card>
       </div>
 
       <Card>
@@ -214,6 +232,13 @@ export default function AdminSecurityPage() {
                   <option value="login_failed">Login failed</option>
                   <option value="logout">Logout</option>
                   <option value="brute_force">Brute force</option>
+                  <option value="login_blocked">Login blocked</option>
+                  <option value="suspicious_input">Suspicious input</option>
+                  <option value="access_denied">Access denied</option>
+                  <option value="temp_password_expired">Expired temp password</option>
+                  <option value="password_changed">Password changed</option>
+                  <option value="support_spam">Support form spam</option>
+                  <option value="rate_limit">Rate limit</option>
                 </select>
               </div>
               <div>

@@ -3,6 +3,7 @@ import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
 import { canAccessPath, type UserRole } from "@/lib/roles";
+import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 
 export async function middleware(request: NextRequest) {
   // First refresh the session
@@ -16,7 +17,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public routes that don't need further checks
-  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support"];
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login"];
   if (publicPaths.some((p) => path.startsWith(p))) {
     return response;
   }
@@ -71,6 +72,13 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/login";
       url.search = "?expired=1";
+      await writeSecurityEvent(metaFromRequest(request), {
+        eventType: "temp_password_expired",
+        severity: "warning",
+        emailAttempted: user.email,
+        userId: user.id,
+        details: { path, where: "middleware" },
+      });
       const redirect = NextResponse.redirect(url);
       request.cookies
         .getAll()
@@ -89,6 +97,13 @@ export async function middleware(request: NextRequest) {
     if (path.startsWith("/admin")) {
       const role = ((profile?.role as UserRole) || "user");
       if (!canAccessPath(role, path)) {
+        await writeSecurityEvent(metaFromRequest(request), {
+          eventType: "access_denied",
+          severity: "warning",
+          emailAttempted: user.email,
+          userId: user.id,
+          details: { path, role },
+        });
         const url = request.nextUrl.clone();
         url.pathname = "/";
         return NextResponse.redirect(url);
