@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home, Plane, FileText, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon,
+  Home, Plane, FileText, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -23,6 +23,7 @@ export function Sidebar() {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [appName, setAppName] = useState("Expense Tracker");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
+  const [personalEnabled, setPersonalEnabled] = useState(true);
 
   useEffect(() => {
     async function load() {
@@ -36,6 +37,9 @@ export function Sidebar() {
           document.documentElement.style.setProperty("--brand-primary", settings.primary_color);
         }
       }
+      // Separate query so the sidebar keeps working before the personal migration has been run
+      const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
+      if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
       if (!user) return;
       const { data } = await supabase.from("profiles").select("first_name, last_name, full_name, avatar_url, role").eq("id", user.id).single();
       if (data) {
@@ -61,6 +65,7 @@ export function Sidebar() {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/trips", label: "Trips", icon: Plane },
     { href: "/reports", label: "Reports", icon: FileText },
+    ...(personalEnabled ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
     { href: "/profile", label: "Profile", icon: User },
   ];
 

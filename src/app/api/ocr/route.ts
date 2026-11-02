@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractReceiptWithClaude } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractGroceryWithClaude, extractReceiptWithClaude } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -59,11 +59,15 @@ export async function POST(request: Request) {
   }
   const currency = String(form.get("currency") || "").toUpperCase();
 
+  const image = { data: new Uint8Array(await file.arrayBuffer()), mime: file.type };
+  const hints = { currency: /^[A-Z]{3}$/.test(currency) ? currency : null, categories };
+
   try {
-    const result = await extractReceiptWithClaude(
-      { data: new Uint8Array(await file.arrayBuffer()), mime: file.type },
-      { currency: /^[A-Z]{3}$/.test(currency) ? currency : null, categories }
-    );
+    if (form.get("mode") === "grocery") {
+      const result = await extractGroceryWithClaude(image, hints);
+      return NextResponse.json({ result });
+    }
+    const result = await extractReceiptWithClaude(image, hints);
     return NextResponse.json({ result });
   } catch (e) {
     console.error("[ocr]", e instanceof Error ? e.message : e);

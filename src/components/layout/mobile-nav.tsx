@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Shield, LogOut } from "lucide-react";
+import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,11 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import type { UserRole } from "@/lib/roles";
 import { canCreateUsers, canViewSecurity, canManageAppSettings } from "@/lib/roles";
 
-const mainItems = [
+const baseItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/trips", label: "Trips", icon: Plane },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/personal", label: "Personal", icon: Wallet },
   { href: "/profile", label: "Profile", icon: User },
 ];
 
@@ -24,6 +25,7 @@ export function MobileNav() {
   const supabase = createClient();
   const [open, setOpen] = useState(false);
   const [role, setRole] = useState<UserRole>("user");
+  const [personalEnabled, setPersonalEnabled] = useState(true);
 
   useEffect(() => { setOpen(false); }, [pathname]);
 
@@ -33,6 +35,8 @@ export function MobileNav() {
       if (!user) return;
       const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
       if (data?.role) setRole(data.role as UserRole);
+      const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
+      if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
     }
     loadRole();
   }, [supabase]);
@@ -52,6 +56,7 @@ export function MobileNav() {
     ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: Settings }] : []),
   ];
 
+  const mainItems = personalEnabled ? baseItems : baseItems.filter((i) => i.href !== "/personal");
   const menuActive = pathname.startsWith("/admin");
 
   return (

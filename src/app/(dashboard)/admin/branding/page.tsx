@@ -26,6 +26,7 @@ export default function AdminBrandingPage() {
   const [logoSize, setLogoSize] = useState(56);
   const [privacyPolicy, setPrivacyPolicy] = useState("");
   const [supportEmail, setSupportEmail] = useState("");
+  const [personalEnabled, setPersonalEnabled] = useState(true);
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -46,6 +47,7 @@ export default function AdminBrandingPage() {
         setLogoSize(data.login_logo_size || 56);
         setPrivacyPolicy(data.privacy_policy || "");
         setSupportEmail(data.support_email || "");
+        setPersonalEnabled(data.personal_enabled !== false);
       }
     }
     load();
@@ -109,6 +111,7 @@ export default function AdminBrandingPage() {
         login_logo_size: logoSize,
         privacy_policy: privacyPolicy.trim() || null,
         support_email: supportEmail.trim() || null,
+        personal_enabled: personalEnabled,
         updated_at: new Date().toISOString(),
         updated_by: user.id,
       };
@@ -328,6 +331,22 @@ export default function AdminBrandingPage() {
               Shown on the contact page. If the server has a RESEND_API_KEY, new messages are also emailed here.
             </p>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Personal section</CardTitle>
+          <CardDescription>
+            Lets each person track their own groceries, home projects and personal trips. That data is private to the
+            user: admins cannot see it. Turn this off to hide the section for everyone.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={personalEnabled} onChange={(e) => setPersonalEnabled(e.target.checked)} />
+            Enable the Personal section
+          </label>
         </CardContent>
       </Card>
 
