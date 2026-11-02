@@ -17,8 +17,6 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [role, setRole] = useState<UserRole>("user");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [appName, setAppName] = useState("Expense Tracker");
@@ -41,15 +39,8 @@ export function Sidebar() {
       const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
       if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
       if (!user) return;
-      const { data } = await supabase.from("profiles").select("first_name, last_name, full_name, avatar_url, role").eq("id", user.id).single();
-      if (data) {
-        const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || data.full_name || user.email?.split("@")[0] || "User";
-        setDisplayName(name);
-        setAvatarUrl(data.avatar_url);
-        setRole((data.role as UserRole) || "user");
-      } else {
-        setDisplayName(user.email?.split("@")[0] || "User");
-      }
+      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+      if (data) setRole((data.role as UserRole) || "user");
     }
     load();
   }, [supabase, pathname]);
@@ -66,7 +57,6 @@ export function Sidebar() {
     { href: "/trips", label: "Trips", icon: Plane },
     { href: "/reports", label: "Reports", icon: FileText },
     ...(personalEnabled ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
-    { href: "/profile", label: "Profile", icon: User },
   ];
 
   const adminNav = [
@@ -90,21 +80,6 @@ export function Sidebar() {
           )}
           <span className="font-semibold text-base truncate">{appName}</span>
         </div>
-
-        <Link href="/profile" className="flex items-center gap-3 px-4 py-3 border-b hover:bg-accent transition-colors">
-          <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center overflow-hidden shrink-0">
-            {avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={avatarUrl} alt={displayName || "User"} className="h-full w-full object-cover" />
-            ) : (
-              <User className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate">{displayName || "Loading..."}</p>
-            <p className="text-xs text-muted-foreground">{roleLabel ? `${roleLabel} \u00b7 Profile` : "View profile"}</p>
-          </div>
-        </Link>
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {userNav.map((item) => {
@@ -135,6 +110,17 @@ export function Sidebar() {
         </nav>
 
         <div className="p-3 border-t space-y-1">
+          <Link
+            href="/profile"
+            title="Your profile"
+            className={cn(
+              "flex h-10 w-full items-center justify-start gap-3 rounded-md px-4 text-sm font-medium transition-colors",
+              pathname.startsWith("/profile") ? "text-white" : "hover:bg-accent hover:text-accent-foreground"
+            )}
+            style={pathname.startsWith("/profile") ? { backgroundColor: primaryColor } : undefined}
+          >
+            <User className="h-5 w-5" /> {roleLabel || "Profile"}
+          </Link>
           <ThemeToggle className="w-full justify-start gap-3" />
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
             <LogOut className="h-5 w-5" /> Sign out
