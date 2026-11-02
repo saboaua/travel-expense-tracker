@@ -12,6 +12,7 @@ import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { extractReceipt } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
+import { takeQuickScan } from "@/lib/quick-scan";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
@@ -41,12 +42,31 @@ export default function AddExpensePage() {
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const categories = useExpenseCategories();
+  const [tripReady, setTripReady] = useState(false);
+  const quickHandled = useRef(false);
 
   useEffect(() => {
     supabase.from("trips").select("currency").eq("id", tripId).single().then(({ data }) => {
       if (data?.currency) setCurrency(data.currency);
+      setTripReady(true);
     });
   }, [supabase, tripId]);
+
+  // Photo taken with Quick Scan on the dashboard: load it and read it automatically
+  useEffect(() => {
+    if (!tripReady || quickHandled.current) return;
+    quickHandled.current = true;
+    if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
+    takeQuickScan(tripId).then((f) => {
+      if (!f) return;
+      setFile(f);
+      const reader = new FileReader();
+      reader.onload = () => setPreview(reader.result as string);
+      reader.readAsDataURL(f);
+      runOcrOnFile(f);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tripReady]);
 
   useEffect(() => {
     if (categories.length > 0 && !categories.some((c) => c.name === category)) setCategory(categories[0].name);

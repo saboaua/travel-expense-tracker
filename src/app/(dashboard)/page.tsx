@@ -3,7 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plane, Receipt, TrendingUp, MapPin, Clock } from "lucide-react";
-import { formatCurrency, formatDate, todayISO, daysBetween } from "@/lib/utils";
+import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
+import { DashboardHeader, type HeaderTrip } from "@/components/DashboardHeader";
 import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 
@@ -74,14 +75,53 @@ export default async function DashboardPage() {
     return { label: "Passed", cls: "bg-amber-500 text-white" };
   };
 
+  // Greeting identity: profile first name, else first word of the full name, else the email prefix
+  const firstName =
+    profile?.first_name || (profile?.full_name ? String(profile.full_name).split(" ")[0] : null) || user?.email?.split("@")[0] || null;
+  const initials = (
+    profile?.first_name && profile?.last_name
+      ? `${profile.first_name[0]}${profile.last_name[0]}`
+      : profile?.full_name
+        ? String(profile.full_name).split(" ").filter(Boolean).slice(0, 2).map((w: string) => w[0]).join("")
+        : (firstName || "?").slice(0, 2)
+  ).toUpperCase();
+
+  // Pill: "Panama in 18d • Nov 17–20"
+  const cityOf = (t: { destination: string | null; name: string }) => (t.destination?.split(",")[0].trim() || t.name);
+  let heroPill: { text: string; tone: "upcoming" | "progress" | "passed" } | null = null;
+  if (featured) {
+    const range = formatDateRange(featured.start_date, featured.end_date);
+    const city = cityOf(featured);
+    if (featured.start_date > today) {
+      const d = daysBetween(today, featured.start_date);
+      heroPill = { text: `${city} in ${d}d \u2022 ${range}`, tone: "upcoming" };
+    } else if (!isPassed(featured)) {
+      const total = daysBetween(featured.start_date, endOf(featured)) + 1;
+      const day = daysBetween(featured.start_date, today) + 1;
+      heroPill = { text: `${city} \u2022 Day ${day} of ${total} \u2022 ${range}`, tone: "progress" };
+    } else {
+      heroPill = { text: `${city} \u2022 Passed \u2022 ${range}`, tone: "passed" };
+    }
+  }
+
+  // Quick Scan target order: in progress, then still-open past trips (receipts keep arriving), then upcoming
+  const quickScanTrips: HeaderTrip[] = [...ongoing, ...ended, ...upcoming].map((t) => ({
+    id: t.id,
+    name: t.name,
+    destination: t.destination,
+    range: formatDateRange(t.start_date, t.end_date),
+  }));
+
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">
-          Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
-        </h1>
-        <p className="text-muted-foreground mt-1">Track your business travel expenses</p>
-      </div>
+      <DashboardHeader
+        firstName={firstName}
+        initials={initials}
+        avatarUrl={profile?.avatar_url || null}
+        activeCount={activeCount}
+        pill={heroPill}
+        trips={quickScanTrips}
+      />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>

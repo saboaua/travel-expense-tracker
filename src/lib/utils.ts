@@ -32,3 +32,14 @@ export function todayISO(timeZone = "America/Aruba") {
 export function daysBetween(from: string, to: string) {
   return Math.round((Date.parse(to) - Date.parse(from)) / 86400000);
 }
+
+/** "Nov 17–20", "Nov 28 – Dec 2" or "Dec 30, 2026 – Jan 2, 2027" from two YYYY-MM-DD strings. */
+export function formatDateRange(start: string, end?: string | null) {
+  const mon = (d: Date) => d.toLocaleDateString("en-US", { month: "short", timeZone: "UTC" });
+  const s = new Date(`${start}T00:00:00Z`);
+  if (!end || end === start) return `${mon(s)} ${s.getUTCDate()}`;
+  const e = new Date(`${end}T00:00:00Z`);
+  if (s.getUTCFullYear() !== e.getUTCFullYear()) return `${formatDate(start)} – ${formatDate(end)}`;
+  if (s.getUTCMonth() === e.getUTCMonth()) return `${mon(s)} ${s.getUTCDate()}\u2013${e.getUTCDate()}`;
+  return `${mon(s)} ${s.getUTCDate()} \u2013 ${mon(e)} ${e.getUTCDate()}`;
+}
