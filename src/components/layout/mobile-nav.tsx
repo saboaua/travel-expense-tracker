@@ -16,7 +16,6 @@ const baseItems = [
   { href: "/trips", label: "Trips", icon: Plane },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/personal", label: "Personal", icon: Wallet },
-  { href: "/profile", label: "Profile", icon: User },
 ];
 
 export function MobileNav() {
@@ -57,7 +56,7 @@ export function MobileNav() {
   ];
 
   const mainItems = personalEnabled ? baseItems : baseItems.filter((i) => i.href !== "/personal");
-  const menuActive = pathname.startsWith("/admin");
+  const menuActive = pathname.startsWith("/admin") || pathname.startsWith("/profile");
 
   return (
     <>
@@ -69,6 +68,18 @@ export function MobileNav() {
               <p className="font-semibold">Menu</p>
               <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-md text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
+
+            {/* Profile above admin / management */}
+            <Link
+              href="/profile"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium",
+                pathname.startsWith("/profile") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
+              )}
+            >
+              <User className="h-5 w-5" /> Profile
+            </Link>
+
             {adminItems.length > 0 && (
               <div className="space-y-1">
                 <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>
