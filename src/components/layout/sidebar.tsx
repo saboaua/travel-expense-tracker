@@ -66,8 +66,6 @@ export function Sidebar() {
     ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: SettingsIcon }] : []),
   ];
 
-  const roleLabel = role === "admin" ? "Admin" : role === "assistant" ? "Assistant" : null;
-
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">
       <div className="flex flex-col flex-1 min-h-0">
@@ -121,7 +119,7 @@ export function Sidebar() {
             style={pathname.startsWith("/profile") ? { backgroundColor: primaryColor } : undefined}
           >
             <User className="h-5 w-5 shrink-0" />
-            <span className="truncate">{roleLabel || "Profile"}</span>
+            <span className="truncate">Profile</span>
           </Link>
           <ThemeToggle className="w-full justify-start gap-3" />
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
