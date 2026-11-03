@@ -214,3 +214,88 @@ export async function buildYearlyWorkbook(params: {
 
   return workbook.xlsx.writeBuffer() as Promise<ExcelJS.Buffer>;
 }
+
+export async function buildMonthlyWorkbook(params: {
+  month: string; // YYYY-MM
+  expenses: Array<ExpenseRow & { tripName: string; destination: string | null }>;
+  userName?: string;
+  companyName?: string;
+}): Promise<ExcelJS.Buffer> {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = "Travel Expense Tracker";
+  workbook.created = new Date();
+
+  const sheet = workbook.addWorksheet("Expenses");
+  sheet.mergeCells("A1:K1");
+  sheet.getCell("A1").value = `Expenses for ${params.month}`;
+  sheet.getCell("A1").font = { bold: true, size: 16 };
+  if (params.userName) {
+    sheet.getCell("A2").value = "Prepared by";
+    sheet.getCell("B2").value = params.userName;
+  }
+  if (params.companyName) {
+    sheet.getCell("A3").value = "Company";
+    sheet.getCell("B3").value = params.companyName;
+  }
+
+  const headerRow = 5;
+  const headers = [
+    "Date",
+    "Trip Name",
+    "Destination",
+    "Merchant",
+    "Category",
+    "Amount",
+    "Currency",
+    "Rate to USD",
+    "Amount USD",
+    "Notes",
+    "Has Receipt",
+  ];
+  headers.forEach((h, i) => {
+    const cell = sheet.getCell(headerRow, i + 1);
+    cell.value = h;
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF4F46E5" } };
+  });
+
+  params.expenses.forEach((e, idx) => {
+    const row = headerRow + 1 + idx;
+    sheet.getCell(row, 1).value = e.expense_date;
+    sheet.getCell(row, 2).value = e.tripName || "";
+    sheet.getCell(row, 3).value = e.destination || "";
+    sheet.getCell(row, 4).value = e.merchant || "";
+    sheet.getCell(row, 5).value = e.category || "Other";
+    sheet.getCell(row, 6).value = Number(e.amount);
+    sheet.getCell(row, 6).numFmt = "#,##0.00";
+    sheet.getCell(row, 7).value = e.currency || "USD";
+    sheet.getCell(row, 8).value = e.exchange_rate != null ? Number(e.exchange_rate) : "";
+    sheet.getCell(row, 9).value = usdOf(e, e.currency || "USD");
+    sheet.getCell(row, 9).numFmt = "#,##0.00";
+    sheet.getCell(row, 10).value = e.notes || "";
+    sheet.getCell(row, 11).value = e.receipt_path ? "Yes" : "No";
+  });
+
+  const totalRow = headerRow + 1 + params.expenses.length;
+  sheet.getCell(totalRow, 8).value = "Total USD";
+  sheet.getCell(totalRow, 8).font = { bold: true };
+  sheet.getCell(totalRow, 9).value = params.expenses.reduce((s, e) => s + usdOf(e, e.currency || "USD"), 0);
+  sheet.getCell(totalRow, 9).font = { bold: true };
+  sheet.getCell(totalRow, 9).numFmt = "#,##0.00";
+
+  sheet.columns = [
+    { width: 12 },
+    { width: 28 },
+    { width: 24 },
+    { width: 28 },
+    { width: 16 },
+    { width: 12 },
+    { width: 10 },
+    { width: 14 },
+    { width: 14 },
+    { width: 30 },
+    { width: 12 },
+  ];
+
+  return workbook.xlsx.writeBuffer() as Promise<ExcelJS.Buffer>;
+}

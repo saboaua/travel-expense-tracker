@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { FileText, Download, Calendar, Archive } from "lucide-react";
 import { formatCurrency } from "@/lib/utils";
+import { MonthlyDownload } from "@/components/MonthlyDownload";
 
 type Expense = {
   amount: number;
@@ -112,6 +113,21 @@ export default async function ReportsPage() {
                 ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Monthly Report
+          </CardTitle>
+          <CardDescription>
+            Download an Excel of all expenses in a month (same columns as a trip report, plus Trip Name and Destination)
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <MonthlyDownload defaultMonth={currentMonth} />
         </CardContent>
       </Card>
 
