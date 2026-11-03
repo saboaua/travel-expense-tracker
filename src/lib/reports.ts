@@ -26,6 +26,20 @@ export function pctChange(now: number, before: number): number | null {
 
 export type CategorySlice = { category: string; total: number; pct: number };
 
+/** Top `max` categories by spend with the rest merged into "Other"; pct is the share of `total`. */
+export function categorySlices(cats: Map<string, number>, total: number, max = 6): CategorySlice[] {
+  let slices = [...cats.entries()].sort((a, b) => b[1] - a[1]).map(([category, t]) => ({ category, total: t }));
+  if (slices.length > max) {
+    const head = slices.slice(0, max - 1);
+    const rest = slices.slice(max - 1).reduce((sum, x) => sum + x.total, 0);
+    const existingOther = head.find((x) => x.category === "Other");
+    if (existingOther) existingOther.total += rest;
+    else head.push({ category: "Other", total: rest });
+    slices = head.sort((a, b) => b.total - a.total);
+  }
+  return slices.map((s) => ({ category: s.category, total: r2(s.total), pct: total > 0 ? Math.round((s.total / total) * 1000) / 10 : 0 }));
+}
+
 export type YearSummary = {
   year: number;
   total: number;
@@ -98,19 +112,7 @@ export function summarize(rows: ExpenseRow[], year: number, currentMonthKey: str
     }
   }
 
-  // Category slices: top N, the rest merged into "Other"
-  const sorted = [...cats.entries()].sort((a, b) => b[1] - a[1]);
-  let slices = sorted.map(([category, t]) => ({ category, total: t }));
-  if (slices.length > maxSlices) {
-    const head = slices.slice(0, maxSlices - 1);
-    const tail = slices.slice(maxSlices - 1);
-    const rest = tail.reduce((s, x) => s + x.total, 0);
-    const existingOther = head.find((x) => x.category === "Other");
-    if (existingOther) existingOther.total += rest;
-    else head.push({ category: "Other", total: rest });
-    slices = head.sort((a, b) => b.total - a.total);
-  }
-  const categories = slices.map((s) => ({ category: s.category, total: r2(s.total), pct: total > 0 ? Math.round((s.total / total) * 1000) / 10 : 0 }));
+  const categories = categorySlices(cats, total, maxSlices);
 
   // Focus month: this month for the current year, otherwise the biggest month
   let focus = monthly.indexOf(Math.max(...monthly));

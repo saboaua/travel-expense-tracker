@@ -43,3 +43,12 @@ export function formatDateRange(start: string, end?: string | null) {
   if (s.getUTCMonth() === e.getUTCMonth()) return `${mon(s)} ${s.getUTCDate()}\u2013${e.getUTCDate()}`;
   return `${mon(s)} ${s.getUTCDate()} \u2013 ${mon(e)} ${e.getUTCDate()}`;
 }
+
+/** "Today", "Yesterday" or "Tue, Oct 14" for a YYYY-MM-DD expense date. */
+export function formatDayHeading(date: string, today: string) {
+  if (date === today) return "Today";
+  const y = new Date(`${today}T00:00:00Z`);
+  y.setUTCDate(y.getUTCDate() - 1);
+  if (date === y.toISOString().slice(0, 10)) return "Yesterday";
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", timeZone: "UTC" });
+}
