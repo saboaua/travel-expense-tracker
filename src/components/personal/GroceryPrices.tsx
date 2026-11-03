@@ -26,7 +26,7 @@ export function GroceryPrices() {
   useEffect(() => {
     const supabase = createClient();
     fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
-      supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, line_total, grocery_receipts!inner(store, purchase_date, currency)").order("created_at", { ascending: false }).range(a, b)
+      supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").order("created_at", { ascending: false }).range(a, b)
     )
       .then((data) =>
         setRows(
@@ -36,6 +36,7 @@ export function GroceryPrices() {
             category: d.category,
             unit_price: Number(d.unit_price),
             quantity: Number(d.quantity),
+            unit: d.unit ?? null,
             line_total: Number(d.line_total),
             receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
           }))
@@ -121,7 +122,7 @@ export function GroceryPrices() {
                 </div>
                 <div className="flex shrink-0 items-center gap-3">
                   <Sparkline values={t.history.map((h) => h.price)} />
-                  <div className="text-right"><p className="font-semibold">{fmt(t.stats.last)}</p>{badge(t)}</div>
+                  <div className="text-right"><p className="font-semibold">{fmt(t.stats.last)}{t.unit ? <span className="text-xs font-normal text-muted-foreground">/{t.unit}</span> : null}</p>{badge(t)}</div>
                 </div>
               </button>
 

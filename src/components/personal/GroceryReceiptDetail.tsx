@@ -10,7 +10,7 @@ import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type Receipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null };
-type Item = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number };
+type Item = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null };
 
 export function GroceryReceiptDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -24,7 +24,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
     (async () => {
       const [r, i] = await Promise.all([
         supabase.from("grocery_receipts").select("*").eq("id", id).single(),
-        supabase.from("grocery_items").select("id, name, category, quantity, unit_price, line_total").eq("receipt_id", id).order("created_at"),
+        supabase.from("grocery_items").select("id, name, category, quantity, unit_price, unit, line_total").eq("receipt_id", id).order("created_at"),
       ]);
       if (!r.data) return setError(r.error?.message || "Receipt not found");
       setReceipt({ ...r.data, total: Number(r.data.total) });
@@ -76,7 +76,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
             <div key={it.id} className="flex items-center justify-between gap-3 border-b py-2 last:border-0">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{it.name}</p>
-                <p className="text-xs text-muted-foreground">{it.category}{it.quantity !== 1 ? ` · ${it.quantity} × ${fmt(it.unit_price)}` : ""}</p>
+                <p className="text-xs text-muted-foreground">{it.category}{it.unit ? ` · ${it.quantity} ${it.unit} × ${fmt(it.unit_price)}/${it.unit}` : it.quantity !== 1 ? ` · ${it.quantity} × ${fmt(it.unit_price)}` : ""}</p>
               </div>
               <p className="text-sm font-semibold tabular-nums">{fmt(it.line_total)}</p>
             </div>

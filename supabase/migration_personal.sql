@@ -135,3 +135,7 @@ create policy "Own grocery items" on public.grocery_items
   );
 
 notify pgrst, 'reload schema';
+
+-- Weighed items (added later): store the weight unit with the item
+alter table public.grocery_items add column if not exists unit text check (unit is null or char_length(unit) <= 8);
+notify pgrst, 'reload schema';

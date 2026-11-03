@@ -18,7 +18,7 @@ import { formatCurrency, todayISO } from "@/lib/utils";
 const selectClass = "flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 py-1 text-sm";
 const BACK = "/personal/groceries";
 
-type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string };
+type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string };
 const uid = () => Math.random().toString(36).slice(2);
 const money = (s: string) => {
   const n = parseFloat(s);
@@ -72,6 +72,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           unit_price: String(it.unit_price),
           line_total: String(it.line_total),
           category: it.category,
+          unit: it.unit || "",
         }))
       );
       if (r.data.receipt_path) {
@@ -98,6 +99,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           unit_price: it.unit_price.toFixed(2),
           line_total: it.line_total.toFixed(2),
           category: it.category,
+          unit: it.unit || "",
         }))
       );
       setNote(
@@ -171,6 +173,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             quantity: money(r.quantity),
             unit_price: money(r.unit_price),
             line_total: money(r.line_total),
+            ...(r.unit ? { unit: r.unit } : {}),
           }))
         );
         if (error) throw error;
@@ -236,7 +239,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">Items ({rows.length})</label>
-                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => setRows((rs) => [...rs, { key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: "Other" }])}>
+                <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => setRows((rs) => [...rs, { key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: "Other", unit: "" }])}>
                   <Plus className="h-4 w-4" /> Add item
                 </Button>
               </div>
@@ -249,9 +252,10 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  {r.unit && <p className="text-xs text-muted-foreground">Weighed: {money(r.quantity)} {r.unit} @ {formatCurrency(money(r.unit_price), currency)}/{r.unit}</p>}
                   <div className="grid grid-cols-3 gap-2">
-                    <div><label className="text-xs text-muted-foreground">Qty</label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => setQty(r, e.target.value)} /></div>
-                    <div><label className="text-xs text-muted-foreground">Price each</label><Input type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
+                    <div><label className="text-xs text-muted-foreground">{r.unit ? `Weight (${r.unit})` : "Qty"}</label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => setQty(r, e.target.value)} /></div>
+                    <div><label className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
                     <div><label className="text-xs text-muted-foreground">Line total</label><Input type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
                   <select className={selectClass} value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>

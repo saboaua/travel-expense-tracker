@@ -6,7 +6,7 @@
 /* ---------------- item name normalisation ---------------- */
 
 const SIZE_TOKENS = /\b\d+(?:[.,]\d+)?\s?(?:kg|kgs|g|gr|gm|lb|lbs|oz|l|lt|ltr|ml|cl|ct|pk|pkt|pack|pcs|pc|each|ea|dz|doz)\b/g;
-const STOP_WORDS = new Set(["the", "of", "a", "an", "and", "with", "fresh", "new", "pk", "pack"]);
+const STOP_WORDS = new Set(["the", "of", "a", "an", "and", "with", "fresh", "new", "pk", "pack", "kg", "kgs", "lb", "lbs", "awg", "usd", "eur", "ang", "for", "per", "st", "stuk"]);
 const ABBREVIATIONS: Record<string, string> = { org: "organic", chkn: "chicken", chk: "chicken", bnls: "boneless", whl: "whole", ff: "fat free", sk: "skim" };
 const KEEP_S = /(ss|us|is)$/;
 
@@ -46,9 +46,9 @@ export function normalizeItemName(name: string): string {
 
 const GROCERY_RULES: [string, RegExp][] = [
   ["Produce", /\b(banana|apple|orange|lemon|lime|grape|berry|berries|strawberr|avocado|tomato|potato|onion|garlic|lettuce|spinach|kale|cabbage|carrot|cucumber|pepper|broccoli|cauliflower|mango|pineapple|melon|papaya|herb|cilantro|parsley|produce|vegetable|fruit|salad)\w*\b/i],
-  ["Meat & Seafood", /\b(chicken|beef|pork|steak|bacon|sausage|ham|turkey|lamb|fish|salmon|tuna|shrimp|prawn|seafood|mince|ground\s+beef|ribs|fillet|meat)\b/i],
-  ["Dairy & Eggs", /\b(milk|cheese|yogurt|yoghurt|butter|cream|egg|eggs|margarine|cheddar|mozzarella|dairy)\b/i],
-  ["Bakery", /\b(bread|bun|buns|bagel|croissant|tortilla|cake|muffin|baguette|roll|rolls|bakery|pastry|donut)\b/i],
+  ["Meat & Seafood", /\b(kip|vlees|vis|chicken|beef|pork|steak|bacon|sausage|ham|turkey|lamb|fish|salmon|tuna|shrimp|prawn|seafood|mince|ground\s+beef|ribs|fillet|meat)\b/i],
+  ["Dairy & Eggs", /\b(kaas|melk|ei|eieren|boter|milk|cheese|gouda|muenster|edam|yogurt|yoghurt|butter|cream|egg|eggs|margarine|cheddar|mozzarella|dairy)\b/i],
+  ["Bakery", /\b(brood|bread|bun|buns|bagel|croissant|tortilla|cake|muffin|baguette|roll|rolls|bakery|pastry|donut)\b/i],
   ["Frozen", /\b(frozen|ice\s*cream|pizza|fries|popsicle|gelato)\b/i],
   ["Beverages", /\b(water|juice|soda|cola|coke|pepsi|sprite|beer|wine|rum|vodka|whisky|coffee|tea|drink|energy|lemonade|smoothie)\b/i],
   ["Snacks", /\b(chips|cracker|cookie|cookies|candy|chocolate|snack|popcorn|nuts|pretzel|biscuit|granola|bar)\b/i],
@@ -65,7 +65,77 @@ export function guessGroceryCategory(name: string): string {
 
 /* ---------------- line item parser (offline fallback) ---------------- */
 
-export type GroceryLine = { name: string; quantity: number; unit_price: number; line_total: number; category: string };
+export type GroceryLine = {
+  name: string;
+  quantity: number;
+  unit_price: number;
+  line_total: number;
+  category: string;
+  /** "kg" / "lb" / ... when quantity is a weight; null for counted items. */
+  unit?: string | null;
+};
+
+/* ---------------- receipt name clean-up and weight lines ---------------- */
+
+const CURRENCY_OR_UNIT_TAIL = /(?:\s+(?:kg|kgs|lb|lbs|awg|usd|eur|ang|cur|st))+\s*$/i;
+
+/** "MUENSTER JALAPENO YEL KG AWG" -> "Muenster Jalapeno Yel". Shouting names become Title Case. */
+export function cleanReceiptItemName(name: string): string {
+  let out = name.replace(/\s+/g, " ").trim();
+  for (let i = 0; i < 3 && CURRENCY_OR_UNIT_TAIL.test(out); i++) out = out.replace(CURRENCY_OR_UNIT_TAIL, "").trim();
+  const letters = out.replace(/[^A-Za-z]/g, "");
+  if (letters.length > 3 && letters === letters.toUpperCase()) {
+    out = out
+      .split(" ")
+      .map((w) => (/\d/.test(w) ? w : w.toLowerCase().replace(/(^|[/(-])(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase())))
+      .join(" ");
+  }
+  return out;
+}
+
+const WEIGHT_AT_START = /^(\d+(?:[.,]\d+)?)\s*(kg|kgs|lb|lbs|g|gr|oz)\b/i;
+
+/** A printed weight line such as "0.1219 kg for AWG 36.60/kg" or "0.750 kg @ 3.99/kg". */
+export function isWeightLine(name: string): boolean {
+  const m = name.trim().match(WEIGHT_AT_START);
+  if (!m) return false;
+  const rest = name.trim().slice(m[0].length);
+  return !/\p{L}{4,}/u.test(rest.replace(/\b(for|per|awg|usd|eur|ang)\b/gi, "")) && /(for|@|x|\/|per)/i.test(rest);
+}
+
+/**
+ * Fold weight lines into the product above: quantity becomes the weight, unit the weight unit and
+ * unit_price the price per unit. The weight line is never kept as an item and its price is not
+ * added again (the receipt prints the same amount on both lines).
+ */
+export function attachWeightLines(items: GroceryLine[]): GroceryLine[] {
+  const out: GroceryLine[] = [];
+  for (const it of items) {
+    const prev = out[out.length - 1];
+    if (isWeightLine(it.name) && prev) {
+      const m = it.name.trim().match(WEIGHT_AT_START)!;
+      const weight = parseFloat(m[1].replace(",", "."));
+      const unit = m[2].toLowerCase().replace(/^kgs$/, "kg").replace(/^lbs$/, "lb").replace(/^gr$/, "g");
+      const perUnit = it.name.match(/(\d+(?:[.,]\d+)?)\s*\/\s*(?:kg|lb|lbs|g|oz)/i);
+      if (weight > 0) {
+        if (!(prev.line_total > 0)) prev.line_total = it.line_total;
+        prev.quantity = weight;
+        prev.unit = unit;
+        prev.unit_price = perUnit ? parseFloat(perUnit[1].replace(",", ".")) : Math.round((prev.line_total / weight) * 100) / 100;
+      }
+      continue;
+    }
+    if (isWeightLine(it.name)) continue; // orphan weight line: drop rather than create a junk item
+    out.push({ ...it, name: cleanReceiptItemName(it.name), unit: it.unit ?? null });
+  }
+  return out;
+}
+
+/** Display text for a weighed item, e.g. "0.122 kg × 36.60/kg". */
+export function weightLabel(it: { quantity: number; unit_price: number; unit?: string | null }, fmt: (n: number) => string): string | null {
+  if (!it.unit) return null;
+  return `${Math.round(it.quantity * 1000) / 1000} ${it.unit} × ${fmt(it.unit_price)}/${it.unit}`;
+}
 
 const PRICE = /(-?\d{1,4}(?:[.,]\d{3})*[.,]\d{2})/;
 const STOP_SECTION = /\b(sub\s*-?\s*total|subtotal|total|amount\s*due|balance\s*due|grand\s*total)\b/i;
@@ -96,7 +166,7 @@ export function parseLineItems(text: string): GroceryLine[] {
       if (wl && pl) {
         const total = num(pl[1]);
         if (total > 0) {
-          items.push({ name: line, quantity: num(wl[1]), unit_price: num(wl[3]), line_total: total, category: guessGroceryCategory(line) });
+          items.push({ name: line, quantity: num(wl[1]), unit_price: num(wl[3]), line_total: total, category: guessGroceryCategory(line), unit: wl[2].toLowerCase() });
         }
         i += 2;
         continue;
@@ -112,6 +182,7 @@ export function parseLineItems(text: string): GroceryLine[] {
     let qty = 1;
     let unit: number | null = null;
     let total: number | null = null;
+    let weightUnit: string | null = null;
 
     if (lead) {
       qty = num(lead[1]);
@@ -141,6 +212,7 @@ export function parseLineItems(text: string): GroceryLine[] {
     if (w) {
       qty = num(w[1]);
       unit = num(w[3]);
+      weightUnit = w[2].toLowerCase();
       i++;
     }
 
@@ -149,9 +221,9 @@ export function parseLineItems(text: string): GroceryLine[] {
     if (qty <= 0 || !Number.isFinite(qty)) qty = 1;
     if (unit == null || !Number.isFinite(unit)) unit = Math.round((total / qty) * 100) / 100;
 
-    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: guessGroceryCategory(name) });
+    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: guessGroceryCategory(name), unit: weightUnit });
   }
-  return items;
+  return attachWeightLines(items);
 }
 
 /* ---------------- price statistics ---------------- */
@@ -217,6 +289,7 @@ export type TrackerRow = {
   category: string;
   unit_price: number;
   quantity: number;
+  unit?: string | null;
   line_total: number;
   receipt: { store: string; purchase_date: string; currency: string };
 };
@@ -225,6 +298,7 @@ export type TrackedItem = {
   key: string;
   name: string;
   currency: string;
+  unit: string | null;
   category: string;
   history: PricePoint[];
   stats: PriceStats;
@@ -235,7 +309,7 @@ export type TrackedItem = {
 export function buildTracker(rows: TrackerRow[]): TrackedItem[] {
   const map = new Map<string, { rows: TrackerRow[] }>();
   for (const r of rows) {
-    const key = `${r.receipt.currency}|${r.normalized_name}`;
+    const key = `${r.receipt.currency}|${r.normalized_name}|${r.unit ?? ""}`;
     const g = map.get(key) || { rows: [] };
     g.rows.push(r);
     map.set(key, g);
@@ -250,6 +324,7 @@ export function buildTracker(rows: TrackerRow[]): TrackedItem[] {
       key,
       name: latest.name,
       currency: latest.receipt.currency,
+      unit: latest.unit ?? null,
       category: latest.category,
       history,
       stats: priceStats(history)!,

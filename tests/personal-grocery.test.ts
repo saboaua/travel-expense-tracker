@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/personal-grocery.test.ts
-import { normalizeItemName, parseLineItems, priceStats, buildTracker, monthlyTotals, categoryTotals, topItems, guessGroceryCategory } from "../src/lib/personal/grocery";
+import { normalizeItemName, parseLineItems, priceStats, buildTracker, monthlyTotals, categoryTotals, topItems, guessGroceryCategory, attachWeightLines, cleanReceiptItemName, isWeightLine } from "../src/lib/personal/grocery";
 const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 
 eq(normalizeItemName("ORG BANANAS 1KG"), "banana organic", "org bananas 1kg");
@@ -35,9 +35,9 @@ VISA ****1234      23.46`;
 const items = parseLineItems(text);
 console.log(JSON.stringify(items));
 eq(items.length >= 4, true, "parsed at least 4 items");
-eq(items.find(i=>/BANANAS/.test(i.name))?.line_total, 2.49, "banana price");
-eq(items.find(i=>/MILK/.test(i.name))?.line_total, 1.89, "milk with F flag");
-eq(items.find(i=>/CHKN/.test(i.name))?.quantity, 3, "qty prefix 3 x");
+eq(items.find(i=>/BANANAS/i.test(i.name))?.line_total, 2.49, "banana price");
+eq(items.find(i=>/MILK/i.test(i.name))?.line_total, 1.89, "milk with F flag");
+eq(items.find(i=>/CHKN/i.test(i.name))?.quantity, 3, "qty prefix 3 x");
 eq(items.some(i=>/total|visa|tax|savings/i.test(i.name)), false, "no payment lines");
 
 const s = priceStats([
@@ -68,3 +68,22 @@ const its = [
  {receipt_id:"r4",category:"Pantry",name:"Rice",normalized_name:"rice",line_total:50}];
 eq(categoryTotals(receipts,its,"2026-10","USD"), [{category:"Produce",total:15},{category:"Dairy & Eggs",total:12}], "category totals");
 eq(topItems(receipts,its,"2026-10","USD",1), [{name:"Banana",total:15,count:2}], "top items");
+
+// ---- weighed items: the weight line must fold into the product above ----
+eq(cleanReceiptItemName("MUENSTER JALAPENO YEL KG AWG"), "Muenster Jalapeno Yel", "clean KG AWG");
+eq(cleanReceiptItemName("Gouda Jong Kaas"), "Gouda Jong Kaas", "mixed case untouched");
+eq(isWeightLine("0.1219 kg for"), true, "weight line (screenshot)");
+eq(isWeightLine("0.1219 kg for AWG 36.60/kg"), true, "weight line full");
+eq(isWeightLine("500g Rice"), false, "product with size is not a weight line");
+const folded = attachWeightLines([
+  {name:"MUENSTER JALAPENO YEL KG AWG",quantity:1,unit_price:4.46,line_total:4.46,category:"Other"},
+  {name:"0.1219 kg for AWG 36.60/kg",quantity:1,unit_price:4.46,line_total:4.46,category:"Other"},
+  {name:"GOUDA JONG KAAS KG AWG",quantity:1,unit_price:9.9,line_total:9.9,category:"Other"},
+  {name:"0.2705 kg for",quantity:1,unit_price:9.9,line_total:9.9,category:"Other"}]);
+eq(folded.length, 2, "weight lines removed");
+eq(folded[0], {name:"Muenster Jalapeno Yel",quantity:0.1219,unit_price:36.6,line_total:4.46,category:"Other",unit:"kg"}, "weight attached to product");
+eq(folded[1].unit_price, 36.6, "per-kg price derived when only weight printed");
+eq(folded.reduce((s,x)=>s+x.line_total,0), 14.36, "no double counting");
+const parsed = parseLineItems("MUENSTER JALAPENO YEL KG  4.46\n0.1219 kg @ 36.60/kg\nBREAD  2.50");
+eq(parsed.map(p=>[p.name,p.quantity,p.unit,p.line_total]), [["Muenster Jalapeno Yel",0.1219,"kg",4.46],["Bread",1,null,2.5]], "parseLineItems folds weight");
+eq(guessGroceryCategory("Gouda Jong Kaas"), "Dairy & Eggs", "dutch cheese");

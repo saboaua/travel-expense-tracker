@@ -4,7 +4,7 @@
  */
 import type { OcrHints, OcrResult } from "@/lib/ocr";
 import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
-import { guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
+import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 
 const DEFAULT_MODEL = "claude-haiku-5-5"; // override with OCR_MODEL
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
@@ -142,10 +142,13 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
     '- "currency": 3-letter ISO code if clear, otherwise null',
     '- "items": array with one entry per purchased product, in receipt order, each:',
     '    { "name": product name written out in readable words (expand obvious abbreviations, keep it short),',
-    '      "quantity": number bought (weight in kg/lb for weighed items), "unit_price": price per unit as a number,',
+    '      "quantity": number bought (the weight for weighed items), "unit": "kg" | "lb" | "g" for weighed items otherwise null,',
+    '      "unit_price": price per unit (per kg/lb for weighed items) as a number,',
     '      "line_total": amount charged for that line as a number,',
     `      "category": exactly one of ${JSON.stringify(GROCERY_CATEGORIES)} }`,
     "Rules:",
+    '- A weighed item prints a second line such as "0.1219 kg for AWG 36.60/kg". That is NOT a separate item: use it for the product above (quantity 0.1219, unit "kg", unit_price 36.60) and never list it on its own.',
+    "- Product names must not contain units or currency codes (drop trailing KG, AWG, USD).",
     "- Do NOT include subtotal, tax, total, payment, change, loyalty points or store messages as items.",
     "- Discount or coupon lines: subtract them from the product they belong to when obvious, otherwise leave them out.",
     "- unit_price x quantity should equal line_total; if only line_total is printed use quantity 1 or the printed quantity.",
@@ -191,8 +194,10 @@ export async function extractGroceryWithClaude(
     if (!Number.isFinite(unit) || unit < 0) unit = Math.round((total / qty) * 100) / 100;
     const category =
       typeof r.category === "string" ? GROCERY_CATEGORIES.find((c) => c.toLowerCase() === (r.category as string).toLowerCase()) : undefined;
-    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name) });
+    const rawUnit = typeof r.unit === "string" ? r.unit.toLowerCase().trim() : "";
+    const weightUnit = ["kg", "lb", "g", "oz"].includes(rawUnit) ? rawUnit : null;
+    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit });
   }
 
-  return { store: base.merchant, date: base.date, total: base.amount, currency: base.currency, items, source: "ai" };
+  return { store: base.merchant, date: base.date, total: base.amount, currency: base.currency, items: attachWeightLines(items), source: "ai" };
 }
