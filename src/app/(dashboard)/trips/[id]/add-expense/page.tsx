@@ -12,6 +12,7 @@ import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { extractReceipt } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
+import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
@@ -29,6 +30,7 @@ export default function AddExpensePage() {
 
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [pendingCrop, setPendingCrop] = useState<File | null>(null);
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -59,11 +61,7 @@ export default function AddExpensePage() {
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
     takeQuickScan(tripId).then((f) => {
       if (!f) return;
-      setFile(f);
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result as string);
-      reader.readAsDataURL(f);
-      runOcrOnFile(f);
+      setPendingCrop(f);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tripReady]);
@@ -148,18 +146,22 @@ export default function AddExpensePage() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files?.[0];
+    e.target.value = "";
     if (!selected) return;
+    setPendingCrop(selected);
+  };
 
+  const onCropped = async (cropped: File) => {
+    setPendingCrop(null);
     setOcrLoading(true);
-    let processed = selected;
+    let processed = cropped;
     try {
-      processed = await compressReceiptImage(selected);
+      processed = await compressReceiptImage(cropped);
     } catch {
-      // fall back to original if compression fails
+      // fall back to cropped if compression fails
     }
-
     setFile(processed);
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
@@ -304,6 +306,14 @@ export default function AddExpensePage() {
           </form>
         </CardContent>
       </Card>
+
+      {pendingCrop && (
+        <ReceiptCropper
+          file={pendingCrop}
+          onDone={onCropped}
+          onCancel={() => setPendingCrop(null)}
+        />
+      )}
     </div>
   );
 }

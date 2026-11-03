@@ -280,7 +280,7 @@ export default function AdminUsersPage() {
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="user">User — Dashboard, Trips, Reports, Profile, Settings</option>
+                  <option value="user">User — Dashboard, Trips, Reports, Personal, Profile, Settings</option>
                   <option value="assistant">Assistant — Same as User + create users (not roles)</option>
                   <option value="admin">Admin — Full access</option>
                 </select>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
 import { compressReceiptImage } from "@/lib/compress-image";
+import { ReceiptCropper } from "@/components/ReceiptCropper";
 
-/** Camera/upload picker with preview. Compresses the photo, then hands it to `onFile`. */
+/** Camera/upload picker with optional crop, then compresses and hands the file to `onFile`. */
 export function ReceiptCapture({
   preview,
   busy,
@@ -21,19 +22,26 @@ export function ReceiptCapture({
   onClear: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
+  const [pending, setPending] = useState<File | null>(null);
 
-  const handle = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    if (!selected) return;
-    let processed = selected;
+  const finish = async (file: File) => {
+    setPending(null);
+    let processed = file;
     try {
-      processed = await compressReceiptImage(selected, { maxSide });
+      processed = await compressReceiptImage(file, { maxSide });
     } catch {
-      // keep the original if compression is not possible
+      // keep as-is if compression fails
     }
     const reader = new FileReader();
     reader.onload = () => onFile(processed, reader.result as string);
     reader.readAsDataURL(processed);
+  };
+
+  const handle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files?.[0];
+    e.target.value = "";
+    if (!selected) return;
+    setPending(selected);
   };
 
   return (
@@ -88,6 +96,14 @@ export function ReceiptCapture({
         </div>
       )}
       <input ref={input} type="file" accept="image/*" className="hidden" onChange={handle} />
+
+      {pending && (
+        <ReceiptCropper
+          file={pending}
+          onDone={finish}
+          onCancel={() => setPending(null)}
+        />
+      )}
     </div>
   );
 }
