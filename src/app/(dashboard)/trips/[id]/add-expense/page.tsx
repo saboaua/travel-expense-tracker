@@ -19,6 +19,9 @@ import { takeQuickScan } from "@/lib/quick-scan";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { enqueueExpense, newExpenseId, pushExpense, type PushOutcome, type QueuedExpense } from "@/lib/offline-queue";
+import { makeSyncApi } from "@/lib/offline-api";
+import { SYNC_NOW_EVENT } from "@/components/OfflineSync";
 
 
 export default function AddExpensePage() {
@@ -44,6 +47,7 @@ export default function AddExpensePage() {
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [queuedNote, setQueuedNote] = useState<string | null>(null);
   const categories = useExpenseCategories();
   const [tripReady, setTripReady] = useState(false);
   const quickHandled = useRef(false);
@@ -177,42 +181,64 @@ export default function AddExpensePage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
+  const resetForm = () => {
+    clearImage();
+    setMerchant("");
+    setAmount("");
+    setNotes("");
+    setExpenseDate(todayISO());
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    setQueuedNote(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      let receiptPath: string | null = null;
-      if (file) {
-        const ext = file.name.split(".").pop() || "jpg";
-        const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from("receipts").upload(fileName, file, { cacheControl: "3600", upsert: false });
-        if (uploadError) throw uploadError;
-        receiptPath = fileName;
-      }
+      // The signed-in person is read from the device, so this works without a connection too.
+      const { data: { session } } = await supabase.auth.getSession();
+      const userId = session?.user.id;
+      if (!userId) throw new Error("Not authenticated");
 
       const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
       const amountNum = parseFloat(amount);
-      const { error: insertError } = await supabase.from("expenses").insert({
-        trip_id: tripId,
-        user_id: user.id,
+      const item: QueuedExpense = {
+        id: newExpenseId(),
+        userId,
+        tripId,
+        createdAt: Date.now(),
         merchant: merchant || null,
         amount: amountNum,
         currency,
-        exchange_rate: rateNum,
-        amount_usd: toUsd(amountNum, rateNum),
+        exchangeRate: rateNum,
+        amountUsd: toUsd(amountNum, rateNum),
         category,
-        expense_date: expenseDate,
+        expenseDate,
         notes: notes || null,
-        receipt_path: receiptPath,
-      });
-      if (insertError) throw insertError;
+        image: file,
+        imageName: file?.name ?? null,
+        uploaded: false,
+        status: "pending",
+        error: null,
+        attempts: 0,
+      };
 
-      router.push(`/trips/${tripId}`);
-      router.refresh();
+      // Online: save straight away, as before. No connection (or it drops mid-save): keep it on this device and send it later.
+      const outcome: PushOutcome = navigator.onLine ? await pushExpense(makeSyncApi(supabase), item) : { kind: "offline" };
+      if (outcome.kind === "synced") {
+        router.push(`/trips/${tripId}`);
+        router.refresh();
+        return;
+      }
+      if (outcome.kind === "offline") {
+        if (!(await enqueueExpense(item))) throw new Error("No connection, and this device could not keep the receipt. Please try again when you are online.");
+        setQueuedNote("Saved on this device. It will upload automatically when you are back online.");
+        resetForm();
+        window.dispatchEvent(new Event(SYNC_NOW_EVENT));
+        setLoading(false);
+        return;
+      }
+      throw new Error(outcome.message);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
@@ -303,6 +329,11 @@ export default function AddExpensePage() {
             </div>
 
             {error && <Alert>{error}</Alert>}
+            {queuedNote && (
+              <Alert variant="info">
+                {queuedNote} <Link href="/pending" className="font-medium underline">See waiting receipts</Link>
+              </Alert>
+            )}
             <Button type="submit" className="w-full" disabled={loading || ocrLoading}>{loading ? "Saving..." : "Save Expense"}</Button>
           </form>
         </CardContent>

@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { OfflineSync } from "@/components/OfflineSync";
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
         <main className="pb-20 md:pb-8">{children}</main>
       </div>
       <MobileNav />
+      <OfflineSync />
     </div>
   );
 }
