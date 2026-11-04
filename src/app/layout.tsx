@@ -4,6 +4,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotice } from "@/components/UpdateNotice";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { ConfirmProvider } from "@/components/ui/confirm";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -56,6 +57,7 @@ export default async function RootLayout({
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <UpdateNotice />
+        <PullToRefresh />
       </body>
     </html>
   );

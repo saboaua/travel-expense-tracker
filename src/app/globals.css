@@ -62,3 +62,9 @@
     font-size: 16px !important;
   }
 }
+
+/* Our own pull-to-refresh handles the gesture; this stops the browser's built-in one from firing as well. */
+html,
+body {
+  overscroll-behavior-y: contain;
+}
