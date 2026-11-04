@@ -77,7 +77,7 @@ const eq = (n: string, g: unknown, w: unknown) => { const ok = JSON.stringify(g)
 
   // --- supabase store maps rows
   const calls: string[] = [];
-  const rpc = async (fn: string, args: Record<string, unknown>) => {
+  const rpc = async (fn: string) => {
     calls.push(fn);
     if (fn === "throttle_status") return { data: [{ key: "pair:a|b", count: 3, locked_until: new Date(t + 60_000).toISOString() }], error: null };
     if (fn === "throttle_hit") return { data: [{ count: 2, locked_until: null }], error: null };

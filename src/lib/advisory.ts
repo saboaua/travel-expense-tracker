@@ -34,7 +34,6 @@ export type Advisory =
 export const ADVICE_HOME = "https://www.nederlandwereldwijd.nl/reisadvies";
 export const API_BASE = "https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes";
 
-const COLOUR_WORDS: Record<string, AdvisoryLevel> = { groen: "green", geel: "yellow", oranje: "orange", rood: "red" };
 const SEVERITY: Record<AdvisoryLevel, number> = { unknown: 0, green: 1, yellow: 2, orange: 3, red: 4 };
 
 export const LEVEL_META: Record<AdvisoryLevel, { label: string; meaning: string }> = {

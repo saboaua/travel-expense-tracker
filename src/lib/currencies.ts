@@ -35,11 +35,6 @@ const FIXED_USD: Record<string, number> = Object.fromEntries(
   CURRENCIES.filter((c) => c.usd_rate).map((c) => [c.code, c.usd_rate as number])
 );
 
-export function currencyLabel(code: string) {
-  const found = CURRENCIES.find((c) => c.code === code);
-  return found ? `${found.code} \u2014 ${found.name}` : code;
-}
-
 export function toUsd(amount: number, rate: number) {
   return Math.round(amount * rate * 100) / 100;
 }

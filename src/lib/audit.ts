@@ -70,33 +70,3 @@ export async function logSecurityEvent(params: {
   if (error) throw new Error(error.message);
 }
 
-export async function checkBruteForce(ip: string, email?: string) {
-  const supabase = getServiceClient();
-  const since = new Date(Date.now() - 15 * 60 * 1000).toISOString();
-  const { count } = await supabase
-    .from("security_events")
-    .select("*", { count: "exact", head: true })
-    .eq("event_type", "login_failed")
-    .eq("ip_address", ip)
-    .gte("created_at", since);
-
-  const failures = count || 0;
-  if (failures >= 10) {
-    await logSecurityEvent({
-      eventType: "brute_force",
-      severity: "critical",
-      emailAttempted: email,
-      details: { failures_in_15min: failures, ip },
-    });
-    return { blocked: true, failures };
-  }
-  if (failures >= 5) {
-    await logSecurityEvent({
-      eventType: "brute_force",
-      severity: "warning",
-      emailAttempted: email,
-      details: { failures_in_15min: failures, ip },
-    });
-  }
-  return { blocked: false, failures };
-}

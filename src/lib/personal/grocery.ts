@@ -131,12 +131,6 @@ export function attachWeightLines(items: GroceryLine[]): GroceryLine[] {
   return out;
 }
 
-/** Display text for a weighed item, e.g. "0.122 kg × 36.60/kg". */
-export function weightLabel(it: { quantity: number; unit_price: number; unit?: string | null }, fmt: (n: number) => string): string | null {
-  if (!it.unit) return null;
-  return `${Math.round(it.quantity * 1000) / 1000} ${it.unit} × ${fmt(it.unit_price)}/${it.unit}`;
-}
-
 const PRICE = /(-?\d{1,4}(?:[.,]\d{3})*[.,]\d{2})/;
 const STOP_SECTION = /\b(sub\s*-?\s*total|subtotal|total|amount\s*due|balance\s*due|grand\s*total)\b/i;
 const SKIP_LINE = /\b(tax|vat|btw|itbis|change|cash|tender(ed)?|visa|mastercard|amex|debit|credit|card|savings|you\s*saved|discount|coupon|points|rewards|approval|auth|ref|thank|receipt|cashier|store|tel|phone|www|survey|balance)\b/i;

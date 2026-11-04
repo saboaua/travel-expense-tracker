@@ -157,4 +157,3 @@ export function adminNavItems(roleKey: string, perms: Set<string>): AdminNavItem
   return out;
 }
 
-export const sectionVisible = (perms: Set<string>, key: string) => perms.has(key);

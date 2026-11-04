@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lock, Eye, EyeOff, Plane, ShieldCheck } from "lucide-react";
+import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 
 export default function ChangePasswordPage() {
   const [password, setPassword] = useState("");
