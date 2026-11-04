@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { Download, FileText, Loader2, Plus, Trash2, ShieldCheck, Image as ImageIcon } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Camera, Download, FileText, Loader2, Plus, Trash2, ShieldCheck, Sparkles, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate, todayISO } from "@/lib/utils";
 import { DOC_KINDS, kindHasExpiry, kindLabel, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
 import { DOC_ACCEPT, DOC_BUCKET, removeTravelDocument, saveTravelDocument } from "@/lib/document-upload";
+import { extractDocumentFields } from "@/lib/document-extract";
 
 const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 const LEVEL_STYLE = {
@@ -34,6 +35,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanNote, setScanNote] = useState<string | null>(null);
+  const camera = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -62,7 +66,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   useEffect(() => { load(); }, [load]);
 
-  const reset = () => { setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setKind(defaultKind); setAdding(false); };
+  const reset = () => { setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setKind(defaultKind); setAdding(false); setScanNote(null); };
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +87,43 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     } finally {
       setSaving(false);
     }
+  };
+
+  /** Reads the photo and fills the form. Existing typed values are only replaced when the scan found something. */
+  const scan = async (f: File) => {
+    setFile(f);
+    setScanNote(null);
+    setError(null);
+    setScanning(true);
+    try {
+      const { fields, source } = await extractDocumentFields(f);
+      if (source === "none") {
+        setScanNote("Could not read the details from this photo. Try a sharper, well-lit shot of the page with your photo, or enter them below.");
+        return;
+      }
+      // Passports belong to the general list, not to a trip
+      if (fields.kind && !(tripId && fields.kind === "passport")) setKind(fields.kind);
+      const k = fields.kind && !(tripId && fields.kind === "passport") ? fields.kind : kind;
+      if (fields.issuing_country) setCountry(fields.issuing_country);
+      if (fields.expiry_date) setExpiry(fields.expiry_date);
+      if (!title.trim()) {
+        const label = DOC_KINDS.find((d) => d.value === k)?.label.split(" / ")[0] ?? "Document";
+        setTitle(fields.holder_name ? `${label} \u2013 ${fields.holder_name}` : label);
+      }
+      setScanNote(
+        source === "ai"
+          ? "Details filled from your photo. Please check them, especially the expiry date, before saving."
+          : "Read from the passport's machine-readable lines. Please check the details before saving."
+      );
+    } finally {
+      setScanning(false);
+    }
+  };
+
+  const onCamera = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) scan(f);
   };
 
   const remove = async (d: TravelDocument) => {
@@ -142,6 +183,25 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
       {adding ? (
         <form onSubmit={save} className="space-y-3 rounded-xl border bg-muted/30 p-4">
+          <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
+            <button
+              type="button"
+              disabled={scanning}
+              onClick={() => camera.current?.click()}
+              className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-70 sm:w-auto sm:px-5"
+            >
+              {scanning ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
+              {scanning ? "Reading…" : "Scan with camera"}
+            </button>
+            <p className="mt-2 text-xs text-muted-foreground">Take a photo of your passport page (or any travel document) and we fill in the details for you.</p>
+            {scanNote && (
+              <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground" role="status">
+                <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+                {scanNote}
+              </p>
+            )}
+            <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={onCamera} />
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs text-muted-foreground">Type</label>
@@ -168,13 +228,19 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
           </div>
           <div>
             <label className="text-xs text-muted-foreground">File (PDF or photo, up to 10 MB)</label>
-            <Input type="file" accept={DOC_ACCEPT} onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+            <Input type="file" accept={DOC_ACCEPT} onChange={(e) => { setFile(e.target.files?.[0] ?? null); setScanNote(null); }} />
+            {file && file.type.startsWith("image/") && !scanning && (
+              <button type="button" onClick={() => scan(file)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                <Sparkles className="h-3.5 w-3.5" /> Fill the fields from this photo
+              </button>
+            )}
+            {file && <p className="mt-1 truncate text-xs text-muted-foreground">Attached: {file.name}</p>}
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Notes</label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" maxLength={1000} />
           </div>
-          {kind === "passport" && <p className="text-xs text-muted-foreground">Only the expiry date is needed for reminders. Your documents are stored privately and only you can open them.</p>}
+          {kind === "passport" && <p className="text-xs text-muted-foreground">Only the expiry date is needed for reminders. We never save your passport number. Your documents are stored privately and only you can open them. When AI reading is on, the photo is sent to the AI service to read it.</p>}
           <div className="flex gap-2">
             <Button type="submit" disabled={saving} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving…" : "Save document"}</Button>
             <Button type="button" variant="outline" onClick={reset} disabled={saving}>Cancel</Button>

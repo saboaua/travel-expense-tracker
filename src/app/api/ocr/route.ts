@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractGroceryWithClaude, extractReceiptWithClaude } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithClaude, extractGroceryWithClaude, extractReceiptWithClaude } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -63,6 +63,10 @@ export async function POST(request: Request) {
   const hints = { currency: /^[A-Z]{3}$/.test(currency) ? currency : null, categories };
 
   try {
+    if (form.get("mode") === "document") {
+      const result = await extractDocumentWithClaude(image);
+      return NextResponse.json({ result });
+    }
     if (form.get("mode") === "grocery") {
       const result = await extractGroceryWithClaude(image, hints);
       return NextResponse.json({ result });
