@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { InstallPrompt } from "@/components/InstallPrompt";
+import { UpdateNotice } from "@/components/UpdateNotice";
 import { ConfirmProvider } from "@/components/ui/confirm";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -55,6 +56,7 @@ export default async function RootLayout({
       <body className={`${inter.className} antialiased`}>
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
+        <UpdateNotice />
       </body>
     </html>
   );
