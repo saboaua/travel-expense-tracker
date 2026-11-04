@@ -40,7 +40,7 @@ export function categorySlices(cats: Map<string, number>, total: number, max = 6
   return slices.map((s) => ({ category: s.category, total: r2(s.total), pct: total > 0 ? Math.round((s.total / total) * 1000) / 10 : 0 }));
 }
 
-export type YearSummary = {
+type YearSummary = {
   year: number;
   total: number;
   prevYearTotal: number;

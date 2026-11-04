@@ -53,3 +53,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* iPhones zoom into any field smaller than 16px when it gets focus; pinch-to-zoom stays available for everyone. */
+@media (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

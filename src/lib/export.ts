@@ -13,7 +13,7 @@ export interface ExpenseRow {
   receipt_path: string | null;
 }
 
-export interface TripExportData {
+interface TripExportData {
   id: string;
   name: string;
   start_date: string;

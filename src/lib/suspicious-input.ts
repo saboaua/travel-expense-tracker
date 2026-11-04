@@ -15,7 +15,7 @@ const PATTERNS: [string, RegExp][] = [
 ];
 
 /** Undo common disguises (URL / HTML entity encoding, curly quotes) so encoded attacks are caught too. */
-export function normalizeForScan(text: string): string {
+function normalizeForScan(text: string): string {
   let t = text;
   for (let i = 0; i < 2; i++) {
     try {
@@ -35,7 +35,7 @@ export function normalizeForScan(text: string): string {
     .replace(/[\u201c\u201d\uff02]/g, '"');
 }
 
-export type SuspiciousHit = { field: string; pattern: string; snippet: string };
+type SuspiciousHit = { field: string; pattern: string; snippet: string };
 
 export function scanFields(fields: Record<string, unknown>): SuspiciousHit[] {
   const hits: SuspiciousHit[] = [];

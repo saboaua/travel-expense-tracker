@@ -1,5 +1,5 @@
-export type GroceryRow = { total: number | string; currency: string };
-export type ProjectRow = { kind: string; status?: string; personal_expenses?: { amount_usd: number | string | null }[] | null };
+type GroceryRow = { total: number | string; currency: string };
+type ProjectRow = { kind: string; status?: string; personal_expenses?: { amount_usd: number | string | null }[] | null };
 
 export type PersonalSummary = {
   /** This month's receipts in the most-used currency (null when there are none). */

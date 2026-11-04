@@ -31,8 +31,8 @@ export type Advisory =
   | { status: "not_found"; url: string }
   | { status: "unavailable"; url: string };
 
-export const ADVICE_HOME = "https://www.nederlandwereldwijd.nl/reisadvies";
-export const API_BASE = "https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes";
+const ADVICE_HOME = "https://www.nederlandwereldwijd.nl/reisadvies";
+const API_BASE = "https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes";
 
 const SEVERITY: Record<AdvisoryLevel, number> = { unknown: 0, green: 1, yellow: 2, orange: 3, red: 4 };
 
@@ -45,7 +45,7 @@ export const LEVEL_META: Record<AdvisoryLevel, { label: string; meaning: string 
 };
 
 /** Lower-case, no accents, letters and digits only. */
-export function normalizeName(s: string): string {
+function normalizeName(s: string): string {
   return s
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")

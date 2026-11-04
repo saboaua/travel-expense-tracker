@@ -26,7 +26,7 @@ async function getJson<T>(url: string, fetcher: Fetcher): Promise<T> {
   return (await res.json()) as T;
 }
 
-export async function fetchPlaceName(lat: number, lon: number, fetcher: Fetcher = fetch) {
+async function fetchPlaceName(lat: number, lon: number, fetcher: Fetcher = fetch) {
   try {
     const d = await getJson<{ city?: string; locality?: string; principalSubdivision?: string; countryCode?: string }>(
       `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lon}&localityLanguage=en`,

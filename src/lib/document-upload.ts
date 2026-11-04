@@ -3,7 +3,7 @@ import { compressReceiptImage } from "@/lib/compress-image";
 import type { DocKind, TravelDocument } from "@/lib/documents";
 
 export const DOC_BUCKET = "documents";
-export const MAX_DOC_BYTES = 10 * 1024 * 1024;
+const MAX_DOC_BYTES = 10 * 1024 * 1024;
 export const DOC_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif";
 const ALLOWED = new Set(DOC_ACCEPT.split(","));
 
@@ -32,7 +32,7 @@ export function compressDocImage(file: File, q: DocQuality = "standard"): Promis
 
 const safeName = (n: string) => n.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
 
-export type NewDocument = {
+type NewDocument = {
   tripId?: string | null;
   kind: DocKind;
   title: string;

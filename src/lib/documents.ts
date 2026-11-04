@@ -36,8 +36,8 @@ export type TravelDocument = {
   created_at: string;
 };
 
-export const REQUIRED_VALIDITY_MONTHS = 6;
-export const RENEWAL_LEAD_MONTHS = 3;
+const REQUIRED_VALIDITY_MONTHS = 6;
+const RENEWAL_LEAD_MONTHS = 3;
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/;
 const toUTC = (iso: string) => {
@@ -64,7 +64,7 @@ export function addMonths(iso: string, n: number): string {
 
 export type PassportLevel = "expired" | "critical" | "renew" | "ok";
 
-export type PassportStatus = {
+type PassportStatus = {
   level: PassportLevel;
   daysLeft: number;
   /** Date you should have started renewing by */
@@ -101,7 +101,7 @@ export function passportStatus(
   return { level, daysLeft, renewBy, validForEntryUntil, title: messages[level][0], message: messages[level][1] };
 }
 
-export type TripPassportCheck = { ok: boolean; mustBeValidUntil: string; shortByDays: number; expiredBeforeTrip: boolean };
+type TripPassportCheck = { ok: boolean; mustBeValidUntil: string; shortByDays: number; expiredBeforeTrip: boolean };
 
 /** Does this passport cover a trip that ends on `tripEnd`, with the usual 6-month buffer? */
 export function tripPassportCheck(expiry: string, tripEnd: string, requiredMonths = REQUIRED_VALIDITY_MONTHS): TripPassportCheck | null {

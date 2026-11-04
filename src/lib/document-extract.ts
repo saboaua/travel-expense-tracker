@@ -5,7 +5,7 @@ import { parseMrz, sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz
 
 let aiUnavailable = false;
 
-export type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none"; reason?: string };
+type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none"; reason?: string };
 
 const EMPTY: DocumentFields = { kind: null, document_number: null, issuing_country: null, expiry_date: null, holder_name: null };
 const today = () => todayISO();

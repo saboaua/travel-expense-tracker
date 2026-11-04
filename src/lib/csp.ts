@@ -5,7 +5,7 @@
  * Rollout: the policy is sent as Content-Security-Policy-Report-Only first (violations are logged to the
  * security log by /api/csp-report). Set CSP_ENFORCE=1 in the environment to start blocking.
  */
-export type CspOptions = { nonce: string; dev?: boolean; supabaseUrl?: string | null; turnstile?: boolean };
+type CspOptions = { nonce: string; dev?: boolean; supabaseUrl?: string | null; turnstile?: boolean };
 
 function originOf(url: string | null | undefined): string | null {
   try {

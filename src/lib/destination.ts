@@ -1,4 +1,4 @@
-export type DestinationInfo = {
+type DestinationInfo = {
   title: string;
   summary: string | null;
   imageUrl: string | null;

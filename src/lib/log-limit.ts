@@ -2,7 +2,7 @@
  * Caps how fast attacker-controllable events can be written to the security log, so one noisy address
  * cannot fill the table. Per server instance (cheap, no database call); the retention job bounds the rest.
  */
-export type LimiterOptions = { perKey?: number; perType?: number; windowMs?: number; now?: () => number };
+type LimiterOptions = { perKey?: number; perType?: number; windowMs?: number; now?: () => number };
 
 export function createLogLimiter({ perKey = 20, perType = 200, windowMs = 60_000, now = Date.now }: LimiterOptions = {}) {
   const keys = new Map<string, { n: number; reset: number; dropped: number }>();

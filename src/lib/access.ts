@@ -9,7 +9,7 @@
 
 export type FeatureGroup = "App" | "Administration";
 
-export type Feature = {
+type Feature = {
   key: string;
   label: string;
   description: string;
@@ -36,9 +36,9 @@ export const FEATURES: Feature[] = [
 
 export const FEATURE_KEYS = FEATURES.map((f) => f.key);
 const BY_KEY = new Map(FEATURES.map((f) => [f.key, f]));
-export const ADMIN_FEATURE_KEYS = FEATURES.filter((f) => f.group === "Administration").map((f) => f.key);
+const ADMIN_FEATURE_KEYS = FEATURES.filter((f) => f.group === "Administration").map((f) => f.key);
 
-export const SYSTEM_ROLES = ["user", "assistant", "admin"] as const;
+const SYSTEM_ROLES = ["user", "assistant", "admin"] as const;
 export const isSystemRole = (key: string) => (SYSTEM_ROLES as readonly string[]).includes(key);
 
 export type RoleRecord = {
@@ -76,7 +76,7 @@ export function unreviewedFeatures(role: Pick<RoleRecord, "key" | "known_feature
 
 export const hasAnyAdminFeature = (perms: Set<string>) => ADMIN_FEATURE_KEYS.some((k) => perms.has(k));
 
-export type PathRule = { kind: "open" } | { kind: "feature"; key: string } | { kind: "adminOnly" } | { kind: "hub" };
+type PathRule = { kind: "open" } | { kind: "feature"; key: string } | { kind: "adminOnly" } | { kind: "hub" };
 
 export function ruleForPath(path: string): PathRule {
   const clean = path.split("?")[0];
@@ -131,7 +131,7 @@ export function sanitizeLabel(input: unknown, max = 40): string | null {
 
 /* ---------------- navigation ---------------- */
 
-export type AdminNavItem = { href: string; label: string; kind: "security" | "users" | "settings" | "other" };
+type AdminNavItem = { href: string; label: string; kind: "security" | "users" | "settings" | "other" };
 
 const NAV_LABEL: Record<string, string> = { "users.manage": "Users" };
 

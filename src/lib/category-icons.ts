@@ -5,7 +5,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
-export const ICONS: Record<string, LucideIcon> = {
+const ICONS: Record<string, LucideIcon> = {
   briefcase: Briefcase,
   building: Building2,
   car: Car,

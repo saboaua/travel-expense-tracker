@@ -1,7 +1,7 @@
 export type PersonalKind = "home_project" | "personal_trip";
 
-export const PROJECT_CATEGORIES = ["Materials", "Tools", "Labor", "Permits & Fees", "Delivery", "Appliances", "Furniture", "Decor", "Other"];
-export const TRAVEL_CATEGORIES = ["Flights", "Lodging", "Food", "Transport", "Activities", "Shopping", "Other"];
+const PROJECT_CATEGORIES = ["Materials", "Tools", "Labor", "Permits & Fees", "Delivery", "Appliances", "Furniture", "Decor", "Other"];
+const TRAVEL_CATEGORIES = ["Flights", "Lodging", "Food", "Transport", "Activities", "Shopping", "Other"];
 export const GROCERY_CATEGORIES = [
   "Produce", "Meat & Seafood", "Dairy & Eggs", "Bakery", "Pantry", "Beverages", "Snacks", "Frozen", "Household", "Personal Care", "Other",
 ];

@@ -27,7 +27,7 @@ export interface ThrottleStore {
   reset(key: string): Promise<void>;
 }
 
-export type Keys = { ip?: string; pair: string; email: string };
+type Keys = { ip?: string; pair: string; email: string };
 
 /** An unknown address (no proxy header) is shared by everyone, so it gets no per-address counter. */
 export function keysFor(ip: string | null | undefined, email: string): Keys {
@@ -39,7 +39,7 @@ export function keysFor(ip: string | null | undefined, email: string): Keys {
   };
 }
 
-export type Decision =
+type Decision =
   | { action: "allow" }
   | { action: "block"; scope: "ip" | "pair" | "email"; retryAfterSec: number }
   | { action: "captcha" };

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Button } from "@/components/ui/button";
 
-export type ConfirmOptions = {
+type ConfirmOptions = {
   title?: string;
   message: string;
   confirmLabel?: string;

@@ -1,6 +1,6 @@
 import type { CategorySlice } from "@/lib/reports";
 
-export const SLICE_COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"];
+const SLICE_COLORS = ["#4f46e5", "#0ea5e9", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#64748b"];
 
 /** Donut + legend with percentages. Pure SVG, stroke segments on a circle of circumference 100. */
 export function CategoryDonut({ slices, total, fmt }: { slices: CategorySlice[]; total: number; fmt: (n: number) => string }) {

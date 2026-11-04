@@ -2,7 +2,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { clampDetails, createLogLimiter } from "./log-limit";
 
-export type RequestMeta = { ip: string; userAgent: string; origin: string; country: string | null };
+type RequestMeta = { ip: string; userAgent: string; origin: string; country: string | null };
 
 export function metaFromRequest(request: Request): RequestMeta {
   const h = request.headers;
@@ -14,7 +14,7 @@ export function metaFromRequest(request: Request): RequestMeta {
   };
 }
 
-export type SecurityEventInput = {
+type SecurityEventInput = {
   eventType: string;
   severity?: "info" | "warning" | "critical";
   emailAttempted?: string | null;

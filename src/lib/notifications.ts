@@ -22,7 +22,7 @@ export type AppNotification = {
 type TripLite = { id: string; name: string; start_date: string; end_date: string | null; status: string };
 
 const RANK: Record<Severity, number> = { urgent: 0, warning: 1, info: 2 };
-export const DOCS_REMINDER_DAYS = 14;
+const DOCS_REMINDER_DAYS = 14;
 export const SNOOZE_DAYS = 7;
 
 export function buildNotifications(input: {
@@ -112,11 +112,11 @@ export function topSeverity(list: AppNotification[]): Severity | null {
 
 /* ---------------- security alerts (admins only) ---------------- */
 
-export type SecurityEventLite = { event_type: string; severity: string; created_at: string };
+type SecurityEventLite = { event_type: string; severity: string; created_at: string };
 
-export const SECURITY_WINDOW_HOURS = 24;
+const SECURITY_WINDOW_HOURS = 24;
 /** One mistyped password is normal; this many in a day is worth an admin's attention. */
-export const FAILED_LOGIN_THRESHOLD = 5;
+const FAILED_LOGIN_THRESHOLD = 5;
 const SECURITY_LABELS: Record<string, string> = {
   brute_force: "Brute force attack detected",
   login_blocked: "Logins blocked by lockout",

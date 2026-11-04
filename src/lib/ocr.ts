@@ -20,7 +20,7 @@ export interface OcrResult {
   source: "ai" | "tesseract";
 }
 
-export type OcrImageSource = File | string | Uint8Array | ArrayBuffer;
+type OcrImageSource = File | string | Uint8Array | ArrayBuffer;
 
 /* ------------------------------------------------------------------ */
 /* Amount                                                              */
@@ -76,7 +76,7 @@ function lineScore(line: string): number {
   return score;
 }
 
-export function parseAmount(text: string): number | null {
+function parseAmount(text: string): number | null {
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
   let best: { score: number; idx: number; value: number } | null = null;
@@ -125,7 +125,7 @@ const SYMBOLS: [RegExp, string][] = [
   [/₹/, "INR"],
 ];
 
-export function parseCurrency(text: string): string | null {
+function parseCurrency(text: string): string | null {
   const counts = new Map<string, number>();
   for (const code of CODES) {
     const found = text.match(new RegExp(`\\b${code}\\b`, "g"));
@@ -183,7 +183,7 @@ function dateCandidates(line: string, monthFirst: boolean): string[] {
   return out;
 }
 
-export function parseDate(text: string, hints: OcrHints = {}, now = new Date()): string | null {
+function parseDate(text: string, hints: OcrHints = {}, now = new Date()): string | null {
   const monthFirst = !hints.currency || MONTH_FIRST_CURRENCIES.has(hints.currency);
   const lines = text.split(/\r?\n/);
   // Lines that say "date" first, then everything else
@@ -201,7 +201,7 @@ export function parseDate(text: string, hints: OcrHints = {}, now = new Date()):
 const NOT_MERCHANT =
   /^(tel|phone|fax|www\.|http|invoice|receipt|tax\s*id|vat|order|table|cashier|server|date|time|welcome|thank|customer|copy|duplicate)|@|\b(street|st\.|avenue|ave\.?|road|rd\.?|blvd|calle|straat|weg)\b/i;
 
-export function parseMerchant(text: string): string | null {
+function parseMerchant(text: string): string | null {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.replace(/[^\p{L}\p{N}&'.,\- ]/gu, " ").replace(/\s{2,}/g, " ").trim())
@@ -226,7 +226,7 @@ const CATEGORY_RULES: [string, RegExp][] = [
   ["Office Supplies", /\b(staples|office\s*depot|stationery|printer|toner|ink|paper|supplies|notebook)\b/i],
 ];
 
-export function guessCategory(text: string, allowed?: string[]): string | null {
+function guessCategory(text: string, allowed?: string[]): string | null {
   let best: { name: string; hits: number } | null = null;
   for (const [name, re] of CATEGORY_RULES) {
     const hits = (text.match(new RegExp(re.source, "gi")) || []).length;

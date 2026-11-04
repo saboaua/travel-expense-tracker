@@ -15,7 +15,7 @@ export type DocumentFields = {
   holder_name: string | null;
 };
 
-export type MrzResult = DocumentFields & { kind: "passport"; verified: boolean };
+type MrzResult = DocumentFields & { kind: "passport"; verified: boolean };
 
 const COUNTRIES: Record<string, string> = {
   ABW: "Aruba", NLD: "Netherlands", CUW: "Curaçao", SXM: "Sint Maarten", USA: "United States", CAN: "Canada", GBR: "United Kingdom",

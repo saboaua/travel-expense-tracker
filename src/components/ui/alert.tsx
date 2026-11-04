@@ -8,7 +8,7 @@ const VARIANTS = {
   info: "bg-blue-50 text-blue-800",
 } as const;
 
-export type AlertProps = React.HTMLAttributes<HTMLDivElement> & { variant?: keyof typeof VARIANTS };
+type AlertProps = React.HTMLAttributes<HTMLDivElement> & { variant?: keyof typeof VARIANTS };
 
 /** The one message box for errors, confirmations and warnings. */
 export function Alert({ variant = "error", className, children, role, ...props }: AlertProps) {

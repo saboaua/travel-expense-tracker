@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 
 const API = "https://api.telegram.org";
 
-export type BotConfig = {
+type BotConfig = {
   token: string;
   secret: string | null;
   username: string;
