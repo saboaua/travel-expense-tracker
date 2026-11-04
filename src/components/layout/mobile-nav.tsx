@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
+import { Home, Plane, FileText, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ const baseItems = [
   { href: "/", label: "Home", icon: Home },
   { href: "/trips", label: "Trips", icon: Plane },
   { href: "/reports", label: "Reports", icon: FileText },
+  { href: "/documents", label: "Docs", icon: FolderOpen },
   { href: "/personal", label: "Personal", icon: Wallet },
 ];
 

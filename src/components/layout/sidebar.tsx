@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home, Plane, FileText, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet,
+  Home, Plane, FileText, FolderOpen, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -56,6 +56,7 @@ export function Sidebar() {
     { href: "/", label: "Dashboard", icon: Home },
     { href: "/trips", label: "Trips", icon: Plane },
     { href: "/reports", label: "Reports", icon: FileText },
+    { href: "/documents", label: "Documents", icon: FolderOpen },
     ...(personalEnabled ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
   ];
 

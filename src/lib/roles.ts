@@ -33,6 +33,7 @@ function isUserPath(path: string): boolean {
   if (path.startsWith("/settings")) return true;
   if (path.startsWith("/reports")) return true;
   if (path.startsWith("/personal")) return true;
+  if (path.startsWith("/documents")) return true;
   return false;
 }
 

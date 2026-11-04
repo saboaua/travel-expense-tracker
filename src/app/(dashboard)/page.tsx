@@ -7,6 +7,8 @@ import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } fr
 import { DashboardHeader, type HeaderTrip } from "@/components/DashboardHeader";
 import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
+import { PassportBalloon } from "@/components/documents/PassportBalloon";
+import { currentPassport, renewalAlert } from "@/lib/documents";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -38,6 +40,14 @@ export default async function DashboardPage() {
     .from("expenses")
     .select("amount, amount_usd, currency, expense_date")
     .eq("user_id", user?.id);
+
+  // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
+  const { data: passportDocs } = await supabase
+    .from("travel_documents")
+    .select("kind, expiry_date")
+    .eq("user_id", user?.id)
+    .eq("kind", "passport");
+  const passportAlert = renewalAlert(currentPassport(passportDocs || []), trips || [], todayISO());
 
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
@@ -103,6 +113,8 @@ export default async function DashboardPage() {
         activeCount={activeCount}
         trips={quickScanTrips}
       />
+
+      {passportAlert && <PassportBalloon alert={passportAlert} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>

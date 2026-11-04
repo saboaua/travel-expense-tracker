@@ -2,12 +2,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { ArrowLeft, Archive, Camera, CalendarDays, Clock, Download, MapPin, Pencil, Plus, Tag } from "lucide-react";
-import { daysBetween, formatCurrency, formatDateRange, todayISO } from "@/lib/utils";
+import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
 import { categorySlices } from "@/lib/reports";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
 import { CategoryDonut } from "@/components/reports/CategoryDonut";
+import { DocumentsManager } from "@/components/documents/DocumentsManager";
+import { currentPassport, tripPassportCheck } from "@/lib/documents";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -21,8 +23,9 @@ function Tile({ label, value, sub }: { label: string; value: string; sub?: strin
 
 const actionBtn = "inline-flex h-10 items-center justify-center gap-2 rounded-lg border bg-background px-3 text-sm font-medium transition-colors hover:bg-accent";
 
-export default async function TripDetailPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TripDetailPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ docs_failed?: string }> }) {
   const { id } = await params;
+  const { docs_failed } = await searchParams;
   const supabase = await createClient();
   const {
     data: { user },
@@ -33,6 +36,10 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
 
   const { data: expenses } = await supabase.from("expenses").select("*").eq("trip_id", id).order("expense_date", { ascending: false });
   const list = expenses || [];
+
+  const { data: passportDocs } = await supabase.from("travel_documents").select("kind, expiry_date").eq("user_id", user?.id).eq("kind", "passport");
+  const passport = currentPassport(passportDocs || []);
+  const passportCheck = passport?.expiry_date ? tripPassportCheck(passport.expiry_date, trip.end_date || trip.start_date) : null;
 
   const today = todayISO();
   const endDate: string = trip.end_date || trip.start_date;
@@ -172,6 +179,25 @@ export default async function TripDetailPage({ params }: { params: Promise<{ id:
           <CategoryDonut slices={slices} total={usdTotal} fmt={(n) => formatCurrency(n, "USD")} />
         </section>
       )}
+
+      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+        <div className="mb-3">
+          <h2 className="text-base font-semibold">Documents</h2>
+          <p className="text-xs text-muted-foreground">Tickets, bookings, visa and insurance for this trip, kept private.</p>
+        </div>
+        {Number(docs_failed) > 0 && (
+          <p className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            {docs_failed} document{Number(docs_failed) !== 1 ? "s" : ""} could not be uploaded when the trip was created. Add {Number(docs_failed) !== 1 ? "them" : "it"} below.
+          </p>
+        )}
+        {passportCheck && !passportCheck.ok && !completed && (
+          <p className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+            Your passport expires {formatDate(passport!.expiry_date as string)}. Most destinations want it valid until {formatDate(passportCheck.mustBeValidUntil)} for this trip.{" "}
+            <Link href="/documents" className="font-medium underline">Check my passport</Link>
+          </p>
+        )}
+        <DocumentsManager tripId={id} />
+      </section>
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
