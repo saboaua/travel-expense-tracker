@@ -10,10 +10,12 @@ export function ReceiptCropper({
   file,
   onDone,
   onCancel,
+  title = "Crop to the ticket",
 }: {
   file: File;
   onDone: (file: File) => void;
   onCancel: () => void;
+  title?: string;
 }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -94,7 +96,7 @@ export function ReceiptCropper({
   return (
     <div className="fixed inset-0 z-[70] flex flex-col bg-black/95" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
       <div className="flex items-center justify-between p-3 text-white">
-        <p className="text-sm font-medium">Crop to the ticket</p>
+        <p className="text-sm font-medium">{title}</p>
         <button type="button" onClick={onCancel} className="p-1" aria-label="Cancel crop">
           <X className="h-5 w-5" />
         </button>

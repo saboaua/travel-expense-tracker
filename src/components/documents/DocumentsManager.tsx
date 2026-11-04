@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fileKind } from "@/lib/documents";
-import { Camera, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, X, Image as ImageIcon } from "lucide-react";
+import { Camera, Crop, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, X, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate, todayISO } from "@/lib/utils";
 import { DOC_KINDS, kindHasExpiry, kindLabel, maskNumber, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
-import { DOC_ACCEPT, DOC_BUCKET, removeTravelDocument, saveTravelDocument, updateTravelDocument } from "@/lib/document-upload";
+import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, removeTravelDocument, saveTravelDocument, updateTravelDocument, type DocQuality } from "@/lib/document-upload";
+import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields } from "@/lib/document-extract";
 
 const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -86,9 +87,16 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // Photo pipeline: original pick -> crop -> compress. `prepared` files are uploaded as is.
+  const [original, setOriginal] = useState<File | null>(null);
+  const [cropped, setCropped] = useState<File | null>(null);
+  const [cropping, setCropping] = useState<{ file: File; thenScan: boolean } | null>(null);
+  const [quality, setQuality] = useState<DocQuality>("standard");
+  const [sizes, setSizes] = useState<{ before: number; after: number } | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanNote, setScanNote] = useState<string | null>(null);
   const camera = useRef<HTMLInputElement>(null);
+  const preparedFile = useRef<File | null>(null);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -117,7 +125,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   useEffect(() => { load(); }, [load]);
 
-  const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setKind(defaultKind); setAdding(false); setScanNote(null); };
+  const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
 
   const startEdit = (d: TravelDocument) => {
     setError(null);
@@ -130,6 +138,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setExpiry(d.expiry_date || "");
     setNotes(d.notes || "");
     setFile(null);
+    setOriginal(null);
+    setCropped(null);
+    setSizes(null);
     setAdding(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   };
@@ -153,7 +164,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file };
+      const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file, prepared: !!cropped && file === preparedFile.current };
       if (editing) await updateTravelDocument(supabase, user.id, editing, fields);
       else await saveTravelDocument(supabase, user.id, { tripId, ...fields });
       reset();
@@ -163,6 +174,43 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     } finally {
       setSaving(false);
     }
+  };
+
+  /** Compresses the cropped photo with the chosen quality and shows the size saving. */
+  const prepare = async (src: File, q: DocQuality, before: number) => {
+    const out = await compressDocImage(src, q).catch(() => src);
+    preparedFile.current = out;
+    setFile(out);
+    setSizes({ before, after: out.size });
+    return out;
+  };
+
+  /** A photo was chosen or taken: crop it first when the browser can, otherwise use it as is. */
+  const pick = (f: File, thenScan: boolean) => {
+    setScanNote(null);
+    setOriginal(f);
+    setCropped(null);
+    setSizes(null);
+    preparedFile.current = null;
+    if (isCroppable(f)) {
+      setCropping({ file: f, thenScan });
+    } else {
+      setFile(f);
+      if (thenScan && f.type.startsWith("image/")) scan(f);
+    }
+  };
+
+  const onCropped = async (c: File) => {
+    const job = cropping;
+    setCropping(null);
+    setCropped(c);
+    const out = await prepare(c, quality, original?.size ?? c.size);
+    if (job?.thenScan) scan(out);
+  };
+
+  const changeQuality = async (q: DocQuality) => {
+    setQuality(q);
+    if (cropped) await prepare(cropped, q, original?.size ?? cropped.size);
   };
 
   /** Reads the photo and fills the form. Existing typed values are only replaced when the scan found something. */
@@ -200,7 +248,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const onCamera = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
-    if (f) scan(f);
+    if (f) pick(f, true);
   };
 
   const remove = async (d: TravelDocument) => {
@@ -217,6 +265,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   return (
     <div className="space-y-3">
+      {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
 
@@ -331,13 +380,33 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
           </div>
           <div>
             <label className="text-xs text-muted-foreground">{editing?.file_path ? "Replace file (optional, the current file is kept otherwise)" : "File (PDF or photo, up to 10 MB)"}</label>
-            <Input type="file" accept={DOC_ACCEPT} onChange={(e) => { setFile(e.target.files?.[0] ?? null); setScanNote(null); }} />
+            <Input
+              type="file"
+              accept={DOC_ACCEPT}
+              onChange={(e) => {
+                const f = e.target.files?.[0] ?? null;
+                if (!f) { setFile(null); setOriginal(null); setCropped(null); setSizes(null); return; }
+                if (f.type.startsWith("image/")) pick(f, false);
+                else { setOriginal(null); setCropped(null); setSizes(null); preparedFile.current = null; setFile(f); setScanNote(null); }
+              }}
+            />
             {file && file.type.startsWith("image/") && !scanning && (
               <button type="button" onClick={() => scan(file)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                 <Sparkles className="h-3.5 w-3.5" /> Fill the fields from this photo
               </button>
             )}
-            {file && <p className="mt-1 truncate text-xs text-muted-foreground">Attached: {file.name}</p>}
+            {file && <p className="mt-1 truncate text-xs text-muted-foreground">Attached: {file.name}{sizes ? ` \u00b7 ${formatBytes(sizes.before)} \u2192 ${formatBytes(sizes.after)}` : ` \u00b7 ${formatBytes(file.size)}`}</p>}
+            {original && cropped && (
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button type="button" onClick={() => setCropping({ file: original, thenScan: false })} className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium hover:bg-accent">
+                  <Crop className="h-3.5 w-3.5" /> Crop again
+                </button>
+                <label className="sr-only" htmlFor="doc-quality">Photo quality</label>
+                <select id="doc-quality" className="h-8 rounded-md border bg-background px-2 text-xs" value={quality} onChange={(e) => changeQuality(e.target.value as DocQuality)} title={DOC_QUALITY[quality].hint}>
+                  {(Object.keys(DOC_QUALITY) as DocQuality[]).map((q) => <option key={q} value={q}>{DOC_QUALITY[q].label}</option>)}
+                </select>
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Notes</label>

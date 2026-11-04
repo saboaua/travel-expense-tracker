@@ -7,6 +7,29 @@ export const MAX_DOC_BYTES = 10 * 1024 * 1024;
 export const DOC_ACCEPT = "application/pdf,image/jpeg,image/png,image/webp,image/heic,image/heif";
 const ALLOWED = new Set(DOC_ACCEPT.split(","));
 
+export type DocQuality = "small" | "standard" | "sharp";
+export const DOC_QUALITY: Record<DocQuality, { label: string; hint: string; maxSide: number; quality: number }> = {
+  small: { label: "Small file", hint: "Smallest size, fine for tickets and bookings", maxSide: 1400, quality: 0.7 },
+  standard: { label: "Standard", hint: "Recommended: clear text at a small size", maxSide: 2200, quality: 0.85 },
+  sharp: { label: "Sharp", hint: "Best detail, larger file", maxSide: 3200, quality: 0.92 },
+};
+
+/** Photos the browser can draw to a canvas (HEIC cannot be cropped here). */
+export function isCroppable(file: { type: string }): boolean {
+  return /^image\/(jpeg|png|webp)$/.test(file.type);
+}
+
+export function formatBytes(n: number): string {
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export function compressDocImage(file: File, q: DocQuality = "standard"): Promise<File> {
+  const { maxSide, quality } = DOC_QUALITY[q];
+  return compressReceiptImage(file, { maxSide, quality });
+}
+
 const safeName = (n: string) => n.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
 
 export type NewDocument = {
@@ -18,6 +41,8 @@ export type NewDocument = {
   expiry_date?: string | null;
   notes?: string | null;
   file?: File | null;
+  /** The photo was already cropped and compressed by the form, so it is uploaded as is. */
+  prepared?: boolean;
 };
 
 /** Uploads the file (images are compressed, PDFs are kept as is) and records the document row. */
@@ -26,7 +51,7 @@ export async function saveTravelDocument(supabase: SupabaseClient, userId: strin
   if (input.file) {
     let file = input.file;
     if (!ALLOWED.has(file.type)) throw new Error("Use a PDF or a photo (JPG, PNG, WebP or HEIC).");
-    if (file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
+    if (!input.prepared && file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
       // Larger and sharper than receipts: passport pages must stay readable
       file = await compressReceiptImage(file, { maxSide: 2200, quality: 0.85 }).catch(() => file);
     }
@@ -65,10 +90,10 @@ const dbMessage = (m: string) =>
       ? "Documents table not found. Run supabase/migration_documents.sql."
       : m;
 
-async function uploadDocFile(supabase: SupabaseClient, userId: string, tripId: string | null | undefined, original: File): Promise<string> {
+async function uploadDocFile(supabase: SupabaseClient, userId: string, tripId: string | null | undefined, original: File, prepared = false): Promise<string> {
   let file = original;
   if (!ALLOWED.has(file.type)) throw new Error("Use a PDF or a photo (JPG, PNG, WebP or HEIC).");
-  if (file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
+  if (!prepared && file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
     file = await compressReceiptImage(file, { maxSide: 2200, quality: 0.85 }).catch(() => file);
   }
   if (file.size > MAX_DOC_BYTES) throw new Error("That file is over 10 MB. Use a smaller photo or PDF.");
@@ -80,7 +105,7 @@ async function uploadDocFile(supabase: SupabaseClient, userId: string, tripId: s
 
 /** Edits a document. A new file replaces the old one (the old file is removed only after the update succeeds). */
 export async function updateTravelDocument(supabase: SupabaseClient, userId: string, doc: TravelDocument, input: Omit<NewDocument, "tripId">): Promise<void> {
-  const newPath = input.file ? await uploadDocFile(supabase, userId, doc.trip_id, input.file) : null;
+  const newPath = input.file ? await uploadDocFile(supabase, userId, doc.trip_id, input.file, input.prepared) : null;
   const number = input.document_number?.trim() || null;
   const patch: Record<string, unknown> = {
     kind: input.kind,

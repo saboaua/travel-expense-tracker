@@ -1,4 +1,5 @@
 // Run with: npx tsx tests/documents.test.ts
+import { formatBytes, isCroppable } from "../src/lib/document-upload";
 import { fileKind, maskNumber, addMonths, dayDiff, passportStatus, tripPassportCheck, currentPassport, renewalAlert } from "../src/lib/documents";
 const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 
@@ -47,3 +48,10 @@ eq(fileKind("u/t/abc-photo.jpg"), "image", "jpg kind");
 eq(fileKind("u/t/abc-photo.webp"), "image", "webp kind");
 eq(fileKind("u/t/abc-photo.heic"), "other", "heic cannot be shown inline");
 eq(fileKind(null), "other", "null kind");
+
+eq(formatBytes(500), "500 B", "bytes");
+eq(formatBytes(2048), "2 KB", "kb");
+eq(formatBytes(3.2 * 1024 * 1024), "3.2 MB", "mb");
+eq(isCroppable({ type: "image/jpeg" }), true, "jpeg croppable");
+eq(isCroppable({ type: "image/heic" }), false, "heic not croppable");
+eq(isCroppable({ type: "application/pdf" }), false, "pdf not croppable");
