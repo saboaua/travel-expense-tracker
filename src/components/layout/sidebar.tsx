@@ -10,14 +10,14 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import type { UserRole } from "@/lib/roles";
-import { canCreateUsers, canViewSecurity, canManageAppSettings } from "@/lib/roles";
+import { adminNavItems } from "@/lib/access";
+import { useAccess } from "@/lib/use-access";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const [role, setRole] = useState<UserRole>("user");
+  const { role, perms } = useAccess(pathname);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [appName, setAppName] = useState("Expense Tracker");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
@@ -39,8 +39,6 @@ export function Sidebar() {
       const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
       if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
       if (!user) return;
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      if (data) setRole((data.role as UserRole) || "user");
     }
     load();
   }, [supabase, pathname]);
@@ -54,18 +52,14 @@ export function Sidebar() {
 
   const userNav = [
     { href: "/", label: "Dashboard", icon: Home },
-    { href: "/trips", label: "Trips", icon: Plane },
-    { href: "/reports", label: "Reports", icon: FileText },
-    { href: "/documents", label: "Documents", icon: FolderOpen },
-    ...(personalEnabled ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
+    ...(perms.has("trips") ? [{ href: "/trips", label: "Trips", icon: Plane }] : []),
+    ...(perms.has("reports") ? [{ href: "/reports", label: "Reports", icon: FileText }] : []),
+    ...(perms.has("documents") ? [{ href: "/documents", label: "Documents", icon: FolderOpen }] : []),
+    ...(personalEnabled && perms.has("personal") ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
   ];
 
-  const adminNav = [
-    // Users is under Global Settings for admins; assistants still get a direct link
-    ...(canCreateUsers(role) && !canManageAppSettings(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
-    ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: SettingsIcon }] : []),
-  ];
+  const NAV_ICONS = { security: Activity, users: Users, settings: SettingsIcon, other: SettingsIcon } as const;
+  const adminNav = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind] }));
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">

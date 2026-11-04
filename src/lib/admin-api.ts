@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { canCreateUsers, type UserRole } from "@/lib/roles";
+import type { UserRole } from "@/lib/roles";
+import { loadPermissions } from "@/lib/access-server";
 import { getRequestMeta } from "@/lib/audit";
 import { writeSecurityEvent } from "@/lib/security-log";
 
@@ -14,7 +15,7 @@ export async function requireUserManager() {
 
   const { data: profile } = await supabase.from("profiles").select("role, email").eq("id", user.id).single();
   const myRole = (profile?.role as UserRole) || "user";
-  if (!canCreateUsers(myRole)) {
+  if (!(await loadPermissions(supabase, myRole)).has("users.manage")) {
     await writeSecurityEvent(await getRequestMeta(), {
       eventType: "access_denied",
       severity: "warning",

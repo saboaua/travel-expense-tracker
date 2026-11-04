@@ -4,6 +4,7 @@
  * level), so when the situation changes it is a new notification and shows up again.
  */
 import { dayDiff, type RenewalAlert } from "@/lib/documents";
+import { unreviewedFeatures } from "@/lib/access";
 
 export type Severity = "urgent" | "warning" | "info";
 
@@ -170,4 +171,30 @@ export function buildSecurityNotifications(events: SecurityEventLite[], now: num
     .sort((a, b) => RANK[a.severity] - RANK[b.severity] || b._count - a._count)
     .slice(0, max)
     .map(({ _count, ...n }) => { void _count; return n; });
+}
+
+/* ---------------- new app options to assign (admins only) ---------------- */
+
+/** One notice when options exist that no one has reviewed for a role yet. The id changes when the set changes. */
+export function buildAccessNotification(roles: { key: string; label?: string; known_features?: string[] | null }[]): AppNotification[] {
+  const labels = new Map<string, string>();
+  const roleNames = new Set<string>();
+  for (const r of roles) {
+    for (const f of unreviewedFeatures({ key: r.key, known_features: r.known_features || [] })) {
+      labels.set(f.key, f.label);
+      roleNames.add(r.label || r.key);
+    }
+  }
+  if (labels.size === 0) return [];
+  const list = [...labels.values()];
+  return [
+    {
+      id: `roles-new:${[...labels.keys()].sort().join(",")}`,
+      severity: "info",
+      title: `${list.length} new option${list.length !== 1 ? "s" : ""} to assign`,
+      message: `${list.slice(0, 3).join(", ")}${list.length > 3 ? ` and ${list.length - 3} more` : ""}. Choose which roles can use ${list.length !== 1 ? "them" : "it"}.`,
+      href: "/admin/users?tab=roles",
+      cta: "Review roles",
+    },
+  ];
 }

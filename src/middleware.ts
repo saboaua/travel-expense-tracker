@@ -2,7 +2,8 @@ import { type NextRequest, NextResponse } from "next/server";
 import { updateSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
-import { canAccessPath, type UserRole } from "@/lib/roles";
+import { canAccessPath, ruleForPath } from "@/lib/access";
+import { loadPermissions } from "@/lib/access-server";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 
 export async function middleware(request: NextRequest) {
@@ -93,10 +94,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(url);
     }
 
-    // Protect /admin routes using the same role rules as the navigation
-    if (path.startsWith("/admin")) {
-      const role = ((profile?.role as UserRole) || "user");
-      if (!canAccessPath(role, path)) {
+    // Protect pages with the same role rules as the navigation (admin pages and feature sections)
+    const role = (profile?.role as string) || "user";
+    if (role !== "admin" && ruleForPath(path).kind !== "open") {
+      const perms = await loadPermissions(supabase, role);
+      if (!canAccessPath(role, perms, path)) {
         await writeSecurityEvent(metaFromRequest(request), {
           eventType: "access_denied",
           severity: "warning",

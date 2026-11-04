@@ -8,23 +8,24 @@ import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import type { UserRole } from "@/lib/roles";
-import { canCreateUsers, canViewSecurity, canManageAppSettings } from "@/lib/roles";
+import { adminNavItems } from "@/lib/access";
+import { useAccess } from "@/lib/use-access";
 
 const baseItems = [
-  { href: "/", label: "Home", icon: Home },
-  { href: "/trips", label: "Trips", icon: Plane },
-  { href: "/reports", label: "Reports", icon: FileText },
-  { href: "/documents", label: "Docs", icon: FolderOpen },
-  { href: "/personal", label: "Personal", icon: Wallet },
-];
+  { href: "/", label: "Home", icon: Home, feature: null },
+  { href: "/trips", label: "Trips", icon: Plane, feature: "trips" },
+  { href: "/reports", label: "Reports", icon: FileText, feature: "reports" },
+  { href: "/documents", label: "Docs", icon: FolderOpen, feature: "documents" },
+  { href: "/personal", label: "Personal", icon: Wallet, feature: "personal" },
+] as const;
 
 export function MobileNav() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const [role, setRole] = useState<UserRole>("user");
+  const pathnameKey = pathname;
+  const { role, perms } = useAccess(pathnameKey);
   const [personalEnabled, setPersonalEnabled] = useState(true);
 
   useEffect(() => { setOpen(false); }, [pathname]);
@@ -33,8 +34,6 @@ export function MobileNav() {
     async function loadRole() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-      if (data?.role) setRole(data.role as UserRole);
       const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
       if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
     }
@@ -49,14 +48,10 @@ export function MobileNav() {
     router.refresh();
   };
 
-  const adminItems = [
-    // Users is under Global Settings for admins; assistants still get a direct link
-    ...(canCreateUsers(role) && !canManageAppSettings(role) ? [{ href: "/admin/users", label: "Users", icon: Users }] : []),
-    ...(canViewSecurity(role) ? [{ href: "/admin/security", label: "Security", icon: Activity }] : []),
-    ...(canManageAppSettings(role) ? [{ href: "/admin/settings", label: "Global Settings", icon: Settings }] : []),
-  ];
+  const NAV_ICONS = { security: Activity, users: Users, settings: Settings, other: Settings } as const;
+  const adminItems = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind] }));
 
-  const mainItems = personalEnabled ? baseItems : baseItems.filter((i) => i.href !== "/personal");
+  const mainItems = baseItems.filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal"));
   const menuActive = pathname.startsWith("/admin") || pathname.startsWith("/profile");
 
   return (

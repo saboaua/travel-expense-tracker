@@ -9,8 +9,8 @@ import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, renewalAlert } from "@/lib/documents";
-import { buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
-import { canViewSecurity, type UserRole } from "@/lib/roles";
+import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
+import { loadPermissions } from "@/lib/access-server";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -50,7 +50,8 @@ export default async function DashboardPage() {
   for (const d of docRows || []) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
   // Security alerts are only for admins (the same people who can open Admin > Security)
   let securityNotifications: ReturnType<typeof buildSecurityNotifications> = [];
-  if (canViewSecurity((profile?.role as UserRole) || "user")) {
+  const myPerms = await loadPermissions(supabase, (profile?.role as string) || "user");
+  if (myPerms.has("security.view")) {
     const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
     const { data: events } = await supabase
       .from("security_events")
@@ -61,8 +62,15 @@ export default async function DashboardPage() {
       .limit(300);
     securityNotifications = buildSecurityNotifications(events || [], Date.now());
   }
+  // Admin only: new app options nobody has reviewed yet
+  let accessNotifications: ReturnType<typeof buildAccessNotification> = [];
+  if ((profile?.role as string) === "admin") {
+    const { data: roleRows } = await supabase.from("roles").select("key, label, known_features");
+    accessNotifications = buildAccessNotification(roleRows || []);
+  }
   const notifications = [
     ...securityNotifications,
+    ...accessNotifications,
     ...buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() }),
   ].sort((a, b) => ({ urgent: 0, warning: 1, info: 2 })[a.severity] - ({ urgent: 0, warning: 1, info: 2 })[b.severity]);
 
@@ -130,6 +138,7 @@ export default async function DashboardPage() {
         activeCount={activeCount}
         trips={quickScanTrips}
         notifications={notifications}
+        canUseTrips={myPerms.has("trips")}
       />
 
       {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}

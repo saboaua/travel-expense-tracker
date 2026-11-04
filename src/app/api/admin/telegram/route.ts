@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { loadPermissions } from "@/lib/access-server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createService } from "@supabase/supabase-js";
 import { maskToken, randomCode, setWebhook, tgWithToken } from "@/lib/telegram";
@@ -16,7 +17,7 @@ async function requireAdmin() {
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "admin") {
+  if (!(await loadPermissions(supabase, (profile?.role as string) || "user")).has("telegram.manage")) {
     return { error: NextResponse.json({ error: "Forbidden" }, { status: 403 }) };
   }
   return { user };

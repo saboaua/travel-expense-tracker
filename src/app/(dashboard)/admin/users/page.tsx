@@ -8,6 +8,7 @@ import { UserPlus, Copy, Check, Shield, User, Mail, UserCog, KeyRound, RefreshCw
 import type { UserRole } from "@/lib/roles";
 import { canAssignRole } from "@/lib/roles";
 import { TEMP_PASSWORD_TTL_HOURS } from "@/lib/temp-password-config";
+import { RolesManager, type RoleSummary } from "@/components/admin/RolesManager";
 
 interface ManagedUser {
   id: string;
@@ -73,6 +74,8 @@ export default function AdminUsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [warning, setWarning] = useState<string | null>(null);
   const [myRole, setMyRole] = useState<UserRole>("user");
+  const [tab, setTab] = useState<"users" | "roles">("users");
+  const [roles, setRoles] = useState<RoleSummary[]>([]);
 
   const [email, setEmail] = useState("");
   const [firstName, setFirstName] = useState("");
@@ -100,6 +103,55 @@ export default function AdminUsersPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  // Roles list (admin only) feeds the Role pickers; falls back to the 3 built-in roles before the roles migration
+  const loadRoles = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/roles", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (Array.isArray(data.roles)) setRoles(data.roles as RoleSummary[]);
+    } catch {
+      // keep the fallback list
+    }
+  }, []);
+
+  useEffect(() => {
+    if (canAssignRole(myRole)) loadRoles();
+  }, [myRole, loadRoles]);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "roles") setTab("roles");
+  }, []);
+
+  const roleOptions = roles.length
+    ? roles
+    : ([
+        { key: "user", label: "User", description: "Dashboard, trips, reports, personal and documents." },
+        { key: "assistant", label: "Assistant", description: "Same as User, and can create users." },
+        { key: "admin", label: "Admin", description: "Full access." },
+      ] as RoleSummary[]);
+
+  const changeRole = async (u: ManagedUser, next: string) => {
+    if (next === u.role) return;
+    if (!confirm(`Change ${u.email}'s role to ${roleOptions.find((r) => r.key === next)?.label ?? next}?`)) return;
+    setBusyId(u.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: next }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Could not change the role");
+      await loadUsers();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not change the role");
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   const showCredentials = (c: Credentials) => {
     setCredentials(c);
@@ -182,9 +234,30 @@ export default function AdminUsersPage() {
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold">User Management</h1>
-        <p className="text-muted-foreground mt-1">Create accounts and manage access. Public signup is disabled.</p>
+        <h1 className="text-2xl md:text-3xl font-bold">User Roles &amp; Users</h1>
+        <p className="text-muted-foreground mt-1">Create accounts, choose each person&apos;s role, and decide what each role can use. Public signup is disabled.</p>
       </div>
+
+      {canAssignRole(myRole) && (
+        <div role="tablist" className="inline-flex rounded-lg border bg-muted p-1">
+          {([["users", "Users"], ["roles", "Roles & access"]] as const).map(([id, label]) => (
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              onClick={() => setTab(id)}
+              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === "roles" && canAssignRole(myRole) ? (
+        <RolesManager onChanged={() => { loadRoles(); loadUsers(); }} />
+      ) : (
+      <>
 
       {credentials && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
@@ -280,9 +353,11 @@ export default function AdminUsersPage() {
                   onChange={(e) => setRole(e.target.value as UserRole)}
                   className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
-                  <option value="user">User — Dashboard, Trips, Reports, Personal, Profile, Settings</option>
-                  <option value="assistant">Assistant — Same as User + create users (not roles)</option>
-                  <option value="admin">Admin — Full access</option>
+                  {roleOptions.map((r) => (
+                    <option key={r.key} value={r.key}>
+                      {r.label}{r.description ? ` — ${r.description}` : ""}
+                    </option>
+                  ))}
                 </select>
               </div>
             ) : (
@@ -336,7 +411,21 @@ export default function AdminUsersPage() {
                           </p>
                         </div>
                       </div>
-                      <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${roleBadge(u.role)}`}>{u.role}</span>
+                      {canAssignRole(myRole) && u.id !== meId ? (
+                        <select
+                          value={u.role}
+                          disabled={busyId === u.id}
+                          onChange={(e) => changeRole(u, e.target.value)}
+                          aria-label={`Role for ${u.email}`}
+                          className="h-8 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
+                        >
+                          {(roleOptions.some((r) => r.key === u.role) ? roleOptions : [...roleOptions, { key: u.role, label: u.role, description: "" }]).map((r) => (
+                            <option key={r.key} value={r.key}>{r.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${roleBadge(u.role)}`}>{roleOptions.find((r) => r.key === u.role)?.label ?? u.role}</span>
+                      )}
                     </div>
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pl-12">
@@ -367,6 +456,8 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

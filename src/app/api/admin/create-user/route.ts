@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { logAudit } from "@/lib/audit";
-import { canAssignRole, canCreateUsers, type UserRole } from "@/lib/roles";
+import { canAssignRole, type UserRole } from "@/lib/roles";
+import { loadPermissions } from "@/lib/access-server";
 import { generateTempPassword, tempPasswordWindow } from "@/lib/temp-password";
 
 export async function POST(request: Request) {
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
 
     const myRole = (profile?.role as UserRole) || "user";
 
-    if (!canCreateUsers(myRole)) {
+    if (!(await loadPermissions(supabase, myRole)).has("users.manage")) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
@@ -40,10 +41,8 @@ export async function POST(request: Request) {
     const password = generateTempPassword();
     const { issuedAt, expiresAt } = tempPasswordWindow();
 
-    // Assistants can only create regular users
+    // Only an admin chooses the role; everyone else with the "create users" feature creates regular users
     if (!canAssignRole(myRole)) {
-      role = "user";
-    } else if (!["user", "assistant", "admin"].includes(role)) {
       role = "user";
     }
 
@@ -67,6 +66,13 @@ export async function POST(request: Request) {
         },
       }
     );
+
+    // The chosen role must exist (custom roles live in public.roles). Before the roles migration only the 3 built-ins exist.
+    if (role !== "user") {
+      const { data: roleRow, error: roleErr } = await adminClient.from("roles").select("key").eq("key", role).maybeSingle();
+      const known = roleErr ? ["assistant", "admin"].includes(role) : !!roleRow;
+      if (!known) return NextResponse.json({ error: "That role does not exist." }, { status: 400 });
+    }
 
     const { data: newUser, error: createError } =
       await adminClient.auth.admin.createUser({

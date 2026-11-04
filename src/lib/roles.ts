@@ -1,70 +1,20 @@
-export type UserRole = "user" | "assistant" | "admin";
+/**
+ * Roles are stored in the database (public.roles) and can be created by an admin.
+ * What each role may do is decided by src/lib/access.ts (features) and loaded with access-server.ts.
+ */
+export type UserRole = string;
 
-export const ROLE_LABELS: Record<UserRole, string> = {
+export const ROLE_LABELS: Record<string, string> = {
   user: "User",
   assistant: "Assistant",
   admin: "Admin",
 };
 
-/** Nav items each role can see */
-export function canAccessPath(role: UserRole, path: string): boolean {
-  if (role === "admin") return true;
-
-  if (role === "assistant") {
-    if (path.startsWith("/admin/security")) return false;
-    if (path.startsWith("/admin/branding")) return false;
-    if (path.startsWith("/admin/telegram")) return false;
-    if (path.startsWith("/admin/currencies")) return false;
-    if (path.startsWith("/admin/categories")) return false;
-    if (path.startsWith("/admin/travel-categories")) return false;
-    if (path.startsWith("/admin/settings")) return false;
-    if (path.startsWith("/admin/support")) return false;
-    if (path.startsWith("/admin")) return true;
-    return isUserPath(path);
-  }
-
-  if (path.startsWith("/admin")) return false;
-  return isUserPath(path);
+export function roleLabel(key: string, roles?: { key: string; label: string }[]): string {
+  return roles?.find((r) => r.key === key)?.label ?? ROLE_LABELS[key] ?? key;
 }
 
-function isUserPath(path: string): boolean {
-  if (path === "/" || path.startsWith("/trips")) return true;
-  if (path.startsWith("/profile")) return true;
-  if (path.startsWith("/settings")) return true;
-  if (path.startsWith("/reports")) return true;
-  if (path.startsWith("/personal")) return true;
-  if (path.startsWith("/documents")) return true;
-  return false;
-}
-
-export function canCreateUsers(role: UserRole): boolean {
-  return role === "admin" || role === "assistant";
-}
-
+/** Only an admin can assign or change roles (an assistant or custom role can never promote anyone). */
 export function canAssignRole(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canManageBranding(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canManageTelegram(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canManageCurrencies(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canManageCategories(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canManageAppSettings(role: UserRole): boolean {
-  return role === "admin";
-}
-
-export function canViewSecurity(role: UserRole): boolean {
   return role === "admin";
 }

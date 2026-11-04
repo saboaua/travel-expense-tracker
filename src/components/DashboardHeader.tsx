@@ -19,6 +19,8 @@ type Props = {
   /** Active trips, the most likely receipt target first */
   trips: HeaderTrip[];
   notifications?: AppNotification[];
+  /** Hide Quick Scan / New Trip for roles without the Trips feature */
+  canUseTrips?: boolean;
 };
 
 function greetingFor(hour: number) {
@@ -27,7 +29,7 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [] }: Props) {
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [], canUseTrips = true }: Props) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [greeting, setGreeting] = useState("Welcome back");
@@ -110,6 +112,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
           </div>
         </div>
 
+        {canUseTrips && (
         <div className="mt-4 grid grid-cols-2 gap-3 md:max-w-md">
           <button
             type="button"
@@ -128,6 +131,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
             New Trip
           </Link>
         </div>
+        )}
 
         {notice && (
           <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
