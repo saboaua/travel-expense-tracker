@@ -5,27 +5,27 @@ import { formatCurrency } from "@/lib/utils";
 import type { PersonalSummary } from "@/lib/personal/summary";
 
 /** Personal spending at a glance, shown under the active trips on the dashboard. */
-export function PersonalTiles({ summary }: { summary: PersonalSummary }) {
+export function PersonalTiles({ summary, currency = "USD" }: { summary: PersonalSummary; currency?: string }) {
   const tiles = [
     {
       href: "/personal/groceries",
       label: "Groceries",
       icon: ShoppingCart,
-      amount: formatCurrency(summary.grocery?.total ?? 0, summary.grocery?.currency ?? "USD"),
+      amount: formatCurrency(summary.grocery?.total ?? 0, summary.grocery?.currency ?? currency),
       sub: summary.grocery ? `This month · ${summary.grocery.count} receipt${summary.grocery.count !== 1 ? "s" : ""}` : "Nothing this month yet",
     },
     {
       href: "/personal/projects",
       label: "Home Projects",
       icon: Hammer,
-      amount: formatCurrency(summary.projects.spent, "USD"),
+      amount: formatCurrency(summary.projects.spent, currency),
       sub: `${summary.projects.count} active project${summary.projects.count !== 1 ? "s" : ""}`,
     },
     {
       href: "/personal/travel",
       label: "Personal Travel",
       icon: Plane,
-      amount: formatCurrency(summary.trips.spent, "USD"),
+      amount: formatCurrency(summary.trips.spent, currency),
       sub: `${summary.trips.count} active trip${summary.trips.count !== 1 ? "s" : ""}`,
     },
   ];

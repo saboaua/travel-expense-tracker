@@ -16,7 +16,7 @@ const KEY = "dashboard-view";
  * Sits right under the welcome section. The business dashboard (children) is left exactly as it is; this only decides
  * whether it or the personal analytics is shown. The page renders it only for roles that have "Personal dashboard".
  */
-export function DashboardViews({ rows, projects, today, children }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; children: ReactNode }) {
+export function DashboardViews({ rows, projects, today, shared, personalTiles, children }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; /** Shown under the switch in both views (weather) */ shared?: ReactNode; /** Groceries / Home Projects / Personal Travel tiles, top of the Personal view */ personalTiles?: ReactNode; children: ReactNode }) {
   const [view, setView] = useState<View>("business");
 
   useEffect(() => {
@@ -58,11 +58,13 @@ export function DashboardViews({ rows, projects, today, children }: { rows: Dash
         {tab("business", "Business")}
         {tab("personal", "Personal")}
       </div>
+      {shared}
       <div id="dash-panel-business" role="tabpanel" aria-labelledby="dash-tab-business" hidden={view !== "business"} className="space-y-6">
         {children}
       </div>
       {view === "personal" && (
-        <div id="dash-panel-personal" role="tabpanel" aria-labelledby="dash-tab-personal">
+        <div id="dash-panel-personal" role="tabpanel" aria-labelledby="dash-tab-personal" className="space-y-6">
+          {personalTiles}
           <PersonalDashboard rows={rows} projects={projects} today={today} />
         </div>
       )}

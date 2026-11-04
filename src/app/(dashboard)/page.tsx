@@ -15,7 +15,7 @@ import { loadPermissions } from "@/lib/access-server";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
-import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
+import { buildRows, tileSummary, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -102,7 +102,7 @@ export default async function DashboardPage() {
       const [ex, gr, pj, cu] = await Promise.all([
         supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", user?.id).order("expense_date", { ascending: false }).limit(5000),
         supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", user?.id).order("purchase_date", { ascending: false }).limit(5000),
-        supabase.from("personal_projects").select("id, name, kind, start_date, end_date").eq("user_id", user?.id),
+        supabase.from("personal_projects").select("id, name, kind, status, start_date, end_date").eq("user_id", user?.id),
         supabase.from("currencies").select("code, usd_rate"),
       ]);
       if (!ex.error && !gr.error && !pj.error) {
@@ -114,8 +114,9 @@ export default async function DashboardPage() {
     }
   }
 
-  const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
+  const monthTotal =
+    allExpenses?.filter((e) => (e.expense_date || "").startsWith(today.slice(0, 7))).reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const yearTotal =
     allExpenses?.filter((e) => (e.expense_date || "").startsWith(today.slice(0, 4))).reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const endOf = (t: { start_date: string; end_date: string | null }) => t.end_date || t.start_date;
@@ -171,8 +172,8 @@ export default async function DashboardPage() {
       {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}
       {passportAlert && passportAlert.level !== "renew" && <PassportBalloon alert={passportAlert} />}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-        <Card>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
+        <Card className="col-span-2 sm:col-span-1">
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Plane className="h-4 w-4" />
@@ -187,11 +188,11 @@ export default async function DashboardPage() {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Receipt className="h-4 w-4" />
-              Total in USD
+              This Month
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(totalSpent, "USD")}</p>
+            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(monthTotal, "USD")}</p>
           </CardContent>
         </Card>
         <Card>
@@ -205,7 +206,6 @@ export default async function DashboardPage() {
             <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(yearTotal, "USD")}</p>
           </CardContent>
         </Card>
-        <WeatherCard />
       </div>
 
       {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
@@ -304,7 +304,8 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {personalSummary && <PersonalTiles summary={personalSummary} />}
+      {/* Without the Personal dashboard option the tiles stay here, so nobody loses the links */}
+      {!dashRows && personalSummary && <PersonalTiles summary={personalSummary} />}
     </>
   );
 
@@ -321,11 +322,20 @@ export default async function DashboardPage() {
       />
 
       {dashRows ? (
-        <DashboardViews rows={dashRows} projects={dashProjects} today={today}>
+        <DashboardViews
+          rows={dashRows}
+          projects={dashProjects}
+          today={today}
+          shared={<WeatherCard />}
+          personalTiles={myPerms.has("personal") ? <PersonalTiles summary={tileSummary(dashRows, dashProjects, today)} currency="AWG" /> : null}
+        >
           {businessView}
         </DashboardViews>
       ) : (
-        businessView
+        <>
+          <WeatherCard />
+          {businessView}
+        </>
       )}
     </div>
   );

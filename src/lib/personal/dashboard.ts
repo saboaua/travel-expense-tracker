@@ -27,7 +27,7 @@ export type DashboardRow = {
   awg: number | null;
 };
 
-export type DashboardProject = { id: string; name: string; kind: string; start_date: string | null; end_date: string | null };
+export type DashboardProject = { id: string; name: string; kind: string; status?: string; start_date: string | null; end_date: string | null };
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -225,5 +225,22 @@ export function analyze(allRows: DashboardRow[], filtered: DashboardRow[], proje
     byCurrency,
     perProject,
     stores,
+  };
+}
+
+/** Tiles at the top of the Personal view: groceries this month, and active home projects / personal trips. All in AWG. */
+export function tileSummary(rows: DashboardRow[], projects: DashboardProject[], today: string) {
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const groc = rows.filter((r) => r.source === "grocery" && r.date >= monthStart && r.awg != null);
+  const spent = (kind: string) => {
+    const active = projects.filter((p) => p.kind === kind && (p.status || "active") === "active");
+    const ids = new Set(active.map((p) => p.id));
+    const t = rows.filter((r) => r.projectId && ids.has(r.projectId) && r.awg != null).reduce((s, r) => s + (r.awg as number), 0);
+    return { count: active.length, spent: round2(t) };
+  };
+  return {
+    grocery: groc.length ? { total: round2(groc.reduce((s, r) => s + (r.awg as number), 0)), currency: BASE_CURRENCY, count: groc.length } : null,
+    projects: spent("home_project"),
+    trips: spent("personal_trip"),
   };
 }

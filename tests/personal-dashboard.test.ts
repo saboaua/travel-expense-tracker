@@ -52,6 +52,13 @@ const mo = trendSeries(all, "month", resolveRange({ range: "all", from: "", to: 
 eq("monthly all-time starts at first purchase", mo[0].key, "2025-01-01");
 eq("empty trend", trendSeries([], "day", resolveRange(DEFAULT_FILTER, today), today), []);
 
+// Tiles at the top of the Personal view
+import { tileSummary } from "../src/lib/personal/dashboard";
+const ts = tileSummary(rows, [{ id: "p1", name: "Kitchen", kind: "home_project", status: "active", start_date: null, end_date: null }, { id: "p2", name: "Trip", kind: "personal_trip", status: "completed", start_date: null, end_date: null }], today);
+eq("tiles: groceries this month in AWG", ts.grocery, { total: 200.5, currency: "AWG", count: 1 });
+eq("tiles: active home project spend (all time)", ts.projects, { count: 1, spent: 100 + 89.5 + 500 });
+eq("tiles: completed trip not counted", ts.trips, { count: 0, spent: 0 });
+
 // Role option
 const feat = FEATURES.find((x) => x.key === "personal.dashboard");
 eq("feature registered in App group", feat?.group, "App");
