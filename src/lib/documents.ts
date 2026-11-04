@@ -172,3 +172,11 @@ export function maskNumber(n: string): string {
   if (t.length <= 4) return "••••";
   return `••••${t.slice(-4)}`;
 }
+
+/** What a stored file is, from its path: used to pick the right viewer. */
+export function fileKind(path: string | null | undefined): "pdf" | "image" | "other" {
+  const ext = (path || "").toLowerCase().split("?")[0].split(".").pop() || "";
+  if (ext === "pdf") return "pdf";
+  if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
+  return "other";
+}

@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, Image as ImageIcon } from "lucide-react";
+import { fileKind } from "@/lib/documents";
+import { Camera, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, X, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +18,51 @@ const LEVEL_STYLE = {
   renew: "bg-amber-100 text-amber-800",
   ok: "bg-emerald-100 text-emerald-700",
 } as const;
+
+
+/** Full-screen preview of an uploaded document (photo or PDF). */
+function DocumentViewer({ title, url, path, onClose }: { title: string; url: string; path: string; onClose: () => void }) {
+  const kind = fileKind(path);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prev;
+    };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[70] flex flex-col bg-black/80" role="dialog" aria-modal="true" aria-label={`Viewing ${title}`}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
+        <p className="min-w-0 truncate font-medium">{title}</p>
+        <div className="flex shrink-0 items-center gap-1">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm hover:bg-white/10" aria-label="Open in a new tab or download">
+            <Download className="h-4 w-4" /> <span className="hidden sm:inline">Open / download</span>
+          </a>
+          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10" aria-label="Close viewer" autoFocus>
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      </div>
+      <div className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-4" onClick={(e) => e.target === e.currentTarget && onClose()}>
+        {kind === "pdf" ? (
+          <iframe src={url} title={title} className="h-full w-full max-w-4xl rounded-lg bg-white" />
+        ) : kind === "image" ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={title} className="max-h-full max-w-full rounded-lg object-contain" />
+        ) : (
+          <div className="rounded-xl bg-card p-6 text-center text-sm text-card-foreground">
+            <p className="mb-3">This file type cannot be previewed here (for example HEIC photos from some phones).</p>
+            <a href={url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary hover:underline">Open or download it</a>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /**
  * Lists and uploads documents. With a tripId it shows that trip's documents,
@@ -34,6 +80,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [country, setCountry] = useState("");
   const [number, setNumber] = useState("");
   const [editing, setEditing] = useState<TravelDocument | null>(null);
+  const [viewing, setViewing] = useState<{ title: string; url: string; path: string } | null>(null);
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const formRef = useRef<HTMLFormElement>(null);
   const [expiry, setExpiry] = useState("");
@@ -170,6 +217,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   return (
     <div className="space-y-3">
+      {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
 
       {loading ? (
@@ -205,11 +253,20 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
                   {d.notes && <p className="truncate text-xs text-muted-foreground">{d.notes}</p>}
                 </div>
                 {st && <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:inline ${LEVEL_STYLE[st.level]}`}>{st.level === "ok" ? "Valid" : st.level === "renew" ? "Renew soon" : st.level === "critical" ? "Renew now" : "Expired"}</span>}
-                {url ? (
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-md border hover:bg-accent" aria-label={`Open ${d.title}`}>
-                    <Download className="h-4 w-4" />
-                  </a>
-                ) : null}
+                {d.file_path && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="shrink-0"
+                    disabled={!url}
+                    onClick={() => url && d.file_path && setViewing({ title: d.title, url, path: d.file_path })}
+                    aria-label={`View ${d.title}`}
+                    title={url ? "View" : "Preparing preview\u2026"}
+                  >
+                    <Eye className="h-4 w-4" />
+                  </Button>
+                )}
                 <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => startEdit(d)} aria-label={`Edit ${d.title}`} title="Edit">
                   <Pencil className="h-4 w-4" />
                 </Button>
