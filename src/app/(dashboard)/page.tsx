@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } fr
 import { DashboardHeader, type HeaderTrip } from "@/components/DashboardHeader";
 import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
+import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, renewalAlert } from "@/lib/documents";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
@@ -180,6 +181,9 @@ export default async function DashboardPage() {
         </Card>
         <WeatherCard />
       </div>
+
+      {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
+      {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
 
       {/* Active Trips */}
       <Card>
