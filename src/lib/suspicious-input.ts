@@ -14,6 +14,27 @@ const PATTERNS: [string, RegExp][] = [
   ["path_traversal", /\.\.[\/\\]/],
 ];
 
+/** Undo common disguises (URL / HTML entity encoding, curly quotes) so encoded attacks are caught too. */
+export function normalizeForScan(text: string): string {
+  let t = text;
+  for (let i = 0; i < 2; i++) {
+    try {
+      const decoded = decodeURIComponent(t.replace(/\+/g, " "));
+      if (decoded === t) break;
+      t = decoded;
+    } catch {
+      break;
+    }
+  }
+  return t
+    .replace(/&#x27;|&#39;|&apos;/gi, "'")
+    .replace(/&quot;|&#x22;|&#34;/gi, '"')
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/[\u2018\u2019\u02bc\uff07]/g, "'")
+    .replace(/[\u201c\u201d\uff02]/g, '"');
+}
+
 export type SuspiciousHit = { field: string; pattern: string; snippet: string };
 
 export function scanFields(fields: Record<string, unknown>): SuspiciousHit[] {
@@ -21,8 +42,9 @@ export function scanFields(fields: Record<string, unknown>): SuspiciousHit[] {
   for (const [field, value] of Object.entries(fields)) {
     if (typeof value !== "string" || !value) continue;
     const text = value.slice(0, 5000);
+    const normalized = normalizeForScan(text);
     for (const [pattern, re] of PATTERNS) {
-      if (re.test(text)) {
+      if (re.test(text) || re.test(normalized)) {
         hits.push({ field, pattern, snippet: text.slice(0, 120) });
         break;
       }
