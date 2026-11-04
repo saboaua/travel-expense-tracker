@@ -11,15 +11,19 @@ export function ReceiptCropper({
   onDone,
   onCancel,
   title = "Crop to the ticket",
+  initialCrop = { x: 8, y: 8, w: 84, h: 84 },
+  hint,
 }: {
   file: File;
   onDone: (file: File) => void;
   onCancel: () => void;
   title?: string;
+  initialCrop?: Crop;
+  hint?: string;
 }) {
   const imgRef = useRef<HTMLImageElement>(null);
   const [url, setUrl] = useState<string | null>(null);
-  const [crop, setCrop] = useState<Crop>({ x: 8, y: 8, w: 84, h: 84 });
+  const [crop, setCrop] = useState<Crop>(initialCrop);
   const [busy, setBusy] = useState(false);
   const drag = useRef<{ mode: "move" | "nw" | "ne" | "sw" | "se"; startX: number; startY: number; start: Crop } | null>(null);
 
@@ -102,6 +106,7 @@ export function ReceiptCropper({
         </button>
       </div>
 
+      {hint && <p className="px-4 pb-2 text-xs text-white/80">{hint}</p>}
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3">
         <div className="relative inline-block max-h-full max-w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}

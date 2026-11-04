@@ -10,7 +10,7 @@ import { formatDate, todayISO } from "@/lib/utils";
 import { DOC_KINDS, kindHasExpiry, kindLabel, maskNumber, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
 import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, removeTravelDocument, saveTravelDocument, updateTravelDocument, type DocQuality } from "@/lib/document-upload";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
-import { extractDocumentFields } from "@/lib/document-extract";
+import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
 
 const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 const LEVEL_STYLE = {
@@ -220,9 +220,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setError(null);
     setScanning(true);
     try {
-      const { fields, source } = await extractDocumentFields(f);
+      const { fields, source, reason } = await extractDocumentFields(f);
       if (source === "none") {
-        setScanNote("Could not read the details from this photo. Try a sharper, well-lit shot of the page with your photo, or enter them below.");
+        setScanNote(scanFailureMessage(reason));
         return;
       }
       // Passports belong to the general list, not to a trip
@@ -265,7 +265,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   return (
     <div className="space-y-3">
-      {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
+      {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
       {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
 

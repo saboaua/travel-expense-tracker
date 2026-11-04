@@ -30,10 +30,10 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   if (!aiOcrConfigured()) {
-    return NextResponse.json({ error: "AI OCR is not configured", configured: false }, { status: 503 });
+    return NextResponse.json({ error: "AI OCR is not configured", configured: false, reason: "not_configured" }, { status: 503 });
   }
   if (!allowed(user.id)) {
-    return NextResponse.json({ error: "Too many scans this hour" }, { status: 429 });
+    return NextResponse.json({ error: "Too many scans this hour", reason: "limit" }, { status: 429 });
   }
 
   let form: FormData;
@@ -74,7 +74,10 @@ export async function POST(request: Request) {
     const result = await extractReceiptWithClaude(image, hints);
     return NextResponse.json({ result });
   } catch (e) {
-    console.error("[ocr]", e instanceof Error ? e.message : e);
-    return NextResponse.json({ error: "AI OCR failed" }, { status: 502 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error("[ocr]", msg);
+    // Only the upstream status number is exposed (e.g. 401 bad key, 402/429 credit or rate limit, 404 unknown model)
+    const upstream = msg.match(/request failed \((\d{3})\)/)?.[1] ?? null;
+    return NextResponse.json({ error: "AI OCR failed", reason: "ai_failed", upstream }, { status: 502 });
   }
 }

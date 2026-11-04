@@ -4,7 +4,7 @@ import { parseMrz, sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz
 
 let aiUnavailable = false;
 
-export type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none" };
+export type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none"; reason?: string };
 
 const EMPTY: DocumentFields = { kind: null, document_number: null, issuing_country: null, expiry_date: null, holder_name: null };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -16,12 +16,16 @@ const today = () => new Date().toISOString().slice(0, 10);
  */
 export async function extractDocumentFields(file: File): Promise<DocumentScan> {
   // Sharper than receipts: the small machine-readable lines must stay legible
+  // (A photo that was already cropped and compressed in the form is sent as is: compressing twice blurs the small print.)
   let image = file;
-  try {
-    image = await compressReceiptImage(file, { maxSide: 2000, quality: 0.85 });
-  } catch {
-    // keep the original
+  if (file.size > 1.5 * 1024 * 1024) {
+    try {
+      image = await compressReceiptImage(file, { maxSide: 2000, quality: 0.85 });
+    } catch {
+      // keep the original
+    }
   }
+  let reason: string | undefined;
 
   if (!aiUnavailable) {
     try {
@@ -29,15 +33,23 @@ export async function extractDocumentFields(file: File): Promise<DocumentScan> {
       form.append("file", image);
       form.append("mode", "document");
       const res = await fetch("/api/ocr", { method: "POST", body: form });
-      if (res.status === 503) aiUnavailable = true;
-      else if (res.ok) {
+      if (res.status === 503) {
+        aiUnavailable = true;
+        reason = "not_configured";
+      } else if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { reason?: string; upstream?: string | null };
+        reason = body.reason === "ai_failed" ? `ai_failed${body.upstream ? `_${body.upstream}` : ""}` : body.reason || `http_${res.status}`;
+      } else if (res.ok) {
         const { result } = (await res.json()) as { result?: Record<string, unknown> };
         const fields = sanitizeDocumentFields(result || {}, today());
         if (fields.expiry_date || fields.issuing_country || fields.holder_name || fields.document_number) return { fields, source: "ai" };
+        reason = "ai_empty";
       }
     } catch {
-      // network problem: use on-device reading
+      reason = "network";
     }
+  } else {
+    reason = "not_configured";
   }
 
   try {
@@ -47,5 +59,19 @@ export async function extractDocumentFields(file: File): Promise<DocumentScan> {
   } catch {
     // unreadable image
   }
-  return { fields: EMPTY, source: "none" };
+  return { fields: EMPTY, source: "none", reason };
+}
+
+/** Plain-language explanation for a failed scan. */
+export function scanFailureMessage(reason?: string): string {
+  const tip = " Retake it flat and well lit with the whole page in view (including the two lines of < < < at the bottom), or enter the details below.";
+  if (reason === "not_configured") return "AI reading is not set up on the server (ANTHROPIC_API_KEY is missing), and the passport's printed lines could not be read on this device." + tip;
+  if (reason === "limit") return "Too many scans this hour. Enter the details below or try again later.";
+  if (reason?.startsWith("ai_failed")) {
+    const code = reason.split("_")[2];
+    return `The AI reader returned an error${code ? ` (${code})` : ""}, and the printed lines could not be read on this device.` + tip;
+  }
+  if (reason === "ai_empty") return "The AI reader could not find the details in this photo." + tip;
+  if (reason === "network") return "Could not reach the reading service (network problem)." + tip;
+  return "Could not read the details from this photo." + tip;
 }
