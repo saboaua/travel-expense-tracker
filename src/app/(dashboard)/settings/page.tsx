@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -180,12 +181,12 @@ export default function SettingsPage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
+              <Alert>{error}</Alert>
             )}
             {saved && (
-              <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+              <Alert variant="success">
                 Settings saved successfully
-              </p>
+              </Alert>
             )}
 
             <Button type="submit" disabled={loading}>

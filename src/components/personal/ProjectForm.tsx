@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -11,7 +13,6 @@ import { ArrowLeft } from "lucide-react";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { useCurrencies } from "@/lib/use-currencies";
 
-const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId?: string }) {
   const meta = KIND_META[kind];
@@ -129,9 +130,9 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Budget currency</label>
-                <select className={selectClass} value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
             <div className="space-y-2">
@@ -144,7 +145,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
                 Mark as completed
               </label>
             )}
-            {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+            {error && <Alert>{error}</Alert>}
             <Button type="submit" disabled={saving} className="w-full">{saving ? "Saving..." : projectId ? "Save changes" : `Create ${meta.noun}`}</Button>
           </form>
         </CardContent>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Archive, Check, Download, MapPin, CalendarDays, Search, ArrowUpRight } from "lucide-react";
@@ -61,10 +62,10 @@ export function TripReportList({ trips, year }: { trips: TripReportRow[]; year: 
           {chip("all", "All")}
           {chip("active", "Active")}
           {chip("completed", "Completed")}
-          <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="h-9 rounded-md border border-input bg-background px-2 text-xs" aria-label="Sort trips">
+          <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="w-auto min-w-fit h-9 px-2 text-xs py-0" aria-label="Sort trips">
             <option value="recent">Newest</option>
             <option value="spend">Highest spend</option>
-          </select>
+          </Select>
         </div>
       </div>
 

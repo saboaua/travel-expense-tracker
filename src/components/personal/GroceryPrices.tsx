@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -84,23 +86,23 @@ export function GroceryPrices() {
         <Link href="/personal/groceries/new"><Button className="gap-2"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
       </div>
 
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       <div className="flex flex-col gap-2 sm:flex-row">
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input className="pl-9" placeholder="Search items" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
-        <select className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
+        <Select className="w-auto min-w-fit px-2" value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort">
           <option value="increase">Biggest price increase</option>
           <option value="recent">Most recent</option>
           <option value="purchases">Most purchased</option>
           <option value="name">Name</option>
-        </select>
+        </Select>
         {currencies.length > 1 && (
-          <select className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={cur} onChange={(e) => setCurrency(e.target.value)} aria-label="Currency">
+          <Select className="w-auto min-w-fit px-2" value={cur} onChange={(e) => setCurrency(e.target.value)} aria-label="Currency">
             {currencies.map((c) => <option key={c}>{c}</option>)}
-          </select>
+          </Select>
         )}
       </div>
 

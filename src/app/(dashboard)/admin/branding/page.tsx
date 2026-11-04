@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -350,11 +351,11 @@ export default function AdminBrandingPage() {
         </CardContent>
       </Card>
 
-      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+      {error && <Alert>{error}</Alert>}
       {saved && (
-        <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+        <Alert variant="success">
           Branding saved. Refresh the page to see it everywhere.
-        </p>
+        </Alert>
       )}
 
       <Button type="submit" disabled={loading}>

@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,7 +18,6 @@ import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
 
-const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function EditExpensePage() {
   const currencies = useCurrencies();
@@ -127,8 +129,9 @@ export default function EditExpensePage() {
     }
   };
 
+  const confirm = useConfirm();
   const remove = async () => {
-    if (!window.confirm("Delete this expense? This cannot be undone.")) return;
+    if (!(await confirm({ title: "Delete expense?", message: "Delete this expense? This cannot be undone.", destructive: true }))) return;
     setSaving(true);
     const { error } = await supabase.from("expenses").delete().eq("id", expenseId);
     if (error) {
@@ -187,9 +190,9 @@ export default function EditExpensePage() {
                 </div>
                 <div className="space-y-2 min-w-0">
                   <label className="text-sm font-medium">Currency</label>
-                  <select value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectClass}>
+                  <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                     {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                  </select>
+                  </Select>
                 </div>
               </div>
 
@@ -214,7 +217,7 @@ export default function EditExpensePage() {
                 <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
 
-              {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+              {error && <Alert>{error}</Alert>}
               <Button type="submit" className="w-full" disabled={saving}>{saving ? "Saving\u2026" : "Save changes"}</Button>
               <Button type="button" variant="outline" className="w-full gap-2 text-red-600" disabled={saving} onClick={remove}>
                 <Trash2 className="h-4 w-4" /> Delete expense

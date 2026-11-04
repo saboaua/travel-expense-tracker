@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/ui/confirm";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +16,7 @@ import { daysBetween, formatCurrency, formatDate } from "@/lib/utils";
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
   const router = useRouter();
+  const confirm = useConfirm();
   const supabase = createClient();
   const [project, setProject] = useState<PersonalProject | null>(null);
   const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
@@ -71,7 +73,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
   };
 
   const remove = async () => {
-    if (!confirm(`Delete "${project.name}" and all its expenses? This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Delete project?", message: `Delete "${project.name}" and all its expenses? This cannot be undone.`, destructive: true }))) return;
     const paths = expenses.map((e) => e.receipt_path).filter(Boolean) as string[];
     if (paths.length) await supabase.storage.from("receipts").remove(paths).catch(() => {});
     const { error } = await supabase.from("personal_projects").delete().eq("id", id);

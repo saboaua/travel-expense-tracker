@@ -1,5 +1,9 @@
 "use client";
 
+import { formatDateTime } from "@/lib/utils";
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,8 +29,7 @@ interface ManagedUser {
 
 type Credentials = { email: string; password: string; expiresAt: string };
 
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const fmt = formatDateTime;
 
 function timeAgo(iso: string) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
@@ -132,9 +135,10 @@ export default function AdminUsersPage() {
         { key: "admin", label: "Admin", description: "Full access." },
       ] as RoleSummary[]);
 
+  const confirm = useConfirm();
   const changeRole = async (u: ManagedUser, next: string) => {
     if (next === u.role) return;
-    if (!confirm(`Change ${u.email}'s role to ${roleOptions.find((r) => r.key === next)?.label ?? next}?`)) return;
+    if (!(await confirm({ title: "Change role?", message: `Change ${u.email}'s role to ${roleOptions.find((r) => r.key === next)?.label ?? next}?`, confirmLabel: "Change role" }))) return;
     setBusyId(u.id);
     setError(null);
     try {
@@ -195,12 +199,7 @@ export default function AdminUsersPage() {
   };
 
   const regenerate = async (u: ManagedUser) => {
-    if (
-      !confirm(
-        `Generate a new temporary password for ${u.email}? Their current password stops working immediately.`
-      )
-    )
-      return;
+    if (!(await confirm({ title: "Generate new password?", message: `Generate a new temporary password for ${u.email}? Their current password stops working immediately.`, confirmLabel: "Generate" }))) return;
     setBusyId(u.id);
     setError(null);
     setWarning(null);
@@ -302,8 +301,8 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {warning && <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 p-3 rounded-md">{warning}</p>}
-      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+      {warning && <Alert variant="warning">{warning}</Alert>}
+      {error && <Alert>{error}</Alert>}
 
       <Card>
         <CardHeader>
@@ -348,17 +347,17 @@ export default function AdminUsersPage() {
             {canAssignRole(myRole) ? (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Role</label>
-                <select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                >
+                <Select
+ value={role}
+ onChange={(e) => setRole(e.target.value as UserRole)}
+
+ >
                   {roleOptions.map((r) => (
                     <option key={r.key} value={r.key}>
                       {r.label}{r.description ? ` — ${r.description}` : ""}
                     </option>
                   ))}
-                </select>
+                </Select>
               </div>
             ) : (
               <p className="text-sm text-muted-foreground">
@@ -412,17 +411,17 @@ export default function AdminUsersPage() {
                         </div>
                       </div>
                       {canAssignRole(myRole) && u.id !== meId ? (
-                        <select
-                          value={u.role}
-                          disabled={busyId === u.id}
-                          onChange={(e) => changeRole(u, e.target.value)}
-                          aria-label={`Role for ${u.email}`}
-                          className="h-8 shrink-0 rounded-md border border-input bg-background px-2 text-xs"
-                        >
+                        <Select
+ value={u.role}
+ disabled={busyId === u.id}
+ onChange={(e) => changeRole(u, e.target.value)}
+ aria-label={`Role for ${u.email}`}
+ className="w-auto min-w-fit h-8 shrink-0 px-2 text-xs py-0"
+ >
                           {(roleOptions.some((r) => r.key === u.role) ? roleOptions : [...roleOptions, { key: u.role, label: u.role, description: "" }]).map((r) => (
                             <option key={r.key} value={r.key}>{r.label}</option>
                           ))}
-                        </select>
+                        </Select>
                       ) : (
                         <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${roleBadge(u.role)}`}>{roleOptions.find((r) => r.key === u.role)?.label ?? u.role}</span>
                       )}

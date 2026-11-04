@@ -1,5 +1,6 @@
 "use client";
 
+import { useConfirm } from "@/components/ui/confirm";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -36,8 +37,9 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
     })();
   }, [id]);
 
+  const confirm = useConfirm();
   const remove = async () => {
-    if (!receipt || !confirm(`Delete the ${receipt.store} receipt and its ${items.length} items?`)) return;
+    if (!receipt || !(await confirm({ title: "Delete receipt?", message: `Delete the ${receipt.store} receipt and its ${items.length} items?`, destructive: true }))) return;
     const supabase = createClient();
     if (receipt.receipt_path) await supabase.storage.from("receipts").remove([receipt.receipt_path]).catch(() => {});
     const { error } = await supabase.from("grocery_receipts").delete().eq("id", id);

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { useConfirm } from "@/components/ui/confirm";
 
 /**
  * Close/reopen a trip. The tone tells the story: a trip whose dates have passed but is still open
@@ -22,6 +23,7 @@ export function TripStatusToggle({
   endLabel?: string;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const supabase = createClient();
   const [completed, setCompleted] = useState(status === "completed");
   const [saving, setSaving] = useState(false);
@@ -36,7 +38,7 @@ export function TripStatusToggle({
     setSaving(false);
     if (error) {
       setCompleted(!next);
-      window.alert(error.message);
+      await confirm({ title: "Could not update the trip", message: error.message, confirmLabel: "OK", hideCancel: true });
       return;
     }
     router.refresh();

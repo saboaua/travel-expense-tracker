@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -49,13 +51,14 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
   const iconByCategory = useMemo(() => new Map(categories.map((c) => [c.name, c.icon])), [categories]);
   const present = useMemo(() => [...new Set(expenses.map((e) => e.category || "Other"))], [expenses]);
 
+  const confirm = useConfirm();
   const remove = async (expense: Expense) => {
     const label = expense.merchant || "this expense";
-    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    if (!(await confirm({ title: "Delete expense?", message: `Delete ${label}? This cannot be undone.`, destructive: true }))) return;
     setBusyId(expense.id);
     const { error } = await supabase.from("expenses").delete().eq("id", expense.id);
     if (error) {
-      window.alert(error.message);
+      await confirm({ title: "Could not delete", message: error.message, confirmLabel: "OK", hideCancel: true });
       setBusyId(null);
       return;
     }
@@ -118,11 +121,11 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
                 <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search merchant or notes" aria-label="Search expenses" className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm" />
               </div>
             )}
-            <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort expenses" className="h-9 rounded-md border border-input bg-background px-2 text-xs">
+            <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort expenses" className="w-auto min-w-fit h-9 px-2 text-xs py-0">
               <option value="newest">Newest first</option>
               <option value="oldest">Oldest first</option>
               <option value="highest">Highest amount</option>
-            </select>
+            </Select>
           </div>
           {present.length > 1 && (
             <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">

@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Link from "next/link";
@@ -18,7 +20,6 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
-const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export default function AddExpensePage() {
   const currencies = useCurrencies();
@@ -274,9 +275,9 @@ export default function AddExpensePage() {
               </div>
               <div className="space-y-2 min-w-0">
                 <label htmlFor="currency" className="text-sm font-medium">Currency</label>
-                <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectClass}>
+                <Select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -301,7 +302,7 @@ export default function AddExpensePage() {
               <Input id="notes" placeholder="Optional notes..." value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+            {error && <Alert>{error}</Alert>}
             <Button type="submit" className="w-full" disabled={loading || ocrLoading}>{loading ? "Saving..." : "Save Expense"}</Button>
           </form>
         </CardContent>

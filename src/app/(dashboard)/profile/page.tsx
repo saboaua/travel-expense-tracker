@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { compressAvatarImage } from "@/lib/compress-image";
@@ -430,12 +431,12 @@ export default function ProfilePage() {
             </div>
 
             {error && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
+              <Alert>{error}</Alert>
             )}
             {saved && (
-              <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+              <Alert variant="success">
                 Profile saved successfully
-              </p>
+              </Alert>
             )}
 
             <Button type="submit" disabled={loading}>
@@ -484,12 +485,12 @@ export default function ProfilePage() {
             </div>
 
             {pwError && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{pwError}</p>
+              <Alert>{pwError}</Alert>
             )}
             {pwSaved && (
-              <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">
+              <Alert variant="success">
                 Password updated successfully
-              </p>
+              </Alert>
             )}
 
             <Button type="submit" disabled={pwLoading}>
@@ -569,7 +570,7 @@ export default function ProfilePage() {
             )}
 
             {tgError && (
-              <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{tgError}</p>
+              <Alert>{tgError}</Alert>
             )}
           </CardContent>
         </Card>

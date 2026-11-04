@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -88,15 +91,15 @@ export function CategoryManager({
     await load();
   };
 
+  const confirm = useConfirm();
   const remove = async (id: string) => {
-    if (!confirm(deleteWarning)) return;
+    if (!(await confirm({ message: deleteWarning, destructive: true }))) return;
     setError(null);
     const { error } = await supabase.from(table).delete().eq("id", id);
     if (error) setError(error.message);
     else await load();
   };
 
-  const selectClass = "flex h-10 rounded-md border border-input bg-background px-2 py-2 text-sm";
 
   return (
     <div className={embedded ? "space-y-6" : "p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6"}>
@@ -112,7 +115,7 @@ export function CategoryManager({
       </div>
       )}
 
-      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       <Card>
         <CardHeader>
@@ -122,9 +125,9 @@ export function CategoryManager({
         <CardContent>
           <form onSubmit={add} className="flex flex-col sm:flex-row gap-2">
             <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} className="flex-1" />
-            <select value={icon} onChange={(e) => setIcon(e.target.value)} className={selectClass} aria-label="Icon">
+            <Select value={icon} onChange={(e) => setIcon(e.target.value)} className="w-auto min-w-fit px-2" aria-label="Icon">
               {ICON_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
-            </select>
+            </Select>
             <Button type="submit" className="gap-2">
               <Plus className="h-4 w-4" /> Add
             </Button>
@@ -149,9 +152,9 @@ export function CategoryManager({
                   <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
                   <Input value={row.name} onChange={(e) => patch(row.id, { name: e.target.value })} className="flex-1" />
                   <div className="flex flex-wrap items-center gap-2">
-                    <select value={row.icon || defaultIcon} onChange={(e) => patch(row.id, { icon: e.target.value })} className={selectClass} aria-label="Icon">
+                    <Select value={row.icon || defaultIcon} onChange={(e) => patch(row.id, { icon: e.target.value })} className="w-auto min-w-fit px-2" aria-label="Icon">
                       {ICON_KEYS.map((k) => <option key={k} value={k}>{k}</option>)}
-                    </select>
+                    </Select>
                     <label className="flex items-center gap-1 text-sm">
                       <input type="checkbox" checked={row.enabled} onChange={(e) => patch(row.id, { enabled: e.target.checked })} />
                       Enabled

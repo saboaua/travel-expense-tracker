@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -17,7 +20,6 @@ import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
-const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: PersonalKind; projectId: string; expenseId?: string }) {
   const meta = KIND_META[kind];
@@ -135,8 +137,9 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
     }
   };
 
+  const confirm = useConfirm();
   const remove = async () => {
-    if (!expenseId || !confirm("Delete this expense?")) return;
+    if (!expenseId || !(await confirm({ title: "Delete expense?", message: "Delete this expense?", destructive: true }))) return;
     const supabase = createClient();
     if (existingPath) await supabase.storage.from("receipts").remove([existingPath]).catch(() => {});
     const { error } = await supabase.from("personal_expenses").delete().eq("id", expenseId);
@@ -180,9 +183,9 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Currency</label>
-                <select className={selectClass} value={currency} onChange={(e) => { setRateLocked(false); setCurrency(e.target.value); }}>
+                <Select value={currency} onChange={(e) => { setRateLocked(false); setCurrency(e.target.value); }}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
+                </Select>
               </div>
             </div>
 
@@ -208,7 +211,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+            {error && <Alert>{error}</Alert>}
             <div className="flex gap-2">
               <Button type="submit" disabled={saving || scanning} className="flex-1">{saving ? "Saving..." : "Save expense"}</Button>
               {expenseId && <Button type="button" variant="outline" className="text-red-600" onClick={remove} aria-label="Delete"><Trash2 className="h-4 w-4" /></Button>}

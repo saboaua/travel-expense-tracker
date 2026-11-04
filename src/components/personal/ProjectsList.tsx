@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -82,7 +83,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
         </Link>
       </div>
 
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       {!loading && !error && rows.length === 0 && (
         <Card>

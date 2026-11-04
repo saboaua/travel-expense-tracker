@@ -23,6 +23,11 @@ export function formatDate(date: string | Date) {
   }).format(new Date(date));
 }
 
+/** A timestamp as "Nov 4, 2026, 9:30 PM" in the viewer's own locale and time zone. */
+export function formatDateTime(iso: string | Date) {
+  return new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+}
+
 /** Today's calendar date (YYYY-MM-DD) in the app's home time zone (Aruba). */
 export function todayISO(timeZone = "America/Aruba", now: Date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone }).format(now);

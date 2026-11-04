@@ -1,5 +1,8 @@
 "use client";
 
+import { formatDateTime } from "@/lib/utils";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -16,8 +19,7 @@ type SupportRequest = {
   created_at: string;
 };
 
-const fmt = (iso: string) =>
-  new Date(iso).toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const fmt = formatDateTime;
 
 export default function AdminSupportPage() {
   const supabase = createClient();
@@ -56,8 +58,9 @@ export default function AdminSupportPage() {
     else setRows((rs) => rs.map((r) => (r.id === id ? { ...r, status } : r)));
   };
 
+  const confirm = useConfirm();
   const remove = async (id: string) => {
-    if (!confirm("Delete this message permanently?")) return;
+    if (!(await confirm({ title: "Delete message?", message: "Delete this message permanently?", destructive: true }))) return;
     const { error } = await supabase.from("support_requests").delete().eq("id", id);
     if (error) setError(error.message);
     else setRows((rs) => rs.filter((r) => r.id !== id));
@@ -76,7 +79,7 @@ export default function AdminSupportPage() {
         <p className="text-muted-foreground mt-1">Messages sent from the Contact Support form on the login screen.</p>
       </div>
 
-      {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       <Card>
         <CardHeader className="flex flex-row items-start justify-between space-y-0">

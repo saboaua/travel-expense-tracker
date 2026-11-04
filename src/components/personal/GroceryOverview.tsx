@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -89,7 +91,7 @@ export function GroceryOverview() {
         </div>
       </div>
 
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       {!loading && !error && receipts.length === 0 && (
         <Card><CardContent className="py-16 text-center">
@@ -108,9 +110,9 @@ export function GroceryOverview() {
               <Button variant="outline" size="icon" onClick={() => setMonth(shift(month, 1))} disabled={month >= monthOf(todayISO())} aria-label="Next month"><ChevronRight className="h-4 w-4" /></Button>
             </div>
             {currencies.length > 1 && (
-              <select className="h-10 rounded-md border border-input bg-background px-2 text-sm" value={cur} onChange={(e) => setCurrency(e.target.value)} aria-label="Currency">
+              <Select className="w-auto min-w-fit px-2" value={cur} onChange={(e) => setCurrency(e.target.value)} aria-label="Currency">
                 {currencies.map((c) => <option key={c}>{c}</option>)}
-              </select>
+              </Select>
             )}
           </div>
 

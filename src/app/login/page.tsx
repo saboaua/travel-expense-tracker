@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -200,9 +201,9 @@ export default function LoginPage() {
             )}
 
             {error && (
-              <div className="text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
+              <Alert className="rounded-xl border border-red-100">
                 {error}
-              </div>
+              </Alert>
             )}
 
             <button

@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { addDaysISO, todayISO } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,7 +58,6 @@ function eventLabel(type: string) {
   return map[type] || type;
 }
 
-const selectClass = "mt-1 flex h-9 w-full rounded-md border border-input bg-background px-2 text-sm";
 
 export default function AdminSecurityPage() {
   const [tab, setTab] = useState<"security" | "audit">("security");
@@ -166,10 +167,10 @@ export default function AdminSecurityPage() {
       </div>
 
       {error && (
-        <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">
+        <Alert>
           {error}
           <span className="block mt-1">If the table is missing, run supabase/migration_audit.sql in the SQL Editor.</span>
-        </p>
+        </Alert>
       )}
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -225,7 +226,7 @@ export default function AdminSecurityPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Event</label>
-                <select value={eventType} onChange={(e) => setEventType(e.target.value)} className={selectClass}>
+                <Select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All events</option>
                   <option value="login_success">Login success</option>
                   <option value="login_failed">Login failed</option>
@@ -240,37 +241,37 @@ export default function AdminSecurityPage() {
                   <option value="password_changed">Password changed</option>
                   <option value="support_spam">Support form spam</option>
                   <option value="rate_limit">Rate limit</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Severity</label>
-                <select value={severity} onChange={(e) => setSeverity(e.target.value)} className={selectClass}>
+                <Select value={severity} onChange={(e) => setSeverity(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All severities</option>
                   <option value="info">Info</option>
                   <option value="warning">Warning</option>
                   <option value="critical">Critical</option>
-                </select>
+                </Select>
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-xs text-muted-foreground">Action</label>
-                <select value={action} onChange={(e) => setAction(e.target.value)} className={selectClass}>
+                <Select value={action} onChange={(e) => setAction(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All actions</option>
                   <option value="created">Created</option>
                   <option value="updated">Updated</option>
                   <option value="deleted">Deleted</option>
-                </select>
+                </Select>
               </div>
               <div>
                 <label className="text-xs text-muted-foreground">Record</label>
-                <select value={entityType} onChange={(e) => setEntityType(e.target.value)} className={selectClass}>
+                <Select value={entityType} onChange={(e) => setEntityType(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All records</option>
                   <option value="expenses">Expenses</option>
                   <option value="trips">Trips</option>
                   <option value="user">Users</option>
-                </select>
+                </Select>
               </div>
             </div>
           )}

@@ -1,5 +1,7 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,7 +17,6 @@ import { extractGroceryReceipt } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
-const selectClass = "flex h-9 w-full min-w-0 rounded-md border border-input bg-background px-2 py-1 text-sm";
 const BACK = "/personal/groceries";
 
 type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string };
@@ -239,9 +240,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Currency</label>
-                <select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-                </select>
+                </Select>
               </div>
               <div className="col-span-2 space-y-2">
                 <label className="text-sm font-medium">Receipt total</label>
@@ -271,9 +272,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     <div><label className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
                     <div><label className="text-xs text-muted-foreground">Line total</label><Input type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
-                  <select className={selectClass} value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
+                  <Select className="h-9 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
                     {(categoryNames.includes(r.category) ? categoryNames : [r.category, ...categoryNames]).map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                  </Select>
                 </div>
               ))}
 
@@ -290,7 +291,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
-            {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+            {error && <Alert>{error}</Alert>}
             <Button type="submit" disabled={saving || scanning} className="w-full">{saving ? "Saving..." : "Save receipt"}</Button>
           </form>
         </CardContent>

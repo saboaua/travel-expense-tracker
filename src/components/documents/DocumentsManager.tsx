@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fileKind } from "@/lib/documents";
 import { Camera, Crop, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, X, Image as ImageIcon } from "lucide-react";
@@ -12,7 +15,6 @@ import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isC
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
 
-const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
 const LEVEL_STYLE = {
   expired: "bg-red-100 text-red-700",
   critical: "bg-red-100 text-red-700",
@@ -251,8 +253,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     if (f) pick(f, true);
   };
 
+  const confirm = useConfirm();
   const remove = async (d: TravelDocument) => {
-    if (!window.confirm(`Delete "${d.title}"?`)) return;
+    if (!(await confirm({ title: "Delete document?", message: `Delete "${d.title}"?`, destructive: true }))) return;
     try {
       await removeTravelDocument(createClient(), d);
       await load();
@@ -267,7 +270,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     <div className="space-y-3">
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
+      {error && <Alert>{error}</Alert>}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -353,9 +356,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="text-xs text-muted-foreground">Type</label>
-              <select className={selectClass} value={kind} onChange={(e) => setKind(e.target.value as DocKind)}>
+              <Select value={kind} onChange={(e) => setKind(e.target.value as DocKind)}>
                 {DOC_KINDS.filter((k) => tripId ? k.value !== "passport" : true).map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-              </select>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-muted-foreground">Name</label>
@@ -402,9 +405,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
                   <Crop className="h-3.5 w-3.5" /> Crop again
                 </button>
                 <label className="sr-only" htmlFor="doc-quality">Photo quality</label>
-                <select id="doc-quality" className="h-8 rounded-md border bg-background px-2 text-xs" value={quality} onChange={(e) => changeQuality(e.target.value as DocQuality)} title={DOC_QUALITY[quality].hint}>
+                <Select id="doc-quality" className="w-auto min-w-fit h-8 px-2 text-xs py-0" value={quality} onChange={(e) => changeQuality(e.target.value as DocQuality)} title={DOC_QUALITY[quality].hint}>
                   {(Object.keys(DOC_QUALITY) as DocQuality[]).map((q) => <option key={q} value={q}>{DOC_QUALITY[q].label}</option>)}
-                </select>
+                </Select>
               </div>
             )}
           </div>

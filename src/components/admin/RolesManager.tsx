@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Loader2, Lock, Plus, Shield, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -133,9 +136,10 @@ export function RolesManager({ onChanged }: { onChanged?: () => void }) {
     }
   };
 
+  const confirm = useConfirm();
   const remove = async (r: RoleSummary) => {
     const n = r.users || 0;
-    if (!confirm(n > 0 ? `Delete "${r.label}"? ${n} ${n === 1 ? "person" : "people"} will move to the User role.` : `Delete "${r.label}"?`)) return;
+    if (!(await confirm({ title: "Delete role?", message: n > 0 ? `Delete "${r.label}"? ${n} ${n === 1 ? "person" : "people"} will move to the User role.` : `Delete "${r.label}"?`, confirmLabel: "Delete role", destructive: true }))) return;
     setBusy(r.key);
     setError(null);
     try {
@@ -162,8 +166,8 @@ export function RolesManager({ onChanged }: { onChanged?: () => void }) {
 
   return (
     <div className="space-y-5">
-      {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
-      {notice && <p className="rounded-md bg-emerald-50 p-3 text-sm text-emerald-800" role="status">{notice}</p>}
+      {error && <Alert>{error}</Alert>}
+      {notice && <Alert variant="success">{notice}</Alert>}
 
       {newOptions.length > 0 && (
         <div className="flex items-start gap-3 rounded-xl border border-primary/30 bg-primary/5 p-4">
@@ -186,10 +190,10 @@ export function RolesManager({ onChanged }: { onChanged?: () => void }) {
           </div>
           <div>
             <label className="text-xs text-muted-foreground">Start from</label>
-            <select value={from} onChange={(e) => setFrom(e.target.value)} className="flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm">
+            <Select value={from} onChange={(e) => setFrom(e.target.value)}>
               <option value="">Nothing (choose below)</option>
               {roles.filter((r) => r.key !== "admin").map((r) => <option key={r.key} value={r.key}>Same as {r.label}</option>)}
-            </select>
+            </Select>
           </div>
         </div>
         <div>

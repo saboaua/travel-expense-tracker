@@ -1,5 +1,8 @@
 "use client";
 
+import { Select } from "@/components/ui/select";
+import { useConfirm } from "@/components/ui/confirm";
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -14,7 +17,6 @@ import { DOC_ACCEPT, DOC_BUCKET, saveTravelDocument } from "@/lib/document-uploa
 import { useTravelCategories } from "@/lib/use-categories";
 import { useCurrencies } from "@/lib/use-currencies";
 
-const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
 /** One form for creating and editing a trip, so both screens always look and validate the same. */
 export function TripForm({ tripId }: { tripId?: string }) {
@@ -114,9 +116,10 @@ export function TripForm({ tripId }: { tripId?: string }) {
     }
   };
 
+  const confirm = useConfirm();
   const remove = async () => {
     if (!tripId) return;
-    if (!window.confirm("Delete this trip and all of its expenses, receipt photos and documents? This cannot be undone.")) return;
+    if (!(await confirm({ title: "Delete trip?", message: "Delete this trip and all of its expenses, receipt photos and documents? This cannot be undone.", confirmLabel: "Delete trip", destructive: true }))) return;
     setSaving(true);
     try {
       const supabase = createClient();
@@ -185,21 +188,21 @@ export function TripForm({ tripId }: { tripId?: string }) {
 
               <div className="space-y-2">
                 <label htmlFor="currency" className="text-sm font-medium">Default currency</label>
-                <select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)} className={selectClass}>
+                <Select id="currency" value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {currencies.map((c) => (
                     <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
                   ))}
-                </select>
+                </Select>
                 <p className="text-xs text-muted-foreground">Each expense can still use a different currency. Totals are also shown in USD.</p>
               </div>
 
               {editing && (
                 <div className="space-y-2">
                   <label htmlFor="status" className="text-sm font-medium">Status</label>
-                  <select id="status" value={status} onChange={(e) => setStatus(e.target.value === "completed" ? "completed" : "active")} className={selectClass}>
+                  <Select id="status" value={status} onChange={(e) => setStatus(e.target.value === "completed" ? "completed" : "active")}>
                     <option value="active">Active: receipts can still be added</option>
                     <option value="completed">Completed: every invoice is in</option>
-                  </select>
+                  </Select>
                 </div>
               )}
 
@@ -213,9 +216,9 @@ export function TripForm({ tripId }: { tripId?: string }) {
                   <label className="text-sm font-medium">Documents <span className="font-normal text-muted-foreground">(optional)</span></label>
                   <p className="text-xs text-muted-foreground">Ticket, booking, visa or insurance. They are saved with the trip so you have them close by.</p>
                   <div className="flex gap-2">
-                    <select value={docKind} onChange={(e) => setDocKind(e.target.value as DocKind)} className="h-10 rounded-md border border-input bg-background px-2 text-sm" aria-label="Document type">
+                    <Select value={docKind} onChange={(e) => setDocKind(e.target.value as DocKind)} className="w-auto min-w-fit px-2" aria-label="Document type">
                       {DOC_KINDS.filter((k) => k.value !== "passport").map((k) => <option key={k.value} value={k.value}>{k.label}</option>)}
-                    </select>
+                    </Select>
                     <Input
                       type="file"
                       accept={DOC_ACCEPT}
@@ -242,7 +245,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
                 </div>
               )}
 
-              {error && <p className="rounded-md bg-red-50 p-3 text-sm text-red-600" role="alert">{error}</p>}
+              {error && <Alert>{error}</Alert>}
 
               <Button type="submit" className="w-full" disabled={saving}>
                 {saving ? "Saving…" : editing ? "Save changes" : "Create trip"}

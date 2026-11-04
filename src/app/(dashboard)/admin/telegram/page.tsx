@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -131,10 +132,10 @@ export default function AdminTelegramPage() {
               </p>
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>
+                <Alert>{error}</Alert>
               )}
               {message && (
-                <p className="text-sm text-green-600 bg-green-50 p-3 rounded-md">{message}</p>
+                <Alert variant="success">{message}</Alert>
               )}
 
               <div className="flex flex-wrap gap-2">

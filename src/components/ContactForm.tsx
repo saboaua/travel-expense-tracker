@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { useState } from "react";
 import { CheckCircle } from "lucide-react";
 
@@ -85,7 +86,7 @@ export function ContactForm({ primaryColor, supportEmail }: { primaryColor: stri
         </label>
       </div>
 
-      {error && <p className="rounded-xl border border-red-100 bg-red-50 p-3 text-sm text-red-600">{error}</p>}
+      {error && <Alert className="rounded-xl border border-red-100">{error}</Alert>}
 
       <button
         type="submit"
