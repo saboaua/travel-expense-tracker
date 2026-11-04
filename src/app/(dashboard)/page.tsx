@@ -9,6 +9,7 @@ import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, renewalAlert } from "@/lib/documents";
+import { buildNotifications } from "@/lib/notifications";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -42,12 +43,11 @@ export default async function DashboardPage() {
     .eq("user_id", user?.id);
 
   // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
-  const { data: passportDocs } = await supabase
-    .from("travel_documents")
-    .select("kind, expiry_date")
-    .eq("user_id", user?.id)
-    .eq("kind", "passport");
-  const passportAlert = renewalAlert(currentPassport(passportDocs || []), trips || [], todayISO());
+  const { data: docRows } = await supabase.from("travel_documents").select("kind, expiry_date, trip_id").eq("user_id", user?.id);
+  const passportAlert = renewalAlert(currentPassport((docRows || []).filter((d) => d.kind === "passport")), trips || [], todayISO());
+  const docCounts: Record<string, number> = {};
+  for (const d of docRows || []) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
+  const notifications = buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() });
 
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
@@ -112,9 +112,11 @@ export default async function DashboardPage() {
         avatarUrl={profile?.avatar_url || null}
         activeCount={activeCount}
         trips={quickScanTrips}
+        notifications={notifications}
       />
 
-      {passportAlert && <PassportBalloon alert={passportAlert} />}
+      {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}
+      {passportAlert && passportAlert.level !== "renew" && <PassportBalloon alert={passportAlert} />}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <Card>

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { Camera, Loader2, Plus, ShieldCheck, WifiOff, X } from "lucide-react";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { stashQuickScan } from "@/lib/quick-scan";
+import { NotificationBell } from "@/components/NotificationBell";
+import type { AppNotification } from "@/lib/notifications";
 
 export type HeaderTrip = { id: string; name: string; destination: string | null; range: string };
 
@@ -16,6 +18,7 @@ type Props = {
   activeCount: number;
   /** Active trips, the most likely receipt target first */
   trips: HeaderTrip[];
+  notifications?: AppNotification[];
 };
 
 function greetingFor(hour: number) {
@@ -24,7 +27,7 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips }: Props) {
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [] }: Props) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [greeting, setGreeting] = useState("Welcome back");
@@ -83,6 +86,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
             {online ? <ShieldCheck className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
             {online ? "Auto-Sync ON" : "Offline"}
           </span>
+          <NotificationBell notifications={notifications} />
         </div>
 
         <div className="mt-2 flex items-center gap-4">
