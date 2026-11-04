@@ -3,6 +3,9 @@ import type { User } from "@supabase/supabase-js";
 import { requireUserManager } from "@/lib/admin-api";
 import { tempPasswordWindow } from "@/lib/temp-password";
 
+const PROFILE_COLUMNS =
+  "id, email, first_name, last_name, full_name, role, must_change_password, temp_password_expires_at";
+
 export const dynamic = "force-dynamic";
 
 /**
@@ -24,7 +27,7 @@ export async function GET() {
     if (data.users.length < 200) break;
   }
 
-  const { data: profiles, error: profErr } = await admin.from("profiles").select("*");
+  const { data: profiles, error: profErr } = await admin.from("profiles").select(PROFILE_COLUMNS);
   if (profErr) return NextResponse.json({ error: profErr.message }, { status: 500 });
   const byId = new Map((profiles || []).map((p) => [p.id as string, p]));
 
@@ -49,7 +52,7 @@ export async function GET() {
         : {}),
       updated_at: new Date().toISOString(),
     };
-    const { data: saved } = await admin.from("profiles").upsert(row).select("*").single();
+    const { data: saved } = await admin.from("profiles").upsert(row).select(PROFILE_COLUMNS).single();
     if (saved) byId.set(u.id, saved);
   }
 

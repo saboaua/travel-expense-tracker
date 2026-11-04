@@ -8,65 +8,16 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { UserPlus, Copy, Check, Shield, User, Mail, UserCog, KeyRound, RefreshCw, Clock } from "lucide-react";
+import { UserPlus, Shield, User, Mail, UserCog, KeyRound, RefreshCw } from "lucide-react";
 import type { UserRole } from "@/lib/roles";
 import { canAssignRole } from "@/lib/roles";
 import { TEMP_PASSWORD_TTL_HOURS } from "@/lib/temp-password-config";
 import { RolesManager, type RoleSummary } from "@/components/admin/RolesManager";
+import { CredentialsPanel } from "@/components/admin/CredentialsPanel";
+import { statusOf, timeAgo, type Credentials, type ManagedUser } from "@/components/admin/user-status";
 
-interface ManagedUser {
-  id: string;
-  email: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  full_name: string | null;
-  role: string;
-  must_change_password: boolean;
-  temp_password_expires_at: string | null;
-  created_at: string;
-  last_sign_in_at: string | null;
-}
-
-type Credentials = { email: string; password: string; expiresAt: string };
 
 const fmt = formatDateTime;
-
-function timeAgo(iso: string) {
-  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  const hrs = Math.round(mins / 60);
-  if (hrs < 24) return `${hrs} h ago`;
-  const days = Math.round(hrs / 24);
-  return `${days} day${days !== 1 ? "s" : ""} ago`;
-}
-
-function timeLeft(iso: string) {
-  const mins = Math.round((new Date(iso).getTime() - Date.now()) / 60000);
-  if (mins < 60) return `${Math.max(mins, 1)} min`;
-  return `${Math.round(mins / 60)} h`;
-}
-
-type Status = { label: string; cls: string; needsNewPassword: boolean };
-
-function statusOf(u: ManagedUser): Status {
-  if (u.must_change_password) {
-    const expired = u.temp_password_expires_at && new Date(u.temp_password_expires_at).getTime() < Date.now();
-    if (expired) {
-      return { label: "Temp password expired", cls: "bg-red-100 text-red-700", needsNewPassword: true };
-    }
-    return {
-      label: u.temp_password_expires_at
-        ? `Waiting for first login · expires in ${timeLeft(u.temp_password_expires_at)}`
-        : "Waiting for first login",
-      cls: "bg-amber-100 text-amber-800",
-      needsNewPassword: false,
-    };
-  }
-  return u.last_sign_in_at
-    ? { label: "Active", cls: "bg-green-100 text-green-700", needsNewPassword: false }
-    : { label: "Never signed in", cls: "bg-slate-100 text-slate-600", needsNewPassword: false };
-}
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<ManagedUser[]>([]);
@@ -85,7 +36,6 @@ export default function AdminUsersPage() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<UserRole>("user");
   const [credentials, setCredentials] = useState<Credentials | null>(null);
-  const [copied, setCopied] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -159,7 +109,6 @@ export default function AdminUsersPage() {
 
   const showCredentials = (c: Credentials) => {
     setCredentials(c);
-    setCopied(false);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -258,48 +207,7 @@ export default function AdminUsersPage() {
       ) : (
       <>
 
-      {credentials && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-          <p className="text-sm font-medium text-amber-900">
-            Share these credentials securely. The password is shown only once.
-          </p>
-          <div className="bg-white rounded-xl border p-3 font-mono text-sm space-y-1 break-all">
-            <p>
-              <span className="text-muted-foreground">Email:</span> {credentials.email}
-            </p>
-            <p>
-              <span className="text-muted-foreground">Temp password:</span> {credentials.password}
-            </p>
-          </div>
-          <p className="text-sm text-amber-900 flex items-center gap-1.5">
-            <Clock className="h-4 w-4" />
-            Valid until {fmt(credentials.expiresAt)} ({TEMP_PASSWORD_TTL_HOURS} hours). It can be used once to set a new password.
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-2"
-            onClick={() => {
-              navigator.clipboard.writeText(
-                `Email: ${credentials.email}\nTemporary password: ${credentials.password}\n\nSign in and set a new password. This temporary password expires on ${fmt(credentials.expiresAt)}.`
-              );
-              setCopied(true);
-              setTimeout(() => setCopied(false), 2000);
-            }}
-          >
-            {copied ? (
-              <>
-                <Check className="h-4 w-4" /> Copied
-              </>
-            ) : (
-              <>
-                <Copy className="h-4 w-4" /> Copy credentials
-              </>
-            )}
-          </Button>
-        </div>
-      )}
+      {credentials && <CredentialsPanel key={credentials.password} credentials={credentials} />}
 
       {warning && <Alert variant="warning">{warning}</Alert>}
       {error && <Alert>{error}</Alert>}

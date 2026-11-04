@@ -43,7 +43,7 @@ npm install
 ### 3. Set up the Database
 
 1. In the Supabase dashboard, open **SQL Editor**.
-2. Paste and run the entire contents of `supabase/schema.sql`.
+2. Paste and run the contents of each SQL file listed in [`supabase/README.md`](supabase/README.md), in that order, starting with `supabase/schema.sql`.
 3. Create a Storage bucket named `receipts`:
    - Go to **Storage → New bucket**
    - Name: `receipts`
@@ -63,7 +63,18 @@ Fill in:
 ```env
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key   # server only, never expose
 ```
+
+Optional settings:
+
+| Variable | Purpose |
+|----------|---------|
+| `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `NEXT_PUBLIC_SITE_URL` | Telegram receipt bot |
+| `ANTHROPIC_API_KEY`, `OCR_MODEL` | AI receipt and document scanning |
+| `RESEND_API_KEY`, `SUPPORT_FROM_EMAIL` | Support form emails |
+| `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile on the sign-in page |
+| `CSP_ENFORCE=1` | Enforce the Content-Security-Policy (report-only by default) |
 
 ### 5. Run Locally
 
@@ -72,6 +83,14 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+### Checks
+
+```bash
+npm run typecheck   # TypeScript
+npm run lint        # ESLint
+npm test            # unit tests
+```
 
 ### 6. Deploy to Vercel
 
