@@ -1,7 +1,8 @@
-import type { NextConfig } from "next";
+// Plain JavaScript on purpose: Next.js compiles a next.config.ts with the TypeScript package at build time,
+// and that step failed on Vercel ("Cannot read properties of undefined (reading 'fileExists')").
+// The Content-Security-Policy is set per request (with a nonce) in src/middleware.ts.
 
-// Headers sent on every response. (A Content-Security-Policy is intentionally not set yet: the on-device
-// OCR loads workers from a CDN, so a strict policy needs testing against the live app first.)
+// Headers sent on every response
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
   { key: "X-Content-Type-Options", value: "nosniff" },
@@ -12,7 +13,8 @@ const securityHeaders = [
   { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
 ];
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
