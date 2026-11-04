@@ -1,6 +1,6 @@
 // Run with: npx tsx tests/notifications.test.ts
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications, visibleNotifications, badgeLabel, topSeverity } from "../src/lib/notifications";
-const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
+const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 const T = "2026-11-03";
 const trip = (id:string,name:string,s:string,e:string|null,status="active")=>({id,name,start_date:s,end_date:e,status});
 

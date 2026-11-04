@@ -63,7 +63,7 @@ export default function AddExpensePage() {
       if (!f) return;
       setPendingCrop(f);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [tripReady]);
 
   useEffect(() => {
@@ -226,7 +226,7 @@ export default function AddExpensePage() {
       <Card>
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>
-          <CardDescription>Take a photo — we'll try to read merchant, amount, and date automatically</CardDescription>
+          <CardDescription>Take a photo — we&apos;ll try to read merchant, amount, and date automatically</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-5">

@@ -1,7 +1,7 @@
 // Run with: npx tsx tests/documents.test.ts
 import { formatBytes, isCroppable } from "../src/lib/document-upload";
 import { fileKind, maskNumber, addMonths, dayDiff, passportStatus, tripPassportCheck, currentPassport, renewalAlert } from "../src/lib/documents";
-const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
+const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 
 eq(addMonths("2026-08-31", 6), "2027-02-28", "clamp to month end");
 eq(addMonths("2026-01-15", -9), "2025-04-15", "negative months across year");

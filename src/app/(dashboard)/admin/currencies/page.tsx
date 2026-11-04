@@ -36,6 +36,7 @@ export default function AdminCurrenciesPage() {
 
   useEffect(() => {
     load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once on mount
   }, []);
 
   const saveRow = async (row: CurrencyRow) => {

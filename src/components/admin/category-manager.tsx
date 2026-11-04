@@ -49,7 +49,7 @@ export function CategoryManager({
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once on mount
   }, []);
 
   const patch = (id: string, change: Partial<Row>) =>

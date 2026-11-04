@@ -63,7 +63,17 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
-async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
+/** The parts of a Telegram update this bot reads. */
+type TgMessage = {
+  chat: { id: number };
+  from?: { id: number };
+  text?: string;
+  photo?: { file_id: string }[];
+  document?: { file_id: string; mime_type?: string; file_name?: string };
+};
+type TgCallback = { id: string; data?: string; from: { id: number }; message: { chat: { id: number } } };
+
+async function handleMessage(supabase: ReturnType<typeof admin>, message: TgMessage) {
   const chatId = message.chat.id as number;
   const fromId = message.from?.id as number | undefined;
   if (!fromId) return;
@@ -94,9 +104,10 @@ async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
 
   const photo = message.photo?.[message.photo.length - 1];
   const doc = message.document;
-  if (photo || doc) {
+  const fileId = photo?.file_id || doc?.file_id;
+  if (fileId) {
     await startReceipt(supabase, chatId, profile, {
-      fileId: photo?.file_id || doc?.file_id,
+      fileId,
       mime: doc?.mime_type || "image/jpeg",
       fileName: doc?.file_name || "receipt.jpg",
     });
@@ -105,7 +116,7 @@ async function handleMessage(supabase: ReturnType<typeof admin>, message: any) {
   await sendMessage(chatId, "Send a receipt photo or PDF, or use /trips /recent /help.");
 }
 
-async function handleCallback(supabase: ReturnType<typeof admin>, cq: any) {
+async function handleCallback(supabase: ReturnType<typeof admin>, cq: TgCallback) {
   const chatId = cq.message.chat.id as number;
   const fromId = cq.from.id as number;
   const data = String(cq.data || "");

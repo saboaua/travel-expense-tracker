@@ -1,6 +1,6 @@
 // Run with: npx tsx tests/access.test.ts
 import { FEATURE_KEYS, effectivePermissions, legacyPermissions, unreviewedFeatures, canAccessPath, ruleForPath, slugifyRoleKey, sanitizePermissions, hasAnyAdminFeature, sanitizeLabel } from "../src/lib/access";
-const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
+const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 const sorted = (s:Set<string>) => [...s].sort();
 
 // admin gets everything, even features added later

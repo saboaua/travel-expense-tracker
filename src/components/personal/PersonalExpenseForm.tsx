@@ -65,7 +65,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
         if (signed?.signedUrl) setPreview(signed.signedUrl);
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads when the project or expense changes; the client and state setters are stable
   }, [projectId, expenseId]);
 
   const scan = async (f: File) => {

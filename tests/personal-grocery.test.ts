@@ -1,6 +1,6 @@
 // Run with: npx tsx tests/personal-grocery.test.ts
 import { normalizeItemName, parseLineItems, priceStats, buildTracker, monthlyTotals, categoryTotals, topItems, guessGroceryCategory, attachWeightLines, cleanReceiptItemName, isWeightLine } from "../src/lib/personal/grocery";
-const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
+const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 
 eq(normalizeItemName("ORG BANANAS 1KG"), "banana organic", "org bananas 1kg");
 eq(normalizeItemName("Bananas"), "banana", "bananas");

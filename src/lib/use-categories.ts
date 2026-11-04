@@ -23,7 +23,6 @@ function useCategoryTable(table: "categories" | "travel_categories" | "grocery_c
         // If the table/column is missing (migration not run yet) keep the fallback list.
         if (!error && data && data.length > 0) setItems(data as CategoryOption[]);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table]);
 
   return items;

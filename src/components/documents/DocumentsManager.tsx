@@ -120,7 +120,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       setUrls(map);
     }
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- memoised on tripId; the Supabase client created each render is equivalent
   }, [tripId]);
 
   useEffect(() => { load(); }, [load]);
