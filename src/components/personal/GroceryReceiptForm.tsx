@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
-import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
+import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
 import { extractGroceryReceipt } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
@@ -29,6 +29,10 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const router = useRouter();
   const currencies = useCurrencies();
+  const groceryCategories = useGroceryCategories();
+  const categoryNames = useMemo(() => groceryCategories.map((c) => c.name), [groceryCategories]);
+  /** Map a guessed/scanned category onto the admin-managed list (falls back to Other, then the first). */
+  const allowed = (c: string) => categoryNames.find((n) => n.toLowerCase() === c.toLowerCase()) ?? categoryNames.find((n) => n.toLowerCase() === "other") ?? categoryNames[0] ?? c;
   const [store, setStore] = useState("");
   const [date, setDate] = useState(todayISO());
   const [currency, setCurrency] = useState("USD");
@@ -86,7 +90,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     setScanning(true);
     setNote(null);
     try {
-      const r = await extractGroceryReceipt(f, { currency });
+      const r = await extractGroceryReceipt(f, { currency, categories: categoryNames });
       if (r.store && !store) setStore(r.store);
       if (r.date) setDate(r.date);
       if (r.total != null) setTotal(r.total.toFixed(2));
@@ -98,7 +102,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           quantity: String(it.quantity),
           unit_price: it.unit_price.toFixed(2),
           line_total: it.line_total.toFixed(2),
-          category: it.category,
+          category: allowed(it.category),
           unit: it.unit || "",
         }))
       );
@@ -247,7 +251,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               {rows.map((r) => (
                 <div key={r.key} className="space-y-2 rounded-lg border p-3">
                   <div className="flex gap-2">
-                    <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: guessGroceryCategory(r.name) })} placeholder="Item name" maxLength={160} />
+                    <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder="Item name" maxLength={160} />
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -259,7 +263,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     <div><label className="text-xs text-muted-foreground">Line total</label><Input type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
                   <select className={selectClass} value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
-                    {GROCERY_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+                    {(categoryNames.includes(r.category) ? categoryNames : [r.category, ...categoryNames]).map((c) => <option key={c} value={c}>{c}</option>)}
                   </select>
                 </div>
               ))}

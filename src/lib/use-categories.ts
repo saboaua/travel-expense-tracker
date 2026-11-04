@@ -5,10 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import {
   FALLBACK_EXPENSE_CATEGORIES,
   FALLBACK_TRAVEL_CATEGORIES,
+  FALLBACK_GROCERY_CATEGORIES,
   type CategoryOption,
 } from "@/lib/category-icons";
 
-function useCategoryTable(table: "categories" | "travel_categories", fallback: CategoryOption[]) {
+function useCategoryTable(table: "categories" | "travel_categories" | "grocery_categories", fallback: CategoryOption[]) {
   const [items, setItems] = useState<CategoryOption[]>(fallback);
 
   useEffect(() => {
@@ -36,4 +37,9 @@ export function useExpenseCategories() {
 /** Trip travel categories managed in Admin > Travel Categories */
 export function useTravelCategories() {
   return useCategoryTable("travel_categories", FALLBACK_TRAVEL_CATEGORIES);
+}
+
+/** Grocery item categories managed in Admin > Receipt Categories > Grocery */
+export function useGroceryCategories() {
+  return useCategoryTable("grocery_categories", FALLBACK_GROCERY_CATEGORIES);
 }

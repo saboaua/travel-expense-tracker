@@ -131,6 +131,11 @@ export async function extractReceiptWithClaude(
 
 /* ---------------- grocery receipts: store + every line item ---------------- */
 
+function groceryCategoryList(hints: OcrHints): string[] {
+  const c = (hints.categories || []).filter(Boolean);
+  return c.length > 0 ? c : [...GROCERY_CATEGORIES];
+}
+
 function buildGroceryPrompt(hints: OcrHints, today: string) {
   return [
     "You read a photo of a grocery store receipt and return structured data.",
@@ -145,7 +150,7 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
     '      "quantity": number bought (the weight for weighed items), "unit": "kg" | "lb" | "g" for weighed items otherwise null,',
     '      "unit_price": price per unit (per kg/lb for weighed items) as a number,',
     '      "line_total": amount charged for that line as a number,',
-    `      "category": exactly one of ${JSON.stringify(GROCERY_CATEGORIES)} }`,
+    `      "category": exactly one of ${JSON.stringify(groceryCategoryList(hints))} }`,
     "Rules:",
     '- A weighed item prints a second line such as "0.1219 kg for AWG 36.60/kg". That is NOT a separate item: use it for the product above (quantity 0.1219, unit "kg", unit_price 36.60) and never list it on its own.',
     "- Product names must not contain units or currency codes (drop trailing KG, AWG, USD).",
@@ -193,7 +198,7 @@ export async function extractGroceryWithClaude(
     if (!Number.isFinite(total) || total < 0 || total > 1_000_000) continue;
     if (!Number.isFinite(unit) || unit < 0) unit = Math.round((total / qty) * 100) / 100;
     const category =
-      typeof r.category === "string" ? GROCERY_CATEGORIES.find((c) => c.toLowerCase() === (r.category as string).toLowerCase()) : undefined;
+      typeof r.category === "string" ? groceryCategoryList(hints).find((c) => c.toLowerCase() === (r.category as string).toLowerCase()) : undefined;
     const rawUnit = typeof r.unit === "string" ? r.unit.toLowerCase().trim() : "";
     const weightUnit = ["kg", "lb", "g", "oz"].includes(rawUnit) ? rawUnit : null;
     items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit });

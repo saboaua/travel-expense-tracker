@@ -18,14 +18,17 @@ export function CategoryManager({
   deleteWarning,
   headerIcon: HeaderIcon,
   defaultIcon,
+  embedded = false,
 }: {
-  table: "categories" | "travel_categories";
+  table: "categories" | "travel_categories" | "grocery_categories";
   title: string;
   subtitle: string;
   addHint: string;
   deleteWarning: string;
   headerIcon: LucideIcon;
   defaultIcon: string;
+  /** Hide the page header and padding when shown inside tabs */
+  embedded?: boolean;
 }) {
   const supabase = createClient();
   const [rows, setRows] = useState<Row[]>([]);
@@ -96,7 +99,10 @@ export function CategoryManager({
   const selectClass = "flex h-10 rounded-md border border-input bg-background px-2 py-2 text-sm";
 
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+    <div className={embedded ? "space-y-6" : "p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6"}>
+      {embedded ? (
+        <p className="text-muted-foreground">{subtitle}</p>
+      ) : (
       <div>
         <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
           <HeaderIcon className="h-7 w-7" />
@@ -104,6 +110,7 @@ export function CategoryManager({
         </h1>
         <p className="text-muted-foreground mt-1">{subtitle}</p>
       </div>
+      )}
 
       {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-md">{error}</p>}
 

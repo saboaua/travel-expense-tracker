@@ -20,7 +20,7 @@ const sections = [
   {
     href: "/admin/categories",
     title: "Receipt Categories",
-    description: "Manage expense categories used when adding receipts.",
+    description: "Edit or create categories for travel receipts and groceries.",
     icon: Tag,
   },
   {

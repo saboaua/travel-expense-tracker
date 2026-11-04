@@ -40,6 +40,7 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}): P
       form.append("file", file);
       form.append("mode", "grocery");
       if (hints.currency) form.append("currency", hints.currency);
+      if (hints.categories?.length) form.append("categories", JSON.stringify(hints.categories));
 
       const res = await fetch("/api/ocr", { method: "POST", body: form });
       if (res.status === 503) aiUnavailable = true;

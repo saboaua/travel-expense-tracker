@@ -1,6 +1,7 @@
 import {
   Briefcase, Building2, Car, BedDouble, FileText, Fuel, GraduationCap, MapPin, Paperclip,
   Plane, Presentation, ShoppingBag, Coffee, Tag, Ticket, Train, Users, Utensils, Wrench, Phone, Gift,
+  Apple, Beef, Milk, Croissant, Wheat, CupSoda, Cookie, Snowflake, SprayCan, Droplets, ShoppingBasket,
   type LucideIcon,
 } from "lucide-react";
 
@@ -26,6 +27,17 @@ export const ICONS: Record<string, LucideIcon> = {
   wrench: Wrench,
   phone: Phone,
   gift: Gift,
+  apple: Apple,
+  beef: Beef,
+  milk: Milk,
+  croissant: Croissant,
+  wheat: Wheat,
+  "cup-soda": CupSoda,
+  cookie: Cookie,
+  snowflake: Snowflake,
+  "spray-can": SprayCan,
+  droplets: Droplets,
+  "shopping-basket": ShoppingBasket,
 };
 
 export const ICON_KEYS = Object.keys(ICONS);
@@ -51,4 +63,18 @@ export const FALLBACK_TRAVEL_CATEGORIES: CategoryOption[] = [
   { name: "Conference", icon: "building" },
   { name: "Strategy Session", icon: "map-pin" },
   { name: "Internal Review", icon: "file-text" },
+];
+
+export const FALLBACK_GROCERY_CATEGORIES: CategoryOption[] = [
+  { name: "Produce", icon: "apple" },
+  { name: "Meat & Seafood", icon: "beef" },
+  { name: "Dairy & Eggs", icon: "milk" },
+  { name: "Bakery", icon: "croissant" },
+  { name: "Pantry", icon: "wheat" },
+  { name: "Beverages", icon: "cup-soda" },
+  { name: "Snacks", icon: "cookie" },
+  { name: "Frozen", icon: "snowflake" },
+  { name: "Household", icon: "spray-can" },
+  { name: "Personal Care", icon: "droplets" },
+  { name: "Other", icon: "tag" },
 ];
