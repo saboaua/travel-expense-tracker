@@ -28,6 +28,7 @@ export type TravelDocument = {
   trip_id: string | null;
   kind: DocKind;
   title: string;
+  document_number?: string | null;
   issuing_country: string | null;
   expiry_date: string | null;
   notes: string | null;
@@ -163,4 +164,11 @@ export function renewalAlert(
     };
   }
   return { level: status.level, title: status.title, message: status.message, expiry, tripConflict: conflict };
+}
+
+/** "AB123456" -> "••••3456" so the number is not shown on screen by default. */
+export function maskNumber(n: string): string {
+  const t = n.trim();
+  if (t.length <= 4) return "••••";
+  return `••••${t.slice(-4)}`;
 }

@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/documents.test.ts
-import { addMonths, dayDiff, passportStatus, tripPassportCheck, currentPassport, renewalAlert } from "../src/lib/documents";
+import { maskNumber, addMonths, dayDiff, passportStatus, tripPassportCheck, currentPassport, renewalAlert } from "../src/lib/documents";
 const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 
 eq(addMonths("2026-08-31", 6), "2027-02-28", "clamp to month end");
@@ -40,3 +40,4 @@ const b = renewalAlert({expiry_date:"2027-09-01"}, [{name:"Rome",start_date:"202
 eq([b.level, b.tripConflict?.tripName], ["renew","Rome"], "ok today but too short for later trip");
 const c = renewalAlert({expiry_date:"2027-07-01"}, trips, T)!;
 eq([c.level, c.tripConflict], ["renew", null], "renew window without trip conflict");
+eq([maskNumber("NX1234563"), maskNumber("AB1")], ["••••4563","••••"], "mask number");

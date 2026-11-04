@@ -3,12 +3,13 @@
  *  - parseMrz: reads the two machine-readable lines at the bottom of a passport photo page (ICAO 9303 TD3).
  *    Works offline on OCR text and validates the check digits, so a misread date is rejected instead of trusted.
  *  - sanitizeDocumentFields: makes any extracted values (AI or MRZ) safe to put into the form.
- * The passport number is deliberately never read or returned.
+ * The date of birth is deliberately never read or returned. The document number is returned only when its check digit passes.
  */
 import { DOC_KINDS, type DocKind } from "@/lib/documents";
 
 export type DocumentFields = {
   kind: DocKind | null;
+  document_number: string | null;
   issuing_country: string | null;
   expiry_date: string | null;
   holder_name: string | null;
@@ -86,8 +87,14 @@ export function parseMrz(text: string): MrzResult | null {
       .filter(Boolean)
       .join(" ");
 
+    // Document number (positions 0-8, check digit at 9): kept only when it verifies
+    const numRaw = b.slice(0, 9);
+    const numCheck = digitise(b[9]);
+    const number = /^\d$/.test(numCheck) && checkDigit(numRaw) === Number(numCheck) ? numRaw.replace(/</g, "") : "";
+
     return {
       kind: "passport",
+      document_number: number || null,
       issuing_country: COUNTRIES[code] || (code || null),
       expiry_date: expiry,
       holder_name: name ? titleCase(name).slice(0, 80) : null,
@@ -118,5 +125,7 @@ export function sanitizeDocumentFields(raw: Record<string, unknown>, today: stri
   }
 
   const kind = typeof raw.kind === "string" && KINDS.has(raw.kind) ? (raw.kind as DocKind) : null;
-  return { kind, issuing_country: str(raw.issuing_country, 80), expiry_date: expiry, holder_name: str(raw.holder_name, 80) };
+  const n = typeof raw.document_number === "string" ? raw.document_number.toUpperCase().replace(/[\s-]+/g, "") : "";
+  const number = /^[A-Z0-9]{4,20}$/.test(n) ? n : null;
+  return { kind, document_number: number, issuing_country: str(raw.issuing_country, 80), expiry_date: expiry, holder_name: str(raw.holder_name, 80) };
 }

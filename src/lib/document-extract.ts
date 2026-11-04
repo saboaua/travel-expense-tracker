@@ -6,7 +6,7 @@ let aiUnavailable = false;
 
 export type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none" };
 
-const EMPTY: DocumentFields = { kind: null, issuing_country: null, expiry_date: null, holder_name: null };
+const EMPTY: DocumentFields = { kind: null, document_number: null, issuing_country: null, expiry_date: null, holder_name: null };
 const today = () => new Date().toISOString().slice(0, 10);
 
 /**
@@ -33,7 +33,7 @@ export async function extractDocumentFields(file: File): Promise<DocumentScan> {
       else if (res.ok) {
         const { result } = (await res.json()) as { result?: Record<string, unknown> };
         const fields = sanitizeDocumentFields(result || {}, today());
-        if (fields.expiry_date || fields.issuing_country || fields.holder_name) return { fields, source: "ai" };
+        if (fields.expiry_date || fields.issuing_country || fields.holder_name || fields.document_number) return { fields, source: "ai" };
       }
     } catch {
       // network problem: use on-device reading

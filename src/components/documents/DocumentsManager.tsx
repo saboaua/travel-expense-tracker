@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Download, FileText, Loader2, Plus, Trash2, ShieldCheck, Sparkles, Image as ImageIcon } from "lucide-react";
+import { Camera, Download, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate, todayISO } from "@/lib/utils";
-import { DOC_KINDS, kindHasExpiry, kindLabel, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
-import { DOC_ACCEPT, DOC_BUCKET, removeTravelDocument, saveTravelDocument } from "@/lib/document-upload";
+import { DOC_KINDS, kindHasExpiry, kindLabel, maskNumber, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
+import { DOC_ACCEPT, DOC_BUCKET, removeTravelDocument, saveTravelDocument, updateTravelDocument } from "@/lib/document-upload";
 import { extractDocumentFields } from "@/lib/document-extract";
 
 const selectClass = "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm";
@@ -32,6 +32,10 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [kind, setKind] = useState<DocKind>(defaultKind);
   const [title, setTitle] = useState("");
   const [country, setCountry] = useState("");
+  const [number, setNumber] = useState("");
+  const [editing, setEditing] = useState<TravelDocument | null>(null);
+  const [revealed, setRevealed] = useState<Set<string>>(new Set());
+  const formRef = useRef<HTMLFormElement>(null);
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -66,7 +70,30 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   useEffect(() => { load(); }, [load]);
 
-  const reset = () => { setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setKind(defaultKind); setAdding(false); setScanNote(null); };
+  const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setKind(defaultKind); setAdding(false); setScanNote(null); };
+
+  const startEdit = (d: TravelDocument) => {
+    setError(null);
+    setScanNote(null);
+    setEditing(d);
+    setKind(d.kind);
+    setTitle(d.title);
+    setNumber(d.document_number || "");
+    setCountry(d.issuing_country || "");
+    setExpiry(d.expiry_date || "");
+    setNotes(d.notes || "");
+    setFile(null);
+    setAdding(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
+  const toggleReveal = (id: string) =>
+    setRevealed((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -79,7 +106,9 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not signed in");
-      await saveTravelDocument(supabase, user.id, { tripId, kind, title: label, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file });
+      const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file };
+      if (editing) await updateTravelDocument(supabase, user.id, editing, fields);
+      else await saveTravelDocument(supabase, user.id, { tripId, ...fields });
       reset();
       await load();
     } catch (err) {
@@ -104,6 +133,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       // Passports belong to the general list, not to a trip
       if (fields.kind && !(tripId && fields.kind === "passport")) setKind(fields.kind);
       const k = fields.kind && !(tripId && fields.kind === "passport") ? fields.kind : kind;
+      if (fields.document_number) setNumber(fields.document_number);
       if (fields.issuing_country) setCountry(fields.issuing_country);
       if (fields.expiry_date) setExpiry(fields.expiry_date);
       if (!title.trim()) {
@@ -164,6 +194,14 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
                     {d.issuing_country ? ` · ${d.issuing_country}` : ""}
                     {d.expiry_date ? ` · expires ${formatDate(d.expiry_date)}` : ""}
                   </p>
+                  {d.document_number && (
+                    <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>No. <span className="font-mono">{revealed.has(d.id) ? d.document_number : maskNumber(d.document_number)}</span></span>
+                      <button type="button" onClick={() => toggleReveal(d.id)} className="rounded p-0.5 hover:bg-accent" aria-label={revealed.has(d.id) ? "Hide number" : "Show number"}>
+                        {revealed.has(d.id) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </p>
+                  )}
                   {d.notes && <p className="truncate text-xs text-muted-foreground">{d.notes}</p>}
                 </div>
                 {st && <span className={`hidden shrink-0 rounded-full px-2 py-0.5 text-xs font-medium sm:inline ${LEVEL_STYLE[st.level]}`}>{st.level === "ok" ? "Valid" : st.level === "renew" ? "Renew soon" : st.level === "critical" ? "Renew now" : "Expired"}</span>}
@@ -172,7 +210,10 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
                     <Download className="h-4 w-4" />
                   </a>
                 ) : null}
-                <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => remove(d)} aria-label={`Delete ${d.title}`}>
+                <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => startEdit(d)} aria-label={`Edit ${d.title}`} title="Edit">
+                  <Pencil className="h-4 w-4" />
+                </Button>
+                <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => remove(d)} aria-label={`Delete ${d.title}`} title="Delete">
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </li>
@@ -182,7 +223,8 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       )}
 
       {adding ? (
-        <form onSubmit={save} className="space-y-3 rounded-xl border bg-muted/30 p-4">
+        <form ref={formRef} onSubmit={save} className="space-y-3 rounded-xl border bg-muted/30 p-4">
+          {editing && <p className="text-sm font-semibold">Edit document</p>}
           <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
             <button
               type="button"
@@ -213,6 +255,10 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
               <label className="text-xs text-muted-foreground">Name</label>
               <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={kind === "passport" ? "Passport" : "e.g. Flight AUA–MIA"} maxLength={120} />
             </div>
+            <div>
+              <label className="text-xs text-muted-foreground">Document number</label>
+              <Input value={number} onChange={(e) => setNumber(e.target.value)} placeholder="Optional" maxLength={40} autoComplete="off" className="font-mono" />
+            </div>
             {kindHasExpiry(kind) && (
               <div>
                 <label className="text-xs text-muted-foreground">Expiry date{kind === "passport" ? " (required)" : ""}</label>
@@ -227,7 +273,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             )}
           </div>
           <div>
-            <label className="text-xs text-muted-foreground">File (PDF or photo, up to 10 MB)</label>
+            <label className="text-xs text-muted-foreground">{editing?.file_path ? "Replace file (optional, the current file is kept otherwise)" : "File (PDF or photo, up to 10 MB)"}</label>
             <Input type="file" accept={DOC_ACCEPT} onChange={(e) => { setFile(e.target.files?.[0] ?? null); setScanNote(null); }} />
             {file && file.type.startsWith("image/") && !scanning && (
               <button type="button" onClick={() => scan(file)} className="mt-1.5 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
@@ -240,14 +286,14 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             <label className="text-xs text-muted-foreground">Notes</label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" maxLength={1000} />
           </div>
-          {kind === "passport" && <p className="text-xs text-muted-foreground">Only the expiry date is needed for reminders. We never save your passport number. Your documents are stored privately and only you can open them. When AI reading is on, the photo is sent to the AI service to read it.</p>}
+          {kind === "passport" && <p className="text-xs text-muted-foreground">Only the expiry date is needed for reminders. The number is optional and shown hidden by default. Your documents are stored privately and only you can open them. When AI reading is on, the photo is sent to the AI service to read it.</p>}
           <div className="flex gap-2">
-            <Button type="submit" disabled={saving} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving…" : "Save document"}</Button>
+            <Button type="submit" disabled={saving} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving…" : editing ? "Save changes" : "Save document"}</Button>
             <Button type="button" variant="outline" onClick={reset} disabled={saving}>Cancel</Button>
           </div>
         </form>
       ) : (
-        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => setAdding(true)}>
+        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { setEditing(null); setAdding(true); }}>
           <Plus className="h-4 w-4" /> Add document
         </Button>
       )}

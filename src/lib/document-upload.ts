@@ -13,6 +13,7 @@ export type NewDocument = {
   tripId?: string | null;
   kind: DocKind;
   title: string;
+  document_number?: string | null;
   issuing_country?: string | null;
   expiry_date?: string | null;
   notes?: string | null;
@@ -42,6 +43,7 @@ export async function saveTravelDocument(supabase: SupabaseClient, userId: strin
       trip_id: input.tripId || null,
       kind: input.kind,
       title: input.title.trim().slice(0, 120),
+      ...(input.document_number?.trim() ? { document_number: input.document_number.trim().slice(0, 40) } : {}),
       issuing_country: input.issuing_country?.trim() || null,
       expiry_date: input.expiry_date || null,
       notes: input.notes?.trim() || null,
@@ -51,9 +53,51 @@ export async function saveTravelDocument(supabase: SupabaseClient, userId: strin
     .single();
   if (error) {
     if (path) await supabase.storage.from(DOC_BUCKET).remove([path]).catch(() => {});
-    throw new Error(/relation|schema cache/i.test(error.message) ? "Documents table not found. Run supabase/migration_documents.sql." : error.message);
+    throw new Error(dbMessage(error.message));
   }
   return data as TravelDocument;
+}
+
+const dbMessage = (m: string) =>
+  /document_number/i.test(m)
+    ? "The document number column is missing. Run supabase/migration_documents_number.sql in Supabase."
+    : /relation|schema cache/i.test(m)
+      ? "Documents table not found. Run supabase/migration_documents.sql."
+      : m;
+
+async function uploadDocFile(supabase: SupabaseClient, userId: string, tripId: string | null | undefined, original: File): Promise<string> {
+  let file = original;
+  if (!ALLOWED.has(file.type)) throw new Error("Use a PDF or a photo (JPG, PNG, WebP or HEIC).");
+  if (file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
+    file = await compressReceiptImage(file, { maxSide: 2200, quality: 0.85 }).catch(() => file);
+  }
+  if (file.size > MAX_DOC_BYTES) throw new Error("That file is over 10 MB. Use a smaller photo or PDF.");
+  const path = `${userId}/${tripId || "general"}/${crypto.randomUUID()}-${safeName(file.name)}`;
+  const { error } = await supabase.storage.from(DOC_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
+  if (error) throw new Error(/bucket/i.test(error.message) ? "Documents storage is not set up yet. Run supabase/migration_documents.sql." : error.message);
+  return path;
+}
+
+/** Edits a document. A new file replaces the old one (the old file is removed only after the update succeeds). */
+export async function updateTravelDocument(supabase: SupabaseClient, userId: string, doc: TravelDocument, input: Omit<NewDocument, "tripId">): Promise<void> {
+  const newPath = input.file ? await uploadDocFile(supabase, userId, doc.trip_id, input.file) : null;
+  const number = input.document_number?.trim() || null;
+  const patch: Record<string, unknown> = {
+    kind: input.kind,
+    title: input.title.trim().slice(0, 120),
+    issuing_country: input.issuing_country?.trim() || null,
+    expiry_date: input.expiry_date || null,
+    notes: input.notes?.trim() || null,
+    ...(newPath ? { file_path: newPath } : {}),
+    // Only send the number when the column exists (or the user typed one), so older databases keep working
+    ...(number || doc.document_number !== undefined ? { document_number: number ? number.slice(0, 40) : null } : {}),
+  };
+  const { error } = await supabase.from("travel_documents").update(patch).eq("id", doc.id).eq("user_id", userId);
+  if (error) {
+    if (newPath) await supabase.storage.from(DOC_BUCKET).remove([newPath]).catch(() => {});
+    throw new Error(dbMessage(error.message));
+  }
+  if (newPath && doc.file_path) await supabase.storage.from(DOC_BUCKET).remove([doc.file_path]).catch(() => {});
 }
 
 export async function removeTravelDocument(supabase: SupabaseClient, doc: Pick<TravelDocument, "id" | "file_path">) {

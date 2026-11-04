@@ -217,10 +217,11 @@ function buildDocumentPrompt(today: string) {
     "Return ONLY one JSON object, no prose and no code fences, with these keys:",
     '- "kind": one of "passport", "visa", "id", "ticket", "booking", "insurance", "vaccination", "other"',
     '- "issuing_country": the issuing country written out in English (e.g. "Aruba"), or null',
+    '- "document_number": the passport / document number exactly as printed (letters and digits, no spaces), or null',
     '- "expiry_date": expiry / date of expiry as YYYY-MM-DD, or null',
     '- "holder_name": the holder\'s given names and surname in normal capitalisation, or null',
     "Rules:",
-    "- NEVER return the document number, personal ID number, date of birth or any other field not listed above.",
+    "- NEVER return the date of birth, personal ID / national number or any other field not listed above.",
     "- For a passport use the printed expiry date; the two machine-readable lines at the bottom can confirm it (YYMMDD after the nationality and birth date).",
     `- Today is ${today}. If a date is unreadable use null. Never guess.`,
   ].join("\n");
