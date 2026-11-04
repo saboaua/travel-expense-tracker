@@ -126,6 +126,7 @@ const SECURITY_LABELS: Record<string, string> = {
   support_spam: "Support form spam",
   temp_password_expired: "Expired temporary password used",
   login_failed: "Failed logins",
+  protection_degraded: "Sign-in protection degraded",
 };
 
 const ago = (ms: number) => {

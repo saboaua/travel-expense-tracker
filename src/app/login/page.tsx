@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Turnstile } from "@/components/Turnstile";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
 
 const EXPIRED_MESSAGE =
@@ -16,6 +17,13 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Optional security check, shown only after repeated failures for this email
+  const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+  const [captchaNeeded, setCaptchaNeeded] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaRound, setCaptchaRound] = useState(0);
+  const onCaptchaToken = useCallback((t: string | null) => setCaptchaToken(t), []);
+  const onCaptchaError = useCallback(() => setError("The security check could not load. Please refresh and try again."), []);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [appName, setAppName] = useState("Travel Expense Tracker");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
@@ -60,11 +68,16 @@ export default function LoginPage() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, ...(captchaToken ? { captchaToken } : {}) }),
       });
       const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
+        if (data.captcha_required && siteKey) {
+          setCaptchaNeeded(true);
+          setCaptchaRound((n) => n + 1); // tokens are single-use: get a fresh widget
+        }
+        setCaptchaToken(null);
         setError(data.error || "Could not sign in. Please try again.");
         setLoading(false);
         return;
@@ -182,6 +195,10 @@ export default function LoginPage() {
               </Link>
             </div>
 
+            {captchaNeeded && siteKey && (
+              <Turnstile key={captchaRound} siteKey={siteKey} onToken={onCaptchaToken} onError={onCaptchaError} />
+            )}
+
             {error && (
               <div className="text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-xl">
                 {error}
@@ -190,7 +207,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (captchaNeeded && !captchaToken)}
               className="w-full h-11 rounded-xl text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
               style={{
                 backgroundColor: primaryColor,

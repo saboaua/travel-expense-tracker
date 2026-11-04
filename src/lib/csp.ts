@@ -5,7 +5,7 @@
  * Rollout: the policy is sent as Content-Security-Policy-Report-Only first (violations are logged to the
  * security log by /api/csp-report). Set CSP_ENFORCE=1 in the environment to start blocking.
  */
-export type CspOptions = { nonce: string; dev?: boolean; supabaseUrl?: string | null };
+export type CspOptions = { nonce: string; dev?: boolean; supabaseUrl?: string | null; turnstile?: boolean };
 
 function originOf(url: string | null | undefined): string | null {
   try {
@@ -15,7 +15,7 @@ function originOf(url: string | null | undefined): string | null {
   }
 }
 
-export function buildCsp({ nonce, dev = false, supabaseUrl }: CspOptions): string {
+export function buildCsp({ nonce, dev = false, supabaseUrl, turnstile = false }: CspOptions): string {
   const supabase = originOf(supabaseUrl);
   const supabaseWs = supabase ? supabase.replace(/^http/, "ws") : null;
 
@@ -27,11 +27,11 @@ export function buildCsp({ nonce, dev = false, supabaseUrl }: CspOptions): strin
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", ...(supabase ? [supabase] : ["https://*.supabase.co"]), "https://upload.wikimedia.org"],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", ...(supabase ? [supabase, ...(supabaseWs ? [supabaseWs] : [])] : ["https://*.supabase.co", "wss://*.supabase.co"]), ...(dev ? ["ws:", "wss:"] : [])],
+    "connect-src": ["'self'", ...(supabase ? [supabase, ...(supabaseWs ? [supabaseWs] : [])] : ["https://*.supabase.co", "wss://*.supabase.co"]), ...(turnstile ? ["https://challenges.cloudflare.com"] : []), ...(dev ? ["ws:", "wss:"] : [])],
     // On-device OCR runs in a worker served from /tesseract
     "worker-src": ["'self'", "blob:"],
     // Signed Supabase links open PDFs inside the document viewer
-    "frame-src": [...(supabase ? [supabase] : ["https://*.supabase.co"])],
+    "frame-src": [...(supabase ? [supabase] : ["https://*.supabase.co"]), ...(turnstile ? ["https://challenges.cloudflare.com"] : [])],
     "manifest-src": ["'self'"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],

@@ -49,6 +49,7 @@ function eventLabel(type: string) {
     login_blocked: "Login blocked (lockout)",
     suspicious_input: "Suspicious input",
     csp_violation: "CSP violation (report)",
+    protection_degraded: "Protection degraded",
     access_denied: "Access denied",
     temp_password_expired: "Expired temp password used",
     password_changed: "Password changed",
@@ -236,6 +237,7 @@ export default function AdminSecurityPage() {
                   <option value="login_blocked">Login blocked</option>
                   <option value="suspicious_input">Suspicious input</option>
                   <option value="csp_violation">CSP violation</option>
+                  <option value="protection_degraded">Protection degraded</option>
                   <option value="access_denied">Access denied</option>
                   <option value="temp_password_expired">Expired temp password</option>
                   <option value="password_changed">Password changed</option>

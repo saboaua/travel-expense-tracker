@@ -37,5 +37,14 @@ eq("reporting api array", summarizeReport([{ type: "csp-violation", body: { effe
 eq("junk", summarizeReport({ hello: 1 }), null);
 eq("null", summarizeReport(null), null);
 eq("long values capped", (summarizeReport({ "csp-report": { "violated-directive": "x", "blocked-uri": "a".repeat(5000) } })?.blocked || "").length, 200);
+// Turnstile hosts are only allowed when the CAPTCHA is configured
+{
+  const off = buildCsp({ nonce: "n", supabaseUrl: "https://x.supabase.co" });
+  const on = buildCsp({ nonce: "n", supabaseUrl: "https://x.supabase.co", turnstile: true });
+  const ok = !off.includes("challenges.cloudflare.com") && on.includes("frame-src https://x.supabase.co https://challenges.cloudflare.com") && /connect-src[^;]*challenges\.cloudflare\.com/.test(on);
+  console.log(ok ? "PASS" : "FAIL", "turnstile host only when configured");
+  if (!ok) fail++;
+}
+
 console.log(fail ? `${fail} FAILED` : "ALL PASSED");
 process.exit(fail ? 1 : 0);

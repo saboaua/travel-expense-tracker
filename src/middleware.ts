@@ -125,7 +125,7 @@ export async function middleware(request: NextRequest) {
   // Content-Security-Policy with a fresh nonce. It is put on the request too, so Next.js adds the nonce to its scripts.
   const enforce = process.env.CSP_ENFORCE === "1";
   const nonce = makeNonce();
-  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV !== "production", supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL });
+  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV !== "production", supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL, turnstile: !!process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY });
   const name = cspHeaderName(enforce);
   request.headers.set("x-nonce", nonce);
   request.headers.set(name, csp);

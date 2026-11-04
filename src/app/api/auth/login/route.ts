@@ -4,12 +4,14 @@ import { createClient } from "@/lib/supabase/server";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 import { scanFields } from "@/lib/suspicious-input";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
+import { MemoryStore, ResilientStore, SupabaseStore, decide, keysFor, recordFailure, recordSuccess } from "@/lib/auth-throttle";
+import { turnstileConfigured, verifyTurnstile } from "@/lib/turnstile";
+
+// Used when the database counters cannot be reached (per server instance)
+const memory = new MemoryStore();
+let lastDegradedLog = 0;
 
 export const dynamic = "force-dynamic";
-
-const WINDOW_MS = 15 * 60 * 1000;
-const IP_LIMIT = 10; // failed logins per IP per 15 min
-const EMAIL_LIMIT = 15; // failed logins per email per 15 min (across all IPs)
 
 /**
  * Server-side sign-in. Doing it here (instead of in the browser) means every attempt is
@@ -17,7 +19,7 @@ const EMAIL_LIMIT = 15; // failed logins per email per 15 min (across all IPs)
  */
 export async function POST(request: Request) {
   const meta = metaFromRequest(request);
-  let body: { email?: unknown; password?: unknown };
+  let body: { email?: unknown; password?: unknown; captchaToken?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -48,50 +50,67 @@ export async function POST(request: Request) {
     });
   }
 
-  // Lockout check BEFORE trying the password
-  if (db) {
-    const since = new Date(Date.now() - WINDOW_MS).toISOString();
-    const [byIp, byEmail] = await Promise.all([
-      db.from("security_events").select("id", { count: "exact", head: true }).eq("event_type", "login_failed").eq("ip_address", meta.ip).gte("created_at", since),
-      db.from("security_events").select("id", { count: "exact", head: true }).eq("event_type", "login_failed").eq("email_attempted", email).gte("created_at", since),
-    ]);
-    const ipFails = byIp.count ?? 0;
-    const emailFails = byEmail.count ?? 0;
-    if (ipFails >= IP_LIMIT || emailFails >= EMAIL_LIMIT) {
-      // Log at most one "blocked" event per minute per IP so an attacker can't flood the table
-      const { count: recent } = await db
-        .from("security_events")
-        .select("id", { count: "exact", head: true })
-        .eq("event_type", "login_blocked")
-        .eq("ip_address", meta.ip)
-        .gte("created_at", new Date(Date.now() - 60 * 1000).toISOString());
-      if (!recent) {
-        await writeSecurityEvent(meta, {
-          eventType: "login_blocked",
-          severity: "critical",
-          emailAttempted: email,
-          details: { ip_failures_15min: ipFails, email_failures_15min: emailFails },
-        });
-      }
-      return NextResponse.json(
-        { error: "Too many failed attempts. Please try again in 15 minutes.", blocked: true },
-        { status: 429 }
-      );
+  // Counters live in their own table; if it cannot be reached we keep limiting from memory and tell the admin
+  const store = new ResilientStore(
+    db ? new SupabaseStore((fn, args) => db.rpc(fn, args)) : null,
+    memory,
+    (reason) => {
+      if (Date.now() - lastDegradedLog < 10 * 60 * 1000) return;
+      lastDegradedLog = Date.now();
+      console.error("[auth-throttle] degraded:", reason);
+      void writeSecurityEvent(meta, {
+        eventType: "protection_degraded",
+        severity: "warning",
+        details: { component: "login lockout", reason: reason.slice(0, 200), hint: "Run supabase/migration_throttle_retention.sql" },
+      });
     }
+  );
+  const keys = keysFor(meta.ip, email);
+  const captchaOn = turnstileConfigured();
+
+  // Lockout check BEFORE trying the password
+  const status = await store.status([keys.ip, keys.pair, keys.email].filter(Boolean) as string[]);
+  let captchaPassed = false;
+  if (captchaOn && body.captchaToken) captchaPassed = await verifyTurnstile(body.captchaToken, meta.ip);
+  const decision = decide(status, keys, { captchaConfigured: captchaOn, captchaPassed });
+
+  if (decision.action === "block") {
+    await writeSecurityEvent(meta, {
+      eventType: "login_blocked",
+      severity: "critical",
+      emailAttempted: email,
+      details: { scope: decision.scope, retry_after_sec: decision.retryAfterSec },
+    });
+    const minutes = Math.max(1, Math.ceil(decision.retryAfterSec / 60));
+    return NextResponse.json(
+      { error: `Too many failed attempts. Please try again in ${minutes} minute${minutes === 1 ? "" : "s"}.`, blocked: true },
+      { status: 429, headers: { "Retry-After": String(decision.retryAfterSec) } }
+    );
+  }
+  if (decision.action === "captcha") {
+    // Not counted as a password attempt
+    return NextResponse.json(
+      { error: "Please complete the security check to continue.", captcha_required: true },
+      { status: 401 }
+    );
   }
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error || !data.user) {
+    const { captchaNext } = await recordFailure(store, keys, captchaOn);
     await writeSecurityEvent(meta, {
       eventType: "login_failed",
       severity: "warning",
       emailAttempted: email,
       details: { error: error?.message || "Invalid credentials" },
     });
-    return NextResponse.json({ error: error?.message || "Invalid login credentials" }, { status: 401 });
+    // Same wording for every failure so the response never reveals which part was wrong
+    return NextResponse.json({ error: "Invalid email or password.", ...(captchaNext ? { captcha_required: true } : {}) }, { status: 401 });
   }
+
+  await recordSuccess(store, keys);
 
   // Temporary password past its expiry: refuse and end the session
   if (db) {
