@@ -16,7 +16,7 @@ import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, todayISO } from "@/lib/utils";
 
 const selectClass = "flex h-10 w-full min-w-0 rounded-md border border-input bg-background px-3 py-2 text-sm";
 
@@ -37,7 +37,7 @@ export default function AddExpensePage() {
   const [rate, setRate] = useState("1");
   const [rateSource, setRateSource] = useState("manual");
   const [category, setCategory] = useState("Meals");
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split("T")[0]);
+  const [expenseDate, setExpenseDate] = useState(todayISO());
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [ocrLoading, setOcrLoading] = useState(false);

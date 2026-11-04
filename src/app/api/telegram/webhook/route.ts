@@ -1,3 +1,4 @@
+import { todayISO } from "@/lib/utils";
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
@@ -115,11 +116,16 @@ async function handleCallback(supabase: ReturnType<typeof admin>, cq: any) {
 
   if (data.startsWith("trip:")) {
     const tripId = data.slice(5);
-    await supabase.from("profiles").update({ telegram_default_trip_id: tripId }).eq("id", profile.id);
+    const { error: tripErr } = await supabase.from("profiles").update({ telegram_default_trip_id: tripId }).eq("id", profile.id);
+    if (tripErr) {
+      console.error("[telegram] default trip", tripErr.message);
+      return void (await sendMessage(chatId, "Could not save your trip choice. Please try again."));
+    }
 
     const { data: pending } = await supabase.from("telegram_pending").select("*").eq("telegram_id", fromId).maybeSingle();
     if (pending) {
-      await supabase.from("telegram_pending").delete().eq("telegram_id", fromId);
+      const { error: delErr } = await supabase.from("telegram_pending").delete().eq("telegram_id", fromId);
+      if (delErr) console.error("[telegram] clear pending", delErr.message);
       await saveReceipt(supabase, chatId, { ...profile, telegram_default_trip_id: tripId }, pending);
     } else {
       await sendMessage(chatId, "Default trip updated. Send a receipt whenever you are ready.");
@@ -139,11 +145,15 @@ async function linkAccount(supabase: ReturnType<typeof admin>, chatId: number, t
     return sendMessage(chatId, "That code expired. Generate a new one in Settings.");
   }
 
-  await supabase.from("profiles").update({
+  const { error: linkErr } = await supabase.from("profiles").update({
     telegram_id: telegramId,
     telegram_link_code: null,
     telegram_link_expires: null,
   }).eq("id", profile.id);
+  if (linkErr) {
+    console.error("[telegram] link", linkErr.message);
+    return sendMessage(chatId, "Could not link your account right now. Please try again in a moment.");
+  }
 
   await sendMessage(chatId, `Linked${profile.full_name ? ` as ${profile.full_name}` : ""}.\n\nSend a photo or PDF of a receipt to log an expense. Use /trips to pick a default trip.`);
 }
@@ -182,13 +192,17 @@ async function startReceipt(
 
   const preferred = trips.find((t) => t.id === profile.telegram_default_trip_id) || (trips.length === 1 ? trips[0] : null);
   if (!preferred) {
-    await supabase.from("telegram_pending").upsert({
+    const { error: holdErr } = await supabase.from("telegram_pending").upsert({
       telegram_id: profile.telegram_id,
       file_id: file.fileId,
       file_name: file.fileName,
       mime: file.mime,
       created_at: new Date().toISOString(),
     });
+    if (holdErr) {
+      console.error("[telegram] hold receipt", holdErr.message);
+      return sendMessage(chatId, "Could not hold this receipt while you pick a trip. Please send it again.");
+    }
     await sendMessage(chatId, "Which trip is this receipt for?", {
       reply_markup: { inline_keyboard: trips.map((t) => [{ text: t.name, callback_data: `trip:${t.id}` }]) },
     });
@@ -277,7 +291,7 @@ async function saveReceipt(
         : "OCR failed";
     }
 
-    const expenseDate = date || new Date().toISOString().slice(0, 10);
+    const expenseDate = date || todayISO();
     const finalAmount = amount ?? 0;
 
     // Use the currency printed on the receipt when AI read one that the app supports

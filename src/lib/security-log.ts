@@ -41,7 +41,7 @@ export async function writeSecurityEvent(meta: RequestMeta, e: SecurityEventInpu
     const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
-    await db.from("security_events").insert({
+    const { error } = await db.from("security_events").insert({
       event_type: e.eventType,
       severity: e.severity || "info",
       email_attempted: cut(e.emailAttempted, 254) || null,
@@ -52,6 +52,8 @@ export async function writeSecurityEvent(meta: RequestMeta, e: SecurityEventInpu
       country: meta.country,
       details: { ...clampDetails(e.details), ...extra },
     });
+    // A failed insert does not throw; without this the log would silently stay empty
+    if (error) console.error("[security-log] insert failed:", error.message);
   } catch (err) {
     console.error("[security-log]", err);
   }

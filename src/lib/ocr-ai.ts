@@ -3,6 +3,7 @@
  * crumpled, skewed, thermal-paper or non-English receipts. Needs ANTHROPIC_API_KEY.
  */
 import type { OcrHints, OcrResult } from "@/lib/ocr";
+import { todayISO } from "@/lib/utils";
 import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
@@ -124,7 +125,7 @@ export async function extractReceiptWithClaude(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   hints: OcrHints = {}
 ): Promise<OcrResult> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const parsed = await askClaude(image, buildPrompt(hints, today), 400);
   const fields = sanitize(parsed, hints, today);
   return { ...fields, rawText: JSON.stringify(fields), source: "ai" };
@@ -176,7 +177,7 @@ export async function extractGroceryWithClaude(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   hints: OcrHints = {}
 ): Promise<GroceryScan> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const raw = await askClaude(image, buildGroceryPrompt(hints, today), 6000);
 
   const base = sanitize({ merchant: raw.store, total: raw.total, currency: raw.currency, date: raw.date }, {}, today);
@@ -228,7 +229,7 @@ function buildDocumentPrompt(today: string) {
 }
 
 export async function extractDocumentWithClaude(image: { data: Uint8Array | ArrayBuffer; mime: string }): Promise<DocumentFields> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayISO();
   const raw = await askClaude(image, buildDocumentPrompt(today), 300);
   return sanitizeDocumentFields(raw, today);
 }

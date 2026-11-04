@@ -62,10 +62,12 @@ export default function ChangePasswordPage() {
           .eq("id", user.id);
         if (clearErr) {
           // Expiry column missing (migration not run yet): clear the flag alone
-          await supabase
+          const { error: flagErr } = await supabase
             .from("profiles")
             .update({ must_change_password: false, updated_at: new Date().toISOString() })
             .eq("id", user.id);
+          // Without this the person would be sent straight back to this page after a "successful" change
+          if (flagErr) throw flagErr;
         }
       }
 

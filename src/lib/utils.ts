@@ -24,8 +24,15 @@ export function formatDate(date: string | Date) {
 }
 
 /** Today's calendar date (YYYY-MM-DD) in the app's home time zone (Aruba). */
-export function todayISO(timeZone = "America/Aruba") {
-  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(new Date());
+export function todayISO(timeZone = "America/Aruba", now: Date = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", { timeZone }).format(now);
+}
+
+/** A YYYY-MM-DD date moved by `days` (negative = earlier). Plain calendar maths, no time zone involved. */
+export function addDaysISO(date: string, days: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
 }
 
 /** Whole days from `from` to `to` (both YYYY-MM-DD). */

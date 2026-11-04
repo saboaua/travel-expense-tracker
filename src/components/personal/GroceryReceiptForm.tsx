@@ -154,6 +154,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, receipt_path: receiptPath };
       let id = receiptId;
       let oldItemIds: string[] = [];
+      let newItemIds: string[] = [];
 
       if (receiptId) {
         const { data: old } = await supabase.from("grocery_items").select("id").eq("receipt_id", receiptId);
@@ -167,7 +168,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       }
 
       if (clean.length > 0) {
-        const { error } = await supabase.from("grocery_items").insert(
+        const { data: inserted, error } = await supabase.from("grocery_items").insert(
           clean.map((r) => ({
             receipt_id: id,
             user_id: user.id,
@@ -179,11 +180,19 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             line_total: money(r.line_total),
             ...(r.unit ? { unit: r.unit } : {}),
           }))
-        );
+        ).select("id");
         if (error) throw error;
+        newItemIds = (inserted || []).map((r) => r.id as string);
       }
-      // Remove the previous items only after the new ones were stored
-      if (oldItemIds.length) await supabase.from("grocery_items").delete().in("id", oldItemIds);
+      // Remove the previous items only after the new ones were stored. If that fails, undo the new
+      // ones so the receipt is not left with every line twice.
+      if (oldItemIds.length) {
+        const { error: delErr } = await supabase.from("grocery_items").delete().in("id", oldItemIds);
+        if (delErr) {
+          if (newItemIds.length) await supabase.from("grocery_items").delete().in("id", newItemIds);
+          throw new Error("Could not replace the previous items, so nothing was changed. Please try again.");
+        }
+      }
       if (file && existingPath) await supabase.storage.from("receipts").remove([existingPath]).catch(() => {});
 
       router.push(`${BACK}/${id}`);

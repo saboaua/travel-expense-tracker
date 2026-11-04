@@ -1,5 +1,6 @@
 "use client";
 
+import { addDaysISO, todayISO } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -27,12 +28,8 @@ interface AuditLog {
   created_at: string;
 }
 
-function today() {
-  return new Date().toISOString().slice(0, 10);
-}
-function daysAgo(n: number) {
-  return new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
-}
+const today = () => todayISO();
+const daysAgo = (n: number) => addDaysISO(todayISO(), -n);
 
 function severityColor(s: string) {
   if (s === "critical") return "bg-red-100 text-red-800 border-red-200";
