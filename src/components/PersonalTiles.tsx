@@ -32,10 +32,7 @@ export function PersonalTiles({ summary }: { summary: PersonalSummary }) {
 
   return (
     <section aria-label="Personal" className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Personal</h2>
-        <Link href="/personal" className="text-sm font-medium text-primary hover:underline">Open Personal</Link>
-      </div>
+      <h2 className="text-lg font-semibold">Personal</h2>
       <div className="grid grid-cols-3 gap-2 sm:gap-3 md:gap-4">
         {tiles.map((t) => (
           <Link key={t.href} href={t.href} className="group block focus-visible:outline-none">
