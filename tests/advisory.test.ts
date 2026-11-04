@@ -1,4 +1,4 @@
-import { parseColour, extractPoints, extractEntry, matchAdvisory, updatedDate, stripHtml, destinationParts, type AdvisoryListItem } from "../src/lib/advisory";
+import { jsonUrl, parseColour, extractPoints, extractEntry, matchAdvisory, updatedDate, stripHtml, destinationParts, type AdvisoryListItem } from "../src/lib/advisory";
 
 let fail = 0;
 function eq(name: string, got: unknown, want: unknown) {
@@ -65,6 +65,10 @@ eq("hyphen name kept", destinationParts("Saint-Martin"), ["Saint-Martin"]);
 eq("date iso", updatedDate("2026-10-05T14:58:37.504Z"), "2026-10-05");
 eq("date bad", updatedDate("nope"), null);
 eq("strip html", stripHtml("<p>a&nbsp;b</p><br/>c"), "a b c");
+
+eq("json url list", jsonUrl("https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes/traveladvice?rows=200"), "https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes/traveladvice?rows=200&output=json");
+eq("json url detail", jsonUrl("https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes/countries/esp/traveladvice"), "https://opendata.nederlandwereldwijd.nl/v2/sources/nederlandwereldwijd/infotypes/countries/esp/traveladvice?output=json");
+eq("json url already set", jsonUrl("https://x.nl/a?output=xml"), "https://x.nl/a?output=json");
 
 console.log(fail ? `${fail} FAILED` : "ALL PASSED");
 process.exit(fail ? 1 : 0);

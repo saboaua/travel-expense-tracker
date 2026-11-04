@@ -216,7 +216,15 @@ export function updatedDate(lastmodified: string | null | undefined): string | n
   return m ? m[1] : null;
 }
 
-async function getJson(url: string): Promise<unknown> {
+/** The API answers in XML unless `output=json` is in the query string (the Accept header is ignored). */
+export function jsonUrl(url: string): string {
+  const u = new URL(url);
+  u.searchParams.set("output", "json");
+  return u.toString();
+}
+
+async function getJson(rawUrl: string): Promise<unknown> {
+  const url = jsonUrl(rawUrl);
   const res = await fetch(url, {
     headers: { Accept: "application/json", "User-Agent": "TravelExpenseTracker/1.0 (https://github.com/saboaua/travel-expense-tracker)" },
     next: { revalidate: 60 * 60 * 12 },
@@ -224,6 +232,7 @@ async function getJson(url: string): Promise<unknown> {
   });
   if (!res.ok) throw new Error(`advice api ${res.status}`);
   const text = await res.text();
+  if (text.trimStart().startsWith("<")) throw new Error("advice api returned XML");
   return JSON.parse(text);
 }
 
@@ -241,6 +250,8 @@ export async function fetchAdvisory(destination: string | null | undefined): Pro
   let list: AdvisoryListItem[];
   try {
     list = asList(await getJson(`${API_BASE}/traveladvice?rows=200`));
+    // The list is capped at 200 per page
+    if (list.length >= 200) list = [...list, ...asList(await getJson(`${API_BASE}/traveladvice?rows=200&offset=200`)).slice(0, 200)];
   } catch (e) {
     console.error("[advisory] list", e instanceof Error ? e.message : e);
     return { status: "unavailable", url: ADVICE_HOME };
