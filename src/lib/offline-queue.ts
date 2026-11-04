@@ -12,7 +12,19 @@
  *    being retried forever.
  */
 
-export type QueueStatus = "pending" | "conflict" | "failed";
+export type QueueStatus = "pending" | "conflict" | "failed" | "duplicate";
+
+/** An expense you already saved that looks like the one being added. */
+export interface DuplicateMatch {
+  id: string;
+  tripId: string;
+  tripName: string | null;
+  merchant: string | null;
+  amount: number;
+  currency: string | null;
+  expenseDate: string;
+  reason: "same_photo" | "same_details" | "both";
+}
 
 export interface QueuedExpense {
   id: string;
@@ -29,6 +41,12 @@ export interface QueuedExpense {
   notes: string | null;
   image: Blob | null;
   imageName: string | null;
+  /** Fingerprint of the photo (see image-hash.ts), or null. */
+  imageHash?: string | null;
+  /** The person looked at the possible duplicates and chose to keep this one. */
+  duplicateOk?: boolean;
+  /** What it looked like a duplicate of, kept so the Waiting page can show it. */
+  duplicates?: DuplicateMatch[];
   /** True once the photo is in storage, so a retry does not upload it again. */
   uploaded: boolean;
   status: QueueStatus;
@@ -79,6 +97,8 @@ export interface SyncApi {
   currentUser(): Promise<{ userId: string | null; offline: boolean }>;
   upload(path: string, blob: Blob): Promise<{ error: unknown | null }>;
   insertExpense(row: Record<string, unknown>): Promise<{ error: unknown | null }>;
+  /** Asks the database for this person's expenses that look the same. Left out where the check does not apply. */
+  findDuplicates?(item: QueuedExpense): Promise<{ matches: DuplicateMatch[]; error: unknown | null }>;
 }
 
 export interface QueueStore {
@@ -90,6 +110,7 @@ export interface QueueStore {
 export type PushOutcome =
   | { kind: "synced" }
   | { kind: "offline" }
+  | { kind: "duplicate"; matches: DuplicateMatch[] }
   | { kind: "conflict"; message: string }
   | { kind: "failed"; message: string };
 
@@ -106,6 +127,18 @@ function friendly(kind: ErrorKind, err: unknown): string {
 
 /** Sends one expense (photo first, then the row). Safe to repeat. Updates `item` with what it learned. */
 export async function pushExpense(api: SyncApi, item: QueuedExpense): Promise<PushOutcome> {
+  // Look for a receipt that was already claimed, unless the person has already said "keep it".
+  if (!item.duplicateOk && api.findDuplicates) {
+    const { matches, error } = await api.findDuplicates(item);
+    if (error) {
+      const kind = classifyError(error);
+      if (kind === "network" || kind === "auth") return { kind: "offline" };
+      // Any other problem (for example the database update has not been run yet) must never stop a receipt from being saved.
+    } else if (matches.length > 0) {
+      return { kind: "duplicate", matches };
+    }
+  }
+
   let path: string | null = null;
   if (item.image) {
     path = receiptPathFor(item.userId, item.tripId, item.id, item.image, item.imageName);
@@ -133,6 +166,7 @@ export async function pushExpense(api: SyncApi, item: QueuedExpense): Promise<Pu
     expense_date: item.expenseDate,
     notes: item.notes,
     receipt_path: path,
+    image_hash: item.imageHash ?? null,
   });
   if (!error) return { kind: "synced" };
   const kind = classifyError(error);
@@ -170,6 +204,11 @@ export async function runSync(store: QueueStore, api: SyncApi, userId: string): 
       await store.put(item); // keeps `uploaded`
       offline = true;
       break;
+    } else if (outcome.kind === "duplicate") {
+      item.status = "duplicate";
+      item.duplicates = outcome.matches;
+      item.error = "Looks like a receipt you already saved.";
+      await store.put(item);
     } else {
       item.attempts += 1;
       item.error = outcome.message;

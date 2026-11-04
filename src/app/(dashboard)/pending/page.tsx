@@ -11,6 +11,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm";
+import { DuplicateList } from "@/components/DuplicateList";
 import { formatCurrency } from "@/lib/utils";
 
 function Thumb({ blob }: { blob: Blob }) {
@@ -52,8 +53,8 @@ export default function PendingPage() {
     });
   }, [items, supabase]);
 
-  const retry = async (item: QueuedExpense) => {
-    await browserStore.put({ ...item, status: "pending", attempts: 0, error: null });
+  const retry = async (item: QueuedExpense, keepDuplicate = false) => {
+    await browserStore.put({ ...item, status: "pending", attempts: 0, error: null, duplicates: undefined, duplicateOk: keepDuplicate || item.duplicateOk });
     window.dispatchEvent(new Event(SYNC_NOW_EVENT));
   };
 
@@ -117,14 +118,26 @@ export default function PendingPage() {
                   item.status === "pending" ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100" : "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100"
                 }`}
               >
-                {item.status === "pending" ? "Pending" : item.status === "conflict" ? "Needs attention" : "Failed"}
+                {item.status === "pending" ? "Pending" : item.status === "duplicate" ? "Possible duplicate" : item.status === "conflict" ? "Needs attention" : "Failed"}
               </span>
             </div>
 
-            {item.error && <Alert>{item.error}</Alert>}
+            {item.status === "duplicate" && item.duplicates ? (
+              <Alert variant="warning" className="space-y-3">
+                <p className="font-medium">This looks like a receipt you already saved.</p>
+                <DuplicateList matches={item.duplicates} />
+              </Alert>
+            ) : (
+              item.error && <Alert>{item.error}</Alert>
+            )}
 
             <div className="flex flex-wrap gap-2">
-              {item.status !== "conflict" && (
+              {item.status === "duplicate" && (
+                <Button type="button" size="sm" variant="outline" className="gap-1" disabled={!online} onClick={() => retry(item, true)}>
+                  <RefreshCw className="h-4 w-4" /> Keep it anyway
+                </Button>
+              )}
+              {item.status !== "conflict" && item.status !== "duplicate" && (
                 <Button type="button" size="sm" variant="outline" className="gap-1" disabled={!online} onClick={() => retry(item)}>
                   <RefreshCw className="h-4 w-4" /> {item.status === "failed" ? "Try again" : "Sync now"}
                 </Button>

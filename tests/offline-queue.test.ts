@@ -1,4 +1,4 @@
-import { classifyError, pushExpense, receiptPathFor, runSync, type QueuedExpense, type QueueStore, type SyncApi } from "../src/lib/offline-queue";
+import { classifyError, pushExpense, receiptPathFor, runSync, type DuplicateMatch, type QueuedExpense, type QueueStore, type SyncApi } from "../src/lib/offline-queue";
 let fail = 0;
 const eq = (n: string, g: unknown, w: unknown) => { const ok = JSON.stringify(g) === JSON.stringify(w); if (!ok) fail++; console.log(ok ? "PASS" : "FAIL", n, ok ? "" : `got=${JSON.stringify(g)} want=${JSON.stringify(w)}`); };
 
@@ -30,8 +30,9 @@ const memStore = (items: QueuedExpense[]): QueueStore & { items: QueuedExpense[]
   async remove(id) { this.items = this.items.filter((x) => x.id !== id); },
 });
 type Calls = { uploads: string[]; inserts: Record<string, unknown>[] };
-const fakeApi = (opts: { user?: string | null; offline?: boolean; upload?: unknown; insert?: unknown } = {}): SyncApi & Calls => ({
-  uploads: [], inserts: [],
+const fakeApi = (opts: { user?: string | null; offline?: boolean; upload?: unknown; insert?: unknown; dupes?: DuplicateMatch[]; dupeError?: unknown } = {}): SyncApi & Calls & { checks: number } => ({
+  uploads: [], inserts: [], checks: 0,
+  async findDuplicates() { this.checks++; return { matches: opts.dupes ?? [], error: opts.dupeError ?? null }; },
   async currentUser() { return { userId: opts.user === undefined ? "u1" : opts.user, offline: !!opts.offline }; },
   async upload(path) { this.uploads.push(path); return { error: opts.upload ?? null }; },
   async insertExpense(row) { this.inserts.push(row); return { error: opts.insert ?? null }; },
@@ -102,6 +103,39 @@ const fakeApi = (opts: { user?: string | null; offline?: boolean; upload?: unkno
   eq("push: success", (await pushExpense(fakeApi(), item())).kind, "synced");
   eq("push: offline", (await pushExpense(fakeApi({ insert: { message: "Failed to fetch" } }), item())).kind, "offline");
   eq("push: other errors are shown, not queued", (await pushExpense(fakeApi({ insert: { code: "22P02", message: "bad input" } }), item())).kind, "failed");
+
+  // --- duplicate detection
+  const dup: DuplicateMatch = { id: "old", tripId: "t9", tripName: "Lisbon", merchant: "Cafe", amount: 10, currency: "USD", expenseDate: "2026-11-04", reason: "both" };
+  api = fakeApi({ dupes: [dup] });
+  let o = await pushExpense(api, item());
+  eq("possible duplicate stops before anything is uploaded or saved", [o.kind, api.uploads.length, api.inserts.length], ["duplicate", 0, 0]);
+  eq("the matching expense is handed back to show", o.kind === "duplicate" ? o.matches[0].id : null, "old");
+  api = fakeApi({ dupes: [dup] });
+  o = await pushExpense(api, item({ duplicateOk: true }));
+  eq("after 'save anyway' the check is skipped and it saves", [o.kind, api.checks, api.inserts.length], ["synced", 0, 1]);
+  api = fakeApi({ dupeError: { code: "PGRST202", message: "Could not find the function" } });
+  o = await pushExpense(api, item());
+  eq("a missing database function never blocks saving", [o.kind, api.inserts.length], ["synced", 1]);
+  api = fakeApi({ dupeError: { message: "TypeError: Failed to fetch" } });
+  o = await pushExpense(api, item());
+  eq("no connection during the check keeps it queued", [o.kind, api.inserts.length], ["offline", 0]);
+  api = fakeApi();
+  await pushExpense(api, item({ imageHash: "ffff0000ffff0000" }));
+  eq("the photo fingerprint is saved with the expense", api.inserts[0].image_hash, "ffff0000ffff0000");
+  api = fakeApi();
+  await pushExpense(api, item());
+  eq("no fingerprint is saved as null", api.inserts[0].image_hash, null);
+
+  store = memStore([item()]); api = fakeApi({ dupes: [dup] });
+  r = await runSync(store, api, "u1");
+  eq("queued receipt that looks like a duplicate waits for a decision", [r.synced, store.items[0].status, store.items[0].duplicates?.[0].id, api.inserts.length], [0, "duplicate", "old", 0]);
+  api = fakeApi({ dupes: [dup] });
+  await runSync(store, api, "u1");
+  eq("it is not checked or sent again by itself", [api.checks, api.inserts.length], [0, 0]);
+  store.items[0] = { ...store.items[0], status: "pending", duplicateOk: true };
+  api = fakeApi({ dupes: [dup] });
+  r = await runSync(store, api, "u1");
+  eq("after the person keeps it, it syncs", [r.synced, store.items.length], [1, 0]);
 
   process.exit(fail ? 1 : 0);
 })();

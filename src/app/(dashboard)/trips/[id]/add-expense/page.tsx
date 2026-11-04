@@ -19,7 +19,9 @@ import { takeQuickScan } from "@/lib/quick-scan";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { enqueueExpense, newExpenseId, pushExpense, type PushOutcome, type QueuedExpense } from "@/lib/offline-queue";
+import { enqueueExpense, newExpenseId, pushExpense, type DuplicateMatch, type PushOutcome, type QueuedExpense } from "@/lib/offline-queue";
+import { imageDhash } from "@/lib/image-hash";
+import { DuplicateList } from "@/components/DuplicateList";
 import { makeSyncApi } from "@/lib/offline-api";
 import { SYNC_NOW_EVENT } from "@/components/OfflineSync";
 
@@ -48,6 +50,7 @@ export default function AddExpensePage() {
   const [ocrNote, setOcrNote] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [queuedNote, setQueuedNote] = useState<string | null>(null);
+  const [duplicate, setDuplicate] = useState<{ item: QueuedExpense; matches: DuplicateMatch[] } | null>(null);
   const categories = useExpenseCategories();
   const [tripReady, setTripReady] = useState(false);
   const quickHandled = useRef(false);
@@ -189,11 +192,44 @@ export default function AddExpensePage() {
     setExpenseDate(todayISO());
   };
 
+  /** Saves one captured expense: straight away if online, on this device if not, or stops to ask if it looks like a duplicate. */
+  const finish = async (item: QueuedExpense) => {
+    setLoading(true);
+    setError(null);
+    setQueuedNote(null);
+    setDuplicate(null);
+    try {
+      // Online: save straight away, as before. No connection (or it drops mid-save): keep it on this device and send it later.
+      const outcome: PushOutcome = navigator.onLine ? await pushExpense(makeSyncApi(supabase), item) : { kind: "offline" };
+      if (outcome.kind === "synced") {
+        router.push(`/trips/${tripId}`);
+        router.refresh();
+        return;
+      }
+      if (outcome.kind === "duplicate") {
+        setDuplicate({ item, matches: outcome.matches });
+        setLoading(false);
+        return;
+      }
+      if (outcome.kind === "offline") {
+        if (!(await enqueueExpense(item))) throw new Error("No connection, and this device could not keep the receipt. Please try again when you are online.");
+        setQueuedNote("Saved on this device. It will upload automatically when you are back online.");
+        resetForm();
+        window.dispatchEvent(new Event(SYNC_NOW_EVENT));
+        setLoading(false);
+        return;
+      }
+      throw new Error(outcome.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setQueuedNote(null);
     try {
       // The signed-in person is read from the device, so this works without a connection too.
       const { data: { session } } = await supabase.auth.getSession();
@@ -202,7 +238,7 @@ export default function AddExpensePage() {
 
       const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
       const amountNum = parseFloat(amount);
-      const item: QueuedExpense = {
+      await finish({
         id: newExpenseId(),
         userId,
         tripId,
@@ -217,28 +253,13 @@ export default function AddExpensePage() {
         notes: notes || null,
         image: file,
         imageName: file?.name ?? null,
+        imageHash: file ? await imageDhash(file) : null,
+        duplicateOk: false,
         uploaded: false,
         status: "pending",
         error: null,
         attempts: 0,
-      };
-
-      // Online: save straight away, as before. No connection (or it drops mid-save): keep it on this device and send it later.
-      const outcome: PushOutcome = navigator.onLine ? await pushExpense(makeSyncApi(supabase), item) : { kind: "offline" };
-      if (outcome.kind === "synced") {
-        router.push(`/trips/${tripId}`);
-        router.refresh();
-        return;
-      }
-      if (outcome.kind === "offline") {
-        if (!(await enqueueExpense(item))) throw new Error("No connection, and this device could not keep the receipt. Please try again when you are online.");
-        setQueuedNote("Saved on this device. It will upload automatically when you are back online.");
-        resetForm();
-        window.dispatchEvent(new Event(SYNC_NOW_EVENT));
-        setLoading(false);
-        return;
-      }
-      throw new Error(outcome.message);
+      });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
       setLoading(false);
@@ -329,6 +350,23 @@ export default function AddExpensePage() {
             </div>
 
             {error && <Alert>{error}</Alert>}
+            {duplicate && (
+              <div ref={(el) => el?.scrollIntoView({ block: "center", behavior: "smooth" })}>
+              <Alert variant="warning" className="space-y-3">
+                <p className="font-medium">This looks like a receipt you already saved.</p>
+                <DuplicateList matches={duplicate.matches} />
+                <p>Saving it again could mean claiming the same receipt twice.</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => finish({ ...duplicate.item, duplicateOk: true })}>
+                    Save anyway
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" disabled={loading} onClick={() => { setDuplicate(null); resetForm(); }}>
+                    Discard this receipt
+                  </Button>
+                </div>
+              </Alert>
+              </div>
+            )}
             {queuedNote && (
               <Alert variant="info">
                 {queuedNote} <Link href="/pending" className="font-medium underline">See waiting receipts</Link>

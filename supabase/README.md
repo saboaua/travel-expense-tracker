@@ -28,6 +28,7 @@ each file says so when that is the case.
 | 20 | `migration_login_support.sql` | Login logo size, privacy text, support requests |
 | 21 | `migration_security_hardening.sql` | Stops users changing their own role and other fixes |
 | 22 | `migration_throttle_retention.sql` | Sign-in throttling counters and log retention |
+| 23 | `migration_duplicates.sql` | Photo fingerprint column and the duplicate receipt check |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
