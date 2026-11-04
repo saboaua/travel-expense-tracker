@@ -9,6 +9,9 @@ export async function POST() {
       data: { user },
     } = await supabase.auth.getUser();
 
+    // Only a signed-in user can write a logout event (stops anonymous log flooding)
+    if (!user) return NextResponse.json({ ok: true });
+
     await logSecurityEvent({
       eventType: "logout",
       severity: "info",

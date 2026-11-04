@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const API = "https://api.telegram.org";
@@ -125,7 +126,7 @@ export async function setWebhook(url: string, secret?: string | null, token?: st
 export function randomCode(len = 6) {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   let out = "";
-  for (let i = 0; i < len; i++) out += chars[Math.floor(Math.random() * chars.length)];
+  for (let i = 0; i < len; i++) out += chars[randomInt(chars.length)];
   return out;
 }
 

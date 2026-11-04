@@ -32,9 +32,16 @@ export async function POST(request: Request) {
     const body = await request.json();
     let { email, firstName, lastName, role } = body;
     email = typeof email === "string" ? email.trim().toLowerCase() : "";
+    const clean = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 80) : null);
+    firstName = clean(firstName);
+    lastName = clean(lastName);
+    role = typeof role === "string" && role ? role : "user";
 
     if (!email) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    }
+    if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
     }
 
     // The temporary password is always generated on the server (secure RNG)

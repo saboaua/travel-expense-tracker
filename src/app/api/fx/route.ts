@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const from = (new URL(request.url).searchParams.get("from") || "USD").toUpperCase();
+  // Public endpoint: only accept a plain 3-letter currency code
+  if (!/^[A-Z]{3}$/.test(from)) return NextResponse.json({ error: "Invalid currency code" }, { status: 400 });
   try {
     const supabase = await createClient();
     const { data } = await supabase
