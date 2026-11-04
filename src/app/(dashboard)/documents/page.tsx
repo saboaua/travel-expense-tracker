@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { FileText, ShieldCheck } from "lucide-react";
+import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
+import { loadPermissions } from "@/lib/access-server";
 import { createClient } from "@/lib/supabase/server";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, kindLabel, passportStatus, type TravelDocument } from "@/lib/documents";
@@ -10,6 +11,8 @@ const BADGE = { expired: "bg-red-100 text-red-700", critical: "bg-red-100 text-r
 export default async function DocumentsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.id).single();
+  const canSeePersonal = (await loadPermissions(supabase, (profile?.role as string) || "user")).has("personal");
   const { data } = await supabase.from("travel_documents").select("*").eq("user_id", user?.id).order("created_at", { ascending: false });
   const all = (data || []) as TravelDocument[];
   const passport = currentPassport(all);
@@ -23,6 +26,11 @@ export default async function DocumentsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 pb-24 md:p-8">
       <div>
+        {canSeePersonal && (
+          <Link href="/personal" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+            <ArrowLeft className="h-3.5 w-3.5" /> Personal
+          </Link>
+        )}
         <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" /> Documents</h1>
         <p className="mt-1 text-muted-foreground">Your passport and travel papers, close at hand.</p>
       </div>

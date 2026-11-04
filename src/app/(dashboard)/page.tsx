@@ -12,6 +12,8 @@ import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, renewalAlert } from "@/lib/documents";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
 import { loadPermissions } from "@/lib/access-server";
+import { PersonalTiles } from "@/components/PersonalTiles";
+import { summarizePersonal } from "@/lib/personal/summary";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -75,6 +77,20 @@ export default async function DashboardPage() {
     ...buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() }),
   ].sort((a, b) => ({ urgent: 0, warning: 1, info: 2 })[a.severity] - ({ urgent: 0, warning: 1, info: 2 })[b.severity]);
 
+  // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
+  let personalSummary: ReturnType<typeof summarizePersonal> | null = null;
+  if (myPerms.has("personal")) {
+    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
+    if (!(flag && flag.personal_enabled === false)) {
+      const monthStart = `${todayISO().slice(0, 7)}-01`;
+      const [g, pr] = await Promise.all([
+        supabase.from("grocery_receipts").select("total, currency").eq("user_id", user?.id).gte("purchase_date", monthStart),
+        supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("user_id", user?.id).eq("status", "active"),
+      ]);
+      if (!g.error && !pr.error) personalSummary = summarizePersonal(g.data, pr.data as never);
+    }
+  }
+
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
   const yearTotal =
@@ -83,9 +99,6 @@ export default async function DashboardPage() {
   const byStart = (x: { start_date: string }, y: { start_date: string }) => x.start_date.localeCompare(y.start_date);
 
   const activeAll = (trips || []).filter((t) => t.status === "active");
-  const completedTripsList = (trips || [])
-    .filter((t) => t.status === "completed")
-    .sort((x, y) => y.start_date.localeCompare(x.start_date));
   const activeCount = activeAll.length;
 
   // Order: in progress now, then upcoming (soonest first), then trips that ended but are still open.
@@ -190,7 +203,7 @@ export default async function DashboardPage() {
         <CardHeader className="flex flex-row items-center justify-between">
           <div>
             <CardTitle>Active Trips</CardTitle>
-            <CardDescription>Your ongoing and upcoming travels</CardDescription>
+            <CardDescription>Your ongoing and upcoming travels. Completed trips are in Trips.</CardDescription>
           </div>
           <Link href="/trips">
             <Button variant="outline" size="sm">View all</Button>
@@ -278,56 +291,7 @@ export default async function DashboardPage() {
         </CardContent>
       </Card>
 
-      {/* Completed Trips */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Completed Trips</CardTitle>
-            <CardDescription>Past business travels and archived expenses</CardDescription>
-          </div>
-          <Link href="/trips">
-            <Button variant="outline" size="sm">View archive</Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {completedTripsList.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No completed trips yet</p>
-          ) : (
-            <div className="space-y-3">
-              {completedTripsList.map((trip) => {
-                const tripTotal =
-                  trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
-                return (
-                  <Link
-                    key={trip.id}
-                    href={`/trips/${trip.id}`}
-                    className="flex items-center justify-between p-4 rounded-lg border hover:bg-accent transition-colors"
-                  >
-                    <div>
-                      <p className="font-medium">{trip.name}</p>
-                      {trip.destination && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3 w-3" /> {trip.destination}
-                        </p>
-                      )}
-                      <p className="text-sm text-muted-foreground">
-                        {formatDate(trip.start_date)}
-                        {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
-                        completed
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {personalSummary && <PersonalTiles summary={personalSummary} />}
     </div>
   );
 }

@@ -15,7 +15,6 @@ const baseItems = [
   { href: "/", label: "Home", icon: Home, feature: null },
   { href: "/trips", label: "Trips", icon: Plane, feature: "trips" },
   { href: "/reports", label: "Reports", icon: FileText, feature: "reports" },
-  { href: "/documents", label: "Docs", icon: FolderOpen, feature: "documents" },
   { href: "/personal", label: "Personal", icon: Wallet, feature: "personal" },
 ] as const;
 
@@ -51,7 +50,12 @@ export function MobileNav() {
   const NAV_ICONS = { security: Activity, users: Users, settings: Settings, other: Settings } as const;
   const adminItems = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind] }));
 
-  const mainItems = baseItems.filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal"));
+  const personalShown = personalEnabled && perms.has("personal");
+  const mainItems: { href: string; label: string; icon: typeof Home }[] = [
+    ...baseItems.filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal")),
+    // Documents live inside Personal; a role that has Documents but not Personal still gets its own tab
+    ...(perms.has("documents") && !personalShown ? [{ href: "/documents", label: "Docs", icon: FolderOpen }] : []),
+  ];
   const menuActive = pathname.startsWith("/admin") || pathname.startsWith("/profile");
 
   return (
@@ -103,7 +107,7 @@ export function MobileNav() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         <div className="flex items-center justify-around h-16">
           {mainItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors", isActive ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground")}>
