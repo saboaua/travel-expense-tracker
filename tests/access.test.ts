@@ -7,9 +7,9 @@ const sorted = (s:Set<string>) => [...s].sort();
 eq(sorted(effectivePermissions({key:"admin",permissions:[],known_features:[]})), [...FEATURE_KEYS].sort(), "admin has all");
 
 // seeded system roles behave like before roles existed
-eq(sorted(legacyPermissions("user")), ["documents","personal","reports","trips"], "legacy user");
-eq(sorted(legacyPermissions("assistant")), ["documents","personal","reports","trips","users.manage"], "legacy assistant");
-eq(sorted(legacyPermissions("whatever")), ["documents","personal","reports","trips"], "unknown role -> user baseline");
+eq(sorted(legacyPermissions("user")), ["documents","personal","personal.dashboard","reports","trips"], "legacy user");
+eq(sorted(legacyPermissions("assistant")), ["documents","personal","personal.dashboard","reports","trips","users.manage"], "legacy assistant");
+eq(sorted(legacyPermissions("whatever")), ["documents","personal","personal.dashboard","reports","trips"], "unknown role -> user baseline");
 
 // reviewed roles use exactly what the admin ticked
 const reviewedUser = {key:"user",permissions:["trips","reports"],known_features:FEATURE_KEYS};

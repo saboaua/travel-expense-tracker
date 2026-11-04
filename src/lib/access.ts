@@ -24,6 +24,7 @@ export const FEATURES: Feature[] = [
   { key: "trips", label: "Trips & expenses", description: "Create trips, add and scan receipts.", group: "App", paths: ["/trips"], defaultRoles: ["user", "assistant"] },
   { key: "reports", label: "Reports", description: "Spending reports and exports.", group: "App", paths: ["/reports"], defaultRoles: ["user", "assistant"] },
   { key: "personal", label: "Personal", description: "Groceries, home projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
+  { key: "personal.dashboard", label: "Personal dashboard", description: "Business / Personal switch on the home page, with spending charts for personal receipts.", group: "App", paths: [], defaultRoles: ["user", "assistant"] },
   { key: "documents", label: "Documents & passport", description: "Passport, visas and trip documents.", group: "App", paths: ["/documents"], defaultRoles: ["user", "assistant"] },
   { key: "users.manage", label: "Create users", description: "Create users and reset temporary passwords (not roles).", group: "Administration", paths: ["/admin/users"], defaultRoles: ["assistant"] },
   { key: "security.view", label: "Security & audit", description: "See security events and the audit log.", group: "Administration", paths: ["/admin/security"], defaultRoles: [] },

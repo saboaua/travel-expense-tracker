@@ -58,7 +58,7 @@ eq(buildSecurityNotifications([ev("login_blocked","critical","2026-11-03T19:00:0
 
 // ---- new options to assign (admin) ----
 eq(buildAccessNotification([]), [], "no roles");
-eq(buildAccessNotification([{key:"user",known_features:["trips","reports","personal","documents","users.manage","security.view","categories.manage","currencies.manage","branding.manage","telegram.manage","support.view"]},{key:"admin",known_features:[]}]), [], "everything reviewed -> quiet (admin never counts)");
+eq(buildAccessNotification([{key:"user",known_features:["trips","reports","personal","personal.dashboard","documents","users.manage","security.view","categories.manage","currencies.manage","branding.manage","telegram.manage","support.view"]},{key:"admin",known_features:[]}]), [], "everything reviewed -> quiet (admin never counts)");
 const nn = buildAccessNotification([{key:"sales",label:"Sales",known_features:["trips"]}]);
-eq([nn.length, nn[0].href, nn[0].title], [1,"/admin/users?tab=roles","10 new options to assign"], "unreviewed options flagged");
-eq(buildAccessNotification([{key:"sales",known_features:["trips","reports","personal","documents","users.manage","security.view","categories.manage","currencies.manage","branding.manage","telegram.manage"]}])[0].message, "Support requests. Choose which roles can use it.", "single new option wording");
+eq([nn.length, nn[0].href, nn[0].title], [1,"/admin/users?tab=roles","11 new options to assign"], "unreviewed options flagged");
+eq(buildAccessNotification([{key:"sales",known_features:["trips","reports","personal","personal.dashboard","documents","users.manage","security.view","categories.manage","currencies.manage","branding.manage","telegram.manage"]}])[0].message, "Support requests. Choose which roles can use it.", "single new option wording");

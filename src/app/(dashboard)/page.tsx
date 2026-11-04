@@ -14,6 +14,8 @@ import { buildAccessNotification, buildNotifications, buildSecurityNotifications
 import { loadPermissions } from "@/lib/access-server";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
+import { DashboardViews } from "@/components/DashboardViews";
+import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -91,6 +93,27 @@ export default async function DashboardPage() {
     }
   }
 
+  // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
+  let dashRows: DashboardRow[] | null = null;
+  let dashProjects: DashboardProject[] = [];
+  if (myPerms.has("personal.dashboard")) {
+    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
+    if (!(flag && flag.personal_enabled === false)) {
+      const [ex, gr, pj, cu] = await Promise.all([
+        supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", user?.id).order("expense_date", { ascending: false }).limit(5000),
+        supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", user?.id).order("purchase_date", { ascending: false }).limit(5000),
+        supabase.from("personal_projects").select("id, name, kind, start_date, end_date").eq("user_id", user?.id),
+        supabase.from("currencies").select("code, usd_rate"),
+      ]);
+      if (!ex.error && !gr.error && !pj.error) {
+        const rates: Record<string, number> = {};
+        for (const c of cu.data || []) if (c.usd_rate && Number(c.usd_rate) > 0) rates[String(c.code).toUpperCase()] = Number(c.usd_rate);
+        dashRows = buildRows(ex.data, gr.data, rates);
+        dashProjects = (pj.data || []) as DashboardProject[];
+      }
+    }
+  }
+
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();
   const yearTotal =
@@ -143,18 +166,8 @@ export default async function DashboardPage() {
     range: formatDateRange(t.start_date, t.end_date),
   }));
 
-  return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
-      <DashboardHeader
-        firstName={firstName}
-        initials={initials}
-        avatarUrl={profile?.avatar_url || null}
-        activeCount={activeCount}
-        trips={quickScanTrips}
-        notifications={notifications}
-        canUseTrips={myPerms.has("trips")}
-      />
-
+  const businessView = (
+    <>
       {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}
       {passportAlert && passportAlert.level !== "renew" && <PassportBalloon alert={passportAlert} />}
 
@@ -292,6 +305,28 @@ export default async function DashboardPage() {
       </Card>
 
       {personalSummary && <PersonalTiles summary={personalSummary} />}
+    </>
+  );
+
+  return (
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+      <DashboardHeader
+        firstName={firstName}
+        initials={initials}
+        avatarUrl={profile?.avatar_url || null}
+        activeCount={activeCount}
+        trips={quickScanTrips}
+        notifications={notifications}
+        canUseTrips={myPerms.has("trips")}
+      />
+
+      {dashRows ? (
+        <DashboardViews rows={dashRows} projects={dashProjects} today={today}>
+          {businessView}
+        </DashboardViews>
+      ) : (
+        businessView
+      )}
     </div>
   );
 }
