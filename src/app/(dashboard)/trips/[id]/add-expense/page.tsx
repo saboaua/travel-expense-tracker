@@ -239,8 +239,8 @@ export default function AddExpensePage() {
                   <img src={preview} alt="Receipt preview" className="w-full rounded-lg border max-h-64 object-contain bg-muted" />
                   <button type="button" onClick={clearImage} className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white"><X className="h-4 w-4" /></button>
                   {ocrLoading && (
-                    <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
-                      <div className="bg-white rounded-lg px-4 py-3 flex items-center gap-2 text-sm">
+                    <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+                      <div className="bg-white rounded-xl px-4 py-3 flex items-center gap-2 text-sm">
                         <Loader2 className="h-4 w-4 animate-spin" /> Reading receipt...
                       </div>
                     </div>

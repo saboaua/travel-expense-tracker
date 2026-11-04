@@ -148,7 +148,7 @@ export function CategoryManager({
             rows.map((row) => {
               const Icon = iconFor(row.icon);
               return (
-                <div key={row.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-md p-3">
+                <div key={row.id} className="flex flex-col sm:flex-row gap-2 items-start sm:items-center border rounded-xl p-3">
                   <Icon className="h-5 w-5 text-muted-foreground shrink-0" />
                   <Input value={row.name} onChange={(e) => patch(row.id, { name: e.target.value })} className="flex-1" />
                   <div className="flex flex-wrap items-center gap-2">

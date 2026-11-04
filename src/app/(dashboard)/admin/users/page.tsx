@@ -238,14 +238,14 @@ export default function AdminUsersPage() {
       </div>
 
       {canAssignRole(myRole) && (
-        <div role="tablist" className="inline-flex rounded-lg border bg-muted p-1">
+        <div role="tablist" className="inline-flex rounded-xl border bg-muted p-1">
           {([["users", "Users"], ["roles", "Roles & access"]] as const).map(([id, label]) => (
             <button
               key={id}
               role="tab"
               aria-selected={tab === id}
               onClick={() => setTab(id)}
-              className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
             >
               {label}
             </button>
@@ -259,11 +259,11 @@ export default function AdminUsersPage() {
       <>
 
       {credentials && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
           <p className="text-sm font-medium text-amber-900">
             Share these credentials securely. The password is shown only once.
           </p>
-          <div className="bg-white rounded-md border p-3 font-mono text-sm space-y-1 break-all">
+          <div className="bg-white rounded-xl border p-3 font-mono text-sm space-y-1 break-all">
             <p>
               <span className="text-muted-foreground">Email:</span> {credentials.email}
             </p>
@@ -396,7 +396,7 @@ export default function AdminUsersPage() {
                 const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.full_name || "—";
                 const status = statusOf(u);
                 return (
-                  <div key={u.id} className="p-3 rounded-lg border space-y-2">
+                  <div key={u.id} className="p-3 rounded-xl border space-y-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">

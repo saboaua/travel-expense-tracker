@@ -149,7 +149,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
         {tripId ? "Back to trip" : "Back to trips"}
       </Link>
 
-      <Card className="rounded-2xl">
+      <Card className="rounded-xl">
         <CardHeader>
           <CardTitle>{editing ? "Edit trip" : "New trip"}</CardTitle>
           <CardDescription>{editing ? "Change the name, destination, dates, currency or status" : "Create a business trip to track its expenses"}</CardDescription>
@@ -208,7 +208,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
 
               <div className="space-y-2">
                 <label htmlFor="notes" className="text-sm font-medium">Notes</label>
-                <textarea id="notes" placeholder="Optional notes about this trip..." value={notes} onChange={(e) => setNotes(e.target.value)} className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm" />
+                <textarea id="notes" placeholder="Optional notes about this trip..." value={notes} onChange={(e) => setNotes(e.target.value)} className="flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
               </div>
 
               {!editing && (
@@ -233,7 +233,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
                   {pendingDocs.length > 0 && (
                     <ul className="space-y-1">
                       {pendingDocs.map((d) => (
-                        <li key={d.id} className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm">
+                        <li key={d.id} className="flex items-center gap-2 rounded-xl border px-3 py-2 text-sm">
                           <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
                           <span className="min-w-0 flex-1 truncate">{d.file.name}</span>
                           <span className="shrink-0 text-xs text-muted-foreground">{DOC_KINDS.find((k) => k.value === d.kind)?.label}</span>

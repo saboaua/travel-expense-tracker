@@ -35,7 +35,7 @@ export default async function DocumentsPage() {
         <p className="mt-1 text-muted-foreground">Your passport and travel papers, close at hand.</p>
       </div>
 
-      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-3 flex items-center gap-2">
           <ShieldCheck className="h-5 w-5 text-primary" />
           <h2 className="text-base font-semibold">Passport</h2>
@@ -53,7 +53,7 @@ export default async function DocumentsPage() {
       </section>
 
       {tripDocs.length > 0 && (
-        <section className="rounded-2xl border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
           <h2 className="mb-3 text-base font-semibold">Trip documents</h2>
           <ul className="divide-y">
             {tripDocs.map((d) => (

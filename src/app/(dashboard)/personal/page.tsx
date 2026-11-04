@@ -52,7 +52,7 @@ export default function PersonalHubPage() {
       <div className="grid gap-4 sm:grid-cols-2">
         {tiles.map((t) => (
           <Link key={t.href} href={t.href} className="group block">
-            <Card className="h-full rounded-2xl p-5 transition-shadow group-hover:shadow-md">
+            <Card className="h-full rounded-xl p-5 transition-shadow group-hover:shadow-md">
               <div className="flex items-center justify-between">
                 <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary/10 text-primary"><t.icon className="h-5 w-5" /></span>
                 <ChevronRight className="h-4 w-4 text-muted-foreground" />

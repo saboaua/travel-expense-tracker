@@ -54,7 +54,7 @@ export function TripReportList({ trips, year }: { trips: TripReportRow[]; year: 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search trips"
-            className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm"
+            className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm"
             aria-label="Search trips"
           />
         </div>
@@ -76,7 +76,7 @@ export function TripReportList({ trips, year }: { trips: TripReportRow[]; year: 
           {list.map((t) => {
             const completed = t.status === "completed";
             return (
-              <li key={t.id} className="rounded-2xl border bg-card p-4 shadow-sm">
+              <li key={t.id} className="rounded-xl border bg-card p-4 shadow-sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">

@@ -226,7 +226,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 onFile={(f, url) => { setFile(f); setPreview(url); scan(f); }}
                 onClear={() => { setFile(null); setPreview(null); setNote(null); }}
               />
-              {note && <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
+              {note && <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
@@ -259,7 +259,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               </div>
 
               {rows.map((r) => (
-                <div key={r.key} className="space-y-2 rounded-lg border p-3">
+                <div key={r.key} className="space-y-2 rounded-xl border p-3">
                   <div className="flex gap-2">
                     <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder="Item name" maxLength={160} />
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
@@ -279,7 +279,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               ))}
 
               {rows.length > 0 && (
-                <p className={`rounded-md p-2 text-xs ${total && Math.abs(diff) > 0.05 ? "bg-amber-50 text-amber-800" : "bg-muted text-muted-foreground"}`}>
+                <p className={`rounded-lg p-2 text-xs ${total && Math.abs(diff) > 0.05 ? "bg-amber-50 text-amber-800" : "bg-muted text-muted-foreground"}`}>
                   Items add up to {formatCurrency(itemsSum, currency)}
                   {total && Math.abs(diff) > 0.05 ? `. Receipt total is ${formatCurrency(money(total), currency)} (${diff > 0 ? "+" : ""}${formatCurrency(diff, currency)}). That can be tax, bags or discounts, or a missed item.` : "."}
                 </p>

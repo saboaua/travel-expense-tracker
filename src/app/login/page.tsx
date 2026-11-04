@@ -95,7 +95,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
       <div className="w-full max-w-[420px]">
-        <div className="bg-white rounded-2xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
+        <div className="bg-white rounded-xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
           <div className="flex justify-center mb-6">
             {logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -144,7 +144,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
-                  className="w-full h-11 pl-10 pr-4 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+                  className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
                 />
               </div>
             </div>
@@ -163,7 +163,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
-                  className="w-full h-11 pl-10 pr-11 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all"
+                  className="w-full h-11 pl-10 pr-11 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all"
                 />
                 <button
                   type="button"
@@ -201,7 +201,7 @@ export default function LoginPage() {
             )}
 
             {error && (
-              <Alert className="rounded-xl border border-red-100">
+              <Alert className="border border-red-100">
                 {error}
               </Alert>
             )}
@@ -209,7 +209,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading || (captchaNeeded && !captchaToken)}
-              className="w-full h-11 rounded-xl text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
+              className="w-full h-11 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
               style={{
                 backgroundColor: primaryColor,
                 boxShadow: `0 10px 15px -3px ${primaryColor}40`,

@@ -61,7 +61,7 @@ export function TripStatusToggle({
       : "Turn on when every receipt has been uploaded.";
 
   return (
-    <div className={`flex items-center justify-between gap-4 rounded-2xl border p-4 ${tone}`}>
+    <div className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${tone}`}>
       <div className="flex min-w-0 items-start gap-3">
         <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden="true" />
         <div className="min-w-0">

@@ -104,7 +104,7 @@ export function InstallPrompt() {
     <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
-          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+          <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
             {ios ? <Share className="h-5 w-5 text-primary" /> : <Download className="h-5 w-5 text-primary" />}
           </div>
           <div>
@@ -120,7 +120,7 @@ export function InstallPrompt() {
         <button
           type="button"
           onClick={dismiss}
-          className="p-1 rounded-md text-muted-foreground hover:bg-accent"
+          className="p-1 rounded-lg text-muted-foreground hover:bg-accent"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />

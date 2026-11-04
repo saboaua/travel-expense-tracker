@@ -62,8 +62,8 @@ export function ReceiptCapture({
             <X className="h-4 w-4" />
           </button>
           {busy && (
-            <div className="absolute inset-0 bg-black/40 rounded-lg flex items-center justify-center">
-              <div className="bg-white text-slate-900 rounded-lg px-4 py-3 flex items-center gap-2 text-sm">
+            <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+              <div className="bg-white text-slate-900 rounded-xl px-4 py-3 flex items-center gap-2 text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" /> {busyLabel}
               </div>
             </div>

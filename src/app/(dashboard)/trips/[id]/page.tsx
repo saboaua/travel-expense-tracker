@@ -13,7 +13,7 @@ import { currentPassport, tripPassportCheck } from "@/lib/documents";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+    <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-1.5 truncate text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
       <p className="mt-1 min-h-[1rem] truncate text-xs text-muted-foreground">{sub}</p>
@@ -95,7 +95,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         Back to trips
       </Link>
 
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="relative h-44 bg-gradient-to-br from-slate-800 to-slate-600 md:h-56">
           {info?.imageUrl && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -171,7 +171,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
       </div>
 
       {slices.length > 0 && (
-        <section className="rounded-2xl border bg-card p-5 shadow-sm">
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
           <div className="mb-4">
             <h2 className="text-base font-semibold">Spending by category</h2>
             <p className="text-xs text-muted-foreground">Share of this trip&apos;s total in USD</p>
@@ -180,18 +180,18 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         </section>
       )}
 
-      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-3">
           <h2 className="text-base font-semibold">Documents</h2>
           <p className="text-xs text-muted-foreground">Tickets, bookings, visa and insurance for this trip, kept private.</p>
         </div>
         {Number(docs_failed) > 0 && (
-          <p className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             {docs_failed} document{Number(docs_failed) !== 1 ? "s" : ""} could not be uploaded when the trip was created. Add {Number(docs_failed) !== 1 ? "them" : "it"} below.
           </p>
         )}
         {passportCheck && !passportCheck.ok && !completed && (
-          <p className="mb-3 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
             Your passport expires {formatDate(passport!.expiry_date as string)}. Most destinations want it valid until {formatDate(passportCheck.mustBeValidUntil)} for this trip.{" "}
             <Link href="/documents" className="font-medium underline">Check my passport</Link>
           </p>
@@ -199,7 +199,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         <DocumentsManager tripId={id} />
       </section>
 
-      <section className="rounded-2xl border bg-card p-5 shadow-sm">
+      <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-base font-semibold">Expenses</h2>
           <Link href={`/trips/${id}/add-expense`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">

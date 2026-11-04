@@ -5,7 +5,7 @@ import { useState } from "react";
 import { CheckCircle } from "lucide-react";
 
 const inputClass =
-  "w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2";
+  "w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2";
 
 export function ContactForm({ primaryColor, supportEmail }: { primaryColor: string; supportEmail: string | null }) {
   const [name, setName] = useState("");
@@ -86,12 +86,12 @@ export function ContactForm({ primaryColor, supportEmail }: { primaryColor: stri
         </label>
       </div>
 
-      {error && <Alert className="rounded-xl border border-red-100">{error}</Alert>}
+      {error && <Alert className="border border-red-100">{error}</Alert>}
 
       <button
         type="submit"
         disabled={sending}
-        className="h-11 w-full rounded-xl text-sm font-medium text-white shadow-lg transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+        className="h-11 w-full rounded-lg text-sm font-medium text-white shadow-lg transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         style={{ backgroundColor: primaryColor, boxShadow: `0 10px 15px -3px ${primaryColor}40` }}
       >
         {sending ? "Sending..." : "Send message"}

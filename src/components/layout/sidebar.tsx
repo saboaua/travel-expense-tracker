@@ -70,7 +70,7 @@ export function Sidebar() {
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="h-8 w-8 object-contain rounded shrink-0" />
           ) : (
-            <div className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: primaryColor }}>TE</div>
+            <div className="h-8 w-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: primaryColor }}>TE</div>
           )}
           <span className="font-semibold text-base truncate">{appName}</span>
         </div>
@@ -80,7 +80,7 @@ export function Sidebar() {
             const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
+              <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
                 <Icon className="h-5 w-5" /> {item.label}
               </Link>
             );
@@ -94,7 +94,7 @@ export function Sidebar() {
                 const isActive = pathname.startsWith(item.href);
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
+                  <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "text-white" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")} style={isActive ? { backgroundColor: primaryColor } : undefined}>
                     <Icon className="h-5 w-5" /> {item.label}
                   </Link>
                 );
@@ -109,7 +109,7 @@ export function Sidebar() {
             href="/profile"
             title="Your profile"
             className={cn(
-              "flex h-10 w-full items-center justify-start gap-3 rounded-md px-3 text-sm font-medium transition-colors",
+              "flex h-10 w-full items-center justify-start gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
               pathname.startsWith("/profile") ? "text-white" : "hover:bg-accent hover:text-accent-foreground"
             )}
             style={pathname.startsWith("/profile") ? { backgroundColor: primaryColor } : undefined}

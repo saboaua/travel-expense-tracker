@@ -30,7 +30,7 @@ function Delta({ pct, suffix }: { pct: number | null; suffix: string }) {
 
 function Tile({ icon: Icon, label, value, children }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; children?: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border bg-card p-4 shadow-sm sm:p-5">
+    <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
       <p className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="h-4 w-4" />{label}</p>
       <p className="mt-2 truncate text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
       <div className="mt-1 min-h-[1.25rem]">{children}</div>
@@ -40,7 +40,7 @@ function Tile({ icon: Icon, label, value, children }: { icon: React.ComponentTyp
 
 function Section({ title, subtitle, children, className = "" }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-2xl border bg-card p-5 shadow-sm ${className}`}>
+    <section className={`rounded-xl border bg-card p-5 shadow-sm ${className}`}>
       <div className="mb-4">
         <h2 className="text-base font-semibold">{title}</h2>
         {subtitle && <p className="text-xs text-muted-foreground">{subtitle}</p>}
@@ -113,7 +113,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </Link>
             ))}
           </nav>
-          <a href={`/api/export/year/${year}/excel`} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
+          <a href={`/api/export/year/${year}/excel`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
             <Download className="h-4 w-4" /> Export {year}
           </a>
         </div>
@@ -129,11 +129,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       )}
 
       {empty ? (
-        <div className="rounded-2xl border bg-card py-20 text-center shadow-sm">
+        <div className="rounded-xl border bg-card py-20 text-center shadow-sm">
           <Receipt className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
           <p className="font-medium">No expenses in {year}</p>
           <p className="mb-4 mt-1 text-sm text-muted-foreground">Add a trip and scan a receipt to see your reports here.</p>
-          <Link href="/trips/new" className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">New trip</Link>
+          <Link href="/trips/new" className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">New trip</Link>
         </div>
       ) : (
         <>

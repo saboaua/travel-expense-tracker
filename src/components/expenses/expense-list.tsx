@@ -91,7 +91,7 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
         <Receipt className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
         <p className="font-medium">No expenses yet</p>
         <p className="mb-4 mt-1 text-sm text-muted-foreground">Take a photo of a receipt and we will read it for you</p>
-        <Link href={`/trips/${tripId}/add-expense`} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">
+        <Link href={`/trips/${tripId}/add-expense`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground">
           <Camera className="h-4 w-4" /> Add the first expense
         </Link>
       </div>
@@ -118,7 +118,7 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
             {expenses.length > 5 && (
               <div className="relative flex-1">
                 <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
-                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search merchant or notes" aria-label="Search expenses" className="h-9 w-full rounded-md border border-input bg-background pl-9 pr-3 text-sm" />
+                <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search merchant or notes" aria-label="Search expenses" className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm" />
               </div>
             )}
             <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Sort expenses" className="w-auto min-w-fit h-9 px-2 text-xs py-0">
@@ -184,7 +184,7 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
                     disabled={busyId === expense.id}
                     aria-label={`Delete ${expense.merchant || "expense"}`}
                     onClick={() => remove(expense)}
-                    className="mr-2 shrink-0 rounded-md p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
+                    className="mr-2 shrink-0 rounded-lg p-2 text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-50 sm:opacity-0 sm:group-hover:opacity-100 sm:focus:opacity-100"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

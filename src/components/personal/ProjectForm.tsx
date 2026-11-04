@@ -137,7 +137,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span></label>
-              <textarea className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
+              <textarea className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />
             </div>
             {projectId && (
               <label className="flex items-center gap-2 text-sm">

@@ -35,7 +35,7 @@ export function PassportBalloon({ alert }: { alert: RenewalAlert }) {
   };
 
   return (
-    <div role="status" className={`relative flex items-start gap-3 rounded-2xl border p-4 pr-10 shadow-sm ${STYLES[alert.level]}`}>
+    <div role="status" className={`relative flex items-start gap-3 rounded-xl border p-4 pr-10 shadow-sm ${STYLES[alert.level]}`}>
       <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70">
         <BellRing className="h-5 w-5" />
       </span>

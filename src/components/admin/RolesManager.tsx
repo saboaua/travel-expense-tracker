@@ -253,7 +253,7 @@ export function RolesManager({ onChanged }: { onChanged?: () => void }) {
                           </div>
                           <p className="text-xs text-muted-foreground">{GROUP_HELP[g]}</p>
                           {FEATURES.filter((f) => f.group === g).map((f) => (
-                            <label key={f.key} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3 hover:bg-accent/50">
+                            <label key={f.key} className="flex cursor-pointer items-start gap-3 rounded-xl border p-3 hover:bg-accent/50">
                               <input type="checkbox" className="mt-1 h-4 w-4" checked={draft[r.key]?.has(f.key) ?? false} onChange={() => toggle(r.key, f.key)} />
                               <span className="min-w-0">
                                 <span className="flex items-center gap-2 text-sm font-medium">

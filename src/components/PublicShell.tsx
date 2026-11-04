@@ -31,7 +31,7 @@ export function PublicShell({
           <span className="font-semibold text-slate-900">{branding.app_name}</span>
         </Link>
 
-        <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-xl shadow-blue-900/5 sm:p-10">
+        <div className="rounded-xl border border-slate-100 bg-white p-6 shadow-xl shadow-blue-900/5 sm:p-10">
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">{title}</h1>
           {subtitle && <p className="mt-2 text-sm text-slate-500">{subtitle}</p>}
           <div className="mt-6">{children}</div>

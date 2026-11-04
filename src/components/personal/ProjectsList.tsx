@@ -41,7 +41,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
     const pctUsed = r.budget && r.currency === "USD" ? Math.min((spent / Number(r.budget)) * 100, 100) : null;
     return (
       <Link key={r.id} href={`${meta.path}/${r.id}`} className="group block">
-        <div className="h-full rounded-2xl border bg-card p-5 shadow-sm transition-shadow group-hover:shadow-md">
+        <div className="h-full rounded-xl border bg-card p-5 shadow-sm transition-shadow group-hover:shadow-md">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold leading-snug">{r.name}</h3>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />

@@ -197,7 +197,7 @@ export default function AdminSecurityPage() {
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             {[1, 7, 30, 90].map((d) => (
-              <button key={d} type="button" onClick={() => setRange(d)} className="h-8 px-3 rounded-md border text-xs hover:bg-accent">
+              <button key={d} type="button" onClick={() => setRange(d)} className="h-8 px-3 rounded-lg border text-xs hover:bg-accent">
                 {d === 1 ? "Last 24h" : `Last ${d} days`}
               </button>
             ))}
@@ -299,7 +299,7 @@ export default function AdminSecurityPage() {
             ) : (
               <div className="space-y-2 max-h-[520px] overflow-y-auto">
                 {events.map((e) => (
-                  <div key={e.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-lg border text-sm">
+                  <div key={e.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-xl border text-sm">
                     <div className="flex items-center gap-2 shrink-0">
                       <span className={`text-xs px-2 py-0.5 rounded-full border ${severityColor(e.severity)}`}>{e.severity}</span>
                       <span className="font-medium">{eventLabel(e.event_type)}</span>
@@ -329,7 +329,7 @@ export default function AdminSecurityPage() {
             ) : (
               <div className="space-y-2 max-h-[520px] overflow-y-auto">
                 {audits.map((a) => (
-                  <div key={a.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-lg border text-sm">
+                  <div key={a.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-xl border text-sm">
                     <span className="font-medium shrink-0">{a.action}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-muted-foreground truncate">{a.actor_email || a.actor_id || "system"}</p>

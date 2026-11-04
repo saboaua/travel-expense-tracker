@@ -171,8 +171,8 @@ export default function EditExpensePage() {
                   </div>
                 ) : <p className="text-sm text-muted-foreground">No receipt uploaded yet.</p>}
                 <div className="grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => { fileInputRef.current?.setAttribute("capture", "environment"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-md border text-sm"><Camera className="h-4 w-4" /> Take photo</button>
-                  <button type="button" onClick={() => { fileInputRef.current?.removeAttribute("capture"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-md border text-sm"><Upload className="h-4 w-4" /> Upload new</button>
+                  <button type="button" onClick={() => { fileInputRef.current?.setAttribute("capture", "environment"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-lg border text-sm"><Camera className="h-4 w-4" /> Take photo</button>
+                  <button type="button" onClick={() => { fileInputRef.current?.removeAttribute("capture"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-lg border text-sm"><Upload className="h-4 w-4" /> Upload new</button>
                 </div>
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) pickFile(file); }} />
                 <p className="text-xs text-muted-foreground">New photos are resized automatically.</p>

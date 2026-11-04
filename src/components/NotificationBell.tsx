@@ -80,7 +80,7 @@ export function NotificationBell({ notifications }: { notifications: AppNotifica
       </button>
 
       {open && (
-        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-2xl border bg-card shadow-xl">
+        <div role="dialog" aria-label="Notifications" className="absolute right-0 top-12 z-40 w-[min(22rem,calc(100vw-2.5rem))] overflow-hidden rounded-xl border bg-card shadow-xl">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-sm font-semibold">Notifications</h2>
             <span className="text-xs text-muted-foreground">{visible.length ? `${visible.length} need attention` : "All caught up"}</span>
@@ -105,7 +105,7 @@ export function NotificationBell({ notifications }: { notifications: AppNotifica
                       </Link>
                     </div>
                     {isDismissible(n) && (
-                      <button type="button" onClick={() => dismiss(n.id)} className="h-7 w-7 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent" aria-label={`Dismiss: ${n.title}`} title="Hide for a week">
+                      <button type="button" onClick={() => dismiss(n.id)} className="h-7 w-7 shrink-0 rounded-lg p-1 text-muted-foreground hover:bg-accent" aria-label={`Dismiss: ${n.title}`} title="Hide for a week">
                         <X className="h-4 w-4" />
                       </button>
                     )}

@@ -42,10 +42,10 @@ function DocumentViewer({ title, url, path, onClose }: { title: string; url: str
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
         <p className="min-w-0 truncate font-medium">{title}</p>
         <div className="flex shrink-0 items-center gap-1">
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm hover:bg-white/10" aria-label="Open in a new tab or download">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm hover:bg-white/10" aria-label="Open in a new tab or download">
             <Download className="h-4 w-4" /> <span className="hidden sm:inline">Open / download</span>
           </a>
-          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-md hover:bg-white/10" aria-label="Close viewer" autoFocus>
+          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10" aria-label="Close viewer" autoFocus>
             <X className="h-5 w-5" />
           </button>
         </div>
@@ -284,7 +284,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             const isPdf = d.file_path?.toLowerCase().endsWith(".pdf");
             return (
               <li key={d.id} className="flex items-center gap-3 rounded-xl border p-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
                   {d.kind === "passport" ? <ShieldCheck className="h-5 w-5" /> : isPdf ? <FileText className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
                 </div>
                 <div className="min-w-0 flex-1">
@@ -334,7 +334,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       {adding ? (
         <form ref={formRef} onSubmit={save} className="space-y-3 rounded-xl border bg-muted/30 p-4">
           {editing && <p className="text-sm font-semibold">Edit document</p>}
-          <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3">
+          <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
             <button
               type="button"
               disabled={scanning}
@@ -401,7 +401,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             {file && <p className="mt-1 truncate text-xs text-muted-foreground">Attached: {file.name}{sizes ? ` \u00b7 ${formatBytes(sizes.before)} \u2192 ${formatBytes(sizes.after)}` : ` \u00b7 ${formatBytes(file.size)}`}</p>}
             {original && cropped && (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                <button type="button" onClick={() => setCropping({ file: original, thenScan: false })} className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium hover:bg-accent">
+                <button type="button" onClick={() => setCropping({ file: original, thenScan: false })} className="inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium hover:bg-accent">
                   <Crop className="h-3.5 w-3.5" /> Crop again
                 </button>
                 <label className="sr-only" htmlFor="doc-quality">Photo quality</label>

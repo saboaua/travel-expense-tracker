@@ -13,7 +13,7 @@ export type AlertProps = React.HTMLAttributes<HTMLDivElement> & { variant?: keyo
 /** The one message box for errors, confirmations and warnings. */
 export function Alert({ variant = "error", className, children, role, ...props }: AlertProps) {
   return (
-    <div role={role ?? (variant === "error" ? "alert" : "status")} className={cn("rounded-md p-3 text-sm", VARIANTS[variant], className)} {...props}>
+    <div role={role ?? (variant === "error" ? "alert" : "status")} className={cn("rounded-lg p-3 text-sm", VARIANTS[variant], className)} {...props}>
       {children}
     </div>
   );

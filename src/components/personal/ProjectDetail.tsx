@@ -156,7 +156,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
             </div>
           ) : (
             expenses.map((e) => (
-              <Link key={e.id} href={`${meta.path}/${id}/expense/${e.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-accent">
+              <Link key={e.id} href={`${meta.path}/${id}/expense/${e.id}`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-accent">
                 <div className="min-w-0">
                   <p className="truncate font-medium">{e.merchant || e.category}</p>
                   <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{e.receipt_path ? " · receipt" : ""}</p>

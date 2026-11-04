@@ -21,7 +21,7 @@ function TripCard({ trip, today }: { trip: ListTrip; today: string }) {
   const style = PHASE_STYLE[phase];
   return (
     <Link href={`/trips/${trip.id}`} className="group block focus-visible:outline-none">
-      <div className="relative h-full overflow-hidden rounded-2xl border bg-card p-5 pl-6 shadow-sm transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary">
+      <div className="relative h-full overflow-hidden rounded-xl border bg-card p-5 pl-6 shadow-sm transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary">
         <span className={cn("absolute inset-y-0 left-0 w-1.5", style.accent)} aria-hidden="true" />
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-semibold leading-snug">{trip.name}</h3>
@@ -123,7 +123,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label="Trip filter" className="inline-flex rounded-lg border bg-muted/50 p-1">
+        <div role="tablist" aria-label="Trip filter" className="inline-flex rounded-xl border bg-muted/50 p-1">
           {tabs.map((t) => (
             <button
               key={t.id}
@@ -132,7 +132,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
               className={cn(
-                "flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none",
+                "flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none",
                 tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -149,7 +149,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name or destination"
             aria-label="Search trips"
-            className="h-10 w-full rounded-md border bg-background pl-9 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:hidden"
+            className="h-10 w-full rounded-lg border bg-background pl-9 pr-9 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary [&::-webkit-search-cancel-button]:hidden"
           />
           {query && (
             <button type="button" onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground">

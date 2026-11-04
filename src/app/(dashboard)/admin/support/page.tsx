@@ -105,7 +105,7 @@ export default function AdminSupportPage() {
             <p className="text-sm text-muted-foreground py-6 text-center">Nothing here.</p>
           ) : (
             shown.map((r) => (
-              <div key={r.id} className="rounded-lg border p-4 space-y-2">
+              <div key={r.id} className="rounded-xl border p-4 space-y-2">
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="font-semibold">{r.subject || "(no subject)"}</p>
@@ -125,7 +125,7 @@ export default function AdminSupportPage() {
                 <div className="flex flex-wrap gap-2 pt-1">
                   <a
                     href={`mailto:${r.email}?subject=${encodeURIComponent(`Re: ${r.subject || "Your support request"}`)}`}
-                    className="inline-flex h-9 items-center gap-2 rounded-md border px-3 text-sm hover:bg-accent"
+                    className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm hover:bg-accent"
                   >
                     <Mail className="h-4 w-4" /> Reply
                   </a>

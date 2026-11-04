@@ -137,7 +137,7 @@ export function ReceiptCropper({
           type="button"
           disabled={busy}
           onClick={() => applyCrop(true)}
-          className="flex-1 h-11 rounded-xl border border-white/30 text-white text-sm font-medium"
+          className="flex-1 h-11 rounded-lg border border-white/30 text-white text-sm font-medium"
         >
           Use full image
         </button>
@@ -145,7 +145,7 @@ export function ReceiptCropper({
           type="button"
           disabled={busy}
           onClick={() => applyCrop(false)}
-          className="flex-1 h-11 rounded-xl bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+          className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
         >
           <Check className="h-4 w-4" /> Crop
         </button>

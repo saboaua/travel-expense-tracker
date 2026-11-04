@@ -22,14 +22,14 @@ export default function AdminCategoriesPage() {
         <p className="text-muted-foreground mt-1">Edit, reorder or create the categories offered on each kind of receipt.</p>
       </div>
 
-      <div role="tablist" className="inline-flex rounded-lg border bg-muted p-1">
+      <div role="tablist" className="inline-flex rounded-xl border bg-muted p-1">
         {TABS.map((t) => (
           <button
             key={t.id}
             role="tab"
             aria-selected={tab === t.id}
             onClick={() => setTab(t.id)}
-            className={`rounded-md px-4 py-1.5 text-sm font-medium transition ${tab === t.id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
+            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === t.id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
           >
             {t.label}
           </button>

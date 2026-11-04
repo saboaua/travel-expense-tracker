@@ -99,7 +99,7 @@ export default function AdminCurrenciesPage() {
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
             rows.map((row) => (
-              <div key={row.code} className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_72px_1fr_120px] gap-3 items-center border rounded-lg p-3">
+              <div key={row.code} className="grid grid-cols-[auto_1fr] sm:grid-cols-[auto_72px_1fr_120px] gap-3 items-center border rounded-xl p-3">
                 <input
                   type="checkbox"
                   checked={row.enabled}

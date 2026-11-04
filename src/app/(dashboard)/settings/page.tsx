@@ -239,7 +239,7 @@ export default function SettingsPage() {
                 </Button>
 
                 {status?.link && (
-                  <div className="text-sm space-y-3 rounded-md bg-muted p-3">
+                  <div className="text-sm space-y-3 rounded-lg bg-muted p-3">
                     <p>
                       Tap Start in Telegram to finish linking. This link expires in 15 minutes and works once.
                     </p>

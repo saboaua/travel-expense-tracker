@@ -138,7 +138,7 @@ export function GroceryOverview() {
             <CardHeader><CardTitle className="text-base">Receipts in {monthLabel(month)}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
-                <Link key={r.id} href={`/personal/groceries/${r.id}`} className="flex items-center justify-between rounded-lg border p-3 transition-colors hover:bg-accent">
+                <Link key={r.id} href={`/personal/groceries/${r.id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">
                   <div><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}</p></div>
                   <p className="font-semibold">{fmt(r.total)}</p>
                 </Link>

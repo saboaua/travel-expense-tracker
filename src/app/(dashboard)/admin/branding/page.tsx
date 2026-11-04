@@ -273,7 +273,7 @@ export default function AdminBrandingPage() {
                   <img src={logoUrl} alt="" className="h-8 w-8 object-contain rounded" />
                 ) : (
                   <div
-                    className="h-8 w-8 rounded-lg flex items-center justify-center text-white text-xs font-bold"
+                    className="h-8 w-8 rounded-xl flex items-center justify-center text-white text-xs font-bold"
                     style={{ backgroundColor: primaryColor }}
                   >
                     TE
@@ -313,7 +313,7 @@ export default function AdminBrandingPage() {
               onChange={(e) => setPrivacyPolicy(e.target.value)}
               rows={12}
               placeholder="Paste or write your privacy policy here. Line breaks are kept."
-              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm"
             />
             <p className="text-xs text-muted-foreground">Plain text. Leave empty to show &quot;not published yet&quot;.</p>
           </div>

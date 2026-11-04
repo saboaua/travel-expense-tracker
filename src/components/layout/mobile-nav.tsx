@@ -66,14 +66,14 @@ export function MobileNav() {
           <div className="absolute bottom-16 left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <p className="font-semibold">Menu</p>
-              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-md text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
+              <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-lg text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
 
             {/* Profile above admin / management */}
             <Link
               href="/profile"
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium",
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
                 pathname.startsWith("/profile") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
               )}
             >
@@ -87,7 +87,7 @@ export function MobileNav() {
                   const Icon = item.icon;
                   const isActive = pathname.startsWith(item.href);
                   return (
-                    <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
+                    <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
                       <Icon className="h-5 w-5" /> {item.label}
                     </Link>
                   );

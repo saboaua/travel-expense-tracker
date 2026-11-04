@@ -168,7 +168,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
                 onFile={(f, url) => { setFile(f); setPreview(url); scan(f); }}
                 onClear={() => { setFile(null); setPreview(null); setNote(null); }}
               />
-              {note && <p className="rounded-md bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
+              {note && <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
             </div>
 
             <div className="space-y-2">

@@ -82,7 +82,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
 
   return (
     <>
-      <div className="rounded-2xl border bg-card p-4 shadow-sm md:p-5">
+      <div className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex items-center justify-end gap-3">
           <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Your receipts and trips are saved to the cloud as you go" : "You are offline. Changes will not save until you reconnect."}>
             {online ? <ShieldCheck className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
@@ -118,7 +118,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
             type="button"
             disabled={busy}
             onClick={() => input.current?.click()}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-70"
+            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-70"
           >
             {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
             Quick Scan
@@ -146,10 +146,10 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
 
       {pending && (
         <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Choose a trip for this receipt">
-          <div className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-xl sm:rounded-2xl">
+          <div className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-xl sm:rounded-xl">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-base font-semibold">Which trip is this receipt for?</h2>
-              <button type="button" onClick={() => setPending(null)} className="rounded-md p-1 text-muted-foreground" aria-label="Cancel">
+              <button type="button" onClick={() => setPending(null)} className="rounded-lg p-1 text-muted-foreground" aria-label="Cancel">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -168,7 +168,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
               type="button"
               disabled={busy || !choice}
               onClick={() => pending && go(pending, choice)}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-70"
+              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-70"
             >
               {busy && <Loader2 className="h-4 w-4 animate-spin" />} Continue
             </button>
