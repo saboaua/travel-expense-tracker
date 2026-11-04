@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Bell, BellRing, Info, X } from "lucide-react";
-import { badgeLabel, topSeverity, visibleNotifications, type AppNotification, type Severity } from "@/lib/notifications";
+import { badgeLabel, isDismissible, topSeverity, visibleNotifications, type AppNotification, type Severity } from "@/lib/notifications";
 
 const STORAGE_KEY = "notifications-dismissed";
 
@@ -104,7 +104,7 @@ export function NotificationBell({ notifications }: { notifications: AppNotifica
                         {n.cta}
                       </Link>
                     </div>
-                    {n.severity !== "urgent" && (
+                    {isDismissible(n) && (
                       <button type="button" onClick={() => dismiss(n.id)} className="h-7 w-7 shrink-0 rounded-md p-1 text-muted-foreground hover:bg-accent" aria-label={`Dismiss: ${n.title}`} title="Hide for a week">
                         <X className="h-4 w-4" />
                       </button>

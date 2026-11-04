@@ -9,7 +9,8 @@ import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, renewalAlert } from "@/lib/documents";
-import { buildNotifications } from "@/lib/notifications";
+import { buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
+import { canViewSecurity, type UserRole } from "@/lib/roles";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -47,7 +48,23 @@ export default async function DashboardPage() {
   const passportAlert = renewalAlert(currentPassport((docRows || []).filter((d) => d.kind === "passport")), trips || [], todayISO());
   const docCounts: Record<string, number> = {};
   for (const d of docRows || []) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
-  const notifications = buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() });
+  // Security alerts are only for admins (the same people who can open Admin > Security)
+  let securityNotifications: ReturnType<typeof buildSecurityNotifications> = [];
+  if (canViewSecurity((profile?.role as UserRole) || "user")) {
+    const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+    const { data: events } = await supabase
+      .from("security_events")
+      .select("event_type, severity, created_at")
+      .in("severity", ["warning", "critical"])
+      .gte("created_at", since)
+      .order("created_at", { ascending: false })
+      .limit(300);
+    securityNotifications = buildSecurityNotifications(events || [], Date.now());
+  }
+  const notifications = [
+    ...securityNotifications,
+    ...buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() }),
+  ].sort((a, b) => ({ urgent: 0, warning: 1, info: 2 })[a.severity] - ({ urgent: 0, warning: 1, info: 2 })[b.severity]);
 
   const totalSpent = allExpenses?.reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const today = todayISO();

@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/notifications.test.ts
-import { buildNotifications, visibleNotifications, badgeLabel, topSeverity } from "../src/lib/notifications";
+import { buildNotifications, buildSecurityNotifications, visibleNotifications, badgeLabel, topSeverity } from "../src/lib/notifications";
 const eq = (a:any,b:any,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 const T = "2026-11-03";
 const trip = (id:string,name:string,s:string,e:string|null,status="active")=>({id,name,start_date:s,end_date:e,status});
@@ -32,3 +32,26 @@ const dismissed = {"nodocs:a": now - 2*86_400_000, "passport:2027-03-01:critical
 eq(visibleNotifications(all, dismissed, now).map(n=>n.id), ["passport:2027-03-01:critical","ended:d"], "snoozed hidden, urgent stays");
 eq(visibleNotifications(all, {"nodocs:a": now - 8*86_400_000}, now).length, 3, "snooze expires after 7 days");
 eq([badgeLabel(3), badgeLabel(12)], ["3","9+"], "badge label");
+
+// ---- security alerts (admin) ----
+const NOW = Date.parse("2026-11-03T20:00:00Z");
+const ev = (t:string,s:string,iso:string)=>({event_type:t,severity:s,created_at:iso});
+eq(buildSecurityNotifications([], NOW), [], "no events");
+eq(buildSecurityNotifications([ev("login_success","info","2026-11-03T19:00:00Z"),ev("logout","info","2026-11-03T19:10:00Z")], NOW), [], "info events ignored");
+eq(buildSecurityNotifications([ev("brute_force","warning","2026-10-02T19:00:00Z")], NOW), [], "older than 24h ignored");
+const sec = buildSecurityNotifications([
+  ev("brute_force","critical","2026-11-03T19:30:00Z"), ev("brute_force","critical","2026-11-03T19:50:00Z"),
+  ev("suspicious_input","warning","2026-11-03T18:00:00Z"), ev("access_denied","warning","2026-11-03T10:00:00Z"), ev("access_denied","warning","2026-11-03T11:00:00Z"), ev("access_denied","warning","2026-11-03T12:00:00Z"),
+  ev("rate_limit","warning","2026-11-03T09:00:00Z")], NOW);
+eq(sec.length, 3, "capped at 3");
+eq([sec[0].severity, sec[0].title], ["urgent","Security alert: Brute force attack detected"], "brute force first and urgent");
+eq(sec[0].message, "2 events in the last 24 hours. Latest 10 min ago.", "message with count and age");
+eq(sec[0].id, "security:brute_force:2026-11-03T19:50:00Z", "id carries latest event time");
+eq(sec[1].title, "Access denied attempts", "more events ranks higher within warnings");
+eq(sec.every(n=>n.href==="/admin/security" && n.dismissible===true), true, "links to security, dismissible");
+eq(JSON.stringify(sec).includes("@"), false, "no emails leak into the bell");
+eq(visibleNotifications(sec, {[sec[0].id]: NOW - 1000}, NOW).length, 2, "security alert can be dismissed");
+eq(visibleNotifications(sec, {"security:brute_force:2026-11-03T19:00:00Z": NOW - 1000}, NOW).length, 3, "new event re-alerts");
+eq(buildSecurityNotifications([ev("login_failed","warning","2026-11-03T19:00:00Z"),ev("login_failed","warning","2026-11-03T19:05:00Z")], NOW), [], "a couple of failed logins is not an alert");
+eq(buildSecurityNotifications(Array.from({length:5},(_,i)=>ev("login_failed","warning",`2026-11-03T19:0${i}:00Z`)), NOW)[0].title, "Failed logins", "5 failed logins is an alert");
+eq(buildSecurityNotifications([ev("login_blocked","critical","2026-11-03T19:00:00Z")], NOW)[0].title, "Security alert: Logins blocked by lockout", "lockout is a critical alert");

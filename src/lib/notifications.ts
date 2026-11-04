@@ -14,6 +14,8 @@ export type AppNotification = {
   message: string;
   href: string;
   cta: string;
+  /** Defaults to true, except for urgent items which stay until the cause is fixed */
+  dismissible?: boolean;
 };
 
 type TripLite = { id: string; name: string; start_date: string; end_date: string | null; status: string };
@@ -87,10 +89,12 @@ export function buildNotifications(input: {
   return out.sort((a, b) => RANK[a.severity] - RANK[b.severity]);
 }
 
-/** Drops notifications the user dismissed in the last SNOOZE_DAYS. Urgent ones can't be dismissed. */
+export const isDismissible = (n: AppNotification) => n.dismissible ?? n.severity !== "urgent";
+
+/** Drops notifications the user dismissed in the last SNOOZE_DAYS (except ones that can't be dismissed). */
 export function visibleNotifications(list: AppNotification[], dismissed: Record<string, number>, now: number): AppNotification[] {
   return list.filter((n) => {
-    if (n.severity === "urgent") return true;
+    if (!isDismissible(n)) return true;
     const at = dismissed[n.id];
     return !(at && now - at < SNOOZE_DAYS * 86_400_000);
   });
@@ -103,4 +107,67 @@ export function badgeLabel(count: number): string {
 export function topSeverity(list: AppNotification[]): Severity | null {
   if (list.length === 0) return null;
   return list.reduce<Severity>((best, n) => (RANK[n.severity] < RANK[best] ? n.severity : best), "info");
+}
+
+/* ---------------- security alerts (admins only) ---------------- */
+
+export type SecurityEventLite = { event_type: string; severity: string; created_at: string };
+
+export const SECURITY_WINDOW_HOURS = 24;
+/** One mistyped password is normal; this many in a day is worth an admin's attention. */
+export const FAILED_LOGIN_THRESHOLD = 5;
+const SECURITY_LABELS: Record<string, string> = {
+  brute_force: "Brute force attack detected",
+  login_blocked: "Logins blocked by lockout",
+  suspicious_input: "Suspicious input detected",
+  access_denied: "Access denied attempts",
+  rate_limit: "Rate limit hit",
+  support_spam: "Support form spam",
+  temp_password_expired: "Expired temporary password used",
+  login_failed: "Failed logins",
+};
+
+const ago = (ms: number) => {
+  const m = Math.max(0, Math.round(ms / 60000));
+  if (m < 1) return "just now";
+  if (m < 60) return `${m} min ago`;
+  const h = Math.round(m / 60);
+  return `${h} h ago`;
+};
+
+/**
+ * Turns recent warning/critical security events into bell notifications, one per event type.
+ * Only the counts are shown here (no emails or IPs); details live on the Security page.
+ * The id carries the latest event time, so a new event brings back a dismissed alert.
+ * Call this for admins only.
+ */
+export function buildSecurityNotifications(events: SecurityEventLite[], now: number, max = 3): AppNotification[] {
+  const since = now - SECURITY_WINDOW_HOURS * 3_600_000;
+  const groups = new Map<string, { count: number; latest: string; critical: boolean }>();
+  for (const e of events) {
+    if (e.severity !== "warning" && e.severity !== "critical") continue;
+    const t = Date.parse(e.created_at);
+    if (!Number.isFinite(t) || t < since) continue;
+    const g = groups.get(e.event_type) || { count: 0, latest: e.created_at, critical: false };
+    g.count++;
+    if (e.created_at > g.latest) g.latest = e.created_at;
+    if (e.severity === "critical" || e.event_type === "brute_force") g.critical = true;
+    groups.set(e.event_type, g);
+  }
+
+  return [...groups.entries()]
+    .filter(([type, g]) => type !== "login_failed" || g.count >= FAILED_LOGIN_THRESHOLD)
+    .map(([type, g]): AppNotification & { _count: number } => ({
+      id: `security:${type}:${g.latest}`,
+      severity: g.critical ? "urgent" : "warning",
+      title: `${g.critical ? "Security alert: " : ""}${SECURITY_LABELS[type] || type.replace(/_/g, " ")}`,
+      message: `${g.count} event${g.count !== 1 ? "s" : ""} in the last ${SECURITY_WINDOW_HOURS} hours. Latest ${ago(now - Date.parse(g.latest))}.`,
+      href: "/admin/security",
+      cta: "Review in Security",
+      dismissible: true,
+      _count: g.count,
+    }))
+    .sort((a, b) => RANK[a.severity] - RANK[b.severity] || b._count - a._count)
+    .slice(0, max)
+    .map(({ _count, ...n }) => { void _count; return n; });
 }
