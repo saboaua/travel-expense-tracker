@@ -229,22 +229,22 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               {note && <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-2">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="col-span-2 min-w-0 space-y-2 sm:col-span-3">
                 <label className="text-sm font-medium">Store</label>
                 <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Where did you shop?" maxLength={120} />
               </div>
-              <div className="space-y-2">
+              <div className="col-span-2 min-w-0 space-y-2 sm:col-span-1">
                 <label className="text-sm font-medium">Date</label>
                 <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
               </div>
-              <div className="space-y-2">
+              <div className="min-w-0 space-y-2">
                 <label className="text-sm font-medium">Currency</label>
                 <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                 </Select>
               </div>
-              <div className="col-span-2 space-y-2">
+              <div className="min-w-0 space-y-2">
                 <label className="text-sm font-medium">Receipt total</label>
                 <Input type="number" step="0.01" min="0" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={itemsSum ? itemsSum.toFixed(2) : "0.00"} />
               </div>
