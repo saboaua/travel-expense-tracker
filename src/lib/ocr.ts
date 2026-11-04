@@ -304,7 +304,9 @@ async function getWorker(): Promise<TessWorker> {
   if (!workerPromise) {
     workerPromise = (async () => {
       const { createWorker, PSM } = await import("tesseract.js");
-      const worker = await createWorker("eng", 1, { logger: () => {} });
+      // In the browser everything comes from our own /tesseract folder (no CDN), so the CSP can stay strict
+      const local = typeof window !== "undefined" ? { workerPath: "/tesseract/worker.min.js", corePath: "/tesseract/core", langPath: "/tesseract/lang" } : {};
+      const worker = await createWorker("eng", 1, { logger: () => {}, ...local });
       await worker.setParameters({
         tessedit_pageseg_mode: PSM.SINGLE_COLUMN, // receipts are one narrow column of text
         preserve_interword_spaces: "1",

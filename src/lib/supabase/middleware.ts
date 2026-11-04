@@ -25,6 +25,7 @@ const PUBLIC_PREFIXES = [
   "/privacy",
   "/contact",
   "/api/support",
+  "/api/csp-report",
   "/reset-password",
   "/auth",
   "/api/telegram/",

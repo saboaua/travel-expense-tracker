@@ -38,3 +38,5 @@ next-env.d.ts
 
 # vercel
 .vercel
+# on-device OCR files copied by scripts/copy-tesseract.mjs
+/public/tesseract

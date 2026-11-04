@@ -48,6 +48,7 @@ function eventLabel(type: string) {
     brute_force: "Brute force detected",
     login_blocked: "Login blocked (lockout)",
     suspicious_input: "Suspicious input",
+    csp_violation: "CSP violation (report)",
     access_denied: "Access denied",
     temp_password_expired: "Expired temp password used",
     password_changed: "Password changed",
@@ -234,6 +235,7 @@ export default function AdminSecurityPage() {
                   <option value="brute_force">Brute force</option>
                   <option value="login_blocked">Login blocked</option>
                   <option value="suspicious_input">Suspicious input</option>
+                  <option value="csp_violation">CSP violation</option>
                   <option value="access_denied">Access denied</option>
                   <option value="temp_password_expired">Expired temp password</option>
                   <option value="password_changed">Password changed</option>

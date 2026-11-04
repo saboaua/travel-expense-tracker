@@ -5,8 +5,9 @@ import { isTempPasswordExpired } from "@/lib/temp-password-config";
 import { canAccessPath, ruleForPath } from "@/lib/access";
 import { loadPermissions } from "@/lib/access-server";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
+import { buildCsp, cspHeaderName, makeNonce } from "@/lib/csp";
 
-export async function middleware(request: NextRequest) {
+async function handle(request: NextRequest) {
   // First refresh the session
   const response = await updateSession(request);
 
@@ -18,7 +19,7 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public routes that don't need further checks
-  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login"];
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login", "/api/csp-report"];
   if (publicPaths.some((p) => path.startsWith(p))) {
     return response;
   }
@@ -120,8 +121,23 @@ export async function middleware(request: NextRequest) {
   return response;
 }
 
+export async function middleware(request: NextRequest) {
+  // Content-Security-Policy with a fresh nonce. It is put on the request too, so Next.js adds the nonce to its scripts.
+  const enforce = process.env.CSP_ENFORCE === "1";
+  const nonce = makeNonce();
+  const csp = buildCsp({ nonce, dev: process.env.NODE_ENV !== "production", supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL });
+  const name = cspHeaderName(enforce);
+  request.headers.set("x-nonce", nonce);
+  request.headers.set(name, csp);
+
+  const response = await handle(request);
+  response.headers.set(name, csp);
+  response.headers.set("Reporting-Endpoints", 'csp="/api/csp-report"');
+  return response;
+}
+
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|tesseract/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };
