@@ -90,6 +90,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run typecheck   # TypeScript
 npm run lint        # ESLint
 npm test            # unit tests
+npm run test:e2e    # browser tests: sign-in, adding an expense, admin pages (needs Chromium: npx playwright install chromium)
 ```
 
 ### 6. Deploy to Vercel
