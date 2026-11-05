@@ -7,6 +7,7 @@ import { answerCallback, sendMessage } from "@/lib/telegram";
 import { PERSONAL_PROJECT_COLS, TELEGRAM_PENDING_COLS, TELEGRAM_PENDING_COLS_V2, isMissingColumn } from "@/lib/columns";
 import { loadPermissions } from "@/lib/access-server";
 import { buildScanOptions, type ScanOption } from "@/lib/scan-destination";
+import { digestText, gatherDigest } from "@/lib/telegram-reminders";
 import { applyNotifyCommand, parseCommand } from "@/lib/telegram-commands";
 import { escapeHtml, loadPrefs, savePrefs } from "@/lib/telegram-notify";
 import { removeSaved, saveBusiness, saveDocument, saveGrocery, savePersonalExpense, type Saved, type TgFile } from "@/lib/telegram-save";
@@ -58,6 +59,10 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
   if (cmd?.name === "help") return void (await sendMessage(chatId, HELP));
   if (cmd?.name === "trips") return listTrips(supabase, chatId, profile);
   if (cmd?.name === "recent") return listRecent(supabase, chatId, profile.id);
+  if (cmd?.name === "digest") {
+    if (profile.role !== "admin") return void (await sendMessage(chatId, "That command is for admins."));
+    return void (await sendMessage(chatId, digestText(await gatherDigest(supabase, todayISO()))));
+  }
   if (cmd?.name === "notify") {
     const prefs = await loadPrefs(supabase, profile.id);
     const { patch, reply } = applyNotifyCommand(prefs, cmd.args);

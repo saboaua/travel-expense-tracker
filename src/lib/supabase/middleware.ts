@@ -29,6 +29,7 @@ const PUBLIC_PREFIXES = [
   "/reset-password",
   "/auth",
   "/api/telegram/",
+  "/api/cron/",
   "/api/manifest",
   "/api/icon",
   "/api/fx",

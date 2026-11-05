@@ -11,6 +11,7 @@ export const SERVICE_KEY = "service-role-key";
 export const ANON_KEY = "anon-key";
 
 // Tables whose primary key is not "id": an upsert without on_conflict matches on it
+const UNIQUE_KEYS = { telegram_sent_log: ["user_id", "kind", "dedupe_key"] };
 const PRIMARY_KEYS = { telegram_pending: "telegram_id", telegram_notify_prefs: "user_id" };
 
 // table -> relation name -> how rows are joined
@@ -144,6 +145,8 @@ export function createFakeSupabase() {
           const ex = rows.find((r) => r[conflict] != null && r[conflict] === it[conflict]);
           if (ex) { if (/merge/.test(prefer)) Object.assign(ex, it); made.push(ex); continue; }
         }
+        const uk = UNIQUE_KEYS[name];
+        if (uk && rows.some((r) => uk.every((k) => r[k] === it[k]))) return send(res, 409, { code: "23505", message: `duplicate key value violates unique constraint "${name}_key"` });
         if (it.id && rows.some((r) => r.id === it.id)) return send(res, 409, { code: "23505", message: `duplicate key value violates unique constraint "${name}_pkey"` });
         const row = { id: randomUUID(), created_at: new Date().toISOString(), ...it };
         rows.push(row);
