@@ -254,7 +254,7 @@ async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRe
   }
 }
 
-export function notifyQueueChanged() {
+function notifyQueueChanged() {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(QUEUE_EVENT));
 }
 

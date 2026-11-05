@@ -3,6 +3,7 @@ import { timingSafeEqual } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 import { getBotConfig, sendMessage } from "@/lib/telegram";
 import { handleCallback, handleMessage } from "@/lib/telegram-bot";
+import { claimUpdate } from "@/lib/telegram-updates";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -29,8 +30,16 @@ export async function POST(request: Request) {
   const b = Buffer.from(config.secret);
   if (a.length !== b.length || !timingSafeEqual(a, b)) return NextResponse.json({ ok: false }, { status: 401 });
 
-  const update = await request.json();
+  let update;
+  try {
+    update = await request.json();
+  } catch {
+    return NextResponse.json({ ok: true }); // not a Telegram update; a 4xx/5xx would only make Telegram retry
+  }
   const supabase = admin();
+
+  // A repeat of an update we already handled (Telegram re-sends when a reply is slow) must not run twice
+  if (!(await claimUpdate(supabase, update.update_id))) return NextResponse.json({ ok: true });
 
   if (!config.enabled) {
     const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
@@ -46,7 +55,7 @@ export async function POST(request: Request) {
   } catch (err) {
     const chatId = update.message?.chat?.id || update.callback_query?.message?.chat?.id;
     if (chatId) {
-      await sendMessage(chatId, "Something went wrong saving that receipt. Try again or use the web app.").catch(() => {});
+      await sendMessage(chatId, "Something went wrong. Try again or use the web app.").catch(() => {});
     }
     console.error("telegram webhook", err);
   }

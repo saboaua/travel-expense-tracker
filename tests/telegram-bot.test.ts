@@ -49,7 +49,7 @@ const TRIP = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const OTHER_TRIP = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 const PROJECT = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
 const today = todayISO();
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "telegram_pending", "telegram_notify_prefs", "categories", "grocery_categories"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "telegram_pending", "telegram_notify_prefs", "categories", "grocery_categories", "telegram_updates"]) fake.table(t);
 fake.table("profiles").push({ id: USER, role: "user", full_name: "Pat", telegram_id: 777, telegram_default_trip_id: null }, { id: OTHER, role: "user", full_name: "Other", telegram_id: 888, telegram_default_trip_id: null });
 const tripRow = (id: string, user: string, name: string, s: number, e: number) => ({ id, user_id: user, name, destination: "Miami", start_date: addDaysISO(today, s), end_date: addDaysISO(today, e), currency: "USD", status: "active" });
 fake.table("trips").push(tripRow(TRIP, USER, "Miami Conference", -1, 2), tripRow(OTHER_TRIP, OTHER, "Secret Trip", -1, 2));
@@ -131,6 +131,15 @@ eq(fake.table("profiles").find((p: { id: string }) => p.id === USER).telegram_de
 yes(lastText().includes("cannot find that trip"), "...and you are told");
 await press(`trip:${TRIP}`);
 eq(fake.table("profiles").find((p: { id: string }) => p.id === USER).telegram_default_trip_id, TRIP, "your own trip can");
+
+// A repeated Telegram update is skipped; a different one and an update without an id are handled
+{
+  const { claimUpdate } = await import("../src/lib/telegram-updates");
+  eq(await claimUpdate(db, 5001), true, "first delivery of an update is handled");
+  eq(await claimUpdate(db, 5001), false, "a re-delivery is skipped");
+  eq(await claimUpdate(db, 5002), true, "the next update is handled");
+  eq(await claimUpdate(db, undefined), true, "an update without an id is handled");
+}
 
 await fake.close();
 globalThis.fetch = realFetch;
