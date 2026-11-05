@@ -237,6 +237,21 @@ try {
     await ctx.close();
   });
 
+  /* ---------- read a receipt again ---------- */
+  await test("an expense can read its receipt again: the button shows with a receipt and not without", async () => {
+    const id = "e0000000-0000-4000-8000-0000000000aa";
+    fake.table("expenses").push({ id, trip_id: TRIP_ID, user_id: PAT, merchant: "Unread", amount: 0, currency: "USD", exchange_rate: 1, amount_usd: 0, category: "Other", expense_date: today, notes: null, receipt_path: null, created_at: new Date().toISOString() });
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/trips/${TRIP_ID}/expenses/${id}`);
+    await page.getByText("No receipt uploaded yet.").waitFor();
+    assert((await page.getByRole("button", { name: "Read receipt again" }).count()) === 0, "button shown without a receipt");
+    await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Read receipt again" }).waitFor();
+    await ctx.close();
+  });
+
   /* ---------- adding an expense ---------- */
   await test("adding an expense saves it and shows it on the trip", async () => {
     const { ctx, page } = await newPage();

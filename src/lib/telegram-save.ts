@@ -62,6 +62,9 @@ async function supportedCurrency(supabase: SupabaseClient, wanted: string | null
   return supported.includes(wanted) ? wanted : fallback;
 }
 
+/** Added to the confirmation when nothing useful was read, so the person knows what to do next. */
+const unreadHint = (ocr: OcrResult | null) => (!ocr || (ocr.amount == null && !ocr.merchant) ? "Could not read this receipt. Open it in the app and tap “Read receipt again”." : "");
+
 const money = (n: number | null, cur: string) => (n != null ? `Amount: ${n.toFixed(2)} ${cur}` : "Amount: not detected (saved as 0)");
 
 /* ---------------- business trip ---------------- */
@@ -102,6 +105,7 @@ export async function saveBusiness(supabase: SupabaseClient, userId: string, tri
       ocr?.category ? `Category: ${escapeHtml(ocr.category)}` : "",
       `Date: ${date}`,
       note ? `Note: ${note}` : "",
+      unreadHint(ocr),
     ].filter(Boolean),
   };
 }
@@ -135,7 +139,7 @@ export async function savePersonalExpense(supabase: SupabaseClient, userId: stri
 
   return {
     ref: { table: "personal_expenses", id: row.id as string }, path, bucket: "receipts", where: `${project.name} · ${meta.label}`,
-    lines: [ocr?.merchant ? `Merchant: ${escapeHtml(ocr.merchant)}` : "Merchant: not detected", money(amount, finalCurrency), `Category: ${category || "Other"}`, `Date: ${date}`, note ? `Note: ${note}` : ""].filter(Boolean),
+    lines: [ocr?.merchant ? `Merchant: ${escapeHtml(ocr.merchant)}` : "Merchant: not detected", money(amount, finalCurrency), `Category: ${category || "Other"}`, `Date: ${date}`, note ? `Note: ${note}` : "", unreadHint(ocr)].filter(Boolean),
   };
 }
 

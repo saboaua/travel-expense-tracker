@@ -10,13 +10,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Camera, Trash2, Upload, X } from "lucide-react";
+import { ArrowLeft, Camera, Loader2, ScanText, Trash2, Upload, X } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
+import { extractReceipt } from "@/lib/receipt-extract";
 import { EXPENSE_COLS } from "@/lib/columns";
 
 
@@ -44,6 +45,8 @@ export default function EditExpensePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const [readNote, setReadNote] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.from("expenses").select(EXPENSE_COLS).eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
@@ -81,6 +84,54 @@ export default function EditExpensePage() {
     const reader = new FileReader();
     reader.onload = () => setPreview(reader.result as string);
     reader.readAsDataURL(processed);
+  };
+
+  /** Reads the receipt again (AI first, on-device OCR as the fallback) and puts what it finds into the form. Nothing is saved until Save. */
+  const readAgain = async () => {
+    setReading(true);
+    setReadNote(null);
+    try {
+      let file = newFile;
+      if (!file && receiptUrl) {
+        const res = await fetch(receiptUrl);
+        if (!res.ok) throw new Error("Could not open the receipt");
+        const blob = await res.blob();
+        file = new File([blob], "receipt.jpg", { type: blob.type || "image/jpeg" });
+      }
+      if (!file) throw new Error("No receipt to read");
+      if (!file.type.startsWith("image/")) {
+        setReadNote("Only photos can be read again. Enter the details by hand.");
+        return;
+      }
+      const result = await extractReceipt(file, { currency, categories: categories.map((c) => c.name) });
+      const found: string[] = [];
+      if (result.merchant) { setMerchant(result.merchant); found.push("merchant"); }
+      if (result.amount != null) { setAmount(result.amount.toFixed(2)); found.push("amount"); }
+      if (result.date) { setExpenseDate(result.date); found.push("date"); }
+      if (result.currency && result.currency !== currency && currencies.some((c) => c.code === result.currency)) {
+        setCurrency(result.currency);
+        found.push(`currency (${result.currency})`);
+        // The rate belongs to the currency, so fetch the current one
+        if (result.currency === "USD") setRate("1");
+        else {
+          try {
+            const r = await fetch(`/api/fx?from=${result.currency}`);
+            const d = await r.json();
+            if (r.ok && typeof d.rate === "number") setRate(String(d.rate));
+          } catch {
+            // keep the old rate; it can be edited below
+          }
+        }
+      }
+      const cat = result.category ? categories.find((c) => c.name.toLowerCase() === result.category!.toLowerCase()) : null;
+      if (cat) { setCategory(cat.name); found.push("category"); }
+      const how = result.source === "ai" ? "AI" : "basic OCR";
+      setReadNote(found.length ? `Read again (${how}): ${found.join(", ")}. Check the details, then save.` : "Could not read anything from this receipt. Enter the details by hand.");
+    } catch (e) {
+      setReadNote(e instanceof Error ? e.message : "Reading failed. Enter the details by hand.");
+    } finally {
+      setReading(false);
+    }
   };
 
   const clearNew = () => {
@@ -175,6 +226,13 @@ export default function EditExpensePage() {
                   <button type="button" onClick={() => { fileInputRef.current?.setAttribute("capture", "environment"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-lg border text-sm"><Camera className="h-4 w-4" /> Take photo</button>
                   <button type="button" onClick={() => { fileInputRef.current?.removeAttribute("capture"); fileInputRef.current?.click(); }} className="flex items-center justify-center gap-2 h-10 rounded-lg border text-sm"><Upload className="h-4 w-4" /> Upload new</button>
                 </div>
+                {shownImage && (
+                  <button type="button" onClick={readAgain} disabled={reading || saving} className="flex w-full items-center justify-center gap-2 h-10 rounded-lg border border-primary/40 bg-primary/5 text-sm font-medium text-primary disabled:opacity-60">
+                    {reading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ScanText className="h-4 w-4" />}
+                    {reading ? "Reading the receipt…" : "Read receipt again"}
+                  </button>
+                )}
+                {readNote && <p className="text-xs text-muted-foreground flex items-start gap-1.5"><ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{readNote}</p>}
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) pickFile(file); }} />
                 <p className="text-xs text-muted-foreground">New photos are resized automatically.</p>
               </div>
