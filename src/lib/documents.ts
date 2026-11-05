@@ -180,3 +180,39 @@ export function fileKind(path: string | null | undefined): "pdf" | "image" | "ot
   if (["jpg", "jpeg", "png", "webp", "gif"].includes(ext)) return "image";
   return "other";
 }
+
+/* ---------- tiles on the business page ---------- */
+
+export type DocLevel = "ok" | "soon" | "critical" | "expired" | "none";
+
+/** Days before expiry when a non-passport document starts showing "Expires soon". */
+const SOON_DAYS = 60;
+
+/**
+ * The status label for a document tile. Passports follow the 6-month rule used by the renewal banner; everything
+ * else is simply valid, expiring within 60 days, or expired. Documents with no expiry date show no status.
+ */
+export function documentStatus(kind: string, expiry: string | null, today: string): { level: DocLevel; label: string; detail: string } {
+  if (!expiry || !ISO.test(expiry)) return { level: "none", label: "", detail: "No expiry date" };
+  const daysLeft = dayDiff(today, expiry);
+  if (daysLeft < 0) return { level: "expired", label: "Expired", detail: `Expired ${expiry}` };
+  if (kind === "passport") {
+    const p = passportStatus(expiry, today);
+    if (!p) return { level: "ok", label: "Valid", detail: `Expires ${expiry}` };
+    if (p.level === "critical") return { level: "critical", label: "Renew now", detail: `Expires ${expiry}` };
+    if (p.level === "renew") return { level: "soon", label: "Renew soon", detail: `Expires ${expiry}` };
+    return { level: "ok", label: "Valid", detail: `Expires ${expiry}` };
+  }
+  if (daysLeft <= SOON_DAYS) return { level: "soon", label: "Expires soon", detail: `Expires ${expiry}` };
+  return { level: "ok", label: "Valid", detail: `Expires ${expiry}` };
+}
+
+/** Order for the tiles: expired and soonest-to-expire first, documents without an expiry last. */
+export function sortForTiles<T extends { expiry_date: string | null; created_at?: string }>(docs: T[]): T[] {
+  return [...docs].sort((a, b) => {
+    if (a.expiry_date && b.expiry_date) return a.expiry_date.localeCompare(b.expiry_date);
+    if (a.expiry_date) return -1;
+    if (b.expiry_date) return 1;
+    return (b.created_at || "").localeCompare(a.created_at || "");
+  });
+}

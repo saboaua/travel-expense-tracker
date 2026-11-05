@@ -22,6 +22,10 @@ export const DOCUMENT_COLS_BASE = "id, user_id, trip_id, kind, title, issuing_co
 /** document_number comes from migration_documents_number.sql, which an older database may not have yet. */
 export const DOCUMENT_COLS = `${DOCUMENT_COLS_BASE}, document_number`;
 
+/** What the document tiles on the home page need. document_number (masked on the tile) needs its own migration. */
+export const DOCUMENT_TILE_COLS_BASE = "id, kind, title, issuing_country, expiry_date, trip_id, file_path, created_at";
+export const DOCUMENT_TILE_COLS = `${DOCUMENT_TILE_COLS_BASE}, document_number`;
+
 export const ROLE_COLS = "key, label, description, permissions, known_features, is_system, created_at";
 
 export const SECURITY_EVENT_COLS = "id, created_at, event_type, severity, email_attempted, ip_address, country, origin, user_agent, user_id, details";

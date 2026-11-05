@@ -134,6 +134,28 @@ try {
     await ctx.close();
   });
 
+  /* ---------- travel document tiles ---------- */
+  await test("business page shows a tile per uploaded document, soonest to expire first", async () => {
+    const docs = fake.table("travel_documents");
+    docs.push(
+      { id: "d0c00000-0000-4000-8000-000000000001", user_id: PAT, kind: "insurance", title: "Zeta Insurance", issuing_country: "Netherlands", document_number: "POL99887766", expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() },
+      { id: "d0c00000-0000-4000-8000-000000000002", user_id: PAT, kind: "visa", title: "Alpha Visa", issuing_country: "USA", document_number: "V12345678", expiry_date: addDays(today, 20), trip_id: null, file_path: null, created_at: new Date().toISOString() },
+      { id: "d0c00000-0000-4000-8000-000000000003", user_id: PAT, kind: "booking", title: "Trip-only Booking", issuing_country: null, document_number: null, expiry_date: addDays(today, 5), trip_id: TRIP_ID, file_path: null, created_at: new Date().toISOString() }
+    );
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("heading", { name: "Travel documents" }).waitFor();
+    const titles = await page.locator("section[aria-labelledby=doc-tiles-heading] p.truncate.font-bold").allInnerTexts();
+    assert(titles.join("|") === "Alpha Visa|Zeta Insurance", `tile order/content was: ${titles.join("|")}`);
+    await page.getByText("Expires soon").first().waitFor();
+    const text = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
+    assert(!text.includes("V12345678") && !text.includes("POL99887766"), "full document number leaked into a tile");
+    assert(!text.includes("Trip-only Booking"), "trip document shown on the dashboard tiles");
+    docs.length = 0;
+    await ctx.close();
+  });
+
   /* ---------- adding an expense ---------- */
   await test("adding an expense saves it and shows it on the trip", async () => {
     const { ctx, page } = await newPage();

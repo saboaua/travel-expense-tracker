@@ -61,3 +61,13 @@ eq(/\(401\)/.test(scanFailureMessage("ai_failed_401")), true, "reason: upstream 
 eq(/Too many/.test(scanFailureMessage("limit")), true, "reason: limit");
 eq(/network/.test(scanFailureMessage("network")), true, "reason: network");
 eq(/Could not read/.test(scanFailureMessage(undefined)), true, "reason: default");
+import { documentStatus, sortForTiles } from "../src/lib/documents";
+eq(documentStatus("passport", "2031-03-14", "2026-11-05").level, "ok", "tile: passport far from expiry is valid");
+eq(documentStatus("passport", "2027-02-02", "2026-11-05").label, "Renew now", "tile: passport inside 6 months = renew now");
+eq(documentStatus("passport", "2027-06-01", "2026-11-05").label, "Renew soon", "tile: passport inside 9 months = renew soon");
+eq(documentStatus("passport", "2026-10-01", "2026-11-05").level, "expired", "tile: expired passport");
+eq(documentStatus("visa", "2027-02-02", "2026-11-05").level, "ok", "tile: visa 90 days out is valid");
+eq(documentStatus("visa", "2026-12-20", "2026-11-05").label, "Expires soon", "tile: visa within 60 days");
+eq(documentStatus("insurance", "2026-11-05", "2026-11-05").level, "soon", "tile: expires today is still valid, but soon");
+eq(documentStatus("ticket", null, "2026-11-05").level, "none", "tile: no expiry, no status");
+eq(sortForTiles([{ expiry_date: null, created_at: "2026-01-01" }, { expiry_date: "2031-01-01" }, { expiry_date: "2026-12-01" }]).map((d) => d.expiry_date), ["2026-12-01", "2031-01-01", null], "tile order");

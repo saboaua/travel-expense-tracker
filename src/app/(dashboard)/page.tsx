@@ -9,14 +9,15 @@ import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
-import { currentPassport, renewalAlert } from "@/lib/documents";
+import { currentPassport, documentStatus, kindLabel, maskNumber, renewalAlert, sortForTiles } from "@/lib/documents";
+import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
 import { loadPermissions } from "@/lib/access-server";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, tileSummary, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
-import { PROFILE_HOME_COLS } from "@/lib/columns";
+import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, PROFILE_HOME_COLS, withColumnFallback } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -50,10 +51,16 @@ export default async function DashboardPage() {
     .eq("user_id", user?.id);
 
   // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
-  const { data: docRows } = await supabase.from("travel_documents").select("kind, expiry_date, trip_id").eq("user_id", user?.id);
-  const passportAlert = renewalAlert(currentPassport((docRows || []).filter((d) => d.kind === "passport")), trips || [], todayISO());
+  const { data: docData } = await withColumnFallback(
+    (cols) => supabase.from("travel_documents").select(cols).eq("user_id", user?.id),
+    DOCUMENT_TILE_COLS,
+    DOCUMENT_TILE_COLS_BASE
+  );
+  type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null };
+  const docRows = (docData || []) as unknown as DocRow[];
+  const passportAlert = renewalAlert(currentPassport(docRows.filter((d) => d.kind === "passport")), trips || [], todayISO());
   const docCounts: Record<string, number> = {};
-  for (const d of docRows || []) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
+  for (const d of docRows) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
   // Security alerts are only for admins (the same people who can open Admin > Security)
   let securityNotifications: ReturnType<typeof buildSecurityNotifications> = [];
   const myPerms = await loadPermissions(supabase, (profile?.role as string) || "user");
@@ -168,6 +175,24 @@ export default async function DashboardPage() {
     range: formatDateRange(t.start_date, t.end_date),
   }));
 
+  // Tiles for the person's own documents (not tied to a trip), soonest to expire first
+  const accountDocs = sortForTiles(docRows.filter((d) => !d.trip_id));
+  const docTiles: DocTile[] = accountDocs.slice(0, 4).map((d) => {
+    const st = documentStatus(d.kind, d.expiry_date, todayISO());
+    return {
+      id: d.id,
+      kind: d.kind,
+      kindLabel: kindLabel(d.kind),
+      title: d.title,
+      country: d.issuing_country,
+      number: d.document_number ? maskNumber(d.document_number) : null,
+      expiry: d.expiry_date,
+      level: st.level,
+      statusLabel: st.label,
+      filePath: d.file_path,
+    };
+  });
+
   const businessView = (
     <>
       {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}
@@ -208,6 +233,9 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Travel documents: one tile per saved document, soonest to expire first */}
+      {myPerms.has("documents") && <DocumentTiles tiles={docTiles} total={accountDocs.length} />}
 
       {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
       {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}

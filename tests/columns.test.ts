@@ -47,6 +47,7 @@ check("PERSONAL_EXPENSE_COLS", "personal_expenses", C.PERSONAL_EXPENSE_COLS);
 check("GROCERY_RECEIPT_COLS", "grocery_receipts", C.GROCERY_RECEIPT_COLS);
 check("GROCERY_ITEM_COLS", "grocery_items", C.GROCERY_ITEM_COLS);
 check("DOCUMENT_COLS", "travel_documents", C.DOCUMENT_COLS);
+check("DOCUMENT_TILE_COLS", "travel_documents", C.DOCUMENT_TILE_COLS);
 check("ROLE_COLS", "roles", C.ROLE_COLS);
 check("SECURITY_EVENT_COLS", "security_events", C.SECURITY_EVENT_COLS);
 check("AUDIT_LOG_COLS", "audit_logs", C.AUDIT_LOG_COLS);
