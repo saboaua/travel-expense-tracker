@@ -216,3 +216,30 @@ export function sortForTiles<T extends { expiry_date: string | null; created_at?
     return (b.created_at || "").localeCompare(a.created_at || "");
   });
 }
+
+/* ---------- expiry bar on the Documents page ---------- */
+
+export type ExpiryMeter = { level: DocLevel; label: string; /** 0-100: how much validity is left on the bar */ pct: number; daysLeft: number; caption: string };
+
+/** A bar full at this many days left (or more). Passports are valid for years, so their bar scale is longer. */
+const meterHorizon = (kind: string) => (kind === "passport" ? 730 : 180);
+
+/**
+ * What the expiry bar shows: the colour and label come from the same status as the dashboard tiles, the bar length is
+ * the time left on a fixed scale (so a document nearing its end shows a short bar), and the caption says it in words.
+ * Null for documents that do not expire.
+ */
+export function expiryMeter(kind: string, expiry: string | null, today: string): ExpiryMeter | null {
+  if (!expiry || !ISO.test(expiry) || !kindHasExpiry(kind)) return null;
+  const st = documentStatus(kind, expiry, today);
+  const daysLeft = dayDiff(today, expiry);
+  const pct = daysLeft <= 0 ? 0 : Math.max(4, Math.min(100, Math.round((daysLeft / meterHorizon(kind)) * 100)));
+  let caption: string;
+  if (daysLeft < 0) caption = `Expired ${-daysLeft} ${-daysLeft === 1 ? "day" : "days"} ago`;
+  else if (daysLeft === 0) caption = "Expires today";
+  else if (daysLeft < 90) caption = `${daysLeft} ${daysLeft === 1 ? "day" : "days"} left`;
+  else if (daysLeft < 730) caption = `${Math.round(daysLeft / 30.4)} months left`;
+  else caption = `${Math.floor(daysLeft / 365)} years left`;
+  if (kind === "passport" && daysLeft >= 0 && (st.level === "soon" || st.level === "critical")) caption += " · renew before travelling";
+  return { level: st.level, label: st.label, pct, daysLeft, caption };
+}

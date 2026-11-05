@@ -195,6 +195,27 @@ try {
     await ctx.close();
   });
 
+  /* ---------- documents page: summary and expiry bars ---------- */
+  await test("documents page: summary cards, needs-attention group and an expiry bar per document", async () => {
+    const docs = fake.table("travel_documents");
+    const row = (n, kind, title, days) => ({ id: `d0c00000-0000-4000-8000-00000000010${n}`, user_id: PAT, kind, title, issuing_country: "USA", document_number: null, expiry_date: addDays(today, days), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    docs.push(row(1, "visa", "ESTA", 42), row(2, "passport", "Dutch Passport", 3000), row(3, "id", "Old ID", -10));
+    const browser2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await browser2.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/documents`);
+    await page.getByRole("heading", { name: "Needs attention" }).waitFor();
+    assert((await page.getByTestId("expiry-meter").count()) === 3, "each document with an expiry shows a bar");
+    const text = await page.locator("main").innerText();
+    assert(text.includes("42 days left") && text.includes("Expired 10 days ago"), "captions missing");
+    assert(/expiring soon/i.test(text) && /valid/i.test(text), "summary cards missing");
+    assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)), "page scrolls sideways on a phone");
+    await page.locator("main").screenshot({ path: "/tmp/documents-mobile.png" });
+    docs.length = 0;
+    await browser2.close();
+  });
+
   /* ---------- business navigation ---------- */
   await test("one Business link; Trips and Reports switch inside it", async () => {
     const { ctx, page } = await newPage();

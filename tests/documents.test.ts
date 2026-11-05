@@ -71,3 +71,19 @@ eq(documentStatus("visa", "2026-12-20", "2026-11-05").label, "Expires soon", "ti
 eq(documentStatus("insurance", "2026-11-05", "2026-11-05").level, "soon", "tile: expires today is still valid, but soon");
 eq(documentStatus("ticket", null, "2026-11-05").level, "none", "tile: no expiry, no status");
 eq(sortForTiles([{ expiry_date: null, created_at: "2026-01-01" }, { expiry_date: "2031-01-01" }, { expiry_date: "2026-12-01" }]).map((d) => d.expiry_date), ["2026-12-01", "2031-01-01", null], "tile order");
+
+import { expiryMeter } from "../src/lib/documents";
+{
+  const t = "2026-11-05";
+  eq(expiryMeter("ticket", "2027-01-01", t), null, "meter: documents that do not expire have none");
+  eq(expiryMeter("visa", null, t), null, "meter: no expiry date, no meter");
+  const far = expiryMeter("passport", "2035-08-21", t)!;
+  eq([far.level, far.pct, far.caption], ["ok", 100, "8 years left"], "meter: a passport far from expiry is a full green bar");
+  const visa = expiryMeter("visa", "2026-12-17", t)!;
+  eq([visa.level, visa.daysLeft, visa.caption], ["soon", 42, "42 days left"], "meter: 42 days left is amber");
+  eq(visa.pct, Math.round((42 / 180) * 100), "meter: bar length is time left on the 180-day scale");
+  const old = expiryMeter("id", "2026-10-01", t)!;
+  eq([old.level, old.pct, old.caption], ["expired", 0, "Expired 35 days ago"], "meter: expired is empty and red");
+  eq(expiryMeter("passport", "2027-02-02", t)!.caption.includes("renew before travelling"), true, "meter: passport inside the 6-month rule says so");
+  eq(expiryMeter("visa", "2026-11-06", t)!.pct, 4, "meter: a nearly expired bar is still visible");
+}
