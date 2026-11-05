@@ -95,6 +95,8 @@ try {
   };
   async function signIn(page, email, password) {
     await page.goto(`${BASE}/login`);
+    // Let the page finish loading its scripts first; clicking too early submits the form the old-fashioned way
+    await page.waitForLoadState("networkidle");
     await page.locator("#email").fill(email);
     await page.locator("#password").fill(password);
     await page.locator('button[type="submit"]').click();
@@ -131,6 +133,20 @@ try {
     assert(left.length === 0, `session cookie still set after sign-out: ${left.map((c) => c.name).join(", ")}`);
     await page.goto(`${BASE}/`);
     await page.waitForURL(/\/login/);
+    await ctx.close();
+  });
+
+  /* ---------- opening screen for the installed app ---------- */
+  await test("opening screen is in the page, is hidden once the app is ready, and iOS launch images are linked", async () => {
+    const { ctx, page } = await newPage();
+    const res = await page.goto(`${BASE}/login`);
+    assert(/id="app-splash"/.test(await res.text()), "splash is not in the first HTML the server sends");
+    await page.locator("#email").waitFor();
+    await page.waitForFunction(() => document.getElementById("app-splash")?.classList.contains("app-splash-gone"), null, { timeout: 5000 });
+    const links = await page.locator('link[rel="apple-touch-startup-image"]').evaluateAll((els) => els.map((e) => e.getAttribute("href")));
+    assert(links.length >= 15, `expected launch image links, found ${links.length}`);
+    const img = await page.request.get(`${BASE}${links[0]}`);
+    assert(img.ok() && /image\/png/.test(img.headers()["content-type"] || ""), "launch image is not served");
     await ctx.close();
   });
 

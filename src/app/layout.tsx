@@ -5,6 +5,8 @@ import "./globals.css";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotice } from "@/components/UpdateNotice";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { AppSplash } from "@/components/AppSplash";
+import { startupImages } from "@/lib/splash";
 import { ConfirmProvider } from "@/components/ui/confirm";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -17,6 +19,7 @@ export const metadata: Metadata = {
     capable: true,
     statusBarStyle: "default",
     title: "Expenses",
+    startupImage: startupImages,
   },
   icons: {
     icon: "/api/icon",
@@ -54,6 +57,7 @@ export default async function RootLayout({
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.className} antialiased`}>
+        <AppSplash />
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <UpdateNotice />
