@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { downloadFile, getFile } from "@/lib/telegram";
 import { runReceiptOcr, type OcrResult } from "@/lib/ocr";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithClaude, extractGroceryWithClaude, extractReceiptWithClaude } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
 import { CURRENCIES, rateToUsd, toUsd } from "@/lib/currencies";
 import { KIND_META, GROCERY_CATEGORIES, type PersonalKind } from "@/lib/personal/constants";
 import { normalizeItemName } from "@/lib/personal/grocery";
@@ -43,7 +43,7 @@ async function readReceipt(buf: ArrayBuffer, mime: string, name: string, hints: 
   try {
     if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
       try {
-        ocr = await withTimeout(extractReceiptWithClaude({ data: new Uint8Array(buf), mime }, hints), 25000);
+        ocr = await withTimeout(extractReceiptWithAi({ data: new Uint8Array(buf), mime }, hints), 25000);
         usedAi = true;
       } catch (e) {
         console.error("telegram AI OCR failed, falling back", e instanceof Error ? e.message : e);
@@ -158,11 +158,11 @@ export async function saveGrocery(supabase: SupabaseClient, userId: string, file
   const { data: cats } = await supabase.from("grocery_categories").select("name").eq("enabled", true).order("sort_order");
   const categories = cats && cats.length ? cats.map((c: { name: string }) => c.name) : [...GROCERY_CATEGORIES];
 
-  let scan: Awaited<ReturnType<typeof extractGroceryWithClaude>> | null = null;
+  let scan: Awaited<ReturnType<typeof extractGroceryWithAi>> | null = null;
   let note = "";
   if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
     try {
-      scan = await withTimeout(extractGroceryWithClaude({ data: new Uint8Array(buf), mime }, { currency, categories }), 40000);
+      scan = await withTimeout(extractGroceryWithAi({ data: new Uint8Array(buf), mime }, { currency, categories }), 40000);
     } catch (e) {
       note = e instanceof Error && e.message === "timeout" ? "Reading timed out" : "Could not read the items";
       console.error("telegram grocery read", e instanceof Error ? e.message : e);
@@ -215,7 +215,7 @@ export async function detectIdentityDocument(file: TgFile): Promise<DocumentFiel
   try {
     const { buf, mime } = await fetchTgFile(file);
     if (!AI_IMAGE_TYPES.includes(mime)) return null;
-    const fields = await withTimeout(extractDocumentWithClaude({ data: new Uint8Array(buf), mime }), 12000);
+    const fields = await withTimeout(extractDocumentWithAi({ data: new Uint8Array(buf), mime }), 12000);
     return fields.kind && IDENTITY_KINDS.includes(fields.kind) ? fields : null;
   } catch {
     return null;
@@ -235,7 +235,7 @@ export async function saveDocument(supabase: SupabaseClient, userId: string, fil
   let note = "";
   if (known) fields = known;
   else if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
-    try { fields = await withTimeout(extractDocumentWithClaude({ data: new Uint8Array(buf), mime }), 25000); } catch { note = "Could not read the details"; }
+    try { fields = await withTimeout(extractDocumentWithAi({ data: new Uint8Array(buf), mime }), 25000); } catch { note = "Could not read the details"; }
   }
   const kind: DocKind = fields.kind ?? "other";
   const title = `${kindLabel(kind)}${fields.issuing_country ? ` · ${fields.issuing_country}` : ""}`.slice(0, 120);

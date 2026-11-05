@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithClaude, extractGroceryWithClaude, extractReceiptWithClaude } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -64,14 +64,14 @@ export async function POST(request: Request) {
 
   try {
     if (form.get("mode") === "document") {
-      const result = await extractDocumentWithClaude(image);
+      const result = await extractDocumentWithAi(image);
       return NextResponse.json({ result });
     }
     if (form.get("mode") === "grocery") {
-      const result = await extractGroceryWithClaude(image, hints);
+      const result = await extractGroceryWithAi(image, hints);
       return NextResponse.json({ result });
     }
-    const result = await extractReceiptWithClaude(image, hints);
+    const result = await extractReceiptWithAi(image, hints);
     return NextResponse.json({ result });
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);

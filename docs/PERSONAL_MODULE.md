@@ -64,7 +64,7 @@ home projects (with a budget) and personal trips, by scanning receipts.
 
 ## 5. Execution plan
 1. Run `supabase/migration_personal.sql` (adds tables, policies, toggle).
-2. Deploy the app. Optional: set `ANTHROPIC_API_KEY` for AI line items (basic OCR works without it).
+2. Deploy the app. Optional: set `GEMINI_API_KEY` for AI line items (basic OCR works without it).
 3. Admin may switch the section off under Global Settings -> Branding.
 4. Verify with a real grocery receipt, a project receipt and a travel receipt (checklist in section 6).
 

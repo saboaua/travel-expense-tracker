@@ -8,7 +8,7 @@ const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a)
 const yes = (c: unknown, m: string) => eq(!!c, true, m);
 
 process.env.TELEGRAM_BOT_TOKEN = "123:TEST";
-process.env.ANTHROPIC_API_KEY = "test-key";
+process.env.GEMINI_API_KEY = "test-key";
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const sent: { method: string; body: Record<string, unknown> }[] = [];
@@ -24,14 +24,14 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     sent.push({ method, body });
     return Response.json({ ok: true, result: method === "getFile" ? { file_path: "photos/file_1.jpg" } : {} });
   }
-  if (url.includes("api.anthropic.com")) {
-    const prompt = JSON.stringify(JSON.parse(String(init?.body)).messages);
+  if (url.includes("generativelanguage.googleapis.com")) {
+    const prompt = JSON.stringify(JSON.parse(String(init?.body)).contents);
     const out = /grocery store receipt/.test(prompt)
       ? { store: "Super Food", date: "2026-11-04", total: 12.5, currency: "AWG", items: [{ name: "Milk", quantity: 1, unit_price: 5, line_total: 5, category: "Dairy & Eggs" }, { name: "Bread", quantity: 1, unit_price: 7.5, line_total: 7.5, category: "Bakery" }] }
       : /travel document/.test(prompt)
         ? { kind: idPhoto ? "passport" : "other", issuing_country: "Aruba", document_number: "AB123456", expiry_date: "2028-01-31", holder_name: "Pat" }
         : { merchant: "Cafe Uno", amount: 18.4, date: "2026-11-04", currency: "USD", category: "Meals" };
-    return Response.json({ content: [{ type: "text", text: JSON.stringify(out) }] });
+    return Response.json({ candidates: [{ content: { parts: [{ text: JSON.stringify(out) }] } }] });
   }
   return realFetch(input, init);
 }) as typeof fetch;

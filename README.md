@@ -71,7 +71,7 @@ Optional settings:
 | Variable | Purpose |
 |----------|---------|
 | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `NEXT_PUBLIC_SITE_URL` | Telegram receipt bot |
-| `ANTHROPIC_API_KEY`, `OCR_MODEL` | AI receipt and document scanning |
+| `GEMINI_API_KEY`, `OCR_MODEL` | AI receipt and document scanning |
 | `RESEND_API_KEY`, `SUPPORT_FROM_EMAIL` | Support form emails |
 | `NEXT_PUBLIC_TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | Cloudflare Turnstile on the sign-in page |
 | `CSP_ENFORCE=1` | Enforce the Content-Security-Policy (report-only by default) |

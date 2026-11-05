@@ -56,7 +56,7 @@ eq(isCroppable({ type: "image/jpeg" }), true, "jpeg croppable");
 eq(isCroppable({ type: "image/heic" }), false, "heic not croppable");
 eq(isCroppable({ type: "application/pdf" }), false, "pdf not croppable");
 import { scanFailureMessage } from "../src/lib/document-extract";
-eq(/ANTHROPIC_API_KEY/.test(scanFailureMessage("not_configured")), true, "reason: key missing");
+eq(/GEMINI_API_KEY/.test(scanFailureMessage("not_configured")), true, "reason: key missing");
 eq(/\(401\)/.test(scanFailureMessage("ai_failed_401")), true, "reason: upstream status shown");
 eq(/Too many/.test(scanFailureMessage("limit")), true, "reason: limit");
 eq(/network/.test(scanFailureMessage("network")), true, "reason: network");

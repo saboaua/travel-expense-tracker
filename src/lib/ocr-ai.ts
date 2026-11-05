@@ -1,6 +1,6 @@
 /**
- * AI receipt reading with Claude vision (server only). Much more accurate than classic OCR on
- * crumpled, skewed, thermal-paper or non-English receipts. Needs ANTHROPIC_API_KEY.
+ * AI receipt reading with Google Gemini vision (server only). Much more accurate than classic OCR on
+ * crumpled, skewed, thermal-paper or non-English receipts. Needs GEMINI_API_KEY.
  */
 import type { OcrHints, OcrResult } from "@/lib/ocr";
 import { todayISO } from "@/lib/utils";
@@ -8,11 +8,11 @@ import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 
-const DEFAULT_MODEL = "claude-haiku-5-5"; // override with OCR_MODEL
+const DEFAULT_MODEL = "gemini-2.5-flash"; // override with OCR_MODEL (a Gemini model name)
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
 
 export function aiOcrConfigured() {
-  return !!process.env.ANTHROPIC_API_KEY;
+  return !!process.env.GEMINI_API_KEY;
 }
 
 export const AI_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -71,36 +71,26 @@ function sanitize(raw: Record<string, unknown>, hints: OcrHints, today: string):
   };
 }
 
-async function askClaude(
+async function askAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   prompt: string,
   maxTokens: number
 ): Promise<Record<string, unknown>> {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("AI OCR is not configured");
   if (!AI_IMAGE_TYPES.includes(image.mime)) throw new Error("Unsupported image type for AI OCR");
 
   const base64 = Buffer.from(image.data instanceof ArrayBuffer ? new Uint8Array(image.data) : image.data).toString("base64");
+  // An old OCR_MODEL left over from another provider is ignored
+  const override = process.env.OCR_MODEL;
+  const model = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
     method: "POST",
-    headers: {
-      "x-api-key": key,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
+    headers: { "x-goog-api-key": key, "content-type": "application/json" },
     body: JSON.stringify({
-      model: process.env.OCR_MODEL || DEFAULT_MODEL,
-      max_tokens: maxTokens,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "image", source: { type: "base64", media_type: image.mime, data: base64 } },
-            { type: "text", text: prompt },
-          ],
-        },
-      ],
+      contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
+      generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(maxTokens, 2048), temperature: 0 },
     }),
     signal: AbortSignal.timeout(28000),
   });
@@ -110,8 +100,8 @@ async function askClaude(
     throw new Error(`AI OCR request failed (${res.status}) ${body.slice(0, 200)}`);
   }
 
-  const json = (await res.json()) as { content?: { type: string; text?: string }[] };
-  const text = (json.content || []).filter((b) => b.type === "text").map((b) => b.text || "").join("");
+  const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
+  const text = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
   const match = text.match(/\{[\s\S]*\}/);
   if (!match) throw new Error("AI OCR returned no JSON");
   try {
@@ -121,12 +111,12 @@ async function askClaude(
   }
 }
 
-export async function extractReceiptWithClaude(
+export async function extractReceiptWithAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   hints: OcrHints = {}
 ): Promise<OcrResult> {
   const today = todayISO();
-  const parsed = await askClaude(image, buildPrompt(hints, today), 400);
+  const parsed = await askAi(image, buildPrompt(hints, today), 400);
   const fields = sanitize(parsed, hints, today);
   return { ...fields, rawText: JSON.stringify(fields), source: "ai" };
 }
@@ -173,12 +163,12 @@ export type GroceryScan = {
   source: "ai" | "tesseract";
 };
 
-export async function extractGroceryWithClaude(
+export async function extractGroceryWithAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   hints: OcrHints = {}
 ): Promise<GroceryScan> {
   const today = todayISO();
-  const raw = await askClaude(image, buildGroceryPrompt(hints, today), 6000);
+  const raw = await askAi(image, buildGroceryPrompt(hints, today), 6000);
 
   const base = sanitize({ merchant: raw.store, total: raw.total, currency: raw.currency, date: raw.date }, {}, today);
   const money = (v: unknown) => {
@@ -228,8 +218,8 @@ function buildDocumentPrompt(today: string) {
   ].join("\n");
 }
 
-export async function extractDocumentWithClaude(image: { data: Uint8Array | ArrayBuffer; mime: string }): Promise<DocumentFields> {
+export async function extractDocumentWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }): Promise<DocumentFields> {
   const today = todayISO();
-  const raw = await askClaude(image, buildDocumentPrompt(today), 300);
+  const raw = await askAi(image, buildDocumentPrompt(today), 300);
   return sanitizeDocumentFields(raw, today);
 }
