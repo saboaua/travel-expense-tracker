@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatDate, todayISO } from "@/lib/utils";
 import { DOC_KINDS, kindHasExpiry, kindLabel, maskNumber, passportStatus, type DocKind, type TravelDocument } from "@/lib/documents";
+import { takeQuickScan } from "@/lib/quick-scan";
 import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, removeTravelDocument, saveTravelDocument, updateTravelDocument, type DocQuality } from "@/lib/document-upload";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
@@ -88,6 +89,18 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   }, [tripId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // A photo or PDF sent here by Scan or Upload on the dashboard: open the form with it, as if it had just been picked
+  useEffect(() => {
+    if (tripId || new URLSearchParams(window.location.search).get("quick") !== "1") return;
+    takeQuickScan("document").then((f) => {
+      if (!f) return;
+      setEditing(null);
+      setAdding(true);
+      pick(f, true);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the page opens
+  }, []);
 
   const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
 

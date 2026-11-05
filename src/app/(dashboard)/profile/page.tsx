@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Camera, User } from "lucide-react";
 import { PasswordCard } from "@/components/profile/PasswordCard";
 import { TelegramCard } from "@/components/profile/TelegramCard";
+import { HomePlaceCard } from "@/components/profile/HomePlaceCard";
 
 interface Profile {
   id: string;
@@ -333,6 +334,8 @@ export default function ProfilePage() {
           </form>
         </CardContent>
       </Card>
+
+      <HomePlaceCard />
 
       <PasswordCard />
 

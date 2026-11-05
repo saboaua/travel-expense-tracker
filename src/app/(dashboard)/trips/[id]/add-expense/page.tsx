@@ -16,6 +16,7 @@ import { extractReceipt } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { takeQuickScan } from "@/lib/quick-scan";
+import { ScanChip } from "@/components/scan/ScanChip";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
@@ -53,11 +54,13 @@ export default function AddExpensePage() {
   const [duplicate, setDuplicate] = useState<{ item: QueuedExpense; matches: DuplicateMatch[] } | null>(null);
   const categories = useExpenseCategories();
   const [tripReady, setTripReady] = useState(false);
+  const [tripName, setTripName] = useState("");
   const quickHandled = useRef(false);
 
   useEffect(() => {
-    supabase.from("trips").select("currency").eq("id", tripId).single().then(({ data }) => {
+    supabase.from("trips").select("name, currency").eq("id", tripId).single().then(({ data }) => {
       if (data?.currency) setCurrency(data.currency);
+      if (data?.name) setTripName(data.name);
       setTripReady(true);
     });
   }, [supabase, tripId]);
@@ -67,7 +70,7 @@ export default function AddExpensePage() {
     if (!tripReady || quickHandled.current) return;
     quickHandled.current = true;
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
-    takeQuickScan(tripId).then((f) => {
+    takeQuickScan(`trip:${tripId}`).then((f) => {
       if (!f) return;
       setPendingCrop(f);
     });
@@ -271,6 +274,9 @@ export default function AddExpensePage() {
       <Link href={`/trips/${tripId}`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4" /> Back to trip
       </Link>
+      <div className="mb-4 empty:hidden">
+        <ScanChip currentKey={`trip:${tripId}`} label={`${tripName || "This trip"} \u00b7 Business`} />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>Add Expense</CardTitle>

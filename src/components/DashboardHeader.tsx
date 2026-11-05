@@ -1,23 +1,22 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Camera, Loader2, Plus, ShieldCheck, WifiOff, X } from "lucide-react";
-import { compressReceiptImage } from "@/lib/compress-image";
-import { stashQuickScan } from "@/lib/quick-scan";
+import { ShieldCheck, WifiOff } from "lucide-react";
+import { ScanLauncher } from "@/components/scan/ScanLauncher";
+import type { HomePlace, ScanOption } from "@/lib/scan-destination";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { AppNotification } from "@/lib/notifications";
-
-export type HeaderTrip = { id: string; name: string; destination: string | null; range: string };
 
 type Props = {
   firstName: string | null;
   initials: string;
   avatarUrl: string | null;
   activeCount: number;
-  /** Active trips, the most likely receipt target first */
-  trips: HeaderTrip[];
+  /** Everywhere a receipt can go (trips, groceries, projects, documents) for this person */
+  scanOptions: ScanOption[];
+  /** The person's home place from their profile, so a scan at home suggests Personal */
+  home?: HomePlace | null;
   notifications?: AppNotification[];
   /** Hide Quick Scan / New Trip for roles without the Trips feature */
   canUseTrips?: boolean;
@@ -31,15 +30,9 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [], canUseTrips = true, weather }: Props) {
-  const router = useRouter();
-  const input = useRef<HTMLInputElement>(null);
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, scanOptions, home = null, notifications = [], canUseTrips = true, weather }: Props) {
   const [greeting, setGreeting] = useState("Welcome back");
   const [online, setOnline] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [pending, setPending] = useState<File | null>(null); // photo waiting for a trip choice
-  const [choice, setChoice] = useState<string>(trips[0]?.id ?? "");
-  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     setGreeting(greetingFor(new Date().getHours()));
@@ -52,32 +45,6 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
       window.removeEventListener("offline", sync);
     };
   }, []);
-
-  const go = async (file: File, tripId: string) => {
-    setBusy(true);
-    const stored = await stashQuickScan(file, tripId);
-    router.push(`/trips/${tripId}/add-expense${stored ? "?quick=1" : ""}`);
-  };
-
-  const onPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0];
-    e.target.value = "";
-    if (!selected) return;
-    setNotice(null);
-    if (trips.length === 0) return setNotice("Create a trip first, then scan your receipts into it.");
-
-    setBusy(true);
-    let processed = selected;
-    try {
-      processed = await compressReceiptImage(selected);
-    } catch {
-      // keep original
-    }
-    if (trips.length === 1) return go(processed, trips[0].id);
-    setBusy(false);
-    setChoice(trips[0].id);
-    setPending(processed);
-  };
 
   const name = firstName || "";
   const subtitle = `Track corporate expenses & itineraries \u2022 ${activeCount} active trip${activeCount !== 1 ? "s" : ""}`;
@@ -117,69 +84,9 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
         {weather}
         </div>
 
-        {canUseTrips && (
-        <div className="mt-4 grid grid-cols-2 gap-3 md:max-w-md">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => input.current?.click()}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-70"
-          >
-            {busy ? <Loader2 className="h-5 w-5 animate-spin" /> : <Camera className="h-5 w-5" />}
-            Quick Scan
-          </button>
-          <Link
-            href="/trips/new"
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-primary/10 text-sm font-semibold text-primary transition-colors hover:bg-primary/15"
-          >
-            <Plus className="h-5 w-5" />
-            New Trip
-          </Link>
-        </div>
-        )}
-
-        {notice && (
-          <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            {notice}{" "}
-            <Link href="/trips/new" className="font-semibold underline">
-              New trip
-            </Link>
-          </p>
-        )}
-        <input ref={input} type="file" accept="image/*" capture="environment" className="hidden" onChange={onPhoto} />
+        <ScanLauncher options={scanOptions} home={home} showNewTrip={canUseTrips} />
       </div>
 
-      {pending && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label="Choose a trip for this receipt">
-          <div className="w-full max-w-md rounded-t-2xl bg-card p-5 shadow-xl sm:rounded-xl">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-base font-semibold">Which trip is this receipt for?</h2>
-              <button type="button" onClick={() => setPending(null)} className="rounded-lg p-1 text-muted-foreground" aria-label="Cancel">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="max-h-[50vh] space-y-2 overflow-y-auto">
-              {trips.map((t) => (
-                <label key={t.id} className={`flex cursor-pointer items-center gap-3 rounded-xl border p-3 ${choice === t.id ? "border-primary bg-primary/5" : ""}`}>
-                  <input type="radio" name="trip" value={t.id} checked={choice === t.id} onChange={() => setChoice(t.id)} />
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-medium">{t.name}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{[t.destination, t.range].filter(Boolean).join(" \u00b7 ")}</span>
-                  </span>
-                </label>
-              ))}
-            </div>
-            <button
-              type="button"
-              disabled={busy || !choice}
-              onClick={() => pending && go(pending, choice)}
-              className="mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-primary text-sm font-semibold text-primary-foreground disabled:opacity-70"
-            >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Continue
-            </button>
-          </div>
-        </div>
-      )}
     </>
   );
 }

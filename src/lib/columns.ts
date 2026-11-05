@@ -40,6 +40,8 @@ export const BRANDING_COLS_BASE = "app_name, logo_url, primary_color";
 export const BRANDING_COLS = `${BRANDING_COLS_BASE}, login_logo_size, privacy_policy, support_email, personal_enabled`;
 
 export const PROFILE_HOME_COLS = "first_name, last_name, full_name, avatar_url, role";
+/** Home place comes from migration_home_place.sql; an older database does not have it yet. */
+export const PROFILE_HOME_PLACE_COLS = `${PROFILE_HOME_COLS}, home_country, home_city`;
 
 /** True when an error means "a column in my select list does not exist" (a migration has not been run). */
 export function isMissingColumn(err: { code?: string; message?: string } | null | undefined): boolean {

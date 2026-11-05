@@ -4,7 +4,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Plane, MapPin, Clock } from "lucide-react";
 import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
-import { DashboardHeader, type HeaderTrip } from "@/components/DashboardHeader";
+import { DashboardHeader } from "@/components/DashboardHeader";
+import { buildScanOptions } from "@/lib/scan-destination";
 import { getDestinationInfo } from "@/lib/destination";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
@@ -17,7 +18,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, tileSummary, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
-import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, PROFILE_HOME_COLS, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -33,11 +34,12 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select(PROFILE_HOME_COLS)
-    .eq("id", user?.id)
-    .single();
+  const { data: profileData } = await withColumnFallback(
+    (cols) => supabase.from("profiles").select(cols).eq("id", user?.id).single(),
+    PROFILE_HOME_PLACE_COLS,
+    PROFILE_HOME_COLS
+  );
+  const profile = profileData as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
 
   const { data: trips } = await supabase
     .from("trips")
@@ -93,6 +95,18 @@ export default async function DashboardPage() {
         supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("user_id", user?.id).eq("status", "active"),
       ]);
       if (!g.error && !pr.error) personalSummary = summarizePersonal(g.data, pr.data as never);
+    }
+  }
+
+  // Active home projects and personal trips: places a scanned receipt can go
+  let scanProjects: { id: string; kind: string; name: string; destination: string | null; start_date: string | null; end_date: string | null; status: string | null }[] = [];
+  let personalOn = false;
+  if (myPerms.has("personal")) {
+    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
+    if (!(flag && flag.personal_enabled === false)) {
+      personalOn = true;
+      const pj = await supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", user?.id).eq("status", "active").order("created_at", { ascending: false });
+      if (!pj.error) scanProjects = (pj.data || []) as typeof scanProjects;
     }
   }
 
@@ -158,13 +172,14 @@ export default async function DashboardPage() {
         : (firstName || "?").slice(0, 2)
   ).toUpperCase();
 
-  // Quick Scan target order: in progress, then still-open past trips (receipts keep arriving), then upcoming
-  const quickScanTrips: HeaderTrip[] = [...ongoing, ...ended, ...upcoming].map((t) => ({
-    id: t.id,
-    name: t.name,
-    destination: t.destination,
-    range: formatDateRange(t.start_date, t.end_date),
-  }));
+  // Scan / Upload targets. Trips: in progress, then still-open past trips (receipts keep arriving), then upcoming
+  const scanOptions = buildScanOptions({
+    trips: [...ongoing, ...ended, ...upcoming].map((t) => ({ id: t.id, name: t.name, destination: t.destination, start_date: t.start_date, end_date: t.end_date, range: formatDateRange(t.start_date, t.end_date) })),
+    projects: scanProjects,
+    canTrips: myPerms.has("trips"),
+    canPersonal: personalOn,
+    canDocuments: myPerms.has("documents"),
+  });
 
   // Tiles for the person's own documents (not tied to a trip), soonest to expire first
   const accountDocs = sortForTiles(docRows.filter((d) => !d.trip_id));
@@ -300,7 +315,8 @@ export default async function DashboardPage() {
         initials={initials}
         avatarUrl={profile?.avatar_url || null}
         activeCount={activeCount}
-        trips={quickScanTrips}
+        scanOptions={scanOptions}
+        home={profile?.home_country || profile?.home_city ? { country: profile?.home_country, city: profile?.home_city } : null}
         notifications={notifications}
         canUseTrips={myPerms.has("trips")}
         weather={<WeatherCard inline />}

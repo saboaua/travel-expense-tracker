@@ -174,6 +174,30 @@ try {
     await ctx.close();
   });
 
+  /* ---------- scan and upload ---------- */
+  const JPEG = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
+  await test("Upload with one active trip goes straight to its form, with a Change button", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("button", { name: "Scan" }).waitFor();
+    await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.waitForURL((u) => u.pathname === `/trips/${TRIP_ID}/add-expense`, { timeout: 60_000 });
+    await page.getByText("Miami Conference \u00b7 Business").waitFor();
+    await page.getByRole("button", { name: "Change" }).waitFor();
+    await ctx.close();
+  });
+
+  await test("a PDF can only be kept as a document: the sheet offers just that", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "policy.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF") });
+    await page.getByRole("dialog", { name: "Where does this go?" }).waitFor();
+    await page.getByRole("button", { name: "Save to Document" }).waitFor();
+    await ctx.close();
+  });
+
   /* ---------- adding an expense ---------- */
   await test("adding an expense saves it and shows it on the trip", async () => {
     const { ctx, page } = await newPage();

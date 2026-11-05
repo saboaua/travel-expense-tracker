@@ -2,7 +2,7 @@
 
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
+import { ScanChip } from "@/components/scan/ScanChip";
+import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
 import { extractGroceryReceipt } from "@/lib/receipt-extract";
@@ -87,6 +89,23 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       }
     })();
   }, [receiptId]);
+
+  // Photo sent here by Scan or Upload on the dashboard: show it and read it once the categories are known
+  const quickHandled = useRef(false);
+  useEffect(() => {
+    if (receiptId || quickHandled.current || categoryNames.length === 0) return;
+    quickHandled.current = true;
+    if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
+    takeQuickScan("grocery").then((f) => {
+      if (!f) return;
+      setFile(f);
+      const reader = new FileReader();
+      reader.onload = () => setPreview(reader.result as string);
+      reader.readAsDataURL(f);
+      scan(f);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
+  }, [categoryNames.length]);
 
   const scan = async (f: File) => {
     setScanning(true);
@@ -210,6 +229,11 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       <Link href={receiptId ? `${BACK}/${receiptId}` : BACK} className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
+      {!receiptId && (
+        <div className="mb-4 empty:hidden">
+          <ScanChip currentKey="grocery" label="Groceries \u00b7 Personal" />
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{receiptId ? "Edit grocery receipt" : "Add grocery receipt"}</CardTitle>

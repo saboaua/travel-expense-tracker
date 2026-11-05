@@ -13,6 +13,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Trash2 } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
+import { ScanChip } from "@/components/scan/ScanChip";
+import { takeQuickScan } from "@/lib/quick-scan";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { extractReceipt } from "@/lib/receipt-extract";
 import { toUsd } from "@/lib/currencies";
@@ -44,13 +46,15 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   const [error, setError] = useState<string | null>(null);
   // When editing, keep the saved exchange rate until the currency is changed on purpose
   const [rateLocked, setRateLocked] = useState(!!expenseId);
+  const [projectName, setProjectName] = useState("");
   const { rate, setRate, source } = useUsdRate(currency, !rateLocked);
 
   // Default currency = the project's budget currency; load the expense when editing
   useEffect(() => {
     const supabase = createClient();
-    supabase.from("personal_projects").select("currency").eq("id", projectId).single().then(({ data }) => {
+    supabase.from("personal_projects").select("name, currency").eq("id", projectId).single().then(({ data }) => {
       if (data?.currency && !expenseId) setCurrency(data.currency);
+      if (data?.name) setProjectName(data.name);
     });
     if (!expenseId) return;
     supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("id", expenseId).eq("project_id", projectId).single().then(async ({ data }) => {
@@ -90,6 +94,21 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       setScanning(false);
     }
   };
+
+  // Photo sent here by Scan or Upload on the dashboard: show it and read it, as if it had just been picked
+  const scanKey = `${kind === "home_project" ? "project" : "ptrip"}:${projectId}`;
+  useEffect(() => {
+    if (expenseId || new URLSearchParams(window.location.search).get("quick") !== "1") return;
+    takeQuickScan(scanKey).then((f) => {
+      if (!f) return;
+      setFile(f);
+      const reader = new FileReader();
+      reader.onload = () => setPreview(reader.result as string);
+      reader.readAsDataURL(f);
+      scan(f);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the form opens
+  }, []);
 
   const usd = amount && Number(rate) > 0 ? toUsd(Number(amount), Number(rate)) : null;
 
@@ -154,6 +173,11 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       <Link href={back} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>
+      {!expenseId && (
+        <div className="mb-4 empty:hidden">
+          <ScanChip currentKey={scanKey} label={`${projectName || "This project"} \u00b7 ${kind === "home_project" ? "Home project" : "Personal travel"}`} />
+        </div>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{expenseId ? "Edit expense" : "Add expense"}</CardTitle>
