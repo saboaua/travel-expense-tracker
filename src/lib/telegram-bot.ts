@@ -41,7 +41,7 @@ const HELP = [
   "/help — this message",
 ].join("\n");
 
-const ADMIN_HELP = ["", "Admins:", "/digest — today's summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
+const ADMIN_HELP = ["", "Admins:", "/digest — your own daily summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
 
 export async function handleMessage(supabase: Db, message: TgMessage) {
   const chatId = message.chat.id;
@@ -69,7 +69,7 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
   }
   if (cmd?.name === "digest") {
     if (profile.role !== "admin") return void (await sendMessage(chatId, "That command is for admins."));
-    return void (await sendMessage(chatId, digestText(await gatherDigest(supabase, todayISO()))));
+    return void (await sendMessage(chatId, digestText(await gatherDigest(supabase, todayISO(), profile.id))));
   }
   if (cmd?.name === "notify") {
     const prefs = await loadPrefs(supabase, profile.id);

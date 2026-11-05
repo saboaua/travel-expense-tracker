@@ -4,7 +4,7 @@
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDaysISO, daysBetween, formatDateRange } from "@/lib/utils";
-import { escapeHtml, sendToAdmins, sendToUser } from "@/lib/telegram-notify";
+import { escapeHtml, sendToUser } from "@/lib/telegram-notify";
 
 /**
  * Reminders go out in two steps: about a week before (7 days, or 6 if the first chance was missed) and the day
@@ -55,24 +55,27 @@ export async function runTripReminders(supabase: SupabaseClient, today: string, 
 export type DigestStats = {
   today: string;
   newExpenses: number;
-  activePeople: number;
   newPeople: number;
   openSupport: number | null;
   startingSoon: { name: string; start_date: string }[];
   activeTrips: number;
 };
 
+/** One admin's own summary: only their trips and expenses, plus the two admin duties (sign-ups, support). */
 export function digestText(s: DigestStats): string {
-  const lines = [`📊 <b>Daily summary</b> · ${s.today}`, ""];
-  lines.push(`Yesterday: ${s.newExpenses} ${s.newExpenses === 1 ? "expense" : "expenses"} from ${s.activePeople} ${s.activePeople === 1 ? "person" : "people"}`);
-  if (s.newPeople) lines.push(`New sign-ups: ${s.newPeople}`);
+  const lines = [`📊 <b>Your daily summary</b> · ${s.today}`, ""];
+  lines.push(`Yesterday: ${s.newExpenses} ${s.newExpenses === 1 ? "expense" : "expenses"} added`);
   lines.push(`Trips in progress: ${s.activeTrips}`);
   if (s.startingSoon.length) {
     lines.push("", "Starting this week:");
     for (const t of s.startingSoon.slice(0, 5)) lines.push(`• ${escapeHtml(t.name)} (${formatDateRange(t.start_date, null)})`);
     if (s.startingSoon.length > 5) lines.push(`• and ${s.startingSoon.length - 5} more`);
   }
-  if (s.openSupport) lines.push("", `Open support requests: ${s.openSupport}`);
+  if (s.newPeople || s.openSupport) {
+    lines.push("", "<b>Admin</b>");
+    if (s.newPeople) lines.push(`New sign-ups: ${s.newPeople}`);
+    if (s.openSupport) lines.push(`Open support requests: ${s.openSupport}`);
+  }
   return lines.join("\n");
 }
 
@@ -89,22 +92,20 @@ async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ dat
 /** Aruba has no daylight saving, so a local day is a fixed 04:00 UTC to 04:00 UTC window. */
 const dayStartUtc = (date: string) => `${date}T04:00:00.000Z`;
 
-export async function gatherDigest(supabase: SupabaseClient, today: string): Promise<DigestStats> {
+export async function gatherDigest(supabase: SupabaseClient, today: string, adminId: string): Promise<DigestStats> {
   const yesterday = addDaysISO(today, -1);
   const from = dayStartUtc(yesterday);
   const to = dayStartUtc(today);
-  const exp = { data: await fetchAll((f, t) => supabase.from("expenses").select("id, user_id").gte("created_at", from).lt("created_at", to).order("id").range(f, t)) };
+  const exp = await fetchAll((f, t) => supabase.from("expenses").select("id").eq("user_id", adminId).gte("created_at", from).lt("created_at", to).order("id").range(f, t));
   const [people, trips, soon, support] = await Promise.all([
     supabase.from("profiles").select("id").gte("created_at", from).lt("created_at", to),
-    supabase.from("trips").select("id").eq("status", "active").lte("start_date", today),
-    supabase.from("trips").select("name, start_date").eq("status", "active").gt("start_date", today).lte("start_date", addDaysISO(today, 7)).order("start_date"),
+    supabase.from("trips").select("id").eq("user_id", adminId).eq("status", "active").lte("start_date", today),
+    supabase.from("trips").select("name, start_date").eq("user_id", adminId).eq("status", "active").gt("start_date", today).lte("start_date", addDaysISO(today, 7)).order("start_date"),
     supabase.from("support_requests").select("id").eq("status", "new"),
   ]);
-  const rows = (exp.data || []) as { user_id: string }[];
   return {
     today,
-    newExpenses: rows.length,
-    activePeople: new Set(rows.map((r) => r.user_id)).size,
+    newExpenses: exp.length,
     newPeople: (people.data || []).length,
     openSupport: support.error ? null : (support.data || []).length,
     startingSoon: (soon.data || []) as { name: string; start_date: string }[],
@@ -112,7 +113,13 @@ export async function gatherDigest(supabase: SupabaseClient, today: string): Pro
   };
 }
 
+/** Every admin gets a summary of their own data, never anyone else's. */
 export async function runAdminDigest(supabase: SupabaseClient, today: string) {
-  const stats = await gatherDigest(supabase, today);
-  return sendToAdmins(supabase, digestText(stats), { dedupeKey: `digest:${today}` });
+  const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin").not("telegram_id", "is", null);
+  let sent = 0;
+  for (const a of admins || []) {
+    const stats = await gatherDigest(supabase, today, a.id as string);
+    if ((await sendToUser(supabase, a.id as string, "admin_alert", digestText(stats), { dedupeKey: `digest:${today}` })) === "sent") sent++;
+  }
+  return sent;
 }
