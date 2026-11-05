@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
+import { Briefcase, Wallet } from "lucide-react";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
 const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDashboard"), {
@@ -36,7 +37,7 @@ export function DashboardViews({ rows, projects, today, personalTiles, children 
     }
   };
 
-  const tab = (v: View, label: string) => (
+  const tab = (v: View, label: string, Icon: typeof Briefcase) => (
     <button
       type="button"
       role="tab"
@@ -44,19 +45,20 @@ export function DashboardViews({ rows, projects, today, personalTiles, children 
       aria-selected={view === v}
       aria-controls={`dash-panel-${v}`}
       onClick={() => choose(v)}
-      className={`min-h-10 flex-1 rounded-lg px-5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none ${
+      className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-6 text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none ${
         view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
       }`}
     >
+      <Icon className={`h-5 w-5 ${view === v ? "text-primary" : ""}`} aria-hidden="true" />
       {label}
     </button>
   );
 
   return (
     <>
-      <div role="tablist" aria-label="Dashboard view" className="flex w-full rounded-xl bg-muted p-1 sm:inline-flex sm:w-auto">
-        {tab("business", "Business")}
-        {tab("personal", "Personal")}
+      <div role="tablist" aria-label="Dashboard view" className="flex w-full rounded-2xl bg-muted p-1 sm:inline-flex sm:w-auto">
+        {tab("business", "Business", Briefcase)}
+        {tab("personal", "Personal", Wallet)}
       </div>
       <div id="dash-panel-business" role="tabpanel" aria-labelledby="dash-tab-business" hidden={view !== "business"} className="space-y-6">
         {children}

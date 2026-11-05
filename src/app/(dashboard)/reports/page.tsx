@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
 import { MonthlyDownload } from "@/components/MonthlyDownload";
 import { MonthlyBars } from "@/components/reports/MonthlyBars";
@@ -95,6 +96,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-8">
+      <BusinessTabs />
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Reports</h1>

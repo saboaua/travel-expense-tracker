@@ -156,6 +156,24 @@ try {
     await ctx.close();
   });
 
+  /* ---------- business navigation ---------- */
+  await test("one Business link; Trips and Reports switch inside it", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const side = page.locator("aside");
+    await side.getByRole("link", { name: "Business" }).waitFor();
+    assert((await side.getByRole("link", { name: /^Trips$/ }).count()) === 0, "separate Trips link still in the menu");
+    assert((await side.getByRole("link", { name: /^Reports$/ }).count()) === 0, "separate Reports link still in the menu");
+    await side.getByRole("link", { name: "Business" }).click();
+    await page.waitForURL((u) => u.pathname === "/trips");
+    const sw = page.getByRole("navigation", { name: "Business sections" });
+    await sw.getByRole("link", { name: "Reports" }).click();
+    await page.waitForURL((u) => u.pathname === "/reports");
+    await page.getByRole("navigation", { name: "Business sections" }).getByRole("link", { name: "Trips" }).waitFor();
+    await ctx.close();
+  });
+
   /* ---------- adding an expense ---------- */
   await test("adding an expense saves it and shows it on the trip", async () => {
     const { ctx, page } = await newPage();

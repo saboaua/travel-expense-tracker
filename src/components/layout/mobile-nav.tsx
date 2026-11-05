@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Plane, FileText, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
+import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,6 @@ import { useAccess } from "@/lib/use-access";
 
 const baseItems = [
   { href: "/", label: "Home", icon: Home, feature: null },
-  { href: "/trips", label: "Trips", icon: Plane, feature: "trips" },
-  { href: "/reports", label: "Reports", icon: FileText, feature: "reports" },
   { href: "/personal", label: "Personal", icon: Wallet, feature: "personal" },
 ] as const;
 
@@ -52,7 +50,9 @@ export function MobileNav() {
 
   const personalShown = personalEnabled && perms.has("personal");
   const mainItems: { href: string; label: string; icon: typeof Home }[] = [
-    ...baseItems.filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal")),
+    ...baseItems.slice(0, 1),
+    ...(perms.has("trips") || perms.has("reports") ? [{ href: perms.has("trips") ? "/trips" : "/reports", label: "Business", icon: Briefcase }] : []),
+    ...baseItems.slice(1).filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal")),
     // Documents live inside Personal; a role that has Documents but not Personal still gets its own tab
     ...(perms.has("documents") && !personalShown ? [{ href: "/documents", label: "Docs", icon: FolderOpen }] : []),
   ];
@@ -107,7 +107,7 @@ export function MobileNav() {
       <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 md:hidden">
         <div className="flex items-center justify-around h-16">
           {mainItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
+            const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} className={cn("flex flex-col items-center justify-center flex-1 h-full gap-1 text-xs transition-colors", isActive ? "text-primary font-medium" : "text-muted-foreground hover:text-foreground")}>

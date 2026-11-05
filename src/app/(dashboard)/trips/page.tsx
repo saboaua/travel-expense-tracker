@@ -6,6 +6,7 @@ import type { ListTrip } from "@/lib/trips-list";
 import { Button } from "@/components/ui/button";
 import { Plus, Plane } from "lucide-react";
 import { todayISO } from "@/lib/utils";
+import { BusinessTabs } from "@/components/layout/BusinessTabs";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
 type Trip = {
@@ -53,7 +54,8 @@ export default async function TripsPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8">
+    <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-8">
+      <BusinessTabs />
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Trips</h1>
