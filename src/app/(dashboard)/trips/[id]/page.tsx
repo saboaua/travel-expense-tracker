@@ -10,6 +10,7 @@ import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
 import { CategoryDonut } from "@/components/reports/CategoryDonut";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, tripPassportCheck } from "@/lib/documents";
+import { EXPENSE_COLS, TRIP_COLS } from "@/lib/columns";
 
 function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
@@ -31,10 +32,10 @@ export default async function TripDetailPage({ params, searchParams }: { params:
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: trip } = await supabase.from("trips").select("*").eq("id", id).eq("user_id", user?.id).single();
+  const { data: trip } = await supabase.from("trips").select(TRIP_COLS).eq("id", id).eq("user_id", user?.id).single();
   if (!trip) notFound();
 
-  const { data: expenses } = await supabase.from("expenses").select("*").eq("trip_id", id).order("expense_date", { ascending: false });
+  const { data: expenses } = await supabase.from("expenses").select(EXPENSE_COLS).eq("trip_id", id).order("expense_date", { ascending: false });
   const list = expenses || [];
 
   const { data: passportDocs } = await supabase.from("travel_documents").select("kind, expiry_date").eq("user_id", user?.id).eq("kind", "passport");

@@ -17,6 +17,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
+import { EXPENSE_COLS } from "@/lib/columns";
 
 
 export default function EditExpensePage() {
@@ -45,7 +46,7 @@ export default function EditExpensePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.from("expenses").select("*").eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
+    supabase.from("expenses").select(EXPENSE_COLS).eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
       if (error || !data) {
         setError(error?.message || "Expense not found");
         setLoaded(true);

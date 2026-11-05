@@ -14,6 +14,7 @@ import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isC
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 const LEVEL_STYLE = {
   expired: "bg-red-100 text-red-700",
@@ -58,15 +59,20 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    let q = supabase.from("travel_documents").select("*").order("created_at", { ascending: false });
-    q = tripId ? q.eq("trip_id", tripId) : q.is("trip_id", null);
-    const { data, error } = await q;
+    const { data, error } = await withColumnFallback(
+      (cols) => {
+        const q = supabase.from("travel_documents").select(cols).order("created_at", { ascending: false });
+        return tripId ? q.eq("trip_id", tripId) : q.is("trip_id", null);
+      },
+      DOCUMENT_COLS,
+      DOCUMENT_COLS_BASE
+    );
     if (error) {
       setError(/relation|schema cache/i.test(error.message) ? "Documents are not set up yet. Run supabase/migration_documents.sql in Supabase." : error.message);
       setLoading(false);
       return;
     }
-    const list = (data || []) as TravelDocument[];
+    const list = (data || []) as unknown as TravelDocument[];
     setDocs(list);
     onChange?.(list);
     // Signed links are made up front so they open in one tap (no popup blocking on phones)

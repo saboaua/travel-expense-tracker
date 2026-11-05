@@ -16,6 +16,7 @@ import { DOC_KINDS, type DocKind } from "@/lib/documents";
 import { DOC_ACCEPT, DOC_BUCKET, saveTravelDocument } from "@/lib/document-upload";
 import { useTravelCategories } from "@/lib/use-categories";
 import { useCurrencies } from "@/lib/use-currencies";
+import { TRIP_COLS } from "@/lib/columns";
 
 
 /** One form for creating and editing a trip, so both screens always look and validate the same. */
@@ -44,7 +45,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
     if (!tripId) return;
     createClient()
       .from("trips")
-      .select("*")
+      .select(TRIP_COLS)
       .eq("id", tripId)
       .single()
       .then(({ data, error }) => {

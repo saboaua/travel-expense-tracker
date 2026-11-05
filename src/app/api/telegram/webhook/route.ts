@@ -12,6 +12,7 @@ import {
 import { runReceiptOcr, type OcrResult } from "@/lib/ocr";
 import { AI_IMAGE_TYPES, aiOcrConfigured, extractReceiptWithClaude } from "@/lib/ocr-ai";
 import { CURRENCIES, rateToUsd, toUsd } from "@/lib/currencies";
+import { TELEGRAM_PENDING_COLS } from "@/lib/columns";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -133,7 +134,7 @@ async function handleCallback(supabase: ReturnType<typeof admin>, cq: TgCallback
       return void (await sendMessage(chatId, "Could not save your trip choice. Please try again."));
     }
 
-    const { data: pending } = await supabase.from("telegram_pending").select("*").eq("telegram_id", fromId).maybeSingle();
+    const { data: pending } = await supabase.from("telegram_pending").select(TELEGRAM_PENDING_COLS).eq("telegram_id", fromId).maybeSingle();
     if (pending) {
       const { error: delErr } = await supabase.from("telegram_pending").delete().eq("telegram_id", fromId);
       if (delErr) console.error("[telegram] clear pending", delErr.message);

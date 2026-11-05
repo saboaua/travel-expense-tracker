@@ -16,6 +16,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, tileSummary, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
+import { PROFILE_HOME_COLS } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -33,13 +34,13 @@ export default async function DashboardPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("*")
+    .select(PROFILE_HOME_COLS)
     .eq("id", user?.id)
     .single();
 
   const { data: trips } = await supabase
     .from("trips")
-    .select("*, expenses(amount, amount_usd, currency)")
+    .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
     .eq("user_id", user?.id)
     .order("start_date", { ascending: true });
 

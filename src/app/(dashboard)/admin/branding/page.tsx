@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Palette, Upload, ImageIcon, Plane } from "lucide-react";
+import { BRANDING_COLS, BRANDING_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -35,15 +36,17 @@ export default function AdminBrandingPage() {
 
   useEffect(() => {
     async function load() {
-      const { data } = await supabase
-        .from("app_settings")
-        .select("*")
-        .eq("id", 1)
-        .single();
+      // The later columns need migrations; without them the page still loads the name, logo and color.
+      const { data: row } = await withColumnFallback(
+        (cols) => supabase.from("app_settings").select(cols).eq("id", 1).single(),
+        BRANDING_COLS,
+        BRANDING_COLS_BASE
+      );
 
+      const data = row as unknown as { app_name?: string | null; logo_url?: string | null; primary_color?: string | null; login_logo_size?: number | null; privacy_policy?: string | null; support_email?: string | null; personal_enabled?: boolean | null } | null;
       if (data) {
         setAppName(data.app_name || "Travel Expense Tracker");
-        setLogoUrl(data.logo_url);
+        setLogoUrl(data.logo_url ?? null);
         setPrimaryColor(data.primary_color || "#4f46e5");
         setLogoSize(data.login_logo_size || 56);
         setPrivacyPolicy(data.privacy_policy || "");

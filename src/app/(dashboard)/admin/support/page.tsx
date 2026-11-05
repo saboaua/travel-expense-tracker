@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { LifeBuoy, Mail, Check, Trash2, RotateCcw, RefreshCw } from "lucide-react";
+import { SUPPORT_REQUEST_COLS } from "@/lib/columns";
 
 type SupportRequest = {
   id: string;
@@ -32,7 +33,7 @@ export default function AdminSupportPage() {
     setLoading(true);
     const { data, error } = await supabase
       .from("support_requests")
-      .select("*")
+      .select(SUPPORT_REQUEST_COLS)
       .order("created_at", { ascending: false })
       .limit(200);
     if (error) {

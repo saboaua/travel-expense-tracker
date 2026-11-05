@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { GROCERY_RECEIPT_COLS } from "@/lib/columns";
 
 type Receipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null };
 type Item = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null };
@@ -24,7 +25,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
     const supabase = createClient();
     (async () => {
       const [r, i] = await Promise.all([
-        supabase.from("grocery_receipts").select("*").eq("id", id).single(),
+        supabase.from("grocery_receipts").select(GROCERY_RECEIPT_COLS).eq("id", id).single(),
         supabase.from("grocery_items").select("id, name, category, quantity, unit_price, unit, line_total").eq("receipt_id", id).order("created_at"),
       ]);
       if (!r.data) return setError(r.error?.message || "Receipt not found");

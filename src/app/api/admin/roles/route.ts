@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminService, ROLES_MISSING, isMissingTable } from "@/lib/admin-roles-api";
 import { logAudit } from "@/lib/audit";
 import { FEATURE_KEYS, RESERVED_ROLE_KEYS, effectivePermissions, sanitizeLabel, sanitizePermissions, slugifyRoleKey, type RoleRecord } from "@/lib/access";
+import { ROLE_COLS } from "@/lib/columns";
 
 export const dynamic = "force-dynamic";
 
@@ -10,7 +11,7 @@ export async function GET() {
   const ctx = await requireAdminService();
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
 
-  const { data: roles, error } = await ctx.admin.from("roles").select("*").order("is_system", { ascending: false }).order("created_at");
+  const { data: roles, error } = await ctx.admin.from("roles").select(ROLE_COLS).order("is_system", { ascending: false }).order("created_at");
   if (error) return NextResponse.json({ error: isMissingTable(error.message) ? ROLES_MISSING : error.message, setupNeeded: isMissingTable(error.message) }, { status: isMissingTable(error.message) ? 200 : 500 });
 
   const { data: profiles } = await ctx.admin.from("profiles").select("role");

@@ -16,6 +16,7 @@ import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery"
 import { extractGroceryReceipt } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS } from "@/lib/columns";
 
 const BACK = "/personal/groceries";
 
@@ -59,8 +60,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     }
     (async () => {
       const [r, i] = await Promise.all([
-        supabase.from("grocery_receipts").select("*").eq("id", receiptId).single(),
-        supabase.from("grocery_items").select("*").eq("receipt_id", receiptId).order("created_at"),
+        supabase.from("grocery_receipts").select(GROCERY_RECEIPT_COLS).eq("id", receiptId).single(),
+        supabase.from("grocery_items").select(GROCERY_ITEM_COLS).eq("receipt_id", receiptId).order("created_at"),
       ]);
       if (!r.data) return setError("Receipt not found");
       setStore(r.data.store);

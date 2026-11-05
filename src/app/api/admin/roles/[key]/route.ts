@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminService } from "@/lib/admin-roles-api";
 import { logAudit } from "@/lib/audit";
 import { FEATURE_KEYS, isSystemRole, sanitizeLabel, sanitizePermissions } from "@/lib/access";
+import { ROLE_COLS } from "@/lib/columns";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +13,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ ke
   const { key } = await params;
   if (key === "admin") return NextResponse.json({ error: "The Admin role always has full access and cannot be changed." }, { status: 400 });
 
-  const { data: role } = await ctx.admin.from("roles").select("*").eq("key", key).maybeSingle();
+  const { data: role } = await ctx.admin.from("roles").select(ROLE_COLS).eq("key", key).maybeSingle();
   if (!role) return NextResponse.json({ error: "Role not found." }, { status: 404 });
 
   const body = await request.json().catch(() => ({}));

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, kindLabel, passportStatus, type TravelDocument } from "@/lib/documents";
 import { formatDate, todayISO } from "@/lib/utils";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 const BADGE = { expired: "bg-red-100 text-red-700", critical: "bg-red-100 text-red-700", renew: "bg-amber-100 text-amber-800", ok: "bg-emerald-100 text-emerald-700" } as const;
 
@@ -13,8 +14,12 @@ export default async function DocumentsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.id).single();
   const canSeePersonal = (await loadPermissions(supabase, (profile?.role as string) || "user")).has("personal");
-  const { data } = await supabase.from("travel_documents").select("*").eq("user_id", user?.id).order("created_at", { ascending: false });
-  const all = (data || []) as TravelDocument[];
+  const { data } = await withColumnFallback(
+    (cols) => supabase.from("travel_documents").select(cols).eq("user_id", user?.id).order("created_at", { ascending: false }),
+    DOCUMENT_COLS,
+    DOCUMENT_COLS_BASE
+  );
+  const all = (data || []) as unknown as TravelDocument[];
   const passport = currentPassport(all);
   const status = passport?.expiry_date ? passportStatus(passport.expiry_date, todayISO()) : null;
 

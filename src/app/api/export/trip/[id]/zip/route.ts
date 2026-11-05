@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { buildTripWorkbook } from "@/lib/export";
 import JSZip from "jszip";
+import { EXPENSE_COLS, TRIP_EXPORT_COLS } from "@/lib/columns";
 
 export async function GET(
   _request: Request,
@@ -20,7 +21,7 @@ export async function GET(
 
   const { data: trip } = await supabase
     .from("trips")
-    .select("*")
+    .select(TRIP_EXPORT_COLS)
     .eq("id", id)
     .eq("user_id", user.id)
     .single();
@@ -31,7 +32,7 @@ export async function GET(
 
   const { data: expenses } = await supabase
     .from("expenses")
-    .select("*")
+    .select(EXPENSE_COLS)
     .eq("trip_id", id)
     .order("expense_date", { ascending: true });
 

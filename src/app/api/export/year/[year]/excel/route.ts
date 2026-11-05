@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildYearlyWorkbook } from "@/lib/export";
+import { EXPENSE_COLS, TRIP_EXPORT_COLS } from "@/lib/columns";
 
 export async function GET(
   _request: Request,
@@ -23,7 +24,7 @@ export async function GET(
 
   const { data: trips } = await supabase
     .from("trips")
-    .select("*, expenses(*)")
+    .select(`${TRIP_EXPORT_COLS}, expenses(${EXPENSE_COLS})`)
     .eq("user_id", user.id)
     .gte("start_date", `${year}-01-01`)
     .lte("start_date", `${year}-12-31`)

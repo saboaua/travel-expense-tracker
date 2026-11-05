@@ -19,6 +19,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { PERSONAL_EXPENSE_COLS } from "@/lib/columns";
 
 
 export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: PersonalKind; projectId: string; expenseId?: string }) {
@@ -52,7 +53,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       if (data?.currency && !expenseId) setCurrency(data.currency);
     });
     if (!expenseId) return;
-    supabase.from("personal_expenses").select("*").eq("id", expenseId).eq("project_id", projectId).single().then(async ({ data }) => {
+    supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("id", expenseId).eq("project_id", projectId).single().then(async ({ data }) => {
       if (!data) return setError("Expense not found");
       setMerchant(data.merchant || "");
       setAmount(String(data.amount));

@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { compressReceiptImage } from "@/lib/compress-image";
 import type { DocKind, TravelDocument } from "@/lib/documents";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE } from "@/lib/columns";
 
 export const DOC_BUCKET = "documents";
 const MAX_DOC_BYTES = 10 * 1024 * 1024;
@@ -74,13 +75,14 @@ export async function saveTravelDocument(supabase: SupabaseClient, userId: strin
       notes: input.notes?.trim() || null,
       file_path: path,
     })
-    .select("*")
+    // document_number only exists after migration_documents_number.sql; ask for it back only when it was sent
+    .select(input.document_number?.trim() ? DOCUMENT_COLS : DOCUMENT_COLS_BASE)
     .single();
   if (error) {
     if (path) await supabase.storage.from(DOC_BUCKET).remove([path]).catch(() => {});
     throw new Error(dbMessage(error.message));
   }
-  return data as TravelDocument;
+  return data as unknown as TravelDocument;
 }
 
 const dbMessage = (m: string) =>

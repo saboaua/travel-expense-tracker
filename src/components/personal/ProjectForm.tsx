@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { useCurrencies } from "@/lib/use-currencies";
+import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
 
 
 export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId?: string }) {
@@ -33,7 +34,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
     if (!projectId) return;
     createClient()
       .from("personal_projects")
-      .select("*")
+      .select(PERSONAL_PROJECT_COLS)
       .eq("id", projectId)
       .single()
       .then(({ data }) => {

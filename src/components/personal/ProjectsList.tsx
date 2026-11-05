@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ArrowLeft, Plus, Hammer, Plane, ChevronRight } from "lucide-react";
 import { KIND_META, type PersonalKind, type PersonalProject } from "@/lib/personal/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
 
 type Row = PersonalProject & { personal_expenses: { amount_usd: number }[] };
 
@@ -22,7 +23,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
   useEffect(() => {
     createClient()
       .from("personal_projects")
-      .select("*, personal_expenses(amount_usd)")
+      .select(`${PERSONAL_PROJECT_COLS}, personal_expenses(amount_usd)`)
       .eq("kind", kind)
       .order("created_at", { ascending: false })
       .then(({ data, error }) => {

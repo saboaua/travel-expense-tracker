@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logSecurityEvent, getRequestMeta } from "@/lib/audit";
 import { writeSecurityEvent } from "@/lib/security-log";
 import { loadPermissions } from "@/lib/access-server";
+import { AUDIT_LOG_COLS, SECURITY_EVENT_COLS } from "@/lib/columns";
 
 export const dynamic = "force-dynamic";
 
@@ -54,8 +55,8 @@ export async function GET(request: Request) {
     const until = to ? new Date(to + "T23:59:59.999").toISOString() : null;
     const supabase = adminClient();
 
-    let eventsQuery = supabase.from("security_events").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(500);
-    let auditsQuery = supabase.from("audit_logs").select("*").gte("created_at", since).order("created_at", { ascending: false }).limit(500);
+    let eventsQuery = supabase.from("security_events").select(SECURITY_EVENT_COLS).gte("created_at", since).order("created_at", { ascending: false }).limit(500);
+    let auditsQuery = supabase.from("audit_logs").select(AUDIT_LOG_COLS).gte("created_at", since).order("created_at", { ascending: false }).limit(500);
     if (until) {
       eventsQuery = eventsQuery.lte("created_at", until);
       auditsQuery = auditsQuery.lte("created_at", until);

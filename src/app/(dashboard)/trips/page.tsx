@@ -36,7 +36,7 @@ export default async function TripsPage() {
 
   const { data } = await supabase
     .from("trips")
-    .select("*, expenses(amount, amount_usd, currency)")
+    .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
     .eq("user_id", user?.id)
     .order("start_date", { ascending: false });
 

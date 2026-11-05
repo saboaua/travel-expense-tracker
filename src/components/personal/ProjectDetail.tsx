@@ -12,6 +12,7 @@ import { KIND_META, type PersonalExpense, type PersonalKind, type PersonalProjec
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { Bars } from "@/components/personal/Bars";
 import { daysBetween, formatCurrency, formatDate } from "@/lib/utils";
+import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS } from "@/lib/columns";
 
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
@@ -25,8 +26,8 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
 
   const load = useCallback(async () => {
     const [p, e] = await Promise.all([
-      supabase.from("personal_projects").select("*").eq("id", id).single(),
-      supabase.from("personal_expenses").select("*").eq("project_id", id).order("expense_date", { ascending: false }),
+      supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("id", id).single(),
+      supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("project_id", id).order("expense_date", { ascending: false }),
     ]);
     if (p.error || !p.data) setError(p.error?.message || "Not found");
     else setProject(p.data as PersonalProject);
