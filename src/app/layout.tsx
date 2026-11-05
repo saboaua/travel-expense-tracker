@@ -6,7 +6,7 @@ import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotice } from "@/components/UpdateNotice";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { AppSplash } from "@/components/AppSplash";
-import { startupImages } from "@/lib/splash";
+import { SPLASH_CSS, startupImages } from "@/lib/splash";
 import { ConfirmProvider } from "@/components/ui/confirm";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -54,6 +54,7 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <style dangerouslySetInnerHTML={{ __html: SPLASH_CSS }} />
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.className} antialiased`}>

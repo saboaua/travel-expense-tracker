@@ -1,7 +1,7 @@
 // Minimal service worker so the app meets PWA install criteria.
 // Network-first for pages (with a small offline notice); cache-first for same-origin static files.
 
-const CACHE = "expense-tracker-v2";
+const CACHE = "expense-tracker-v3";
 
 const OFFLINE_PAGE =
   '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title></head>' +
@@ -16,9 +16,11 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))
-    ).then(() => self.clients.claim())
+    Promise.all([
+      // Start the page request while the worker is still waking up, which shortens the blank moment when the app opens
+      self.registration.navigationPreload ? self.registration.navigationPreload.enable().catch(() => {}) : null,
+      caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k)))),
+    ]).then(() => self.clients.claim())
   );
 });
 
@@ -29,7 +31,7 @@ self.addEventListener("fetch", (event) => {
   // Pages: network first. Offline: a short notice instead of the browser's error page.
   if (req.mode === "navigate") {
     event.respondWith(
-      fetch(req).catch(() => new Response(OFFLINE_PAGE, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }))
+      (event.preloadResponse ? event.preloadResponse.then((r) => r || fetch(req)) : fetch(req)).catch(() => new Response(OFFLINE_PAGE, { status: 503, headers: { "Content-Type": "text/html; charset=utf-8" } }))
     );
     return;
   }
