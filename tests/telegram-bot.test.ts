@@ -125,6 +125,13 @@ eq(fake.table("telegram_notify_prefs").find((p: { user_id: string }) => p.user_i
 await handleMessage(db, { chat: { id: 9 }, from: { id: 999 }, photo: [{ file_id: "x" }] });
 yes(lastText().includes("not linked"), "unlinked accounts are refused");
 
+// The default-trip button refuses a trip that is not yours
+await press(`trip:${OTHER_TRIP}`);
+eq(fake.table("profiles").find((p: { id: string }) => p.id === USER).telegram_default_trip_id, null, "someone else's trip cannot become your default");
+yes(lastText().includes("cannot find that trip"), "...and you are told");
+await press(`trip:${TRIP}`);
+eq(fake.table("profiles").find((p: { id: string }) => p.id === USER).telegram_default_trip_id, TRIP, "your own trip can");
+
 await fake.close();
 globalThis.fetch = realFetch;
 }

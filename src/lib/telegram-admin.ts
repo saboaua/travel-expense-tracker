@@ -11,15 +11,15 @@ import { writeAuditRow } from "@/lib/audit";
 import { EMAIL_RE, createUserAccount, roleExists } from "@/lib/user-admin";
 
 type Db = SupabaseClient;
-export type AdminProfile = { id: string; email?: string | null; role: string | null };
+type AdminProfile = { id: string; email?: string | null; role: string | null };
 
-export const NEWUSER_HELP = "Usage: /newuser email@example.com [role:assistant] First Last\nThe role is optional (default: user). Admin accounts are created in the web app.";
-export const ROLE_HELP = "Usage: /role email@example.com rolename\nAdmin roles are changed in the web app.";
+const NEWUSER_HELP = "Usage: /newuser email@example.com [role:assistant] First Last\nThe role is optional (default: user). Admin accounts are created in the web app.";
+const ROLE_HELP = "Usage: /role email@example.com rolename\nAdmin roles are changed in the web app.";
 
 const META = { ip: "telegram", userAgent: "telegram-bot", origin: "telegram" };
 const clean = (v: string) => v.trim().slice(0, 80);
 
-export type NewUserArgs = { email: string; role: string; firstName: string | null; lastName: string | null };
+type NewUserArgs = { email: string; role: string; firstName: string | null; lastName: string | null };
 
 export function parseNewUser(args: string[]): { ok: true; value: NewUserArgs } | { ok: false; error: string } {
   const email = (args[0] || "").trim().toLowerCase();
@@ -94,7 +94,8 @@ export async function requestRoleChange(supabase: Db, chatId: number, isPrivate:
 export async function resolveAdminAction(supabase: Db, chatId: number, isPrivate: boolean, admin: AdminProfile, data: string) {
   const m = /^act:(ok|no):([0-9a-f-]{36})$/.exec(data);
   if (!m) return;
-  if (!isPrivate || admin.role !== "admin") return void (await sendMessage(chatId, PRIVATE_ONLY));
+  if (admin.role !== "admin") return void (await sendMessage(chatId, "That action is for admins."));
+  if (!isPrivate) return void (await sendMessage(chatId, PRIVATE_ONLY));
   const [, choice, id] = m;
   const { data: action } = await supabase.from("telegram_admin_actions").select("id, admin_id, kind, payload, expires_at, done_at").eq("id", id).maybeSingle();
   if (!action || action.admin_id !== admin.id) return void (await sendMessage(chatId, "I could not find that request."));

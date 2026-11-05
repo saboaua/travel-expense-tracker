@@ -3,7 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createFakeSupabase, SERVICE_KEY } from "./e2e/fake-supabase.mjs";
 import { addDaysISO } from "../src/lib/utils";
-import { digestText, reminderDaysFor, reminderText } from "../src/lib/telegram-reminders";
+import { digestText, reminderText, reminderTier } from "../src/lib/telegram-reminders";
 
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 const yes = (c: unknown, m: string) => eq(!!c, true, m);
@@ -26,10 +26,14 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 const today = "2026-11-05";
 const trip = (s: string) => ({ id: "t", user_id: "u", name: "Miami <Conf>", destination: "Miami", start_date: s, end_date: addDaysISO(s, 3) });
 
-eq(reminderDaysFor(trip(addDaysISO(today, 7)), today), 7, "7 days out gets a reminder");
-eq(reminderDaysFor(trip(addDaysISO(today, 1)), today), 1, "1 day out gets a reminder");
-eq(reminderDaysFor(trip(addDaysISO(today, 3)), today), null, "3 days out does not");
-eq(reminderDaysFor(trip(today), today), null, "a trip starting today does not");
+eq(reminderTier(trip(addDaysISO(today, 7)), today), { tier: 7, days: 7 }, "7 days out is the week reminder");
+eq(reminderTier(trip(addDaysISO(today, 6)), today), { tier: 7, days: 6 }, "6 days out is a second chance for it");
+eq(reminderTier(trip(addDaysISO(today, 1)), today), { tier: 1, days: 1 }, "1 day out is the day-before reminder");
+eq(reminderTier(trip(today), today), { tier: 1, days: 0 }, "the start day is a second chance for it");
+eq(reminderTier(trip(addDaysISO(today, 3)), today), null, "3 days out gets nothing");
+eq(reminderTier(trip(addDaysISO(today, 8)), today), null, "8 days out gets nothing");
+eq(reminderTier(trip(addDaysISO(today, -1)), today), null, "a started trip gets nothing");
+yes(reminderText(trip(today), 0).includes("starts today"), "text says today");
 yes(reminderText(trip(addDaysISO(today, 1)), 1).includes("starts tomorrow"), "text says tomorrow");
 yes(reminderText(trip(addDaysISO(today, 7)), 7).includes("in 7 days"), "text says in 7 days");
 yes(reminderText(trip(addDaysISO(today, 7)), 7).includes("Miami &lt;Conf&gt;"), "trip name is escaped");
@@ -78,6 +82,17 @@ async function main() {
   eq(q.sent, 0, "quiet hours hold the reminder");
   const later = await runTripReminders(db, today, noon);
   eq(later.sent, 1, "...and it still goes once quiet hours end");
+
+  // A reminder held back today is sent tomorrow (6 days out) and not again after that
+  fake.table("telegram_sent_log").length = 0;
+  const nextDay = addDaysISO(today, 1);
+  const missed = await runTripReminders(db, nextDay, night);
+  eq(missed.sent, 0, "held back again at night");
+  const retry = await runTripReminders(db, nextDay, noon);
+  eq(retry.sent, 1, "next day the week reminder goes out (6 days out; the other traveller has reminders off)");
+  const third = await runTripReminders(db, addDaysISO(today, 2), noon);
+  eq(third.sent, 1, "two days on only the other trip (now 1 day out) is reminded");
+  eq((await runTripReminders(db, addDaysISO(today, 3), noon)).sent, 0, "nothing repeats");
 
   sent.length = 0;
   eq(await runAdminDigest(db, today), 1, "digest goes to the one linked admin");

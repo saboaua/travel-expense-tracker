@@ -6,24 +6,28 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { addDaysISO, daysBetween, formatDateRange } from "@/lib/utils";
 import { escapeHtml, sendToAdmins, sendToUser } from "@/lib/telegram-notify";
 
-/** Days before the start date that a reminder goes out. */
-export const REMINDER_DAYS = [7, 1] as const;
-
+/**
+ * Reminders go out in two steps: about a week before (7 days, or 6 if the first chance was missed) and the day
+ * before (1 day, or the start day itself if that was missed). The job runs once a day, so a reminder held back by
+ * someone's quiet hours or a failed send gets one more try the next day. Each step is sent once per trip.
+ */
 export type ReminderTrip = { id: string; user_id: string; name: string; destination: string | null; start_date: string; end_date: string | null };
 
-export function reminderDaysFor(trip: Pick<ReminderTrip, "start_date">, today: string): number | null {
-  const d = daysBetween(today, trip.start_date);
-  return (REMINDER_DAYS as readonly number[]).includes(d) ? d : null;
+export function reminderTier(trip: Pick<ReminderTrip, "start_date">, today: string): { tier: 7 | 1; days: number } | null {
+  const days = daysBetween(today, trip.start_date);
+  if (days === 7 || days === 6) return { tier: 7, days };
+  if (days === 1 || days === 0) return { tier: 1, days };
+  return null;
 }
 
 export function reminderText(trip: ReminderTrip, days: number): string {
-  const when = days === 1 ? "tomorrow" : `in ${days} days`;
+  const when = days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
   const where = trip.destination ? ` to ${escapeHtml(trip.destination)}` : "";
   return [
     `✈️ <b>${escapeHtml(trip.name)}</b> starts ${when}`,
     `${formatDateRange(trip.start_date, trip.end_date)}${where}`,
     "",
-    days === 1 ? "Packing check: passport, cards and chargers. Send receipts here as you go." : "Time to check your travel documents. During the trip, send receipts here and I will file them.",
+    days <= 1 ? "Packing check: passport, cards and chargers. Send receipts here as you go." : "Time to check your travel documents. During the trip, send receipts here and I will file them.",
   ].join("\n");
 }
 
@@ -32,14 +36,14 @@ export async function runTripReminders(supabase: SupabaseClient, today: string, 
     .from("trips")
     .select("id, user_id, name, destination, start_date, end_date")
     .eq("status", "active")
-    .gte("start_date", addDaysISO(today, 1))
-    .lte("start_date", addDaysISO(today, Math.max(...REMINDER_DAYS)));
+    .gte("start_date", today)
+    .lte("start_date", addDaysISO(today, 7));
   const out = { checked: 0, sent: 0, skipped: 0 };
   for (const t of (trips || []) as ReminderTrip[]) {
-    const days = reminderDaysFor(t, today);
-    if (days == null) continue;
+    const step = reminderTier(t, today);
+    if (!step) continue;
     out.checked++;
-    const r = await sendToUser(supabase, t.user_id, "trip_reminder", reminderText(t, days), { dedupeKey: `trip:${t.id}:${days}d`, now });
+    const r = await sendToUser(supabase, t.user_id, "trip_reminder", reminderText(t, step.days), { dedupeKey: `trip:${t.id}:${step.tier}d`, now });
     if (r === "sent") out.sent++;
     else out.skipped++;
   }
@@ -72,6 +76,16 @@ export function digestText(s: DigestStats): string {
   return lines.join("\n");
 }
 
+/** Reads every row of a query, 1000 at a time (the server never returns more than that in one go). */
+async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += 1000) {
+    const { data } = await page(from, from + 999);
+    all.push(...(data || []));
+    if (!data || data.length < 1000) return all;
+  }
+}
+
 /** Aruba has no daylight saving, so a local day is a fixed 04:00 UTC to 04:00 UTC window. */
 const dayStartUtc = (date: string) => `${date}T04:00:00.000Z`;
 
@@ -79,8 +93,8 @@ export async function gatherDigest(supabase: SupabaseClient, today: string): Pro
   const yesterday = addDaysISO(today, -1);
   const from = dayStartUtc(yesterday);
   const to = dayStartUtc(today);
-  const [exp, people, trips, soon, support] = await Promise.all([
-    supabase.from("expenses").select("id, user_id").gte("created_at", from).lt("created_at", to),
+  const exp = { data: await fetchAll((f, t) => supabase.from("expenses").select("id, user_id").gte("created_at", from).lt("created_at", to).order("id").range(f, t)) };
+  const [people, trips, soon, support] = await Promise.all([
     supabase.from("profiles").select("id").gte("created_at", from).lt("created_at", to),
     supabase.from("trips").select("id").eq("status", "active").lte("start_date", today),
     supabase.from("trips").select("name, start_date").eq("status", "active").gt("start_date", today).lte("start_date", addDaysISO(today, 7)).order("start_date"),

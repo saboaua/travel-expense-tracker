@@ -99,6 +99,8 @@ export async function handleCallback(supabase: Db, cq: TgCallback) {
   // Default trip from /trips (and a held receipt waiting for a trip, as before)
   if (data.startsWith("trip:")) {
     const tripId = data.slice(5);
+    const { data: own } = await supabase.from("trips").select("id").eq("id", tripId).eq("user_id", profile.id).maybeSingle();
+    if (!own) return void (await sendMessage(chatId, "I cannot find that trip. Send /trips to pick again."));
     const { error } = await supabase.from("profiles").update({ telegram_default_trip_id: tripId }).eq("id", profile.id).select("id");
     if (error) {
       console.error("[telegram] default trip", error.message);
@@ -175,10 +177,9 @@ async function handleUpload(supabase: Db, chatId: number, profile: Profile, file
 
 async function askWhere(supabase: Db, chatId: number, profile: Profile, pending: Pending, title: string, reason?: string | null, choices?: ScanOption[]) {
   const options = choices ?? (await loadOptions(supabase, profile));
-  const list = options.length ? options : [];
-  if (!list.length) return void (await sendMessage(chatId, "There is nowhere to save this. Create a trip in the web app first."));
+  if (!options.length) return void (await sendMessage(chatId, "There is nowhere to save this. Create a trip in the web app first."));
   const isPdf = pending.mime === "application/pdf";
-  const shown = isPdf ? [...list].sort((a) => (a.kind === "document" ? -1 : 0)) : list;
+  const shown = isPdf ? [...options].sort((a) => (a.kind === "document" ? -1 : 0)) : options;
   await sendMessage(chatId, `<b>${title}</b>${reason ? `\n${escapeHtml(reason)}` : ""}`, {
     reply_markup: { inline_keyboard: shown.slice(0, 8).map((o, i) => [{ text: `${i === 0 ? "✓ " : ""}${o.label} · ${o.sub.split(" · ")[0]}`.slice(0, 60), callback_data: destCallback(o.key) }]) },
   });
