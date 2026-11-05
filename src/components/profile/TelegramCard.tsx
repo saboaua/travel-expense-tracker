@@ -5,6 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Copy, ExternalLink, Send } from "lucide-react";
+import { TelegramPrefs } from "@/components/profile/TelegramPrefs";
 
 type TelegramStatus = {
   linked: boolean;
@@ -92,7 +93,7 @@ export function TelegramCard() {
             Telegram
           </CardTitle>
           <CardDescription>
-            Enable it to get a personal link that opens the chatbot for receipt uploads
+            Enable it to send receipts and documents from Telegram: business trips, groceries, home projects, personal travel and documents
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -104,6 +105,8 @@ export function TelegramCard() {
               <span className="text-muted-foreground">Not connected</span>
             )}
           </p>
+
+          {status?.linked && <TelegramPrefs />}
 
           {status?.linked ? (
             <div className="flex flex-wrap gap-2">

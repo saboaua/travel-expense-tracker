@@ -10,6 +10,9 @@ const now = () => Math.floor(Date.now() / 1000);
 export const SERVICE_KEY = "service-role-key";
 export const ANON_KEY = "anon-key";
 
+// Tables whose primary key is not "id": an upsert without on_conflict matches on it
+const PRIMARY_KEYS = { telegram_pending: "telegram_id", telegram_notify_prefs: "user_id" };
+
 // table -> relation name -> how rows are joined
 const RELATIONS = {
   trips: { expenses: { many: "trip_id" } },
@@ -135,7 +138,7 @@ export function createFakeSupabase() {
     if (req.method === "POST") {
       const items = Array.isArray(body) ? body : [body];
       const made = [];
-      const conflict = url.searchParams.get("on_conflict") || "id";
+      const conflict = url.searchParams.get("on_conflict") || PRIMARY_KEYS[name] || "id";
       for (const it of items) {
         if (/merge-duplicates|ignore-duplicates/.test(prefer)) {
           const ex = rows.find((r) => r[conflict] != null && r[conflict] === it[conflict]);

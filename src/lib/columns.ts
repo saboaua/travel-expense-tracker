@@ -34,6 +34,8 @@ export const AUDIT_LOG_COLS = "id, created_at, action, entity_type, entity_id, a
 export const SUPPORT_REQUEST_COLS = "id, name, email, subject, message, status, created_at";
 
 export const TELEGRAM_PENDING_COLS = "telegram_id, file_id, file_name, mime";
+/** saved_ref and saved_path come from migration_telegram_v2.sql */
+export const TELEGRAM_PENDING_COLS_V2 = `${TELEGRAM_PENDING_COLS}, saved_ref, saved_path`;
 
 export const BRANDING_COLS_BASE = "app_name, logo_url, primary_color";
 /** The rest arrive with later migrations (login support, personal section). */

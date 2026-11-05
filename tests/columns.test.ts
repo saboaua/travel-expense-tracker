@@ -48,6 +48,7 @@ check("GROCERY_RECEIPT_COLS", "grocery_receipts", C.GROCERY_RECEIPT_COLS);
 check("GROCERY_ITEM_COLS", "grocery_items", C.GROCERY_ITEM_COLS);
 check("DOCUMENT_COLS", "travel_documents", C.DOCUMENT_COLS);
 check("PROFILE_HOME_PLACE_COLS", "profiles", C.PROFILE_HOME_PLACE_COLS);
+check("TELEGRAM_PENDING_COLS_V2", "telegram_pending", C.TELEGRAM_PENDING_COLS_V2);
 check("DOCUMENT_TILE_COLS", "travel_documents", C.DOCUMENT_TILE_COLS);
 check("ROLE_COLS", "roles", C.ROLE_COLS);
 check("SECURITY_EVENT_COLS", "security_events", C.SECURITY_EVENT_COLS);
