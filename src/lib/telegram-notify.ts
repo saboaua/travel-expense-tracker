@@ -121,10 +121,11 @@ export async function sendToUser(
 }
 
 /** Sends to every linked admin who allows admin alerts. */
-export async function sendToAdmins(supabase: SupabaseClient, text: string, opts: { dedupeKey?: string; urgent?: boolean; replyMarkup?: unknown } = {}): Promise<number> {
+export async function sendToAdmins(supabase: SupabaseClient, text: string, opts: { dedupeKey?: string; urgent?: boolean; replyMarkup?: unknown; excludeUserId?: string | null } = {}): Promise<number> {
   const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin").not("telegram_id", "is", null);
   let sent = 0;
   for (const a of admins || []) {
+    if (opts.excludeUserId && a.id === opts.excludeUserId) continue;
     if ((await sendToUser(supabase, a.id as string, "admin_alert", text, opts)) === "sent") sent++;
   }
   return sent;

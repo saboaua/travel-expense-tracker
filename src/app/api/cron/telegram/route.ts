@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { todayISO } from "@/lib/utils";
+import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { runAdminDigest, runTripReminders } from "@/lib/telegram-reminders";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: true, today, reminders, digestSent });
   } catch (e) {
     console.error("[cron] telegram", e instanceof Error ? e.message : e);
+    await notifyJobFailure(supabase, "Telegram reminders");
     return NextResponse.json({ error: "Job failed" }, { status: 500 });
   }
 }

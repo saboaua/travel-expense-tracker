@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
+import { notifySupportRequest } from "@/lib/telegram-alerts";
 import { scanFields } from "@/lib/suspicious-input";
 
 export const dynamic = "force-dynamic";
@@ -77,17 +78,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many messages. Please try again later." }, { status: 429 });
   }
 
-  const { error } = await db.from("support_requests").insert({
+  const { data: created, error } = await db.from("support_requests").insert({
     name,
     email,
     subject: subject || null,
     message,
     ip,
-  });
+  }).select("id").single();
   if (error) {
     console.error("support insert failed:", error);
     return NextResponse.json({ error: "Could not send your message. Please try again." }, { status: 500 });
   }
+
+  // Tell the admins on Telegram (never blocks or fails the request)
+  if (created?.id) await notifySupportRequest(db, name, subject || null, String(created.id));
 
   // Optional email notification (needs RESEND_API_KEY and a support email in Branding)
   try {

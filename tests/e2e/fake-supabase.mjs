@@ -191,6 +191,13 @@ export function createFakeSupabase() {
       return id ? send(res, 200, userJson(users.get(id))) : send(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
     }
     if (p === "/logout") return send(res, 204);
+    if (p === "/admin/users" && req.method === "POST") {
+      const email = String(body.email || "").toLowerCase();
+      if ([...users.values()].some((x) => x.email === email)) return send(res, 422, { code: 422, error_code: "email_exists", msg: "A user with this email address has already been registered" });
+      const id = randomUUID();
+      users.set(id, { id, email, password: body.password, user_metadata: body.user_metadata || {} });
+      return send(res, 200, userJson(users.get(id)));
+    }
     if (p === "/admin/users" && req.method === "GET") return send(res, 200, { users: [...users.values()].map((u) => ({ ...userJson(u), last_sign_in_at: null, email_confirmed_at: "2026-01-01T00:00:00Z", banned_until: null })), aud: "authenticated" });
     return send(res, 404, { msg: "not found" });
   }

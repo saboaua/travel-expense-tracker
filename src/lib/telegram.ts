@@ -1,4 +1,3 @@
-import { randomInt } from "crypto";
 import { createClient } from "@supabase/supabase-js";
 
 const API = "https://api.telegram.org";
@@ -121,6 +120,14 @@ export async function setWebhook(url: string, secret?: string | null, token?: st
   };
   if (token) return tgWithToken(token, "setWebhook", body);
   return tg("setWebhook", body);
+}
+
+/** Secure random integer below `max` using Web Crypto, so this file also loads in the edge runtime (middleware). */
+function randomInt(max: number) {
+  const limit = Math.floor(0x100000000 / max) * max;
+  const buf = new Uint32Array(1);
+  do crypto.getRandomValues(buf); while (buf[0] >= limit);
+  return buf[0] % max;
 }
 
 export function randomCode(len = 6) {

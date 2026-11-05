@@ -1,5 +1,6 @@
 // Edge-safe security event writer (no next/headers), usable from middleware and route handlers.
 import { createClient } from "@supabase/supabase-js";
+import { notifySecurityEvent } from "./telegram-alerts";
 import { clampDetails, createLogLimiter } from "./log-limit";
 
 type RequestMeta = { ip: string; userAgent: string; origin: string; country: string | null };
@@ -54,6 +55,7 @@ export async function writeSecurityEvent(meta: RequestMeta, e: SecurityEventInpu
     });
     // A failed insert does not throw; without this the log would silently stay empty
     if (error) console.error("[security-log] insert failed:", error.message);
+    else await notifySecurityEvent(db, { eventType: e.eventType, severity: e.severity, emailAttempted: e.emailAttempted, details: e.details });
   } catch (err) {
     console.error("[security-log]", err);
   }

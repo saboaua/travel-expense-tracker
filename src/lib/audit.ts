@@ -1,5 +1,7 @@
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { headers } from "next/headers";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { notifySecurityEvent, alertAdminsOfAudit } from "@/lib/telegram-alerts";
 
 function getServiceClient() {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -23,16 +25,17 @@ export async function getRequestMeta() {
   return { ip, userAgent, origin, country };
 }
 
-export async function logAudit(params: {
+export type AuditParams = {
   actorId?: string | null;
   actorEmail?: string | null;
   action: string;
   entityType?: string;
   entityId?: string;
   details?: Record<string, unknown>;
-}) {
-  const meta = await getRequestMeta();
-  const supabase = getServiceClient();
+};
+
+/** Writes one audit row with the given client. Used by logAudit and by the Telegram bot (no request headers there). */
+export async function writeAuditRow(supabase: SupabaseClient, meta: { ip: string; userAgent: string; origin: string }, params: AuditParams) {
   const { error } = await supabase.from("audit_logs").insert({
     actor_id: params.actorId || null,
     actor_email: params.actorEmail || null,
@@ -45,6 +48,13 @@ export async function logAudit(params: {
     origin: meta.origin,
   });
   if (error) throw new Error(error.message);
+}
+
+export async function logAudit(params: AuditParams) {
+  const meta = await getRequestMeta();
+  const supabase = getServiceClient();
+  await writeAuditRow(supabase, meta, params);
+  await alertAdminsOfAudit(supabase, params);
 }
 
 export async function logSecurityEvent(params: {
@@ -68,5 +78,5 @@ export async function logSecurityEvent(params: {
     details: params.details || {},
   });
   if (error) throw new Error(error.message);
+  await notifySecurityEvent(supabase, { eventType: params.eventType, severity: params.severity, emailAttempted: params.emailAttempted, details: params.details });
 }
-

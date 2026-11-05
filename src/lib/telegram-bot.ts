@@ -7,6 +7,7 @@ import { answerCallback, sendMessage } from "@/lib/telegram";
 import { PERSONAL_PROJECT_COLS, TELEGRAM_PENDING_COLS, TELEGRAM_PENDING_COLS_V2, isMissingColumn } from "@/lib/columns";
 import { loadPermissions } from "@/lib/access-server";
 import { buildScanOptions, type ScanOption } from "@/lib/scan-destination";
+import { requestNewUser, requestRoleChange, resolveAdminAction } from "@/lib/telegram-admin";
 import { digestText, gatherDigest } from "@/lib/telegram-reminders";
 import { applyNotifyCommand, parseCommand } from "@/lib/telegram-commands";
 import { escapeHtml, loadPrefs, savePrefs } from "@/lib/telegram-notify";
@@ -16,18 +17,18 @@ import { DOC_BUCKET } from "@/lib/document-upload";
 import { todayISO } from "@/lib/utils";
 
 type Db = SupabaseClient;
-type Profile = { id: string; full_name: string | null; telegram_id: number; telegram_default_trip_id: string | null; role: string | null };
+type Profile = { id: string; email?: string | null; full_name: string | null; telegram_id: number; telegram_default_trip_id: string | null; role: string | null };
 
 /** The parts of a Telegram update this bot reads. */
 export type TgMessage = {
-  chat: { id: number };
+  chat: { id: number; type?: string };
   from?: { id: number };
   text?: string;
   caption?: string;
   photo?: { file_id: string }[];
   document?: { file_id: string; mime_type?: string; file_name?: string };
 };
-export type TgCallback = { id: string; data?: string; from: { id: number }; message: { chat: { id: number } } };
+export type TgCallback = { id: string; data?: string; from: { id: number }; message: { chat: { id: number; type?: string } } };
 
 const HELP = [
   "Send a photo or PDF and I will file it for you:",
@@ -39,6 +40,8 @@ const HELP = [
   "/notify — messages from the app",
   "/help — this message",
 ].join("\n");
+
+const ADMIN_HELP = ["", "Admins:", "/digest — today's summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
 
 export async function handleMessage(supabase: Db, message: TgMessage) {
   const chatId = message.chat.id;
@@ -56,9 +59,14 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
   const profile = await getProfile(supabase, fromId);
   if (!profile) return void (await sendMessage(chatId, "This Telegram account is not linked yet.\n\nOpen the web app → Settings → Enable Telegram, then open the link."));
 
-  if (cmd?.name === "help") return void (await sendMessage(chatId, HELP));
+  if (cmd?.name === "help") return void (await sendMessage(chatId, profile.role === "admin" ? HELP + ADMIN_HELP : HELP));
   if (cmd?.name === "trips") return listTrips(supabase, chatId, profile);
   if (cmd?.name === "recent") return listRecent(supabase, chatId, profile.id);
+  if (cmd?.name === "newuser" || cmd?.name === "role") {
+    if (profile.role !== "admin") return void (await sendMessage(chatId, "That command is for admins."));
+    const priv = message.chat.type === "private";
+    return cmd.name === "newuser" ? requestNewUser(supabase, chatId, priv, profile, cmd.args) : requestRoleChange(supabase, chatId, priv, profile, cmd.args);
+  }
   if (cmd?.name === "digest") {
     if (profile.role !== "admin") return void (await sendMessage(chatId, "That command is for admins."));
     return void (await sendMessage(chatId, digestText(await gatherDigest(supabase, todayISO()))));
@@ -100,6 +108,8 @@ export async function handleCallback(supabase: Db, cq: TgCallback) {
     if (pending && !pending.saved_ref) return saveHeld(supabase, chatId, { ...profile, telegram_default_trip_id: tripId }, `trip:${tripId}`, pending, "Your default trip");
     return void (await sendMessage(chatId, "Default trip updated. Send a receipt whenever you are ready."));
   }
+
+  if (data.startsWith("act:")) return resolveAdminAction(supabase, chatId, cq.message.chat.type === "private", profile, data);
 
   const key = parseDestCallback(data);
   if (key) {
@@ -236,7 +246,7 @@ async function linkAccount(supabase: Db, chatId: number, telegramId: number, cod
 }
 
 async function getProfile(supabase: Db, telegramId: number): Promise<Profile | null> {
-  const { data } = await supabase.from("profiles").select("id, full_name, telegram_id, telegram_default_trip_id, role").eq("telegram_id", telegramId).maybeSingle();
+  const { data } = await supabase.from("profiles").select("id, email, full_name, telegram_id, telegram_default_trip_id, role").eq("telegram_id", telegramId).maybeSingle();
   return (data as Profile | null) ?? null;
 }
 
