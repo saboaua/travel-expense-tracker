@@ -221,6 +221,15 @@ try {
     await admin.page.getByText("Cannot log in").first().waitFor();
   });
 
+  await test("weather lives inside the welcome card on both views", async () => {
+    await admin.page.goto(`${BASE}/`);
+    const card = admin.page.locator("div.rounded-xl", { has: admin.page.getByRole("heading", { level: 1 }) }).first();
+    await card.getByText(/Weather unavailable|°/).first().waitFor(); // no weather service in the test setup, so the fallback text shows
+    await admin.page.getByRole("tab", { name: "Personal" }).click();
+    assert(await card.getByText(/Weather unavailable|°/).first().isVisible(), "weather disappeared on the Personal view");
+    await admin.page.getByRole("tab", { name: "Business" }).click();
+  });
+
   await test("admin: the Personal view of the home page opens", async () => {
     await admin.page.goto(`${BASE}/`);
     await admin.page.getByRole("tab", { name: "Personal" }).click();
@@ -228,6 +237,19 @@ try {
     await admin.page.getByRole("tab", { name: "Business" }).click();
     await admin.page.getByText("This Month").waitFor();
   });
+
+  if (process.env.E2E_SHOT) {
+    // Optional: screenshots of the welcome card with weather, for a visual check (E2E_SHOT=/some/folder)
+    for (const [name, vp] of [["desktop", { width: 1280, height: 700 }], ["phone", { width: 390, height: 844 }]]) {
+      const ctx = await browser.newContext({ viewport: vp, deviceScaleFactor: 2, storageState: await admin.ctx.storageState() });
+      const page = await ctx.newPage();
+      await page.route("**/api/weather*", (r) => r.fulfill({ json: { city: "Oranjestad", tempC: 31, code: 2, isDay: true, rainChance: 20, countryCode: "AW" } }));
+      await page.goto(`${BASE}/`);
+      await page.getByText("31").first().waitFor();
+      await page.screenshot({ path: `${process.env.E2E_SHOT}/welcome-${name}.png` });
+      await ctx.close();
+    }
+  }
 
   await admin.ctx.close();
   await browser.close();

@@ -320,6 +320,7 @@ export default async function DashboardPage() {
         trips={quickScanTrips}
         notifications={notifications}
         canUseTrips={myPerms.has("trips")}
+        weather={<WeatherCard inline />}
       />
 
       {dashRows ? (
@@ -327,16 +328,12 @@ export default async function DashboardPage() {
           rows={dashRows}
           projects={dashProjects}
           today={today}
-          shared={<WeatherCard />}
           personalTiles={myPerms.has("personal") ? <PersonalTiles summary={tileSummary(dashRows, dashProjects, today)} currency="AWG" /> : null}
         >
           {businessView}
         </DashboardViews>
       ) : (
-        <>
-          <WeatherCard />
-          {businessView}
-        </>
+        businessView
       )}
     </div>
   );

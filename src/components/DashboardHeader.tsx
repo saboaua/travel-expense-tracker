@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Camera, Loader2, Plus, ShieldCheck, WifiOff, X } from "lucide-react";
@@ -21,6 +21,8 @@ type Props = {
   notifications?: AppNotification[];
   /** Hide Quick Scan / New Trip for roles without the Trips feature */
   canUseTrips?: boolean;
+  /** Weather panel, shown beside the greeting */
+  weather?: ReactNode;
 };
 
 function greetingFor(hour: number) {
@@ -29,7 +31,7 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [], canUseTrips = true }: Props) {
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, trips, notifications = [], canUseTrips = true, weather }: Props) {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [greeting, setGreeting] = useState("Welcome back");
@@ -91,25 +93,28 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, t
           <NotificationBell notifications={notifications} />
         </div>
 
-        <div className="mt-2 flex items-center gap-4">
-          <Link href="/profile" className="relative shrink-0" aria-label="Open your profile">
-            <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary text-lg font-semibold text-primary-foreground">
-              {avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
-              ) : (
-                initials
-              )}
-            </span>
-            <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card ${online ? "bg-emerald-500" : "bg-slate-400"}`} />
-          </Link>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold md:text-2xl">
-              {greeting}
-              {name ? `, ${name}` : ""}
-            </h1>
-            <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+        <div className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-4">
+          <div className="flex min-w-0 items-center gap-4">
+            <Link href="/profile" className="relative shrink-0" aria-label="Open your profile">
+              <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </span>
+              <span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-card ${online ? "bg-emerald-500" : "bg-slate-400"}`} />
+            </Link>
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-bold md:text-2xl">
+                {greeting}
+                {name ? `, ${name}` : ""}
+              </h1>
+              <p className="truncate text-sm text-muted-foreground">{subtitle}</p>
+            </div>
           </div>
+        {weather}
         </div>
 
         {canUseTrips && (

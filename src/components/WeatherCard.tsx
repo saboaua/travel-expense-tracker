@@ -40,7 +40,10 @@ function getPosition(): Promise<{ lat: number; lon: number } | null> {
   });
 }
 
-export function WeatherCard() {
+/**
+ * `inline` is the version that lives inside the welcome card: a soft panel instead of a card of its own.
+ */
+export function WeatherCard({ inline = false }: { inline?: boolean } = {}) {
   const [state, setState] = useState<State>({ status: "loading" });
 
   useEffect(() => {
@@ -83,6 +86,28 @@ export function WeatherCard() {
     };
   }, []);
 
+  const panel = "flex w-full items-center gap-3 rounded-xl bg-primary/5 px-4 py-3 sm:w-auto sm:gap-4 sm:px-5";
+
+  if (state.status === "loading" && inline) {
+    return (
+      <div className={`${panel} min-h-[4.25rem]`} aria-busy="true">
+        <div className="h-8 w-8 animate-pulse rounded-full bg-muted" />
+        <div className="space-y-2">
+          <div className="h-3 w-20 animate-pulse rounded bg-muted" />
+          <div className="h-6 w-24 animate-pulse rounded bg-muted" />
+        </div>
+      </div>
+    );
+  }
+
+  if (state.status === "error" && inline) {
+    return (
+      <div className={`${panel} text-sm text-muted-foreground`}>
+        <MapPin className="h-4 w-4" aria-hidden="true" /> Weather unavailable right now
+      </div>
+    );
+  }
+
   if (state.status === "loading") {
     return (
       <Card className="flex min-h-[7rem] flex-col justify-center gap-3 p-5" aria-busy="true">
@@ -104,6 +129,27 @@ export function WeatherCard() {
   const { data } = state;
   const sky = skyKind(data.code);
   const fahrenheit = usesFahrenheit(data.countryCode);
+
+  if (inline) {
+    return (
+      <div className={panel}>
+        <SkyIcon kind={sky.kind} isDay={data.isDay} className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
+        <span className="sr-only">{sky.label}</span>
+        <div className="min-w-0 flex-1 sm:flex-none">
+          <p className="truncate text-xs font-medium text-muted-foreground sm:text-sm" title={data.city || undefined}>{data.city || "Your location"}</p>
+          <div className="flex items-baseline gap-3">
+            <span className="text-2xl font-bold leading-tight sm:text-3xl">{formatTemp(data.tempC, fahrenheit)}</span>
+            {data.rainChance != null && (
+              <span className="flex items-center gap-1 text-sm font-medium sm:text-base" title="Chance of rain today">
+                <Droplets className="h-4 w-4 text-sky-500" aria-hidden="true" />
+                {data.rainChance}%<span className="sr-only"> chance of rain today</span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <Card className="flex min-h-[7rem] flex-col justify-center gap-2 p-4 sm:p-5">
