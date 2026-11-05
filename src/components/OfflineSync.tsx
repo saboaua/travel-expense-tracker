@@ -100,7 +100,7 @@ export function OfflineSync() {
     <Link
       href="/pending"
       role="status"
-      className={`fixed bottom-20 left-4 z-40 inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium shadow-lg md:bottom-4 md:left-[17rem] ${tone}`}
+      className={`fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 z-40 inline-flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium shadow-lg md:bottom-4 md:left-[17rem] ${tone}`}
     >
       {icon}
       <span className="truncate">{text}</span>

@@ -1,5 +1,6 @@
 "use client";
 
+import { scrollAreaOrWindow } from "@/components/layout/ScrollArea";
 import { formatDateTime } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
@@ -109,7 +110,7 @@ export default function AdminUsersPage() {
 
   const showCredentials = (c: Credentials) => {
     setCredentials(c);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    scrollAreaOrWindow().scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleCreate = async (e: React.FormEvent) => {

@@ -1,5 +1,6 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { ScrollArea } from "@/components/layout/ScrollArea";
 import { OfflineSync } from "@/components/OfflineSync";
 
 export default function DashboardLayout({
@@ -8,11 +9,13 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-background">
+    // On phones this is a fixed-size frame: the content scrolls inside it and the bottom menu is part of the frame,
+    // so the menu is always at the bottom of the screen however the page is scrolled or bounced.
+    <div className="bg-background max-md:fixed max-md:inset-0 max-md:flex max-md:flex-col md:min-h-screen print:!static">
       <Sidebar />
-      <div className="md:pl-64">
-        <main className="pb-20 md:pb-8">{children}</main>
-      </div>
+      <ScrollArea>
+        <main className="pb-6 md:pb-8">{children}</main>
+      </ScrollArea>
       <MobileNav />
       <OfflineSync />
     </div>

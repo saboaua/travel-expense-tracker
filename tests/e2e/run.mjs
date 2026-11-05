@@ -150,6 +150,29 @@ try {
     await ctx.close();
   });
 
+  /* ---------- phone layout: bottom menu stays put ---------- */
+  await test("on a phone the bottom menu stays at the bottom while the page scrolls inside its own area", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const nav = page.locator("nav", { hasText: "Menu" });
+    await nav.waitFor();
+    const bottomOf = async () => (await nav.boundingBox()).y + (await nav.boundingBox()).height;
+    const before = await bottomOf();
+    assert(Math.abs(before - 700) < 1.5, `menu is not at the bottom of the screen (${before})`);
+    // Make the page long enough to scroll, then scroll it to the end
+    await page.evaluate(() => { const m = document.querySelector("#app-scroll main"); const pad = document.createElement("div"); pad.style.height = "2000px"; m.appendChild(pad); });
+    await page.evaluate(() => document.getElementById("app-scroll").scrollTo(0, 99999));
+    await page.waitForTimeout(300);
+    const top = await page.evaluate(() => document.getElementById("app-scroll").scrollTop);
+    assert(top > 500, "the content area did not scroll");
+    assert((await page.evaluate(() => window.scrollY)) === 0, "the whole page scrolled instead of the content area");
+    assert(Math.abs((await bottomOf()) - 700) < 1.5, "menu moved while scrolling");
+    await ctx.close();
+  });
+
   /* ---------- travel document tiles ---------- */
   await test("business page shows a tile per uploaded document, soonest to expire first", async () => {
     const docs = fake.table("travel_documents");

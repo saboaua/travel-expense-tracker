@@ -1,16 +1,24 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { SCROLL_AREA_ID } from "@/components/layout/ScrollArea";
 import { ArrowDown, Loader2 } from "lucide-react";
 
 const TRIGGER = 70; // how far (px) the page must be pulled before letting go refreshes it
 const MAX_PULL = 120;
+
+/** How far the page is scrolled: the scrolling area on phones, the window elsewhere. */
+function pageScroll() {
+  const area = document.getElementById(SCROLL_AREA_ID);
+  return Math.max(area && getComputedStyle(area).overflowY !== "visible" ? area.scrollTop : 0, window.scrollY, document.documentElement.scrollTop);
+}
 
 /** True when the touch started somewhere that scrolls or drags on its own, so the gesture is not ours. */
 function startsInsideSomethingElse(target: EventTarget | null): boolean {
   let el = target instanceof Element ? target : null;
   while (el && el !== document.body) {
     if (el.hasAttribute("data-no-pull")) return true;
+    if (el.id === SCROLL_AREA_ID) return false; // the page's own scrolling area is where pulling starts
     const style = getComputedStyle(el);
     if (style.position === "fixed") return true; // dialogs, menus, the photo cropper, the bottom bar
     const scrollsY = /(auto|scroll)/.test(style.overflowY) && el.scrollHeight > el.clientHeight;
@@ -46,7 +54,7 @@ export function PullToRefresh() {
 
     const onStart = (e: TouchEvent) => {
       s.startY = null;
-      if (e.touches.length !== 1 || window.scrollY > 0 || document.documentElement.scrollTop > 0) return;
+      if (e.touches.length !== 1 || pageScroll() > 0) return;
       if (startsInsideSomethingElse(e.target)) return;
       s.startY = e.touches[0].clientY;
     };
@@ -54,7 +62,7 @@ export function PullToRefresh() {
     const onMove = (e: TouchEvent) => {
       if (s.startY === null) return;
       const dy = e.touches[0].clientY - s.startY;
-      if (dy <= 0 || window.scrollY > 0) {
+      if (dy <= 0 || pageScroll() > 0) {
         if (s.pulling) reset();
         return;
       }
