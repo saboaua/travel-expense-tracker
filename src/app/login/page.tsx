@@ -17,6 +17,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
+  // False until the page scripts have loaded, so a tap on Sign In can never submit the form the plain browser way
+  const [ready, setReady] = useState(false);
+  useEffect(() => setReady(true), []);
   const [error, setError] = useState<string | null>(null);
   // Optional security check, shown only after repeated failures for this email
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
@@ -208,7 +211,7 @@ export default function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || (captchaNeeded && !captchaToken)}
+              disabled={!ready || loading || (captchaNeeded && !captchaToken)}
               className="w-full h-11 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
               style={{
                 backgroundColor: primaryColor,
