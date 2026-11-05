@@ -257,7 +257,8 @@ try {
     await admin.page.getByRole("tab", { name: "Personal" }).click();
     await admin.page.getByText("Total spent (AWG)").waitFor();
     await admin.page.getByRole("tab", { name: "Business" }).click();
-    await admin.page.getByText("This Month").waitFor();
+    await admin.page.getByRole("heading", { name: "Active Trips" }).waitFor();
+    assert((await admin.page.getByText("This Month").count()) === 0, "spending tiles should no longer be on the business view");
   });
 
   if (process.env.E2E_SHOT) {

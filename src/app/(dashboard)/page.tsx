@@ -2,7 +2,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plane, Receipt, TrendingUp, MapPin, Clock } from "lucide-react";
+import { Plane, MapPin, Clock } from "lucide-react";
 import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
 import { DashboardHeader, type HeaderTrip } from "@/components/DashboardHeader";
 import { getDestinationInfo } from "@/lib/destination";
@@ -44,11 +44,6 @@ export default async function DashboardPage() {
     .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
     .eq("user_id", user?.id)
     .order("start_date", { ascending: true });
-
-  const { data: allExpenses } = await supabase
-    .from("expenses")
-    .select("amount, amount_usd, currency, expense_date")
-    .eq("user_id", user?.id);
 
   // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
   const { data: docData } = await withColumnFallback(
@@ -123,10 +118,6 @@ export default async function DashboardPage() {
   }
 
   const today = todayISO();
-  const monthTotal =
-    allExpenses?.filter((e) => (e.expense_date || "").startsWith(today.slice(0, 7))).reduce((sum, e) => sum + usdOf(e), 0) || 0;
-  const yearTotal =
-    allExpenses?.filter((e) => (e.expense_date || "").startsWith(today.slice(0, 4))).reduce((sum, e) => sum + usdOf(e), 0) || 0;
   const endOf = (t: { start_date: string; end_date: string | null }) => t.end_date || t.start_date;
   const byStart = (x: { start_date: string }, y: { start_date: string }) => x.start_date.localeCompare(y.start_date);
 
@@ -197,48 +188,6 @@ export default async function DashboardPage() {
     <>
       {/* The bell lists everything; only an expired or nearly-expired passport also gets a banner */}
       {passportAlert && passportAlert.level !== "renew" && <PassportBalloon alert={passportAlert} />}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
-        <Card className="col-span-2 sm:col-span-1">
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Plane className="h-4 w-4" />
-              Active Trips
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl sm:text-3xl font-bold">{activeCount}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <Receipt className="h-4 w-4" />
-              This Month
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(monthTotal, "USD")}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-2">
-            <CardDescription className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              This Year
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl sm:text-3xl font-bold">{formatCurrency(yearTotal, "USD")}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Travel documents: one tile per saved document, soonest to expire first */}
-      {myPerms.has("documents") && <DocumentTiles tiles={docTiles} total={accountDocs.length} />}
-
-      {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
-      {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
 
       {/* Active Trips */}
       <Card>
@@ -332,6 +281,12 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
+      {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
+
+      {/* Travel documents: one tile per saved document, soonest to expire first */}
+      {myPerms.has("documents") && <DocumentTiles tiles={docTiles} total={accountDocs.length} />}
 
       {/* Without the Personal dashboard option the tiles stay here, so nobody loses the links */}
       {!dashRows && personalSummary && <PersonalTiles summary={personalSummary} />}
