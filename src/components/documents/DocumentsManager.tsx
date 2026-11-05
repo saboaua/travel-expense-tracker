@@ -364,7 +364,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
               onChange={(e) => {
                 const f = e.target.files?.[0] ?? null;
                 if (!f) { setFile(null); setOriginal(null); setCropped(null); setSizes(null); return; }
-                if (f.type.startsWith("image/")) pick(f, false);
+                if (f.type.startsWith("image/")) pick(f, true); // a photo is read straight away, like a scan
                 else { setOriginal(null); setCropped(null); setSizes(null); preparedFile.current = null; setFile(f); setScanNote(null); }
               }}
             />
