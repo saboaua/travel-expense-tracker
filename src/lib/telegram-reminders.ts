@@ -11,7 +11,7 @@ import { escapeHtml, sendToUser } from "@/lib/telegram-notify";
  * before (1 day, or the start day itself if that was missed). The job runs once a day, so a reminder held back by
  * someone's quiet hours or a failed send gets one more try the next day. Each step is sent once per trip.
  */
-export type ReminderTrip = { id: string; user_id: string; name: string; destination: string | null; start_date: string; end_date: string | null };
+export type ReminderTrip = { id: string; user_id: string; name: string; destination: string | null; start_date: string; end_date: string | null; /** Personal travel, as opposed to a business trip */ personal?: boolean };
 
 export function reminderTier(trip: Pick<ReminderTrip, "start_date">, today: string): { tier: 7 | 1; days: number } | null {
   const days = daysBetween(today, trip.start_date);
@@ -24,26 +24,34 @@ export function reminderText(trip: ReminderTrip, days: number): string {
   const when = days <= 0 ? "today" : days === 1 ? "tomorrow" : `in ${days} days`;
   const where = trip.destination ? ` to ${escapeHtml(trip.destination)}` : "";
   return [
-    `✈️ <b>${escapeHtml(trip.name)}</b> starts ${when}`,
+    `${trip.personal ? "🌴" : "✈️"} <b>${escapeHtml(trip.name)}</b> starts ${when}${trip.personal ? " (personal)" : ""}`,
     `${formatDateRange(trip.start_date, trip.end_date)}${where}`,
     "",
     days <= 1 ? "Packing check: passport, cards and chargers. Send receipts here as you go." : "Time to check your travel documents. During the trip, send receipts here and I will file them.",
   ].join("\n");
 }
 
+/** Business trips and personal travel are reminded the same way, each once per step. */
+async function loadReminderTrips(supabase: SupabaseClient, today: string): Promise<ReminderTrip[]> {
+  const to = addDaysISO(today, 7);
+  const [biz, personal] = await Promise.all([
+    supabase.from("trips").select("id, user_id, name, destination, start_date, end_date").eq("status", "active").gte("start_date", today).lte("start_date", to),
+    // personal_projects only exists once the personal section is set up; an error just means no personal trips
+    supabase.from("personal_projects").select("id, user_id, name, destination, start_date, end_date").eq("kind", "personal_trip").eq("status", "active").gte("start_date", today).lte("start_date", to),
+  ]);
+  return [
+    ...((biz.data || []) as ReminderTrip[]),
+    ...((personal.error ? [] : personal.data || []) as ReminderTrip[]).map((t) => ({ ...t, personal: true })),
+  ];
+}
+
 export async function runTripReminders(supabase: SupabaseClient, today: string, now: Date = new Date()) {
-  const { data: trips } = await supabase
-    .from("trips")
-    .select("id, user_id, name, destination, start_date, end_date")
-    .eq("status", "active")
-    .gte("start_date", today)
-    .lte("start_date", addDaysISO(today, 7));
   const out = { checked: 0, sent: 0, skipped: 0 };
-  for (const t of (trips || []) as ReminderTrip[]) {
+  for (const t of await loadReminderTrips(supabase, today)) {
     const step = reminderTier(t, today);
     if (!step) continue;
     out.checked++;
-    const r = await sendToUser(supabase, t.user_id, "trip_reminder", reminderText(t, step.days), { dedupeKey: `trip:${t.id}:${step.tier}d`, now });
+    const r = await sendToUser(supabase, t.user_id, "trip_reminder", reminderText(t, step.days), { dedupeKey: `${t.personal ? "ptrip" : "trip"}:${t.id}:${step.tier}d`, now });
     if (r === "sent") out.sent++;
     else out.skipped++;
   }

@@ -10,6 +10,7 @@ import { CURRENCIES, rateToUsd, toUsd } from "@/lib/currencies";
 import { KIND_META, GROCERY_CATEGORIES, type PersonalKind } from "@/lib/personal/constants";
 import { normalizeItemName } from "@/lib/personal/grocery";
 import { kindLabel, type DocKind } from "@/lib/documents";
+import type { DocumentFields } from "@/lib/mrz";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import { isMissingColumn } from "@/lib/columns";
 import { formatSavedRef, type SavedRef } from "@/lib/telegram-upload";
@@ -203,7 +204,25 @@ export async function saveGrocery(supabase: SupabaseClient, userId: string, file
 
 /* ---------------- travel documents ---------------- */
 
-export async function saveDocument(supabase: SupabaseClient, userId: string, file: TgFile): Promise<Saved> {
+const IDENTITY_KINDS: DocKind[] = ["passport", "id", "visa"];
+
+/**
+ * Looks at a photo and says whether it is a passport, ID card or visa. Returns the fields it read (so saving does not
+ * read the photo again), or null for a receipt, anything unclear, or when the reader is not available. Never throws.
+ */
+export async function detectIdentityDocument(file: TgFile): Promise<DocumentFields | null> {
+  if (!aiOcrConfigured()) return null;
+  try {
+    const { buf, mime } = await fetchTgFile(file);
+    if (!AI_IMAGE_TYPES.includes(mime)) return null;
+    const fields = await withTimeout(extractDocumentWithClaude({ data: new Uint8Array(buf), mime }), 12000);
+    return fields.kind && IDENTITY_KINDS.includes(fields.kind) ? fields : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveDocument(supabase: SupabaseClient, userId: string, file: TgFile, known?: DocumentFields | null): Promise<Saved> {
   const { buf, mime, name, ext } = await fetchTgFile(file);
   const allowed = ["application/pdf", "image/jpeg", "image/png", "image/webp", "image/heic", "image/heif"];
   if (!allowed.includes(mime)) throw new Error("Use a PDF or a photo (JPG, PNG, WebP or HEIC).");
@@ -214,7 +233,8 @@ export async function saveDocument(supabase: SupabaseClient, userId: string, fil
 
   let fields: { kind: DocKind | null; document_number: string | null; issuing_country: string | null; expiry_date: string | null } = { kind: null, document_number: null, issuing_country: null, expiry_date: null };
   let note = "";
-  if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
+  if (known) fields = known;
+  else if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
     try { fields = await withTimeout(extractDocumentWithClaude({ data: new Uint8Array(buf), mime }), 25000); } catch { note = "Could not read the details"; }
   }
   const kind: DocKind = fields.kind ?? "other";

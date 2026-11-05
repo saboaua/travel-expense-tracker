@@ -13,6 +13,7 @@ delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const sent: { method: string; body: Record<string, unknown> }[] = [];
 const realFetch = globalThis.fetch;
+let idPhoto = false; // true: the AI reader sees a passport
 const JPEG = new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 16, 0x4a, 0x46, 0x49, 0x46, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0, 0xff, 0xd9]);
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = String(input);
@@ -28,7 +29,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const out = /grocery store receipt/.test(prompt)
       ? { store: "Super Food", date: "2026-11-04", total: 12.5, currency: "AWG", items: [{ name: "Milk", quantity: 1, unit_price: 5, line_total: 5, category: "Dairy & Eggs" }, { name: "Bread", quantity: 1, unit_price: 7.5, line_total: 7.5, category: "Bakery" }] }
       : /travel document/.test(prompt)
-        ? { kind: "visa", issuing_country: "Aruba", document_number: "AB123456", expiry_date: "2028-01-31", holder_name: "Pat" }
+        ? { kind: idPhoto ? "passport" : "other", issuing_country: "Aruba", document_number: "AB123456", expiry_date: "2028-01-31", holder_name: "Pat" }
         : { merchant: "Cafe Uno", amount: 18.4, date: "2026-11-04", currency: "USD", category: "Meals" };
     return Response.json({ content: [{ type: "text", text: JSON.stringify(out) }] });
   }
@@ -120,6 +121,21 @@ eq(fake.table("telegram_notify_prefs").find((p: { user_id: string }) => p.user_i
 yes(lastText().includes("Messages from the app: off"), "...and confirmed");
 await handleMessage(db, { chat: { id: 5 }, from: { id: 777 }, text: "/notify quiet 23 6" });
 eq(fake.table("telegram_notify_prefs").find((p: { user_id: string }) => p.user_id === USER)?.quiet_start, 23, "/notify quiet sets the hours");
+
+// 7b. A passport photo goes to Documents by itself; a caption naming a place still wins
+idPhoto = true;
+const docsBefore = fake.table("travel_documents").length;
+await handleMessage(db, photo());
+eq(fake.table("travel_documents").length, docsBefore + 1, "a passport photo is filed under Documents automatically");
+eq(fake.table("travel_documents").at(-1)?.kind, "passport", "...recognised as a passport");
+yes(lastText().includes("Saved to <b>Documents</b>") && lastText().includes("identity document"), "...and the reply says why");
+const expBefore = fake.table("expenses").length;
+await handleMessage(db, photo("kitchen tiles"));
+eq(fake.table("travel_documents").length, docsBefore + 1, "a caption naming a place overrides the detection");
+idPhoto = false;
+await handleMessage(db, photo());
+eq(fake.table("travel_documents").length, docsBefore + 1, "a receipt photo is not mistaken for a document");
+void expBefore;
 
 // 8. An unlinked account gets told how to link
 await handleMessage(db, { chat: { id: 9 }, from: { id: 999 }, photo: [{ file_id: "x" }] });

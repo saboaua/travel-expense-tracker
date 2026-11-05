@@ -9,10 +9,11 @@ import { loadPermissions } from "@/lib/access-server";
 import { buildScanOptions, type ScanOption } from "@/lib/scan-destination";
 import { requestNewUser, requestRoleChange, resolveAdminAction } from "@/lib/telegram-admin";
 import { digestText, gatherDigest } from "@/lib/telegram-reminders";
-import { applyNotifyCommand, parseCommand } from "@/lib/telegram-commands";
+import { applyNotifyCommand, captionTarget, parseCommand } from "@/lib/telegram-commands";
 import { escapeHtml, loadPrefs, savePrefs } from "@/lib/telegram-notify";
-import { removeSaved, saveBusiness, saveDocument, saveGrocery, savePersonalExpense, type Saved, type TgFile } from "@/lib/telegram-save";
+import { removeSaved, detectIdentityDocument, saveBusiness, saveDocument, saveGrocery, savePersonalExpense, type Saved, type TgFile } from "@/lib/telegram-save";
 import { decideUpload, destCallback, formatSavedRef, parseDestCallback, parseSavedRef } from "@/lib/telegram-upload";
+import type { DocumentFields } from "@/lib/mrz";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import { todayISO } from "@/lib/utils";
 
@@ -167,6 +168,16 @@ async function handleUpload(supabase: Db, chatId: number, profile: Profile, file
   });
 
   const held = { telegram_id: profile.telegram_id, file_id: file.file_id, file_name: file.file_name ?? null, mime: file.mime ?? null, saved_ref: null, saved_path: null };
+
+  // A passport, ID card or visa photo goes to Documents without being asked (unless the caption named a place)
+  const docOption = options.find((o) => o.kind === "document");
+  if (docOption && !isPdf && !captionTarget(caption, options)) {
+    const idDoc = await detectIdentityDocument(file);
+    if (idDoc) {
+      await holdPending(supabase, held);
+      return saveHeld(supabase, chatId, profile, docOption.key, { ...held }, "Looks like an identity document", options, idDoc);
+    }
+  }
   if (decision.pick && decision.confident) {
     await holdPending(supabase, held);
     return saveHeld(supabase, chatId, profile, decision.pick.key, { ...held }, decision.reason, options);
@@ -186,7 +197,7 @@ async function askWhere(supabase: Db, chatId: number, profile: Profile, pending:
 }
 
 /** Saves the held file to the chosen place, remembers the choice, and offers Change. */
-async function saveHeld(supabase: Db, chatId: number, profile: Profile, key: string, pending: Pending, reason: string | null, known?: ScanOption[]) {
+async function saveHeld(supabase: Db, chatId: number, profile: Profile, key: string, pending: Pending, reason: string | null, known?: ScanOption[], docFields?: DocumentFields | null) {
   const options = known ?? (await loadOptions(supabase, profile));
   const opt = options.find((o) => o.key === key);
   if (!opt) return void (await sendMessage(chatId, "I cannot save to that place. Pick another one."));
@@ -198,7 +209,7 @@ async function saveHeld(supabase: Db, chatId: number, profile: Profile, key: str
     if (opt.kind === "trip") saved = await saveBusiness(supabase, profile.id, opt.id!, file);
     else if (opt.kind === "project" || opt.kind === "ptrip") saved = await savePersonalExpense(supabase, profile.id, opt.id!, file);
     else if (opt.kind === "grocery") saved = await saveGrocery(supabase, profile.id, file);
-    else saved = await saveDocument(supabase, profile.id, file);
+    else saved = await saveDocument(supabase, profile.id, file, docFields);
 
     await holdPending(supabase, { telegram_id: profile.telegram_id, file_id: pending.file_id, file_name: pending.file_name, mime: pending.mime, saved_ref: formatSavedRef(saved.ref), saved_path: saved.path });
     await savePrefs(supabase, profile.id, { last_choice: opt.key });

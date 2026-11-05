@@ -37,6 +37,8 @@ yes(reminderText(trip(today), 0).includes("starts today"), "text says today");
 yes(reminderText(trip(addDaysISO(today, 1)), 1).includes("starts tomorrow"), "text says tomorrow");
 yes(reminderText(trip(addDaysISO(today, 7)), 7).includes("in 7 days"), "text says in 7 days");
 yes(reminderText(trip(addDaysISO(today, 7)), 7).includes("Miami &lt;Conf&gt;"), "trip name is escaped");
+yes(reminderText({ ...trip(addDaysISO(today, 7)), personal: true }, 7).includes("(personal)"), "personal travel is labelled");
+yes(!reminderText(trip(addDaysISO(today, 7)), 7).includes("(personal)"), "business trips are not");
 
 const stats = { today, newExpenses: 1, newPeople: 0, openSupport: null, startingSoon: [], activeTrips: 2 };
 yes(digestText(stats).includes("1 expense added"), "digest uses singular");
@@ -47,7 +49,7 @@ yes(digestText({ ...stats, openSupport: 3, startingSoon: Array.from({ length: 7 
 async function main() {
   const { runAdminDigest, runTripReminders } = await import("../src/lib/telegram-reminders");
   const fake = createFakeSupabase();
-  for (const t of ["profiles", "trips", "expenses", "telegram_notify_prefs", "telegram_sent_log", "support_requests"]) fake.table(t);
+  for (const t of ["profiles", "trips", "expenses", "telegram_notify_prefs", "telegram_sent_log", "support_requests", "personal_projects"]) fake.table(t);
   const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ADMIN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc", NOLINK = "dddddddd-dddd-4ddd-8ddd-dddddddddddd", ADMIN2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
   fake.table("profiles").push(
     { id: A, role: "user", full_name: "A", telegram_id: 111, created_at: "2026-11-03T12:00:00.000Z" },
@@ -97,6 +99,18 @@ async function main() {
   const third = await runTripReminders(db, addDaysISO(today, 2), noon);
   eq(third.sent, 1, "two days on only the other trip (now 1 day out) is reminded");
   eq((await runTripReminders(db, addDaysISO(today, 3), noon)).sent, 0, "nothing repeats");
+
+  // Personal travel is reminded too (and a home project or a finished trip is not)
+  const later10 = addDaysISO(today, 10);
+  fake.table("personal_projects").push(
+    { id: "p1", user_id: A, kind: "personal_trip", name: "Beach Week", destination: "Punta Cana", start_date: addDaysISO(later10, 7), end_date: addDaysISO(later10, 12), status: "active" },
+    { id: "p2", user_id: A, kind: "home_project", name: "Kitchen", destination: null, start_date: addDaysISO(later10, 7), end_date: null, status: "active" },
+    { id: "p3", user_id: A, kind: "personal_trip", name: "Old Trip", destination: null, start_date: addDaysISO(later10, 7), end_date: null, status: "completed" }
+  );
+  sent.length = 0;
+  eq((await runTripReminders(db, later10, noon)).sent, 1, "a personal trip a week out is reminded");
+  yes(sent[0].text.includes("Beach Week") && sent[0].text.includes("(personal)"), "...as personal travel");
+  eq((await runTripReminders(db, later10, noon)).sent, 0, "...once only");
 
   sent.length = 0;
   eq(await runAdminDigest(db, today), 2, "each linked admin gets a summary");
