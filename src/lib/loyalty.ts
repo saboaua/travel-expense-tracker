@@ -31,14 +31,17 @@ export type LoyaltyCard = {
 
 export const CARD_CATEGORIES = ["Rewards", "Coffee club", "Care card", "Paw points", "Fuel savings", "Member", "Points", "Discount"];
 
-/** Card colours: dark enough for white text (all pass 4.5:1). */
-export const CARD_COLORS = ["#15803d", "#92400e", "#0e7490", "#7c3aed", "#b91c1c", "#334155", "#1d4ed8", "#be185d"];
+/** The first eight colours. Cards with no colour picked get one of these, so existing cards never change. */
+const DEFAULT_COLORS = ["#15803d", "#92400e", "#0e7490", "#7c3aed", "#b91c1c", "#334155", "#1d4ed8", "#be185d"];
+
+/** Card colours the picker offers (16): dark enough for white text (all pass 4.5:1). */
+export const CARD_COLORS = [...DEFAULT_COLORS, "#0f766e", "#4d7c0f", "#a16207", "#c2410c", "#9d174d", "#5b21b6", "#1e3a8a", "#3f3f46"];
 
 /** A stable colour for a store when none was picked. */
 export function colorForName(name: string): string {
   let h = 0;
   for (const ch of name.trim().toLowerCase()) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
-  return CARD_COLORS[h % CARD_COLORS.length];
+  return DEFAULT_COLORS[h % DEFAULT_COLORS.length];
 }
 
 export const cardColor = (c: Pick<LoyaltyCard, "color" | "store_name">) => c.color || colorForName(c.store_name);

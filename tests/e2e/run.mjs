@@ -266,6 +266,10 @@ try {
     await page.getByRole("button", { name: "Edit", exact: true }).click();
     await page.getByTestId("slot-front").waitFor();
     await page.getByTestId("slot-back").waitFor();
+    assert((await page.getByTestId("color-row").getByRole("button").count()) === 16, "16 colours to pick from");
+    assert(await page.getByTestId("color-row").evaluate((el) => el.scrollWidth > el.clientWidth), "the colours scroll sideways on a phone");
+    await page.getByRole("button", { name: "Colour #1e3a8a" }).click();
+    assert((await page.getByRole("button", { name: "Colour #1e3a8a" }).getAttribute("aria-pressed")) === "true", "a colour from the scrolled part can be picked");
     assert((await page.getByRole("button", { name: "Save changes" }).boundingBox()).y + 20 < 844, "Save stays on screen");
     await page.getByLabel("Upload front photo").setInputFiles({ name: "front.png", mimeType: "image/png", buffer: PNG });
     await page.getByRole("button", { name: "Use full image" }).click();
@@ -277,6 +281,7 @@ try {
     await page.getByRole("dialog", { name: "Edit card" }).waitFor({ state: "detached" });
     const row = fake.table("loyalty_cards")[0];
     assert(row.image_path && row.back_image_path, "front and back photos saved on the card");
+    assert(row.color === "#1e3a8a", "the picked colour is saved");
     assert(fake.log.filter((l) => l.table === "storage" && l.op === "upload").length >= 2, "both photos uploaded");
     await page.locator('[data-testid="loyalty-tile"] img').first().waitFor();
     await page.getByRole("button", { name: "Open Greenfield Market" }).click();

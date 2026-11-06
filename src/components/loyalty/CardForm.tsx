@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, Crop, ImageUp, Loader2, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -93,6 +93,13 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
 
   const frontUrl = useCardPhoto(slots.front.removed ? null : card?.image_path);
   const backUrl = useCardPhoto(slots.back.removed ? null : card?.back_image_path);
+  const swatches = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    // bring a chosen colour that is off-screen into view when the form opens
+    const on = swatches.current?.querySelector<HTMLElement>('[aria-pressed="true"]');
+    if (on && swatches.current) swatches.current.scrollLeft = Math.max(0, on.offsetLeft - 16);
+  }, []);
+
   const chosen: BarcodeFormat = format === "auto" ? detectFormat(number) : format;
   const problem = number.trim() ? formatProblem(number, chosen) : null;
   const shownColor = color || (store.trim() ? colorForName(store) : CARD_COLORS[0]);
@@ -201,13 +208,17 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
           <p className="text-xs text-muted-foreground">Auto-detect picks the format from the number. Change it if the till does not scan.</p>
         </div>
 
-        <fieldset className="space-y-1.5">
+        <fieldset className="min-w-0 space-y-1.5">
           <legend className={label}>Card colour</legend>
-          <div className="flex flex-wrap gap-2">
-            {CARD_COLORS.map((c) => (
-              <button key={c} type="button" onClick={() => setColor(c)} aria-label={`Colour ${c}`} aria-pressed={shownColor === c} className={cn("h-9 w-9 rounded-full ring-offset-2 ring-offset-card", shownColor === c ? "ring-2 ring-foreground" : "")} style={{ background: c }} />
-            ))}
+          <div className="relative">
+            <div ref={swatches} data-testid="color-row" className="-mx-1 flex snap-x gap-2.5 overflow-x-auto px-1 py-1.5 pr-8 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {CARD_COLORS.map((c) => (
+                <button key={c} type="button" onClick={() => setColor(c)} aria-label={`Colour ${c}`} aria-pressed={shownColor === c} className={cn("h-11 w-11 shrink-0 snap-start rounded-full ring-offset-2 ring-offset-card", shownColor === c ? "ring-2 ring-foreground" : "")} style={{ background: c }} />
+              ))}
+            </div>
+            <span className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-card to-transparent" aria-hidden="true" />
           </div>
+          <p className="text-xs text-muted-foreground">Swipe for more colours.</p>
         </fieldset>
 
         {number.trim() && !problem && (

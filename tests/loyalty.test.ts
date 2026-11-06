@@ -34,6 +34,10 @@ eq(displayNumber("AB-12"), "AB-12", "short codes untouched");
 
 eq(colorForName("Greenfield Market"), colorForName(" greenfield market "), "colour is stable per name");
 eq(CARD_COLORS.includes(colorForName("Anything")), true, "colour comes from the palette");
+eq([CARD_COLORS.length, new Set(CARD_COLORS).size], [16, 16], "16 distinct colours");
+const lum = (h: string) => { const v = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)); return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]; };
+eq(CARD_COLORS.filter((c) => 1.05 / (lum(c) + 0.05) < 4.5), [], "every colour keeps white text readable (4.5:1)");
+eq(colorForName("Greenfield Market"), ["#15803d", "#92400e", "#0e7490", "#7c3aed", "#b91c1c", "#334155", "#1d4ed8", "#be185d"].includes(colorForName("Greenfield Market")) ? colorForName("Greenfield Market") : "", "unset cards keep one of the original eight colours");
 
 eq(targetSize(4000, 3000), { width: 800, height: 600 }, "landscape photo shrunk to 800 px");
 eq(targetSize(3000, 4000), { width: 600, height: 800 }, "portrait photo shrunk to 800 px");
