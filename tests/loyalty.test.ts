@@ -1,6 +1,8 @@
 // Run with: npx tsx tests/loyalty.test.ts
 import { cleanNumber, detectFormat, displayNumber, filterCards, formatProblem, gtinCheckDigit, colorForName, CARD_COLORS, type LoyaltyCard } from "../src/lib/loyalty";
-import { targetSize, saveLoyaltyCard, updateLoyaltyCard, removeLoyaltyCard, BACK_MIGRATION_MESSAGE } from "../src/lib/loyalty-image";
+import { targetSize, BACK_MIGRATION_MESSAGE } from "../src/lib/loyalty-image";
+import { applyLoyaltyOutbox, deleteCard, pushLoyaltySave, saveCard, isLoyaltySave, isLoyaltyDelete, type LoyaltyApi, type LoyaltySaveItem } from "../src/lib/loyalty-outbox";
+import type { OutboxItem, OutboxStore } from "../src/lib/outbox";
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 
 // check digits (4006381333931 is a real EAN-13 example, 036000291452 a real UPC-A)
@@ -52,51 +54,107 @@ eq(filterCards(all, "coffee").length, 1, "search by category");
 eq(filterCards(all, "patrick").length, 1, "search by holder");
 eq(filterCards(all, "zzz").length, 0, "no match");
 
-/* ---- front and back photos ---- */
-function fakeDb(opts: { missingBack?: boolean } = {}) {
-  const removed: string[] = [];
-  const uploaded: string[] = [];
-  const missing = { code: "42703", message: "column loyalty_cards.back_image_path does not exist" };
-  const chain = (row: Record<string, unknown>) => ({
-    eq: () => chain(row),
-    select: (cols: string) => ({
-      single: async () => (opts.missingBack && ("back_image_path" in row || /back_image_path/.test(cols)) ? { data: null, error: missing } : { data: { id: "c1", ...row }, error: null }),
-    }),
-  });
-  const supabase = {
-    from: () => ({ insert: (row: Record<string, unknown>) => chain(row), update: (row: Record<string, unknown>) => chain(row) }),
-    storage: { from: () => ({ upload: async (path: string) => { uploaded.push(path); return { error: null }; }, remove: async (paths: string[]) => { removed.push(...paths); return { error: null }; } }) },
-  } as unknown as Parameters<typeof saveLoyaltyCard>[0];
-  return { supabase, removed, uploaded };
+/* ---- saving and deleting cards (online and offline) ---- */
+function fakeApi(opts: { upsertErrors?: unknown[]; uploadError?: unknown; deleteError?: unknown } = {}) {
+  const calls = { uploads: [] as string[], upserts: [] as Record<string, unknown>[], deletes: [] as string[], removed: [] as string[] };
+  const errors = [...(opts.upsertErrors ?? [])];
+  const api: LoyaltyApi = {
+    async upload(path) { calls.uploads.push(path); return { error: opts.uploadError ?? null }; },
+    async upsert(row) { calls.upserts.push(row); return { error: errors.shift() ?? null }; },
+    async deleteRow(id) { calls.deletes.push(id); return { error: opts.deleteError ?? null }; },
+    async remove(paths) { calls.removed.push(...paths); },
+  };
+  return { api, calls };
 }
+const memStore = (): OutboxStore & { items: OutboxItem[] } => ({
+  items: [] as OutboxItem[],
+  async list() { return this.items; },
+  async put(i) { this.items = this.items.filter((x) => x.id !== i.id).concat(i); },
+  async remove(id) { this.items = this.items.filter((x) => x.id !== id); },
+});
 const input = { store_name: "A", card_number: "1", barcode_format: "CODE128" as const };
 const img = (n: string) => new File([new Uint8Array([1])], n, { type: "image/webp" });
+const missingCol = { code: "42703", message: "column loyalty_cards.back_image_path does not exist" };
 
 (async () => {
-  const d = fakeDb();
-  const c = await saveLoyaltyCard(d.supabase, "u", input, img("f"), img("b"));
-  eq([d.uploaded.length, !!c.image_path, !!c.back_image_path], [2, true, true], "a new card stores both photos");
+  // online
+  let f = fakeApi(), st = memStore();
+  let r = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), back: img("b"), online: true });
+  const row = f.calls.upserts[0];
+  eq([f.calls.uploads.length, r.queued, st.items.length, row.id === r.card.id, row.user_id, !!row.image_path, !!row.back_image_path], [2, false, 0, true, "u", true, true], "online: a new card uploads both photos and saves with its own id");
 
-  const base = { ...card("A", null), image_path: "u/f.webp", back_image_path: "u/b.webp" };
-  const d1 = fakeDb();
-  const keep = await updateLoyaltyCard(d1.supabase, "u", base, input);
-  eq([keep.image_path, d1.removed], ["u/f.webp", []], "update keeps both photos when nothing was touched");
-  await updateLoyaltyCard(d1.supabase, "u", base, input, undefined, null);
-  eq(d1.removed, ["u/b.webp"], "removing the back deletes only its file");
-  const d2 = fakeDb();
-  const swapped = await updateLoyaltyCard(d2.supabase, "u", base, input, img("n"), undefined);
-  eq([swapped.image_path !== "u/f.webp", d2.removed], [true, ["u/f.webp"]], "a new front replaces and deletes the old file");
+  // offline then sync
+  f = fakeApi(); st = memStore();
+  const kept: string[] = [];
+  r = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), online: false, keep: async (p) => { kept.push(p); } });
+  eq([f.calls.uploads.length, f.calls.upserts.length, r.queued, st.items.length, r.card.image_path === kept[0]], [0, 0, true, 1, true], "offline: nothing is sent, the card waits on the phone and its photo is kept locally");
+  const waitingItem = st.items[0] as LoyaltySaveItem;
+  const sent = await pushLoyaltySave(f.api, waitingItem);
+  eq([sent.kind, f.calls.uploads.length, f.calls.upserts[0].id === r.card.id], ["synced", 1, true], "later: the waiting card uploads and saves under the same id");
 
-  const d3 = fakeDb({ missingBack: true });
-  const noBack = await saveLoyaltyCard(d3.supabase, "u", input, img("f"));
-  eq(!!noBack.image_path, true, "without the back column a card with only a front still saves");
-  const d4 = fakeDb({ missingBack: true });
+  // network drops after the upload
+  f = fakeApi({ upsertErrors: [{ message: "TypeError: Failed to fetch" }] }); st = memStore();
+  r = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), online: true });
+  const w = st.items[0] as LoyaltySaveItem;
+  eq([r.queued, w.frontUploaded], [true, true], "dropped connection after the upload: kept, and the upload is remembered");
+  await pushLoyaltySave(f.api, w);
+  eq(f.calls.uploads.length, 1, "…so the retry does not upload the photo again");
+
+  // edit semantics
+  const base = { ...card("A", null), id: "c1", image_path: "u/old-f.webp", back_image_path: "u/old-b.webp" };
+  f = fakeApi(); st = memStore();
+  await saveCard({ api: f.api, store: st, userId: "u", card: base, input, online: true });
+  eq(["image_path" in f.calls.upserts[0], "back_image_path" in f.calls.upserts[0], f.calls.removed], [false, false, []], "edit with no photo change leaves both photos alone");
+  await saveCard({ api: f.api, store: st, userId: "u", card: base, input, back: null, online: true });
+  eq([f.calls.upserts[1].back_image_path, f.calls.removed], [null, ["u/old-b.webp"]], "removing the back photo clears it and deletes its file");
+  await saveCard({ api: f.api, store: st, userId: "u", card: base, input, front: img("n"), online: true });
+  eq([f.calls.upserts[2].image_path !== "u/old-f.webp", f.calls.removed.includes("u/old-f.webp")], [true, true], "a new front replaces the old file");
+
+  // database without the back column
+  f = fakeApi({ upsertErrors: [missingCol] }); st = memStore();
+  r = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), back: null, online: true });
+  eq([r.queued, f.calls.upserts.length, "back_image_path" in f.calls.upserts[1]], [false, 2, false], "no back column: a card with no back photo still saves");
+  f = fakeApi({ upsertErrors: [missingCol] }); st = memStore();
   let msg = "";
-  await saveLoyaltyCard(d4.supabase, "u", input, img("f"), img("b")).catch((e: Error) => { msg = e.message; });
-  eq([msg === BACK_MIGRATION_MESSAGE, d4.removed.length], [true, 2], "without the back column a back photo gives a clear message and uploads are cleaned up");
+  await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), back: img("b"), online: true }).catch((e: Error) => { msg = e.message; });
+  eq(msg === BACK_MIGRATION_MESSAGE, true, "no back column: a back photo gives the clear message");
 
-  const removed: string[] = [];
-  const supabase = { from: () => ({ delete: () => ({ eq: async () => ({ error: null }) }) }), storage: { from: () => ({ remove: async (p: string[]) => { removed.push(...p); return { error: null }; } }) } } as unknown as Parameters<typeof removeLoyaltyCard>[0];
-  await removeLoyaltyCard(supabase, { ...card("A", null), image_path: "u/f", back_image_path: "u/b" });
-  eq(removed, ["u/f", "u/b"], "deleting a card removes both photos");
+  // permission problem is shown, not queued
+  f = fakeApi({ upsertErrors: [{ code: "42501", message: "new row violates row-level security policy" }] }); st = memStore();
+  msg = "";
+  await saveCard({ api: f.api, store: st, userId: "u", card: null, input, online: true }).catch((e: Error) => { msg = e.message; });
+  eq([msg, st.items.length], ["You no longer have permission to change this card.", 0], "a permission problem is shown and not kept");
+
+  // two offline edits of one card are one waiting item
+  f = fakeApi(); st = memStore();
+  r = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("one"), online: false });
+  const first = st.items[0] as LoyaltySaveItem;
+  const r2 = await saveCard({ api: f.api, store: st, userId: "u", card: r.card, waiting: first, input: { ...input, store_name: "B" }, front: img("two"), online: false });
+  const merged = st.items[0] as LoyaltySaveItem;
+  eq([st.items.length, merged.isNew, merged.row.store_name, merged.frontPath === r2.card.image_path, merged.frontPath !== first.frontPath], [1, true, "B", true, true], "two offline edits of one card are one waiting item, still new, with the latest photo");
+  const r3 = await saveCard({ api: f.api, store: st, userId: "u", card: r2.card, waiting: merged, input, online: false });
+  eq([(st.items[0] as LoyaltySaveItem).frontPath === r3.card.image_path, st.items.length], [true, 1], "a later edit without a photo keeps the waiting photo");
+
+  // what the screen shows
+  const shown = applyLoyaltyOutbox([{ ...card("Old", null), id: "x" }, { ...card("Gone", null), id: "y" }], [
+    ...st.items,
+    { id: "y", userId: "u", kind: "loyalty.delete", createdAt: 9, status: "pending", error: null, attempts: 0 },
+  ]);
+  eq(shown.map((c) => c.store_name).sort(), ["A", "Old"], "waiting saves show and waiting deletes hide on the card list");
+  eq([isLoyaltySave(st.items[0]), isLoyaltyDelete(st.items[0])], [true, false], "kind guards tell saves from deletes");
+
+  // delete
+  f = fakeApi(); st = memStore();
+  await deleteCard({ api: f.api, store: st, userId: "u", card: base, online: true });
+  eq([f.calls.deletes, f.calls.removed], [["c1"], ["u/old-f.webp", "u/old-b.webp"]], "online delete removes the row and both photos");
+  f = fakeApi(); st = memStore();
+  const d = await deleteCard({ api: f.api, store: st, userId: "u", card: base, online: false });
+  eq([d.queued, f.calls.deletes.length, st.items[0].kind], [true, 0, "loyalty.delete"], "offline delete waits on the phone");
+  f = fakeApi(); st = memStore();
+  const made = await saveCard({ api: f.api, store: st, userId: "u", card: null, input, front: img("f"), online: false });
+  const drop = await deleteCard({ api: f.api, store: st, userId: "u", card: made.card, waiting: st.items[0], online: false });
+  eq([drop.queued, st.items.length, f.calls.removed.length], [false, 0, 1], "deleting a card that never reached the server just drops it and its photo");
+  f = fakeApi({ deleteError: { message: "Failed to fetch" } }); st = memStore();
+  const net = await deleteCard({ api: f.api, store: st, userId: "u", card: base, online: true });
+  eq([net.queued, st.items.length], [true, 1], "delete interrupted by the connection is kept");
 })();

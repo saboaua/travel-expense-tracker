@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { CheckCircle2, CloudOff, Loader2, TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { currentUserOf, makeHandlers } from "@/lib/offline-api";
-import { nounFor, syncOutbox } from "@/lib/outbox";
+import { nounFor, SYNCED_EVENT, syncOutbox } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
 
 export const SYNC_NOW_EVENT = "expense-queue-sync-now";
@@ -38,6 +38,7 @@ export function OfflineSync() {
       const result = await syncOutbox(makeHandlers(supabase), currentUserOf(supabase), userId);
       if (result && result.synced > 0) {
         setJustSynced(result.syncedKinds);
+        window.dispatchEvent(new Event(SYNCED_EVENT));
         router.refresh();
         setTimeout(() => setJustSynced([]), 5000);
       }

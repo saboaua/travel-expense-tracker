@@ -347,10 +347,15 @@ try {
       await page.getByRole("button", { name: "Open Greenfield Market" }).click();
       await page.getByRole("dialog", { name: /Greenfield Market card/ }).waitFor();
       assert((await page.getByTestId("card-number").innerText()) === "4021 8830 1177", "the barcode number opens offline");
-      assert((await page.getByRole("button", { name: "Edit" }).count()) === 0, "no Edit while offline");
       await page.keyboard.press("Escape");
+      // A card added with no connection waits on the phone and shows a badge
       await page.getByRole("button", { name: "Add card" }).click();
-      await page.getByRole("alert").filter({ hasText: "offline" }).waitFor();
+      await page.getByLabel("Store name").fill("Offline Deli");
+      await page.getByLabel("Barcode or card number").fill("5566778899");
+      await page.getByRole("button", { name: "Save card" }).click();
+      await page.getByText("Waiting to sync").first().waitFor();
+      assert((await page.getByTestId("loyalty-tile").count()) === 3, "the new card shows at once, with no connection");
+      assert(!fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli"), "nothing was sent while offline");
 
       await page.goto(`${BASE}/documents`);
       await page.getByText("Offline Passport").first().waitFor({ timeout: 30000 });
@@ -365,6 +370,8 @@ try {
       await ctx2.setOffline(false);
       await page.reload();
       await page.getByTestId("loyalty-tile").first().waitFor();
+      await page.waitForFunction(() => !document.body.innerText.includes("Waiting to sync"), null, { timeout: 60000 });
+      assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
       await page.getByRole("button", { name: /Sign out/ }).first().click().catch(async () => {
         await page.getByRole("button", { name: /menu/i }).first().click();
         await page.getByRole("button", { name: /Sign out/ }).first().click();

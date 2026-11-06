@@ -121,6 +121,8 @@ export async function runOutbox<T extends OutboxItem>(
 
 const NOUNS: Record<string, [string, string]> = {
   "expense.create": ["receipt", "receipts"],
+  "loyalty.save": ["card", "cards"],
+  "loyalty.delete": ["card", "cards"],
 };
 
 /** "receipt" / "receipts" when every item is that kind, otherwise "change" / "changes". */
@@ -137,6 +139,8 @@ const DB_NAME = "expense-tracker-offline";
 // The store is still called "expenses" because that is what it was first made for; it now holds every kind.
 const STORE = "expenses";
 export const QUEUE_EVENT = "expense-queue-changed";
+/** Fired after waiting changes were sent, so a screen can load its list again. */
+export const SYNCED_EVENT = "outbox-synced";
 
 /** Items saved before kinds existed were all expenses. */
 export function withKind<T extends OutboxItem>(raw: T | (Omit<T, "kind"> & { kind?: string })): T {

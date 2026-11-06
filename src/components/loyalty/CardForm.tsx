@@ -8,7 +8,10 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { BARCODE_FORMATS, CARD_CATEGORIES, CARD_COLORS, cleanNumber, colorForName, detectFormat, formatLabel, formatProblem, type BarcodeFormat, type LoyaltyCard } from "@/lib/loyalty";
-import { compressCardImage, LOYALTY_ACCEPT, saveLoyaltyCard, updateLoyaltyCard, type CompressedCard } from "@/lib/loyalty-image";
+import { compressCardImage, LOYALTY_ACCEPT, LOYALTY_BUCKET, type CompressedCard } from "@/lib/loyalty-image";
+import { makeLoyaltyApi, saveCard } from "@/lib/loyalty-outbox";
+import { browserOutbox, type OutboxItem } from "@/lib/outbox";
+import { browserBlobs } from "@/lib/offline-store";
 import { Barcode } from "./Barcode";
 import { useCardPhoto } from "./CardFace";
 
@@ -71,7 +74,7 @@ function PhotoSlot({ side, savedPath, slot, busy, onFile, onCrop, onRemove }: { 
 }
 
 /** Add or edit a card. A photo is shrunk to 800 px (WebP, quality 0.7) the moment it is picked. */
-export function CardForm({ userId, card, onSaved, onClose }: { userId: string; card: LoyaltyCard | null; onSaved: (c: LoyaltyCard) => void; onClose: () => void }) {
+export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: string; card: LoyaltyCard | null; waiting?: OutboxItem | null; onSaved: (c: LoyaltyCard, queued: boolean) => void; onClose: () => void }) {
   const [store, setStore] = useState(card?.store_name ?? "");
   const [holder, setHolder] = useState(card?.holder_name ?? "");
   const [category, setCategory] = useState(card?.category ?? "");
@@ -155,10 +158,12 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
       const supabase = createClient();
       const input = { store_name: store, holder_name: holder, category, card_number: n, barcode_format: chosen, color };
       const change = (x: Slot) => (x.photo ? x.photo.file : x.removed ? null : undefined);
-      const saved = card
-        ? await updateLoyaltyCard(supabase, userId, card, input, change(slots.front), change(slots.back))
-        : await saveLoyaltyCard(supabase, userId, input, change(slots.front), change(slots.back));
-      onSaved(saved);
+      const saved = await saveCard({
+        api: makeLoyaltyApi(supabase), store: browserOutbox, userId, card, input, waiting,
+        front: change(slots.front), back: change(slots.back),
+        keep: (path, blob) => browserBlobs.put(`${LOYALTY_BUCKET}/${path}`, blob),
+      });
+      onSaved(saved.card, saved.queued);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the card.");
       setBusy(false);

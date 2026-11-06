@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { classifyError, EXPENSE_KIND, pushExpense, type DuplicateMatch, type QueuedExpense, type SyncApi } from "@/lib/offline-queue";
+import { LOYALTY_DELETE, LOYALTY_SAVE, makeLoyaltyApi, pushLoyaltyDelete, pushLoyaltySave, type LoyaltyDeleteItem, type LoyaltySaveItem } from "@/lib/loyalty-outbox";
 import type { Handlers } from "@/lib/outbox";
 
 type DuplicateRow = {
@@ -19,8 +20,11 @@ type DuplicateRow = {
  */
 export function makeHandlers(supabase: SupabaseClient): Handlers {
   const api = makeSyncApi(supabase);
+  const loyalty = makeLoyaltyApi(supabase);
   return {
     [EXPENSE_KIND]: (item) => pushExpense(api, item as QueuedExpense),
+    [LOYALTY_SAVE]: (item) => pushLoyaltySave(loyalty, item as LoyaltySaveItem),
+    [LOYALTY_DELETE]: (item) => pushLoyaltyDelete(loyalty, item as LoyaltyDeleteItem),
   };
 }
 
