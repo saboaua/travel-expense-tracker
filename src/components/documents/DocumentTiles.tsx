@@ -59,7 +59,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
     const { data, error: err } = await createClient().storage.from(DOC_BUCKET).createSignedUrl(t.filePath, 3600);
     setBusy(null);
     if (err || !data?.signedUrl) return setError("Could not open that file. Check your connection and try again.");
-    setViewing({ title: t.title, url: data.signedUrl, path: t.filePath });
+    setViewing({ title: t.kindLabel, url: data.signedUrl, path: t.filePath });
   };
 
   const download = async (t: DocTile) => {
@@ -106,17 +106,17 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
                   </span>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <p className="truncate text-sm font-bold" title={t.title}>{t.title}</p>
+                      <p className="truncate text-sm font-bold" title={t.kindLabel}>{t.kindLabel}</p>
                       {t.level !== "none" && <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[t.level]}`}>{t.statusLabel}</span>}
                     </div>
-                    <p className="truncate text-xs text-muted-foreground">{t.country ?? t.kindLabel}</p>
+                    <p className="truncate text-xs text-muted-foreground">{t.country ?? "\u00a0"}</p>
                   </div>
                   {t.filePath && (
                     <div className="-mr-1 -mt-1 flex shrink-0 gap-0.5">
-                      <button type="button" onClick={() => open(t)} disabled={busy === t.id} className={iconBtn} aria-label={`View ${t.title}`}>
+                      <button type="button" onClick={() => open(t)} disabled={busy === t.id} className={iconBtn} aria-label={`View ${t.kindLabel}`}>
                         {busy === t.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                       </button>
-                      <button type="button" onClick={() => download(t)} disabled={busy === t.id} className={iconBtn} aria-label={`Download ${t.title}`}>
+                      <button type="button" onClick={() => download(t)} disabled={busy === t.id} className={iconBtn} aria-label={`Download ${t.kindLabel}`}>
                         <Download className="h-4 w-4" aria-hidden="true" />
                       </button>
                     </div>

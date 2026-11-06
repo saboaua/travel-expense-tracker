@@ -186,7 +186,7 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     await page.getByRole("heading", { name: "Travel documents" }).waitFor();
     const titles = await page.locator("section[aria-labelledby=doc-tiles-heading] p.truncate.font-bold").allInnerTexts();
-    assert(titles.join("|") === "Alpha Visa|Zeta Insurance", `tile order/content was: ${titles.join("|")}`);
+    assert(titles.join("|") === "Visa / e-visa|Travel insurance", `tile order/content was: ${titles.join("|")}`);
     await page.getByText("Expires soon").first().waitFor();
     const text = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
     assert(!text.includes("V12345678") && !text.includes("POL99887766"), "full document number leaked into a tile");
