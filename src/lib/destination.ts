@@ -23,6 +23,21 @@ const NOT_A_PHOTO = /(flag|coat[_ ]of[_ ]arms|locator|location[_ ]map|\bmap\b|_m
 export const WIKI_THUMB_STEPS = [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840];
 export const WIKI_THUMB_SIZE = 1280;
 
+/** Only Wikimedia's picture server may be fetched through our photo route (so it cannot be used to reach anything else). */
+export function isAllowedPhotoUrl(raw: string | null | undefined): boolean {
+  try {
+    const u = new URL(String(raw));
+    return u.protocol === "https:" && u.hostname === "upload.wikimedia.org" && !u.username && !u.password && u.port === "";
+  } catch {
+    return false;
+  }
+}
+
+/** The address the page uses for a destination photo: our own route, which fetches it from Wikimedia for us. */
+export const photoProxyUrl = (src: string) => `/api/destination-photo?u=${encodeURIComponent(src)}`;
+
+export const PHOTO_USER_AGENT = "TravelExpenseTracker/1.0 (https://github.com/saboaua/travel-expense-tracker)";
+
 const USER_AGENT = "TravelExpenseTracker/1.0 (https://github.com/saboaua/travel-expense-tracker)";
 
 async function searchWikipedia(query: string): Promise<DestinationInfo | null> {
