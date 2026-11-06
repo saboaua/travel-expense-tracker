@@ -49,6 +49,7 @@ export async function GET(
     id: trip.id,
     name: trip.name,
     start_date: trip.start_date,
+    destination: trip.destination,
     end_date: trip.end_date,
     currency: trip.currency,
     status: trip.status,

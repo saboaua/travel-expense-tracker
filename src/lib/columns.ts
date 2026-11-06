@@ -8,7 +8,7 @@
 
 export const TRIP_COLS = "id, name, destination, category, start_date, end_date, currency, status, notes";
 /** What the export workbooks need from a trip. */
-export const TRIP_EXPORT_COLS = "id, name, start_date, end_date, currency, status";
+export const TRIP_EXPORT_COLS = "id, name, destination, start_date, end_date, currency, status";
 
 export const EXPENSE_COLS = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 

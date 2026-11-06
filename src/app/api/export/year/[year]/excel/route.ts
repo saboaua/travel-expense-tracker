@@ -47,6 +47,7 @@ export async function GET(
       id: t.id,
       name: t.name,
       start_date: t.start_date,
+      destination: t.destination,
       end_date: t.end_date,
       currency: t.currency,
       status: t.status,
