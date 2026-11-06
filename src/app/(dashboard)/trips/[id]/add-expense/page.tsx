@@ -20,7 +20,7 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { enqueueExpense, newExpenseId, pushExpense, type DuplicateMatch, type PushOutcome, type QueuedExpense } from "@/lib/offline-queue";
+import { enqueueExpense, EXPENSE_KIND, newExpenseId, pushExpense, type DuplicateMatch, type PushOutcome, type QueuedExpense } from "@/lib/offline-queue";
 import { imageDhash } from "@/lib/image-hash";
 import { DuplicateList } from "@/components/DuplicateList";
 import { makeSyncApi } from "@/lib/offline-api";
@@ -259,6 +259,7 @@ export default function AddExpensePage() {
         imageHash: file ? await imageDhash(file) : null,
         duplicateOk: false,
         uploaded: false,
+        kind: EXPENSE_KIND,
         status: "pending",
         error: null,
         attempts: 0,

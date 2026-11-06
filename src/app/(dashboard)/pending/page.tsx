@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CloudOff, Download, RefreshCw, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { browserStore, type QueuedExpense } from "@/lib/offline-queue";
-import { useExpenseQueue } from "@/lib/use-expense-queue";
+import { isExpense, type QueuedExpense } from "@/lib/offline-queue";
+import { browserOutbox, type OutboxItem } from "@/lib/outbox";
+import { useOutbox } from "@/lib/use-outbox";
 import { SYNC_NOW_EVENT } from "@/components/OfflineSync";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -28,7 +29,7 @@ export default function PendingPage() {
   const [ready, setReady] = useState(false);
   const [online, setOnline] = useState(true);
   const [tripNames, setTripNames] = useState<Record<string, string>>({});
-  const { items } = useExpenseQueue(userId);
+  const { items, loaded } = useOutbox(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -46,26 +47,32 @@ export default function PendingPage() {
   }, [supabase]);
 
   useEffect(() => {
-    const ids = [...new Set(items.map((i) => i.tripId))];
+    const ids = [...new Set(items.filter(isExpense).map((i) => i.tripId))];
     if (ids.length === 0 || !navigator.onLine) return;
     supabase.from("trips").select("id, name").in("id", ids).then(({ data }) => {
       if (data) setTripNames(Object.fromEntries(data.map((t: { id: string; name: string }) => [t.id, t.name])));
     });
   }, [items, supabase]);
 
-  const retry = async (item: QueuedExpense, keepDuplicate = false) => {
-    await browserStore.put({ ...item, status: "pending", attempts: 0, error: null, duplicates: undefined, duplicateOk: keepDuplicate || item.duplicateOk });
+  const retry = async (item: OutboxItem, keepDuplicate = false) => {
+    const reset = { status: "pending" as const, attempts: 0, error: null };
+    if (isExpense(item)) {
+      const next: QueuedExpense = { ...item, ...reset, duplicates: undefined, duplicateOk: keepDuplicate || item.duplicateOk };
+      await browserOutbox.put(next);
+    } else {
+      await browserOutbox.put({ ...item, ...reset });
+    }
     window.dispatchEvent(new Event(SYNC_NOW_EVENT));
   };
 
-  const discard = async (item: QueuedExpense) => {
+  const discard = async (item: OutboxItem) => {
     const ok = await confirm({
-      title: "Discard this receipt?",
+      title: isExpense(item) ? "Discard this receipt?" : "Discard this change?",
       message: "It has not been saved to your account yet, so it will be gone for good.",
       confirmLabel: "Discard",
       destructive: true,
     });
-    if (ok) await browserStore.remove(item.id);
+    if (ok) await browserOutbox.remove(item.id);
   };
 
   const download = (item: QueuedExpense) => {
@@ -83,7 +90,7 @@ export default function PendingPage() {
       <div>
         <h1 className="text-2xl font-bold">Waiting to sync</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Receipts saved on this device while offline. They upload automatically when you are connected.
+          Changes saved on this device while offline. They upload automatically when you are connected.
         </p>
       </div>
 
@@ -93,15 +100,42 @@ export default function PendingPage() {
         </Alert>
       )}
 
-      {ready && items.length === 0 && (
+      {ready && loaded && items.length === 0 && (
         <Card>
           <CardContent className="p-6 text-center text-sm text-muted-foreground">
-            Nothing is waiting. All your receipts are saved to your account.
+            Nothing is waiting. Everything is saved to your account.
           </CardContent>
         </Card>
       )}
 
-      {items.map((item) => (
+      {items.filter((i) => !isExpense(i)).map((item) => (
+        <Card key={item.id}>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-start gap-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{item.label || "Change"}</p>
+                {item.summary && <p className="truncate text-sm text-muted-foreground">{item.summary}</p>}
+              </div>
+              <span className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ${item.status === "pending" ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-100" : "bg-red-100 text-red-900 dark:bg-red-950 dark:text-red-100"}`}>
+                {item.status === "pending" ? "Pending" : item.status === "conflict" ? "Needs attention" : "Failed"}
+              </span>
+            </div>
+            {item.error && <Alert>{item.error}</Alert>}
+            <div className="flex flex-wrap gap-2">
+              {item.status !== "conflict" && (
+                <Button type="button" size="sm" variant="outline" className="gap-1" disabled={!online} onClick={() => retry(item)}>
+                  <RefreshCw className="h-4 w-4" /> {item.status === "failed" ? "Try again" : "Sync now"}
+                </Button>
+              )}
+              <Button type="button" size="sm" variant="outline" className="gap-1" onClick={() => discard(item)}>
+                <Trash2 className="h-4 w-4" /> Discard
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+
+      {items.filter(isExpense).map((item) => (
         <Card key={item.id}>
           <CardContent className="space-y-3 p-4">
             <div className="flex items-start gap-3">

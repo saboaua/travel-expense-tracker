@@ -5,14 +5,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, CloudOff, Loader2, TriangleAlert } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { makeSyncApi } from "@/lib/offline-api";
-import { syncBrowserQueue } from "@/lib/offline-queue";
-import { useExpenseQueue } from "@/lib/use-expense-queue";
+import { currentUserOf, makeHandlers } from "@/lib/offline-api";
+import { nounFor, syncOutbox } from "@/lib/outbox";
+import { useOutbox } from "@/lib/use-outbox";
 
 export const SYNC_NOW_EVENT = "expense-queue-sync-now";
 
 /**
- * Sends waiting receipts when the connection is back and shows a small "pending sync" pill while any are waiting.
+ * Sends waiting changes (receipts and, as they are added, other kinds) when the connection is back and shows a small "pending sync" pill while any are waiting.
  * Lives in the dashboard layout, so it works from every page.
  */
 export function OfflineSync() {
@@ -20,10 +20,10 @@ export function OfflineSync() {
   const [supabase] = useState(() => createClient());
   const [userId, setUserId] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [justSynced, setJustSynced] = useState(0);
+  const [justSynced, setJustSynced] = useState<string[]>([]);
   const [online, setOnline] = useState(true);
   const running = useRef(false);
-  const { items } = useExpenseQueue(userId);
+  const { items } = useOutbox(userId);
 
   useEffect(() => {
     // The session is read from the device, so this also works with no connection.
@@ -35,11 +35,11 @@ export function OfflineSync() {
     running.current = true;
     setSyncing(true);
     try {
-      const result = await syncBrowserQueue(makeSyncApi(supabase), userId);
+      const result = await syncOutbox(makeHandlers(supabase), currentUserOf(supabase), userId);
       if (result && result.synced > 0) {
-        setJustSynced(result.synced);
+        setJustSynced(result.syncedKinds);
         router.refresh();
-        setTimeout(() => setJustSynced(0), 5000);
+        setTimeout(() => setJustSynced([]), 5000);
       }
     } catch {
       // Storage problems or a dropped connection: the items stay queued and the next trigger tries again.
@@ -76,24 +76,26 @@ export function OfflineSync() {
   const needAttention = items.filter((i) => i.status !== "pending").length;
   const waiting = items.length - needAttention;
 
-  if (items.length === 0 && justSynced === 0) return null;
+  if (items.length === 0 && justSynced.length === 0) return null;
 
   let icon = <CloudOff className="h-4 w-4" />;
   let text: string;
   let tone = "border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100";
   if (items.length === 0) {
     icon = <CheckCircle2 className="h-4 w-4" />;
-    text = justSynced === 1 ? "Receipt synced" : `${justSynced} receipts synced`;
+    const noun = nounFor(justSynced);
+    text = justSynced.length === 1 ? `${noun.charAt(0).toUpperCase()}${noun.slice(1)} synced` : `${justSynced.length} ${noun} synced`;
     tone = "border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950 dark:text-emerald-100";
   } else if (syncing && waiting > 0) {
     icon = <Loader2 className="h-4 w-4 animate-spin" />;
     text = "Syncing…";
   } else if (waiting === 0) {
     icon = <TriangleAlert className="h-4 w-4" />;
-    text = needAttention === 1 ? "1 receipt needs attention" : `${needAttention} receipts need attention`;
+    const noun = nounFor(items.filter((i) => i.status !== "pending").map((i) => i.kind));
+    text = needAttention === 1 ? `1 ${noun} needs attention` : `${needAttention} ${noun} need attention`;
     tone = "border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950 dark:text-red-100";
   } else {
-    text = `${waiting} ${waiting === 1 ? "receipt" : "receipts"} pending sync${online ? "" : " · offline"}`;
+    text = `${waiting} ${nounFor(items.filter((i) => i.status === "pending").map((i) => i.kind), waiting)} pending sync${online ? "" : " · offline"}`;
   }
 
   return (

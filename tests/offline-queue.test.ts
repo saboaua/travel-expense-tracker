@@ -21,7 +21,7 @@ eq("path uses the file name when the type is unknown", receiptPathFor("u1", "t1"
 // --- sync
 const item = (over: Partial<QueuedExpense> = {}): QueuedExpense => ({
   id: "e1", userId: "u1", tripId: "t1", createdAt: 1, merchant: "Cafe", amount: 10, currency: "USD", exchangeRate: 1, amountUsd: 10,
-  category: "Meals", expenseDate: "2026-11-04", notes: null, image: jpg, imageName: "a.jpg", uploaded: false, status: "pending", error: null, attempts: 0, ...over,
+  category: "Meals", expenseDate: "2026-11-04", notes: null, image: jpg, imageName: "a.jpg", uploaded: false, kind: "expense.create", status: "pending", error: null, attempts: 0, ...over,
 });
 const memStore = (items: QueuedExpense[]): QueueStore & { items: QueuedExpense[] } => ({
   items,

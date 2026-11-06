@@ -89,6 +89,13 @@ try {
   }
 
   const browser = await chromium.launch();
+  {
+    // The development server compiles the sign-in page on first use; wait for it so no test pays for that
+    const warm = await browser.newPage();
+    await warm.goto(`${BASE}/login`);
+    await warm.waitForFunction(() => { const b = document.querySelector('button[type="submit"]'); return !!b && !b.disabled; }, null, { timeout: 120_000 }).catch(() => {});
+    await warm.close();
+  }
   const newPage = async () => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     ctx.setDefaultTimeout(60_000);
@@ -497,6 +504,35 @@ try {
     assert(rows[0].trip_id === TRIP_ID && rows[0].user_id === PAT, "expense saved under the wrong trip or user");
     assert(Number(rows[0].amount) === 42.5, `amount saved as ${rows[0].amount}`);
     await page.getByText("Hilton Test").first().waitFor();
+    await ctx.close();
+  });
+
+  await test("outbox: an expense saved with no connection waits, shows in the pill and Waiting page, and is sent when back online (also one saved before kinds existed)", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/trips/${TRIP_ID}/add-expense`);
+    await page.locator("#merchant").fill("Offline Diner");
+    await page.locator("#amount").fill("18.25");
+    await ctx.setOffline(true);
+    await page.getByRole("button", { name: "Save Expense" }).click();
+    await page.getByRole("status").filter({ hasText: /pending sync/ }).waitFor({ timeout: 60_000 });
+    assert(fake.table("expenses").filter((e) => e.merchant === "Offline Diner").length === 0, "nothing reaches the server while offline");
+    // An item written by the previous version has no kind: it must still be recognised as an expense
+    await page.evaluate(async () => {
+      const db = await new Promise((res, rej) => { const r = indexedDB.open("expense-tracker-offline", 1); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+      const legacy = await new Promise((res) => { const t = db.transaction("expenses", "readwrite"); const st = t.objectStore("expenses"); st.getAll().onsuccess = (e) => { const first = e.target.result[0]; const copy = { ...first, id: "00000000-0000-4000-8000-00000000f00d", merchant: "Legacy Cafe" }; delete copy.kind; st.put(copy); res(true); }; });
+      db.close();
+      return legacy;
+    });
+    await page.goto(`${BASE}/pending`).catch(() => {});
+    await ctx.setOffline(false);
+    await page.goto(`${BASE}/pending`);
+    await page.getByRole("heading", { name: "Waiting to sync" }).waitFor();
+    await page.waitForFunction(() => /Nothing is waiting/.test(document.body.innerText), null, { timeout: 90_000 });
+    const rows = fake.table("expenses").filter((e) => ["Offline Diner", "Legacy Cafe"].includes(e.merchant));
+    if (rows.length !== 2) console.log("[pending page]", (await page.locator("main").innerText()).replace(/\s+/g, " ").slice(0, 600));
+    assert(rows.length === 2, `both waiting expenses were sent, found ${rows.map((r) => r.merchant).join(",") || 0}; left in the table: ${fake.table("expenses").map((r) => r.merchant).join(",")}`);
     await ctx.close();
   });
 

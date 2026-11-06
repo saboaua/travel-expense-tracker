@@ -12,7 +12,12 @@
  *    being retried forever.
  */
 
-export type QueueStatus = "pending" | "conflict" | "failed" | "duplicate";
+import { enqueue, newId, runOutbox, syncOutbox, type Handlers, type OutboxItem, type OutboxStore, type PushOutcome as Outcome, type SyncResult } from "@/lib/outbox";
+
+export { browserOutbox as browserStore, QUEUE_EVENT } from "@/lib/outbox";
+export type { QueueStatus, SyncResult } from "@/lib/outbox";
+
+export const EXPENSE_KIND = "expense.create";
 
 /** An expense you already saved that looks like the one being added. */
 export interface DuplicateMatch {
@@ -26,11 +31,9 @@ export interface DuplicateMatch {
   reason: "same_photo" | "same_details" | "both";
 }
 
-export interface QueuedExpense {
-  id: string;
-  userId: string;
+export interface QueuedExpense extends OutboxItem {
+  kind: typeof EXPENSE_KIND;
   tripId: string;
-  createdAt: number;
   merchant: string | null;
   amount: number;
   currency: string;
@@ -49,10 +52,9 @@ export interface QueuedExpense {
   duplicates?: DuplicateMatch[];
   /** True once the photo is in storage, so a retry does not upload it again. */
   uploaded: boolean;
-  status: QueueStatus;
-  error: string | null;
-  attempts: number;
 }
+
+export const isExpense = (i: OutboxItem): i is QueuedExpense => i.kind === EXPENSE_KIND;
 
 export type ErrorKind = "network" | "auth" | "duplicate" | "conflict" | "failed";
 
@@ -73,14 +75,7 @@ export function classifyError(err: unknown): ErrorKind {
   return "failed";
 }
 
-export function newExpenseId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  // Very old browsers: v4-shaped id from Math.random (only needs to be unique, not secret).
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
-  });
-}
+export const newExpenseId = newId;
 
 const EXT_BY_TYPE: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/heic": "heic" };
 
@@ -101,20 +96,10 @@ export interface SyncApi {
   findDuplicates?(item: QueuedExpense): Promise<{ matches: DuplicateMatch[]; error: unknown | null }>;
 }
 
-export interface QueueStore {
-  list(): Promise<QueuedExpense[]>;
-  put(item: QueuedExpense): Promise<void>;
-  remove(id: string): Promise<void>;
-}
+export type QueueStore = OutboxStore<QueuedExpense>;
 
-export type PushOutcome =
-  | { kind: "synced" }
-  | { kind: "offline" }
-  | { kind: "duplicate"; matches: DuplicateMatch[] }
-  | { kind: "conflict"; message: string }
-  | { kind: "failed"; message: string };
+export type PushOutcome = Outcome<DuplicateMatch>;
 
-const MAX_AUTO_ATTEMPTS = 5;
 
 function friendly(kind: ErrorKind, err: unknown): string {
   const raw = (err as ErrorLike | null)?.message || "Unknown error";
@@ -175,115 +160,15 @@ export async function pushExpense(api: SyncApi, item: QueuedExpense): Promise<Pu
   return kind === "conflict" ? { kind: "conflict", message: friendly(kind, error) } : { kind: "failed", message: friendly(kind, error) };
 }
 
-export interface SyncResult {
-  synced: number;
-  /** Items of this user still waiting (offline, or needing attention). */
-  remaining: number;
-  offline: boolean;
+/** The sending steps this file knows about, by kind. More kinds are added in offline-api.ts as they are built. */
+export const expenseHandlers = (api: SyncApi): Handlers<QueuedExpense> => ({ [EXPENSE_KIND]: (item) => pushExpense(api, item) });
+
+/** Sends every waiting receipt for `userId` (the expense-only entry point; the app uses the full outbox). */
+export function runSync(store: QueueStore, api: SyncApi, userId: string): Promise<SyncResult> {
+  return runOutbox(store, expenseHandlers(api), () => api.currentUser(), userId);
 }
-
-/** Sends everything waiting for `userId`, oldest first. Stops at the first sign of no connection. */
-export async function runSync(store: QueueStore, api: SyncApi, userId: string): Promise<SyncResult> {
-  const mine = (await store.list()).filter((i) => i.userId === userId).sort((a, b) => a.createdAt - b.createdAt);
-  const waiting = mine.filter((i) => i.status === "pending" && i.attempts < MAX_AUTO_ATTEMPTS);
-  if (waiting.length === 0) return { synced: 0, remaining: mine.length, offline: false };
-
-  // Never send someone else's receipts, and never send anything if we cannot tell who is signed in.
-  const who = await api.currentUser();
-  if (who.offline) return { synced: 0, remaining: mine.length, offline: true };
-  if (who.userId !== userId) return { synced: 0, remaining: mine.length, offline: false };
-
-  let synced = 0;
-  let offline = false;
-  for (const item of waiting) {
-    const outcome = await pushExpense(api, item);
-    if (outcome.kind === "synced") {
-      await store.remove(item.id);
-      synced++;
-    } else if (outcome.kind === "offline") {
-      await store.put(item); // keeps `uploaded`
-      offline = true;
-      break;
-    } else if (outcome.kind === "duplicate") {
-      item.status = "duplicate";
-      item.duplicates = outcome.matches;
-      item.error = "Looks like a receipt you already saved.";
-      await store.put(item);
-    } else {
-      item.attempts += 1;
-      item.error = outcome.message;
-      item.status = outcome.kind === "conflict" ? "conflict" : item.attempts >= MAX_AUTO_ATTEMPTS ? "failed" : "pending";
-      await store.put(item);
-    }
-  }
-  const after = (await store.list()).filter((i) => i.userId === userId).length;
-  return { synced, remaining: after, offline };
-}
-
-// ---------------------------------------------------------------------------------------------------------------
-// Browser storage (IndexedDB). Not used by the tests, which pass their own store.
-
-const DB_NAME = "expense-tracker-offline";
-const STORE = "expenses";
-export const QUEUE_EVENT = "expense-queue-changed";
-
-function open(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    if (typeof indexedDB === "undefined") return reject(new Error("IndexedDB is not available"));
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE, { keyPath: "id" });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function tx<T>(mode: IDBTransactionMode, run: (s: IDBObjectStore) => IDBRequest<T>): Promise<T> {
-  const db = await open();
-  try {
-    return await new Promise<T>((resolve, reject) => {
-      const t = db.transaction(STORE, mode);
-      const req = run(t.objectStore(STORE));
-      t.oncomplete = () => resolve(req.result);
-      t.onerror = () => reject(t.error);
-      t.onabort = () => reject(t.error);
-    });
-  } finally {
-    db.close();
-  }
-}
-
-function notifyQueueChanged() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event(QUEUE_EVENT));
-}
-
-export const browserStore: QueueStore = {
-  list: () => tx("readonly", (s) => s.getAll() as IDBRequest<QueuedExpense[]>),
-  async put(item) {
-    await tx("readwrite", (s) => s.put(item));
-    notifyQueueChanged();
-  },
-  async remove(id) {
-    await tx("readwrite", (s) => s.delete(id));
-    notifyQueueChanged();
-  },
-};
 
 /** Keeps a new expense on the device. Resolves false if the browser would not store it (private mode, storage full). */
-export async function enqueueExpense(item: QueuedExpense): Promise<boolean> {
-  try {
-    await browserStore.put(item);
-    return true;
-  } catch {
-    return false;
-  }
-}
+export const enqueueExpense = (item: QueuedExpense): Promise<boolean> => enqueue(item);
 
-/** Runs one sync at a time across tabs (Web Locks), or just here when the browser has no locks. */
-export async function syncBrowserQueue(api: SyncApi, userId: string): Promise<SyncResult | null> {
-  const run = () => runSync(browserStore, api, userId);
-  const locks = typeof navigator !== "undefined" ? (navigator as Navigator & { locks?: LockManager }).locks : undefined;
-  if (!locks) return run();
-  return locks.request("expense-queue-sync", { ifAvailable: true }, async (lock) => (lock ? run() : null));
-}
+export { syncOutbox };

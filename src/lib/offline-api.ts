@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { classifyError, type DuplicateMatch, type QueuedExpense, type SyncApi } from "@/lib/offline-queue";
+import { classifyError, EXPENSE_KIND, pushExpense, type DuplicateMatch, type QueuedExpense, type SyncApi } from "@/lib/offline-queue";
+import type { Handlers } from "@/lib/outbox";
 
 type DuplicateRow = {
   id: string;
@@ -11,6 +12,20 @@ type DuplicateRow = {
   expense_date: string;
   reason: DuplicateMatch["reason"];
 };
+
+/**
+ * Every kind of change the outbox can send, and how. A new kind (a trip, a card, ...) is added here with its own
+ * "send" step; the engine, the sync pill and the Waiting page need no change.
+ */
+export function makeHandlers(supabase: SupabaseClient): Handlers {
+  const api = makeSyncApi(supabase);
+  return {
+    [EXPENSE_KIND]: (item) => pushExpense(api, item as QueuedExpense),
+  };
+}
+
+/** Who is signed in, checked with the server, for the outbox. */
+export const currentUserOf = (supabase: SupabaseClient) => makeSyncApi(supabase).currentUser;
 
 /** Connects the offline queue to Supabase. Everything goes through the signed-in person's own session. */
 export function makeSyncApi(supabase: SupabaseClient): SyncApi {
