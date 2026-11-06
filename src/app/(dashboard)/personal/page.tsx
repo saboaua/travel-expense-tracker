@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ShoppingCart, Hammer, Plane, ChevronRight, Lock, FolderOpen } from "lucide-react";
+import { ShoppingCart, Hammer, Plane, ChevronRight, Lock, FolderOpen, CreditCard } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null };
+type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -23,12 +23,13 @@ export default function PersonalHubPage() {
       if (flag && flag.personal_enabled === false) return setEnabled(false);
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
-      const [g, p, d] = await Promise.all([
+      const [g, p, d, l] = await Promise.all([
         supabase.from("grocery_receipts").select("total, currency").gte("purchase_date", monthStart),
         supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
+        supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
       ]);
-      setStats({ ...summarizePersonal(g.data, p.data as never), documents: d.error ? null : d.count ?? 0 });
+      setStats({ ...summarizePersonal(g.data, p.data as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0 });
     })();
   }, []);
 
@@ -40,6 +41,9 @@ export default function PersonalHubPage() {
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, text: "Scan receipts and get a trip total and summary", stat: stats ? `${stats.trips.count} active · ${formatCurrency(stats.trips.spent, "USD")} spent` : "" },
     ...(perms.has("documents")
       ? [{ href: "/documents", title: "Documents", icon: FolderOpen, text: "Passport, visas and trip documents, with renewal reminders", stat: stats?.documents != null ? `${stats.documents} document${stats.documents !== 1 ? "s" : ""}` : "" }]
+      : []),
+    ...(perms.has("loyalty")
+      ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, text: "Store cards on your phone, ready to scan at the till", stat: stats?.cards != null ? `${stats.cards} card${stats.cards !== 1 ? "s" : ""}` : "" }]
       : []),
   ];
 

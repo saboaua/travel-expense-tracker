@@ -50,6 +50,7 @@ check("DOCUMENT_COLS", "travel_documents", C.DOCUMENT_COLS);
 check("PROFILE_HOME_PLACE_COLS", "profiles", C.PROFILE_HOME_PLACE_COLS);
 check("TELEGRAM_PENDING_COLS_V2", "telegram_pending", C.TELEGRAM_PENDING_COLS_V2);
 check("DOCUMENT_TILE_COLS", "travel_documents", C.DOCUMENT_TILE_COLS);
+check("LOYALTY_CARD_COLS", "loyalty_cards", C.LOYALTY_CARD_COLS);
 check("ROLE_COLS", "roles", C.ROLE_COLS);
 check("SECURITY_EVENT_COLS", "security_events", C.SECURITY_EVENT_COLS);
 check("AUDIT_LOG_COLS", "audit_logs", C.AUDIT_LOG_COLS);

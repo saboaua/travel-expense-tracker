@@ -80,3 +80,9 @@ home projects (with a budget) and personal trips, by scanning receipts.
 * Price comparison is per unit purchased, not per kg/litre. Next step: capture size and compare per unit.
 * One currency per grocery receipt; summaries are shown per currency.
 * Ideas: shopping list from frequent items, budget alerts, CSV export, shared household access.
+
+## Loyalty cards
+
+`/personal/loyalty` is a wallet for store cards. Each card has a store name, an optional card type (Rewards, Coffee club) and holder, the card or barcode number, and a barcode format (auto-detected, or CODE128, QR Code, EAN-13, UPC-A). An optional photo is shrunk in the browser to 800 px at quality 0.7 (WebP, JPEG where WebP is not supported) before it is uploaded, so the original is never stored. Opening a card shows a large barcode (JsBarcode for 1D codes, the `qrcode` library for QR) with a brightness tip, and keeps the screen awake where the browser allows it.
+
+Cards are private to their owner (row security plus a private `loyalty-cards` bucket with one folder per user). The feature is the `loyalty` option in Admin > Roles; `supabase/migration_loyalty.sql` turns it on for every existing role.

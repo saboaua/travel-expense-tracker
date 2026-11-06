@@ -34,10 +34,10 @@ const addDays = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDa
 
 /* ---------------- fake backend + seed ---------------- */
 const fake = createFakeSupabase();
-const FEATURES = ["trips", "reports", "personal", "personal.dashboard", "documents", "users.manage", "security.view", "categories.manage", "currencies.manage", "branding.manage", "telegram.manage", "support.view"];
+const FEATURES = ["trips", "reports", "personal", "personal.dashboard", "documents", "loyalty", "users.manage", "security.view", "categories.manage", "currencies.manage", "branding.manage", "telegram.manage", "support.view"];
 fake.seed("roles", [
-  { key: "user", label: "User", description: "Regular user", permissions: ["trips", "reports", "personal", "personal.dashboard", "documents"], known_features: FEATURES, is_system: true },
-  { key: "assistant", label: "Assistant", description: "Assistant", permissions: ["trips", "reports", "personal", "documents", "users.manage"], known_features: FEATURES, is_system: true },
+  { key: "user", label: "User", description: "Regular user", permissions: ["trips", "reports", "personal", "personal.dashboard", "documents", "loyalty"], known_features: FEATURES, is_system: true },
+  { key: "assistant", label: "Assistant", description: "Assistant", permissions: ["trips", "reports", "personal", "documents", "loyalty", "users.manage"], known_features: FEATURES, is_system: true },
   { key: "admin", label: "Admin", description: "Admin", permissions: FEATURES, known_features: FEATURES, is_system: true },
 ]);
 fake.seed("app_settings", [{ id: 1, app_name: "E2E Expense App", logo_url: null, primary_color: "#4f46e5", login_logo_size: 56, privacy_policy: "", support_email: "help@example.com", personal_enabled: true }]);
@@ -46,7 +46,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "security_events", "audit_logs", "support_requests"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 const ADMIN = fake.addUser({ email: "admin@example.com", password: "Admin-Pass-123", role: "admin", full_name: "Ada Admin" });
@@ -217,6 +217,46 @@ try {
   });
 
   /* ---------- business navigation ---------- */
+  await test("loyalty wallet: empty state, add a card, open its barcode, Escape closes, search and delete", async () => {
+    const browser2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await browser2.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal`);
+    await page.getByRole("heading", { name: "Loyalty cards" }).waitFor();
+    await page.goto(`${BASE}/personal/loyalty`);
+    await page.getByText("No loyalty cards yet").waitFor();
+    await page.getByRole("button", { name: "Add your first card" }).click();
+    await page.getByLabel("Store name").fill("Greenfield Market");
+    await page.getByLabel(/Card type/).fill("Rewards");
+    await page.getByLabel("Barcode or card number").fill("4021 8830 1177");
+    await page.getByLabel("Barcode format").waitFor();
+    assert((await page.getByLabel("Barcode format").innerText()).includes("Auto-detect (CODE128)"), "auto-detect should name the format it picked");
+    await page.getByRole("button", { name: "Save card" }).click();
+    await page.getByTestId("loyalty-tile").waitFor();
+    const tile = await page.getByTestId("loyalty-tile").innerText();
+    assert(/Greenfield Market/.test(tile) && /rewards/i.test(tile), "tile shows the name and the card type");
+    assert(fake.table("loyalty_cards")[0].card_number === "402188301177" && fake.table("loyalty_cards")[0].user_id === PAT, "stored cleaned number for this user");
+    await page.getByRole("button", { name: "Show barcode" }).click();
+    await page.getByRole("dialog", { name: /Greenfield Market card/ }).waitFor();
+    assert((await page.getByTestId("card-number").innerText()) === "4021 8830 1177", "number shown in groups");
+    assert((await page.locator('[role="dialog"] svg[aria-label^="Barcode for"] rect').count()) > 10, "barcode bars drawn");
+    assert(/brightness/i.test(await page.getByRole("dialog").innerText()), "brightness tip shown");
+    await page.keyboard.press("Escape");
+    await page.getByRole("dialog").waitFor({ state: "detached" });
+    await page.getByLabel("Search cards").fill("zzz");
+    await page.getByText(/No card matches/).waitFor();
+    await page.getByLabel("Search cards").fill("green");
+    await page.getByTestId("loyalty-tile").waitFor();
+    assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)), "wallet scrolls sideways on a phone");
+    await page.getByRole("button", { name: "More actions for Greenfield Market" }).click();
+    await page.getByRole("button", { name: "Delete" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).last().click();
+    await page.getByText("No loyalty cards yet").waitFor();
+    assert(fake.table("loyalty_cards").length === 0, "card removed from the database");
+    await browser2.close();
+  });
+
   await test("one Business link; Trips and Reports switch inside it", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

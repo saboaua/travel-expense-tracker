@@ -23,6 +23,8 @@ type Feature = {
 export const FEATURES: Feature[] = [
   { key: "trips", label: "Trips & expenses", description: "Create trips, add and scan receipts.", group: "App", paths: ["/trips"], defaultRoles: ["user", "assistant"] },
   { key: "reports", label: "Reports", description: "Spending reports and exports.", group: "App", paths: ["/reports"], defaultRoles: ["user", "assistant"] },
+  // listed before "personal" so /personal/loyalty is matched by this feature first
+  { key: "loyalty", label: "Loyalty cards", description: "Store cards with a scannable barcode, kept in Personal.", group: "App", paths: ["/personal/loyalty"], defaultRoles: ["user", "assistant"] },
   { key: "personal", label: "Personal", description: "Groceries, home projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
   { key: "personal.dashboard", label: "Personal dashboard", description: "Business / Personal switch on the home page, with spending charts for personal receipts.", group: "App", paths: [], defaultRoles: ["user", "assistant"] },
   { key: "documents", label: "Documents & passport", description: "Passport, visas and trip documents.", group: "App", paths: ["/documents"], defaultRoles: ["user", "assistant"] },
