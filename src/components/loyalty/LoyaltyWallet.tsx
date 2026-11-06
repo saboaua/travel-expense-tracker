@@ -5,10 +5,10 @@ import { CreditCard, Loader2, MoreVertical, Pencil, Plus, ScanBarcode, Search, T
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm";
-import { LOYALTY_CARD_COLS } from "@/lib/columns";
-import { cardColor, filterCards, type LoyaltyCard } from "@/lib/loyalty";
+import { LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { filterCards, type LoyaltyCard } from "@/lib/loyalty";
 import { removeLoyaltyCard } from "@/lib/loyalty-image";
-import { Barcode } from "./Barcode";
+import { CardFace } from "./CardFace";
 import { CardDetail } from "./CardDetail";
 import { CardForm } from "./CardForm";
 
@@ -30,7 +30,7 @@ export function LoyaltyWallet() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       setUserId(user.id);
-      const { data, error: err } = await supabase.from("loyalty_cards").select(LOYALTY_CARD_COLS).eq("user_id", user.id);
+      const { data, error: err } = await withColumnFallback((cols) => supabase.from("loyalty_cards").select(cols).eq("user_id", user.id), LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE);
       if (err) {
         setError(/relation|does not exist|schema cache/i.test(err.message) ? "The loyalty cards table is not set up yet. Run supabase/migration_loyalty.sql in the Supabase SQL Editor." : err.message);
         return setCards([]);
@@ -101,33 +101,22 @@ export function LoyaltyWallet() {
           ) : (
             <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
               {shown.map((c) => (
-                <li key={c.id} data-testid="loyalty-tile" className="flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm">
-                  <div className="p-2.5 pb-0 sm:p-3.5 sm:pb-0">
-                    <div className="relative flex h-24 flex-col items-center justify-center rounded-lg px-2 text-center text-white sm:h-32 sm:rounded-[10px]" style={{ background: cardColor(c) }}>
-                      <div className="absolute right-0 top-0">
-                        <button type="button" onClick={() => setMenu(menu === c.id ? null : c.id)} aria-label={`More actions for ${c.store_name}`} aria-expanded={menu === c.id} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/15"><MoreVertical className="h-[18px] w-[18px]" /></button>
-                        {menu === c.id && (
-                          <>
-                            <button type="button" className="fixed inset-0 z-10 cursor-default" aria-label="Close menu" onClick={() => setMenu(null)} />
-                            <div className="absolute right-1 top-10 z-20 w-36 rounded-lg border bg-card p-1 text-sm text-card-foreground shadow-lg">
-                              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left hover:bg-accent" onClick={() => { setMenu(null); setEditing(c); }}><Pencil className="h-4 w-4" /> Edit</button>
-                              <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-red-600 hover:bg-accent" onClick={() => remove(c)}><Trash2 className="h-4 w-4" /> Delete</button>
-                            </div>
-                          </>
-                        )}
-                      </div>
-                      <p className="line-clamp-2 break-words px-4 text-[15px] font-bold leading-tight sm:text-xl">{c.store_name}</p>
-                      {c.category && <p className="mt-1 text-[10px] uppercase tracking-[0.08em] opacity-90 sm:mt-1.5 sm:text-xs">{c.category}</p>}
-                    </div>
-                  </div>
-                  <button type="button" onClick={() => setOpen(c)} className="mx-2.5 mt-2.5 rounded-md bg-white px-2 py-1.5 sm:mx-3.5 sm:mt-3" aria-label={`Open ${c.store_name} barcode`}>
-                    <Barcode value={c.card_number} format={c.barcode_format} label="Barcode preview" className={c.barcode_format === "QR" ? "mx-auto block h-9 w-9 sm:h-10 sm:w-10" : "block h-7 w-full sm:h-9"} />
+                <li key={c.id} data-testid="loyalty-tile" className="relative">
+                  <button type="button" onClick={() => setOpen(c)} aria-label={`Open ${c.store_name}`} className="block w-full rounded-xl text-left shadow-sm transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+                    <CardFace card={c} className="h-28 rounded-xl border border-black/10 sm:h-36">
+                      <span className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/30 backdrop-blur-sm" aria-hidden="true"><ScanBarcode className="h-4 w-4" /></span>
+                    </CardFace>
                   </button>
-                  <div className="flex items-center gap-2 p-2.5 sm:p-3.5">
-                    <Button type="button" className="h-11 flex-1 px-2 text-[13px] sm:h-10 sm:text-sm" onClick={() => setOpen(c)}><ScanBarcode className="hidden h-4 w-4 sm:block" /> Show barcode</Button>
-                    <Button type="button" variant="outline" size="icon" className="hidden sm:inline-flex" onClick={() => setEditing(c)} aria-label={`Edit ${c.store_name}`}><Pencil className="h-4 w-4" /></Button>
-                    <Button type="button" variant="outline" size="icon" className="hidden text-red-600 sm:inline-flex" onClick={() => remove(c)} aria-label={`Delete ${c.store_name}`}><Trash2 className="h-4 w-4" /></Button>
-                  </div>
+                  <button type="button" onClick={() => setMenu(menu === c.id ? null : c.id)} aria-label={`More actions for ${c.store_name}`} aria-expanded={menu === c.id} className="absolute right-0 top-0 flex h-11 w-11 items-center justify-center rounded-lg text-white drop-shadow hover:bg-white/15"><MoreVertical className="h-[18px] w-[18px]" /></button>
+                  {menu === c.id && (
+                    <>
+                      <button type="button" className="fixed inset-0 z-10 cursor-default" aria-label="Close menu" onClick={() => setMenu(null)} />
+                      <div className="absolute right-1 top-10 z-20 w-36 rounded-lg border bg-card p-1 text-sm text-card-foreground shadow-lg">
+                        <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left hover:bg-accent" onClick={() => { setMenu(null); setEditing(c); }}><Pencil className="h-4 w-4" /> Edit</button>
+                        <button type="button" className="flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-red-600 hover:bg-accent" onClick={() => remove(c)}><Trash2 className="h-4 w-4" /> Delete</button>
+                      </div>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

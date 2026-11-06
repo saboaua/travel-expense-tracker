@@ -24,6 +24,8 @@ export type LoyaltyCard = {
   barcode_format: BarcodeFormat;
   color: string | null;
   image_path: string | null;
+  /** Needs migration_loyalty_back.sql; undefined/null when absent. */
+  back_image_path?: string | null;
   created_at: string;
 };
 

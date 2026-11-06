@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { LOYALTY_CARD_COLS } from "@/lib/columns";
+import { isMissingColumn, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE } from "@/lib/columns";
 import type { BarcodeFormat, LoyaltyCard } from "@/lib/loyalty";
 
 export const LOYALTY_BUCKET = "loyalty-cards";
@@ -72,39 +72,64 @@ async function uploadImage(supabase: SupabaseClient, userId: string, file: File)
   return path;
 }
 
-/** `image` is an already compressed photo (see compressCardImage). */
-export async function saveLoyaltyCard(supabase: SupabaseClient, userId: string, input: CardInput, image?: File | null): Promise<LoyaltyCard> {
-  const image_path = image ? await uploadImage(supabase, userId, image) : null;
-  const { data, error } = await supabase
-    .from("loyalty_cards")
-    .insert({ ...rowOf(input), user_id: userId, image_path })
-    .select(LOYALTY_CARD_COLS)
-    .single();
-  if (error) {
-    if (image_path) await supabase.storage.from(LOYALTY_BUCKET).remove([image_path]);
-    throw new Error(error.message);
+export const BACK_MIGRATION_MESSAGE = "The back photo could not be saved because the database is missing the back_image_path column. Run supabase/migration_loyalty_back.sql in the Supabase SQL Editor. The rest of the card was not changed.";
+
+const removeFiles = async (supabase: SupabaseClient, paths: (string | null | undefined)[]) => {
+  const list = paths.filter((p): p is string => !!p);
+  if (list.length) await supabase.storage.from(LOYALTY_BUCKET).remove(list);
+};
+
+/** A photo slot: a new file to store, `null` to remove it, `undefined` to keep what is there. */
+export type Photo = File | null | undefined;
+
+const next = async (supabase: SupabaseClient, userId: string, current: string | null | undefined, photo: Photo): Promise<{ path: string | null; uploaded: string | null }> => {
+  if (photo) { const path = await uploadImage(supabase, userId, photo); return { path, uploaded: path }; }
+  if (photo === null) return { path: null, uploaded: null };
+  return { path: current ?? null, uploaded: null };
+};
+
+/** Photos are already compressed (see compressCardImage). */
+export async function saveLoyaltyCard(supabase: SupabaseClient, userId: string, input: CardInput, front?: Photo, back?: Photo): Promise<LoyaltyCard> {
+  const f = await next(supabase, userId, null, front);
+  let b: Awaited<ReturnType<typeof next>>;
+  try { b = await next(supabase, userId, null, back); } catch (e) { await removeFiles(supabase, [f.uploaded]); throw e; }
+  const row: Record<string, unknown> = { ...rowOf(input), user_id: userId, image_path: f.path };
+  let res = await supabase.from("loyalty_cards").insert(b.path ? { ...row, back_image_path: b.path } : row).select(LOYALTY_CARD_COLS).single();
+  if (isMissingColumn(res.error)) {
+    if (b.path) { await removeFiles(supabase, [f.uploaded, b.uploaded]); throw new Error(BACK_MIGRATION_MESSAGE); }
+    res = await supabase.from("loyalty_cards").insert(row).select(LOYALTY_CARD_COLS_BASE).single();
   }
-  return data as unknown as LoyaltyCard;
+  if (res.error) {
+    await removeFiles(supabase, [f.uploaded, b.uploaded]);
+    throw new Error(res.error.message);
+  }
+  return res.data as unknown as LoyaltyCard;
 }
 
-/** `image`: a new photo to store, `null` to remove the photo, `undefined` to keep it. */
-export async function updateLoyaltyCard(supabase: SupabaseClient, userId: string, card: LoyaltyCard, input: CardInput, image?: File | null): Promise<LoyaltyCard> {
-  let image_path = card.image_path;
-  if (image) image_path = await uploadImage(supabase, userId, image);
-  else if (image === null) image_path = null;
-  const { data, error } = await supabase.from("loyalty_cards").update({ ...rowOf(input), image_path }).eq("id", card.id).select(LOYALTY_CARD_COLS).single();
-  if (error) {
-    if (image && image_path) await supabase.storage.from(LOYALTY_BUCKET).remove([image_path]);
-    throw new Error(error.message);
+/** Each photo: a new file to store, `null` to remove it, `undefined` to keep it. */
+export async function updateLoyaltyCard(supabase: SupabaseClient, userId: string, card: LoyaltyCard, input: CardInput, front?: Photo, back?: Photo): Promise<LoyaltyCard> {
+  const f = await next(supabase, userId, card.image_path, front);
+  let b: Awaited<ReturnType<typeof next>>;
+  try { b = await next(supabase, userId, card.back_image_path, back); } catch (e) { await removeFiles(supabase, [f.uploaded]); throw e; }
+  const touchesBack = back !== undefined;
+  const row: Record<string, unknown> = { ...rowOf(input), image_path: f.path };
+  let res = await supabase.from("loyalty_cards").update(touchesBack ? { ...row, back_image_path: b.path } : row).eq("id", card.id).select(LOYALTY_CARD_COLS).single();
+  if (isMissingColumn(res.error)) {
+    if (touchesBack && b.path) { await removeFiles(supabase, [f.uploaded, b.uploaded]); throw new Error(BACK_MIGRATION_MESSAGE); }
+    res = await supabase.from("loyalty_cards").update(row).eq("id", card.id).select(LOYALTY_CARD_COLS_BASE).single();
   }
-  if (card.image_path && card.image_path !== image_path) await supabase.storage.from(LOYALTY_BUCKET).remove([card.image_path]);
-  return data as unknown as LoyaltyCard;
+  if (res.error) {
+    await removeFiles(supabase, [f.uploaded, b.uploaded]);
+    throw new Error(res.error.message);
+  }
+  await removeFiles(supabase, [card.image_path !== f.path ? card.image_path : null, card.back_image_path !== b.path ? card.back_image_path : null]);
+  return res.data as unknown as LoyaltyCard;
 }
 
 export async function removeLoyaltyCard(supabase: SupabaseClient, card: LoyaltyCard): Promise<void> {
   const { error } = await supabase.from("loyalty_cards").delete().eq("id", card.id);
   if (error) throw new Error(error.message);
-  if (card.image_path) await supabase.storage.from(LOYALTY_BUCKET).remove([card.image_path]);
+  await removeFiles(supabase, [card.image_path, card.back_image_path]);
 }
 
 function rowOf(input: CardInput) {

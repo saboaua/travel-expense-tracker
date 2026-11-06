@@ -1,6 +1,6 @@
 // Run with: npx tsx tests/loyalty.test.ts
 import { cleanNumber, detectFormat, displayNumber, filterCards, formatProblem, gtinCheckDigit, colorForName, CARD_COLORS, type LoyaltyCard } from "../src/lib/loyalty";
-import { targetSize } from "../src/lib/loyalty-image";
+import { targetSize, saveLoyaltyCard, updateLoyaltyCard, removeLoyaltyCard, BACK_MIGRATION_MESSAGE } from "../src/lib/loyalty-image";
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 
 // check digits (4006381333931 is a real EAN-13 example, 036000291452 a real UPC-A)
@@ -47,3 +47,52 @@ eq(filterCards(all, "BREW").map((c) => c.store_name), ["Brew & Bean"], "search b
 eq(filterCards(all, "coffee").length, 1, "search by category");
 eq(filterCards(all, "patrick").length, 1, "search by holder");
 eq(filterCards(all, "zzz").length, 0, "no match");
+
+/* ---- front and back photos ---- */
+function fakeDb(opts: { missingBack?: boolean } = {}) {
+  const removed: string[] = [];
+  const uploaded: string[] = [];
+  const missing = { code: "42703", message: "column loyalty_cards.back_image_path does not exist" };
+  const chain = (row: Record<string, unknown>) => ({
+    eq: () => chain(row),
+    select: (cols: string) => ({
+      single: async () => (opts.missingBack && ("back_image_path" in row || /back_image_path/.test(cols)) ? { data: null, error: missing } : { data: { id: "c1", ...row }, error: null }),
+    }),
+  });
+  const supabase = {
+    from: () => ({ insert: (row: Record<string, unknown>) => chain(row), update: (row: Record<string, unknown>) => chain(row) }),
+    storage: { from: () => ({ upload: async (path: string) => { uploaded.push(path); return { error: null }; }, remove: async (paths: string[]) => { removed.push(...paths); return { error: null }; } }) },
+  } as unknown as Parameters<typeof saveLoyaltyCard>[0];
+  return { supabase, removed, uploaded };
+}
+const input = { store_name: "A", card_number: "1", barcode_format: "CODE128" as const };
+const img = (n: string) => new File([new Uint8Array([1])], n, { type: "image/webp" });
+
+(async () => {
+  const d = fakeDb();
+  const c = await saveLoyaltyCard(d.supabase, "u", input, img("f"), img("b"));
+  eq([d.uploaded.length, !!c.image_path, !!c.back_image_path], [2, true, true], "a new card stores both photos");
+
+  const base = { ...card("A", null), image_path: "u/f.webp", back_image_path: "u/b.webp" };
+  const d1 = fakeDb();
+  const keep = await updateLoyaltyCard(d1.supabase, "u", base, input);
+  eq([keep.image_path, d1.removed], ["u/f.webp", []], "update keeps both photos when nothing was touched");
+  await updateLoyaltyCard(d1.supabase, "u", base, input, undefined, null);
+  eq(d1.removed, ["u/b.webp"], "removing the back deletes only its file");
+  const d2 = fakeDb();
+  const swapped = await updateLoyaltyCard(d2.supabase, "u", base, input, img("n"), undefined);
+  eq([swapped.image_path !== "u/f.webp", d2.removed], [true, ["u/f.webp"]], "a new front replaces and deletes the old file");
+
+  const d3 = fakeDb({ missingBack: true });
+  const noBack = await saveLoyaltyCard(d3.supabase, "u", input, img("f"));
+  eq(!!noBack.image_path, true, "without the back column a card with only a front still saves");
+  const d4 = fakeDb({ missingBack: true });
+  let msg = "";
+  await saveLoyaltyCard(d4.supabase, "u", input, img("f"), img("b")).catch((e: Error) => { msg = e.message; });
+  eq([msg === BACK_MIGRATION_MESSAGE, d4.removed.length], [true, 2], "without the back column a back photo gives a clear message and uploads are cleaned up");
+
+  const removed: string[] = [];
+  const supabase = { from: () => ({ delete: () => ({ eq: async () => ({ error: null }) }) }), storage: { from: () => ({ remove: async (p: string[]) => { removed.push(...p); return { error: null }; } }) } } as unknown as Parameters<typeof removeLoyaltyCard>[0];
+  await removeLoyaltyCard(supabase, { ...card("A", null), image_path: "u/f", back_image_path: "u/b" });
+  eq(removed, ["u/f", "u/b"], "deleting a card removes both photos");
+})();

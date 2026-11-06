@@ -26,7 +26,9 @@ export const DOCUMENT_COLS = `${DOCUMENT_COLS_BASE}, document_number`;
 export const DOCUMENT_TILE_COLS_BASE = "id, kind, title, issuing_country, expiry_date, trip_id, file_path, created_at";
 export const DOCUMENT_TILE_COLS = `${DOCUMENT_TILE_COLS_BASE}, document_number`;
 
-export const LOYALTY_CARD_COLS = "id, user_id, store_name, holder_name, category, card_number, barcode_format, color, image_path, created_at";
+/** Without the back photo: used when migration_loyalty_back.sql has not been run yet. */
+export const LOYALTY_CARD_COLS_BASE = "id, user_id, store_name, holder_name, category, card_number, barcode_format, color, image_path, created_at";
+export const LOYALTY_CARD_COLS = `${LOYALTY_CARD_COLS_BASE}, back_image_path`;
 
 export const ROLE_COLS = "key, label, description, permissions, known_features, is_system, created_at";
 

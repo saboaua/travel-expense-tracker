@@ -1,17 +1,74 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ImageUp, Loader2, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Camera, Crop, ImageUp, Loader2, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { formatBytes } from "@/lib/document-upload";
+import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { BARCODE_FORMATS, CARD_CATEGORIES, CARD_COLORS, cleanNumber, colorForName, detectFormat, formatLabel, formatProblem, type BarcodeFormat, type LoyaltyCard } from "@/lib/loyalty";
-import { compressCardImage, LOYALTY_ACCEPT, LOYALTY_BUCKET, saveLoyaltyCard, updateLoyaltyCard, type CompressedCard } from "@/lib/loyalty-image";
+import { compressCardImage, LOYALTY_ACCEPT, saveLoyaltyCard, updateLoyaltyCard, type CompressedCard } from "@/lib/loyalty-image";
 import { Barcode } from "./Barcode";
+import { useCardPhoto } from "./CardFace";
 
 const label = "text-sm font-medium";
+
+type Side = "front" | "back";
+type Slot = { photo: CompressedCard | null; removed: boolean };
+const EMPTY: Slot = { photo: null, removed: false };
+
+function useObjectUrl(file: File | null): string | null {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    if (!file) { setUrl(null); return; }
+    const u = URL.createObjectURL(file);
+    setUrl(u);
+    return () => URL.revokeObjectURL(u);
+  }, [file]);
+  return url;
+}
+
+/** One side of the card: a card-shaped preview with Upload, Scan, Crop and Remove. */
+function PhotoSlot({ side, savedPath, slot, busy, onFile, onCrop, onRemove }: { side: Side; savedPath: string | null | undefined; slot: Slot; busy: boolean; onFile: (f: File | undefined) => void; onCrop: () => void; onRemove: () => void }) {
+  const savedUrl = useCardPhoto(slot.removed ? null : savedPath);
+  const newUrl = useObjectUrl(slot.photo?.file ?? null);
+  const url = newUrl ?? savedUrl;
+  const has = !!slot.photo || (!!savedPath && !slot.removed);
+  const name = side === "front" ? "Front" : "Back";
+  const btn = "flex h-10 items-center justify-center gap-1.5 rounded-lg border bg-background px-2 text-[13px] font-medium hover:bg-muted disabled:opacity-50";
+  return (
+    <div className="min-w-0 space-y-2" data-testid={`slot-${side}`}>
+      <p className="text-sm font-medium">{name}</p>
+      <div className={cn("relative flex aspect-[1.586] items-center justify-center overflow-hidden rounded-xl", has ? "border bg-muted/40" : "border-2 border-dashed border-primary/40 bg-primary/5")}>
+        {url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={url} alt={`${name} of the card`} className="h-full w-full object-cover" />
+        ) : has ? (
+          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" aria-label="Loading the photo" />
+        ) : (
+          <p className="px-2 text-center text-xs text-muted-foreground">No {name.toLowerCase()} photo</p>
+        )}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5">
+        <label className={cn(btn, "cursor-pointer", busy && "pointer-events-none opacity-50")}>
+          <ImageUp className="h-4 w-4" aria-hidden="true" /> Upload
+          <input type="file" accept={LOYALTY_ACCEPT} className="sr-only" aria-label={`Upload ${side} photo`} disabled={busy} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
+        <label className={cn(btn, "cursor-pointer", busy && "pointer-events-none opacity-50")}>
+          <Camera className="h-4 w-4" aria-hidden="true" /> Scan
+          <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Scan ${side} photo`} disabled={busy} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+        </label>
+        {has && (
+          <>
+            <button type="button" className={btn} onClick={onCrop} disabled={busy || !url}><Crop className="h-4 w-4" aria-hidden="true" /> Crop</button>
+            <button type="button" className={cn(btn, "text-red-600")} onClick={onRemove} disabled={busy}><Trash2 className="h-4 w-4" aria-hidden="true" /> Remove</button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
 
 /** Add or edit a card. A photo is shrunk to 800 px (WebP, quality 0.7) the moment it is picked. */
 export function CardForm({ userId, card, onSaved, onClose }: { userId: string; card: LoyaltyCard | null; onSaved: (c: LoyaltyCard) => void; onClose: () => void }) {
@@ -21,52 +78,63 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
   const [number, setNumber] = useState(card?.card_number ?? "");
   const [format, setFormat] = useState<BarcodeFormat | "auto">(card?.barcode_format ?? "auto");
   const [color, setColor] = useState<string | null>(card?.color ?? null);
-  const [photo, setPhoto] = useState<CompressedCard | null>(null);
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [removePhoto, setRemovePhoto] = useState(false);
+  const [slots, setSlots] = useState<Record<Side, Slot>>({ front: EMPTY, back: EMPTY });
+  const [cropping, setCropping] = useState<{ side: Side; file: File } | null>(null);
   const [busy, setBusy] = useState(false);
-  const [drag, setDrag] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && onClose();
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && !cropping && onClose();
     window.addEventListener("keydown", onKey);
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
-  }, [busy, onClose]);
+  }, [busy, cropping, onClose]);
 
-  // show the saved photo when editing
-  useEffect(() => {
-    if (!card?.image_path) return;
-    let cancelled = false;
-    createClient().storage.from(LOYALTY_BUCKET).createSignedUrl(card.image_path, 3600).then(({ data }) => {
-      if (!cancelled && data?.signedUrl) setPhotoUrl((u) => u ?? data.signedUrl);
-    });
-    return () => { cancelled = true; };
-  }, [card?.image_path]);
-
+  const frontUrl = useCardPhoto(slots.front.removed ? null : card?.image_path);
+  const backUrl = useCardPhoto(slots.back.removed ? null : card?.back_image_path);
   const chosen: BarcodeFormat = format === "auto" ? detectFormat(number) : format;
   const problem = number.trim() ? formatProblem(number, chosen) : null;
   const shownColor = color || (store.trim() ? colorForName(store) : CARD_COLORS[0]);
-  const hasPhoto = !!photo || (!!card?.image_path && !removePhoto);
-  const previewUrl = useMemo(() => (photo ? URL.createObjectURL(photo.file) : photoUrl), [photo, photoUrl]);
-  useEffect(() => () => { if (photo && previewUrl) URL.revokeObjectURL(previewUrl); }, [photo, previewUrl]);
+  const set = (side: Side, slot: Slot) => setSlots((x) => ({ ...x, [side]: slot }));
 
-  const pick = useCallback(async (file: File | undefined) => {
+  /** A picked or scanned photo first goes to the cropper, so only the card itself is kept. */
+  function choose(side: Side, file: File | undefined) {
     if (!file) return;
+    setError(null);
+    if (!/^image\//.test(file.type)) return setError("Choose a JPG, PNG or WebP photo.");
+    setCropping({ side, file });
+  }
+
+  async function finishCrop(side: Side, file: File) {
+    setCropping(null);
     setError(null);
     setBusy(true);
     try {
-      setPhoto(await compressCardImage(file));
-      setRemovePhoto(false);
+      set(side, { photo: await compressCardImage(file), removed: false });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not use that photo.");
     } finally {
       setBusy(false);
     }
-  }, []);
+  }
+
+  /** Crop what is already there: the new photo, or the saved one fetched back. */
+  async function recrop(side: Side, savedUrl: string | null) {
+    setError(null);
+    const fresh = slots[side].photo?.file;
+    if (fresh) return setCropping({ side, file: fresh });
+    if (!savedUrl) return;
+    setBusy(true);
+    try {
+      const blob = await (await fetch(savedUrl)).blob();
+      setCropping({ side, file: new File([blob], `${side}.${blob.type === "image/webp" ? "webp" : "jpg"}`, { type: blob.type || "image/jpeg" }) });
+    } catch {
+      setError("Could not open the saved photo to crop it. Upload or scan it again instead.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -79,9 +147,10 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
     try {
       const supabase = createClient();
       const input = { store_name: store, holder_name: holder, category, card_number: n, barcode_format: chosen, color };
+      const change = (x: Slot) => (x.photo ? x.photo.file : x.removed ? null : undefined);
       const saved = card
-        ? await updateLoyaltyCard(supabase, userId, card, input, photo ? photo.file : removePhoto ? null : undefined)
-        : await saveLoyaltyCard(supabase, userId, input, photo?.file);
+        ? await updateLoyaltyCard(supabase, userId, card, input, change(slots.front), change(slots.back))
+        : await saveLoyaltyCard(supabase, userId, input, change(slots.front), change(slots.back));
       onSaved(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save the card.");
@@ -91,42 +160,18 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
 
   return (
     <div className="app-frame fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/70 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={card ? "Edit card" : "Add a card"} onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <form onSubmit={save} className="max-h-full w-full max-w-lg space-y-4 overflow-y-auto rounded-t-2xl bg-card p-4 text-card-foreground shadow-2xl sm:max-h-full sm:rounded-2xl sm:p-5">
-        <div className="flex items-center justify-between gap-3">
+      <form onSubmit={save} className="flex max-h-full w-full max-w-lg flex-col overflow-hidden rounded-t-2xl bg-card text-card-foreground shadow-2xl sm:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b p-4 sm:px-5">
           <h2 className="text-xl font-bold">{card ? "Edit card" : "Add a card"}</h2>
           <Button type="button" variant="outline" size="icon" className="h-11 w-11" onClick={onClose} disabled={busy} aria-label="Close"><X className="h-5 w-5" /></Button>
         </div>
 
-        {hasPhoto && previewUrl && (
-          <div className="flex items-center gap-3 rounded-xl border bg-muted/30 p-3">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={previewUrl} alt="Card photo" className="h-[72px] w-28 shrink-0 rounded-lg object-cover" />
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Card photo added</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {photo ? `Shrunk to 800 px and saved as a light ${photo.file.type === "image/webp" ? "WebP" : "JPEG"}. Was ${formatBytes(photo.before)}, now ${formatBytes(photo.after)}.` : "Saved photo."}
-              </p>
-              <div className="mt-2 flex gap-2">
-                <Button type="button" variant="outline" size="sm" onClick={() => fileInput.current?.click()} disabled={busy}>Replace photo</Button>
-                <Button type="button" variant="ghost" size="sm" onClick={() => { setPhoto(null); setPhotoUrl(null); setRemovePhoto(true); }} disabled={busy}>Remove</Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div
-          onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
-          onDragLeave={() => setDrag(false)}
-          onDrop={(e) => { e.preventDefault(); setDrag(false); pick(e.dataTransfer.files?.[0]); }}
-          className={cn("flex flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-5 text-center transition-colors", drag ? "border-primary bg-primary/10" : "border-primary/40 bg-primary/5")}
-        >
-          <button type="button" onClick={() => fileInput.current?.click()} disabled={busy} className="flex min-h-11 items-center gap-2 text-sm font-semibold text-primary disabled:opacity-60">
-            {busy && !store ? <Loader2 className="h-[18px] w-[18px] animate-spin" /> : <ImageUp className="h-[18px] w-[18px]" />}
-            Drop a card photo here, or choose a file
-          </button>
-          <p className="text-xs text-muted-foreground">JPG, PNG or WebP. Optional.</p>
-          <input ref={fileInput} type="file" accept={LOYALTY_ACCEPT} className="sr-only" aria-label="Card photo" onChange={(e) => { pick(e.target.files?.[0]); e.target.value = ""; }} />
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:px-5">
+        <div className="grid grid-cols-2 gap-3">
+          <PhotoSlot side="front" savedPath={card?.image_path} slot={slots.front} busy={busy} onFile={(f) => choose("front", f)} onCrop={() => recrop("front", frontUrl)} onRemove={() => set("front", { photo: null, removed: true })} />
+          <PhotoSlot side="back" savedPath={card?.back_image_path} slot={slots.back} busy={busy} onFile={(f) => choose("back", f)} onCrop={() => recrop("back", backUrl)} onRemove={() => set("back", { photo: null, removed: true })} />
         </div>
+        <p className="-mt-2 text-xs text-muted-foreground">Optional. Upload or scan each side, then crop so only the card is kept. Photos are shrunk to 800 px before they are saved.</p>
 
         <div className="space-y-1.5">
           <label htmlFor="lc-store" className={label}>Store name</label>
@@ -174,14 +219,16 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
         {problem && <p className="text-sm text-destructive" role="alert">{problem}</p>}
         {error && <p className="text-sm text-destructive" role="alert">{error}</p>}
 
-        <div className="flex gap-2.5 pt-1">
+        </div>
+
+        <div className="flex shrink-0 gap-2.5 border-t p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-5">
           <Button type="button" variant="outline" className="h-11 flex-1" onClick={onClose} disabled={busy}>Cancel</Button>
           <Button type="submit" className="h-11 flex-[2]" disabled={busy || !!problem}>
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : null} {card ? "Save changes" : "Save card"}
           </Button>
         </div>
       </form>
+      {cropping && <ReceiptCropper file={cropping.file} title="Crop to the card" initialCrop={{ x: 4, y: 4, w: 92, h: 92 }} hint="Drag the frame so only the card is inside." onDone={(f) => finishCrop(cropping.side, f)} onCancel={() => setCropping(null)} />}
     </div>
   );
 }
-
