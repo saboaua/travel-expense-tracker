@@ -332,6 +332,39 @@ try {
     await ctx.close();
   });
 
+  await test("documents: Add document is a popup whose buttons stay on screen, with a guard against losing what was typed", async () => {
+    const docs = fake.table("travel_documents");
+    for (let i = 1; i <= 6; i++) docs.push({ id: `d0c00000-0000-4000-8000-00000000020${i}`, user_id: PAT, kind: "visa", title: `Visa ${i}`, issuing_country: "USA", document_number: null, expiry_date: addDays(today, 300 + i), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/documents`);
+    await page.getByRole("button", { name: "Add document" }).first().click();
+    const dlg = page.getByRole("dialog", { name: "Add document" });
+    await dlg.waitFor();
+    const save = dlg.getByRole("button", { name: "Save document" });
+    const box = await save.boundingBox();
+        assert(box && box.y + box.height <= 700 + 1, `Save is below the screen (${box && box.y + box.height})`);
+    assert((await dlg.getByRole("button", { name: "Scan with camera" }).boundingBox()).y < 700, "Scan button is off screen");
+    // Empty form: Escape closes without asking
+    await page.keyboard.press("Escape");
+    await dlg.waitFor({ state: "detached" });
+    // Something typed: Escape asks first, Keep editing stays
+    await page.getByRole("button", { name: "Add document" }).first().click();
+    await dlg.waitFor();
+    await dlg.locator('input[maxlength="120"]').fill("My licence");
+    await page.keyboard.press("Escape");
+    await page.getByRole("button", { name: "Keep editing" }).click();
+    assert(await dlg.isVisible(), "popup closed even though the person chose Keep editing");
+    await dlg.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Discard" }).click();
+    await dlg.waitFor({ state: "detached" });
+    docs.length = 0;
+    await ctx.close();
+  });
+
   /* ---------- read a receipt again ---------- */
   await test("an expense can read its receipt again: the button shows with a receipt and not without", async () => {
     const id = "e0000000-0000-4000-8000-0000000000aa";

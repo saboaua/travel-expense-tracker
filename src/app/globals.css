@@ -90,3 +90,7 @@ input[type="date"]::-webkit-date-and-time-value {
     bottom: auto;
   }
 }
+/* A full-screen frame sits at the screen edge. Without this, "space-y-*" on a parent adds a top margin that pushes it down. */
+.app-frame {
+  margin: 0 !important;
+}

@@ -92,7 +92,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
         <Link href="/documents" className="flex min-h-[8rem] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:max-w-xs">
           <Plus className="h-6 w-6 text-primary" aria-hidden="true" />
           <span className="text-sm font-semibold text-foreground">Add a document</span>
-          <span className="text-xs">Passport, ID, driver's license…</span>
+          <span className="text-xs">Passport, ID, driver&apos;s license…</span>
         </Link>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:gap-4 sm:grid-cols-2 xl:grid-cols-3">

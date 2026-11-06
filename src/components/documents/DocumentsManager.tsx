@@ -4,7 +4,7 @@ import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Crop, FileText, Loader2, Plus, Sparkles } from "lucide-react";
+import { Camera, Crop, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -119,7 +119,6 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setCropped(null);
     setSizes(null);
     setAdding(true);
-    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
   };
 
   const toggleReveal = (id: string) =>
@@ -241,6 +240,25 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const today = todayISO();
 
+  /** Closes the popup; asks first when something was typed or a file was chosen that would be lost. */
+  const requestClose = async () => {
+    if (saving) return;
+    const dirty = editing ? !!file : !!(title.trim() || number.trim() || country.trim() || expiry || notes.trim() || file);
+    if (dirty && !(await confirm({ title: "Discard this document?", message: "What you entered will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true }))) return;
+    reset();
+  };
+
+  // Escape closes the popup (unless the crop screen is on top), and the page behind does not scroll
+  useEffect(() => {
+    if (!adding) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape" && !cropping) requestClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { window.removeEventListener("keydown", onKey); document.body.style.overflow = prev; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- requestClose reads the latest state each render
+  }, [adding, cropping, title, number, country, expiry, notes, file, editing, saving]);
+
   const openAdd = () => {
     setEditing(null);
     setAdding(true);
@@ -253,14 +271,14 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
         <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" aria-hidden="true" /> Documents</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Your passport, ID, driver&apos;s license and travel papers, close at hand. We keep track of what is still valid.</p>
           </div>
           <Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>
         </div>
       )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
-      {error && <Alert>{error}</Alert>}
+      {error && !adding && <Alert>{error}</Alert>}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -274,8 +292,17 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       )}
 
       {adding ? (
-        <form ref={formRef} onSubmit={save} className="space-y-3 rounded-xl border bg-muted/30 p-4">
-          {editing && <p className="text-sm font-semibold">Edit document</p>}
+        <div
+          className="app-frame fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4"
+          onMouseDown={(e) => { if (e.target === e.currentTarget) requestClose(); }}
+        >
+        <form ref={formRef} onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? "Edit document" : "Add document"} className="flex max-h-full w-full max-w-lg flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
+          <div className="flex items-center justify-between border-b px-4 py-3">
+            <h2 className="text-lg font-bold">{editing ? "Edit document" : "Add document"}</h2>
+            <button type="button" onClick={requestClose} disabled={saving} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><X className="h-5 w-5" /></button>
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
+          {error && <Alert>{error}</Alert>}
           <div className="rounded-xl border border-dashed border-primary/40 bg-primary/5 p-3">
             <button
               type="button"
@@ -358,11 +385,13 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" maxLength={1000} />
           </div>
           {kind === "passport" && <p className="text-xs text-muted-foreground">Only the expiry date is needed for reminders. The number is optional and shown hidden by default. Your documents are stored privately and only you can open them. When AI reading is on, the photo is sent to the AI service to read it.</p>}
-          <div className="flex gap-2">
-            <Button type="submit" disabled={saving} className="gap-2">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving…" : editing ? "Save changes" : "Save document"}</Button>
-            <Button type="button" variant="outline" onClick={reset} disabled={saving}>Cancel</Button>
+          </div>
+          <div className="flex gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:justify-end">
+            <Button type="button" variant="outline" onClick={requestClose} disabled={saving} className="h-11 w-28 sm:order-1">Cancel</Button>
+            <Button type="submit" disabled={saving} className="h-11 flex-1 gap-2 sm:order-2 sm:flex-none sm:px-8">{saving && <Loader2 className="h-4 w-4 animate-spin" />}{saving ? "Saving…" : editing ? "Save changes" : "Save document"}</Button>
           </div>
         </form>
+        </div>
       ) : tripId ? (
         <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { setEditing(null); setAdding(true); }}>
           <Plus className="h-4 w-4" /> Add document
