@@ -7,6 +7,7 @@ import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } fr
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { buildScanOptions } from "@/lib/scan-destination";
 import { getDestinationInfo } from "@/lib/destination";
+import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
@@ -226,15 +227,7 @@ export default async function DashboardPage() {
               {featured && (
                 <Link href={`/trips/${featured.id}`} className="block">
                   <div className="relative h-40 overflow-hidden rounded-xl bg-gradient-to-br from-slate-800 to-slate-600 md:h-52">
-                    {destinationInfo?.imageUrl && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={destinationInfo.imageUrl}
-                        alt={featured.destination || featured.name}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        referrerPolicy="no-referrer"
-                      />
-                    )}
+                    {destinationInfo?.imageUrl && <DestinationPhoto src={destinationInfo.imageUrl} />}
                     <div className="absolute inset-0 bg-gradient-to-b from-black/5 via-transparent to-black/70" />
                     <span
                       className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold shadow ${heroBadge(featured).cls}`}

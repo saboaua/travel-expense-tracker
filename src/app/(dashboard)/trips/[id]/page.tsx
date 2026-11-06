@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ArrowLeft, Archive, Camera, CalendarDays, Clock, Download, MapPin, Pencil, Plus, Tag } from "lucide-react";
 import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
+import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { categorySlices } from "@/lib/reports";
 import { ExpenseList } from "@/components/expenses/expense-list";
 import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
@@ -98,10 +99,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="relative h-44 bg-gradient-to-br from-slate-800 to-slate-600 md:h-56">
-          {info?.imageUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={info.imageUrl} alt={trip.destination || trip.name} className="absolute inset-0 h-full w-full object-cover" referrerPolicy="no-referrer" />
-          )}
+          {info?.imageUrl && <DestinationPhoto src={info.imageUrl} />}
           <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/75" />
           <span className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-semibold shadow ${badge.cls}`}>
             <Clock className="h-3 w-3" />

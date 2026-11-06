@@ -16,6 +16,13 @@ type WikiPage = {
 // Flags, maps, seals and logos are poor "photos" of a place
 const NOT_A_PHOTO = /(flag|coat[_ ]of[_ ]arms|locator|location[_ ]map|\bmap\b|_map|map_|seal|logo|emblem|blason|escudo|wordmark|icon)/i;
 
+/**
+ * Wikimedia only serves thumbnails at its standard widths and answers other sizes (such as 1400) with an error,
+ * which shows up as a broken photo. Keep this one of those widths.
+ */
+export const WIKI_THUMB_STEPS = [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840];
+export const WIKI_THUMB_SIZE = 1280;
+
 const USER_AGENT = "TravelExpenseTracker/1.0 (https://github.com/saboaua/travel-expense-tracker)";
 
 async function searchWikipedia(query: string): Promise<DestinationInfo | null> {
@@ -30,7 +37,7 @@ async function searchWikipedia(query: string): Promise<DestinationInfo | null> {
     redirects: "1",
     prop: "pageimages|extracts|info",
     piprop: "thumbnail",
-    pithumbsize: "1400",
+    pithumbsize: String(WIKI_THUMB_SIZE),
     exintro: "1",
     explaintext: "1",
     exsentences: "2",
