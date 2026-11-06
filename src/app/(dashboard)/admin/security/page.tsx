@@ -79,7 +79,11 @@ export default function AdminSecurityPage() {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ from, to });
+      // exact start and end of the chosen days in this browser's time zone
+      const params = new URLSearchParams({
+        from: new Date(`${from}T00:00:00`).toISOString(),
+        to: new Date(`${to}T23:59:59.999`).toISOString(),
+      });
       if (eventType) params.set("eventType", eventType);
       if (severity) params.set("severity", severity);
       if (action) params.set("action", action);

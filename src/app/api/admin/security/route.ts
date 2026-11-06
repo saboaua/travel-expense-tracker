@@ -51,8 +51,14 @@ export async function GET(request: Request) {
     const email = url.searchParams.get("email");
     const ip = url.searchParams.get("ip");
 
-    const since = from ? new Date(from + "T00:00:00").toISOString() : new Date(Date.now() - 7 * 86400000).toISOString();
-    const until = to ? new Date(to + "T23:59:59.999").toISOString() : null;
+    // The page sends exact instants (start and end of the admin's own local day), so the range
+    // does not depend on the server's time zone. A plain date is still accepted (read as UTC).
+    const instant = (v: string, end: boolean) => {
+      const d = new Date(v.includes("T") ? v : v + (end ? "T23:59:59.999Z" : "T00:00:00Z"));
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    const since = (from && instant(from, false)) || new Date(Date.now() - 7 * 86400000).toISOString();
+    const until = to ? instant(to, true) : null;
     const supabase = adminClient();
 
     let eventsQuery = supabase.from("security_events").select(SECURITY_EVENT_COLS).gte("created_at", since).order("created_at", { ascending: false }).limit(500);
