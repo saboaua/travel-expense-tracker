@@ -24,6 +24,7 @@ eq(shouldSend(DEFAULT_PREFS, "trip_reminder", night).reason, "quiet", "reminder 
 eq(shouldSend(DEFAULT_PREFS, "admin_alert", night, true).send, true, "urgent alert ignores quiet hours");
 eq(shouldSend({ ...DEFAULT_PREFS, enabled: false }, "admin_alert", day, true).reason, "off", "master switch beats urgent");
 eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "trip_reminder", day).reason, "kind_off", "reminders switched off");
+eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "document_reminder", day).reason, "kind_off", "document reminders follow the same switch");
 eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "admin_alert", day).send, true, "other kinds unaffected");
 
 eq(normalizePrefs(null), DEFAULT_PREFS, "no row gives defaults");

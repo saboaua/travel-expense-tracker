@@ -3,7 +3,8 @@
  * Texts are built by pure functions so they can be tested without a database.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addDaysISO, daysBetween, formatDateRange } from "@/lib/utils";
+import { addDaysISO, daysBetween, formatDate, formatDateRange } from "@/lib/utils";
+import { kindLabel } from "@/lib/documents";
 import { escapeHtml, sendToUser } from "@/lib/telegram-notify";
 
 /**
@@ -52,6 +53,60 @@ export async function runTripReminders(supabase: SupabaseClient, today: string, 
     if (!step) continue;
     out.checked++;
     const r = await sendToUser(supabase, t.user_id, "trip_reminder", reminderText(t, step.days), { dedupeKey: `${t.personal ? "ptrip" : "trip"}:${t.id}:${step.tier}d`, now });
+    if (r === "sent") out.sent++;
+    else out.skipped++;
+  }
+  return out;
+}
+
+/* ---------------- document expiry ---------------- */
+
+export type ReminderDoc = { id: string; user_id: string; kind: string; title: string; expiry_date: string };
+export type DocTier = "soon" | "urgent" | "expired";
+
+/** Passports follow the 6-month rule, so they are flagged earlier (9 and 6 months); everything else 60 and 14 days. */
+const DOC_STEPS = (kind: string) => (kind === "passport" ? { soon: 270, urgent: 180 } : { soon: 60, urgent: 14 });
+/** A document that ran out long ago is not announced; only ones that expired in the last 30 days. */
+const EXPIRED_WINDOW_DAYS = 30;
+
+/** The most urgent step a document has reached, or null. Each step is sent once per expiry date. */
+export function documentTier(doc: Pick<ReminderDoc, "kind" | "expiry_date">, today: string): { tier: DocTier; days: number } | null {
+  const days = daysBetween(today, doc.expiry_date);
+  if (days < 0) return days >= -EXPIRED_WINDOW_DAYS ? { tier: "expired", days } : null;
+  const steps = DOC_STEPS(doc.kind);
+  if (days <= steps.urgent) return { tier: "urgent", days };
+  if (days <= steps.soon) return { tier: "soon", days };
+  return null;
+}
+
+export function documentReminderText(doc: ReminderDoc, days: number): string {
+  const name = escapeHtml(doc.title);
+  const type = kindLabel(doc.kind).toLowerCase();
+  const when = days < 0 ? `expired ${-days} ${-days === 1 ? "day" : "days"} ago` : days === 0 ? "expires today" : days < 90 ? `expires in ${days} ${days === 1 ? "day" : "days"}` : `expires in about ${Math.round(days / 30.4)} months`;
+  const advice = days < 0
+    ? `Your ${type} is no longer valid. Renew it before you book any travel.`
+    : doc.kind === "passport"
+      ? "Most destinations want a passport valid for 6+ months beyond your trip, and renewals can take weeks. Time to start the renewal."
+      : "Time to renew it so it is ready before you travel.";
+  return [`🛂 <b>${name}</b> ${when}`, `${kindLabel(doc.kind)} · ${formatDate(doc.expiry_date)}`, "", advice].join("\n");
+}
+
+/** Tells people when a saved document is nearing its expiry date or has just expired (general documents, not trip ones). */
+export async function runDocumentReminders(supabase: SupabaseClient, today: string, now: Date = new Date()) {
+  const out = { checked: 0, sent: 0, skipped: 0 };
+  const { data, error } = await supabase
+    .from("travel_documents")
+    .select("id, user_id, kind, title, expiry_date")
+    .is("trip_id", null)
+    .not("expiry_date", "is", null)
+    .gte("expiry_date", addDaysISO(today, -EXPIRED_WINDOW_DAYS))
+    .lte("expiry_date", addDaysISO(today, 270));
+  if (error) return out; // the documents table is optional; nothing to remind about
+  for (const d of (data || []) as ReminderDoc[]) {
+    const step = documentTier(d, today);
+    if (!step) continue;
+    out.checked++;
+    const r = await sendToUser(supabase, d.user_id, "document_reminder", documentReminderText(d, step.days), { dedupeKey: `doc:${d.id}:${d.expiry_date}:${step.tier}`, now });
     if (r === "sent") out.sent++;
     else out.skipped++;
   }

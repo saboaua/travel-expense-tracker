@@ -4,7 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { todayISO } from "@/lib/utils";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { pruneUpdates } from "@/lib/telegram-updates";
-import { runAdminDigest, runTripReminders } from "@/lib/telegram-reminders";
+import { runAdminDigest, runDocumentReminders, runTripReminders } from "@/lib/telegram-reminders";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +16,7 @@ function authorized(req: Request) {
   return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
 }
 
-/** Daily job (see vercel.json): trip reminders to travellers, then the summary to admins. Vercel sends the CRON_SECRET. */
+/** Daily job (see vercel.json): trip and document reminders to travellers, then the summary to admins. Vercel sends the CRON_SECRET. */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "Service role key missing" }, { status: 503 });
@@ -24,9 +24,10 @@ export async function GET(req: Request) {
   const today = todayISO();
   try {
     const reminders = await runTripReminders(supabase, today);
+    const documents = await runDocumentReminders(supabase, today);
     const digestSent = await runAdminDigest(supabase, today);
     await pruneUpdates(supabase);
-    return NextResponse.json({ ok: true, today, reminders, digestSent });
+    return NextResponse.json({ ok: true, today, reminders, documents, digestSent });
   } catch (e) {
     console.error("[cron] telegram", e instanceof Error ? e.message : e);
     await notifyJobFailure(supabase, "Telegram reminders");

@@ -16,7 +16,7 @@ const fmtHour = (h: number) => `${String(h).padStart(2, "0")}:00`;
 export function notifyStatus(p: NotifyPrefs): string {
   return [
     `<b>Messages from the app: ${p.enabled ? "on" : "off"}</b>`,
-    `Trip reminders: ${p.trip_reminders ? "on" : "off"}`,
+    `Trip and document reminders: ${p.trip_reminders ? "on" : "off"}`,
     `Admin alerts: ${p.admin_alerts ? "on" : "off"}`,
     `Quiet hours: ${p.quiet_start === p.quiet_end ? "none" : `${fmtHour(p.quiet_start)} to ${fmtHour(p.quiet_end)}`} (${p.tz})`,
     "",

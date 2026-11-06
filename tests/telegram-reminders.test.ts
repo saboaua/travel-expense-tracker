@@ -3,7 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createFakeSupabase, SERVICE_KEY } from "./e2e/fake-supabase.mjs";
 import { addDaysISO } from "../src/lib/utils";
-import { digestText, reminderText, reminderTier } from "../src/lib/telegram-reminders";
+import { digestText, documentReminderText, documentTier, reminderText, reminderTier } from "../src/lib/telegram-reminders";
 
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 const yes = (c: unknown, m: string) => eq(!!c, true, m);
@@ -40,6 +40,20 @@ yes(reminderText(trip(addDaysISO(today, 7)), 7).includes("Miami &lt;Conf&gt;"), 
 yes(reminderText({ ...trip(addDaysISO(today, 7)), personal: true }, 7).includes("(personal)"), "personal travel is labelled");
 yes(!reminderText(trip(addDaysISO(today, 7)), 7).includes("(personal)"), "business trips are not");
 
+const dtier = (kind: string, d: number) => documentTier({ kind, expiry_date: addDaysISO(today, d) }, today);
+eq(dtier("passport", 300), null, "passport far from expiry: nothing");
+eq(dtier("passport", 250), { tier: "soon", days: 250 }, "passport inside 9 months: first reminder");
+eq(dtier("passport", 170), { tier: "urgent", days: 170 }, "passport inside 6 months: urgent");
+eq(dtier("visa", 90), null, "visa 90 days out: nothing");
+eq(dtier("visa", 45), { tier: "soon", days: 45 }, "visa inside 60 days: reminder");
+eq(dtier("id", 10), { tier: "urgent", days: 10 }, "ID inside 14 days: urgent");
+eq(dtier("id", 0), { tier: "urgent", days: 0 }, "expires today: urgent");
+eq(dtier("id", -5), { tier: "expired", days: -5 }, "just expired: told once");
+eq(dtier("id", -45), null, "long expired: not announced");
+yes(documentReminderText({ id: "1", user_id: "u", kind: "passport", title: "Dutch <Passport>", expiry_date: addDaysISO(today, 170) }, 170).includes("Dutch &lt;Passport&gt;"), "document name is escaped");
+yes(documentReminderText({ id: "1", user_id: "u", kind: "passport", title: "P", expiry_date: addDaysISO(today, 170) }, 170).includes("6+ months"), "passport text mentions the 6-month rule");
+yes(documentReminderText({ id: "1", user_id: "u", kind: "visa", title: "ESTA", expiry_date: addDaysISO(today, -3) }, -3).includes("expired 3 days ago"), "expired text");
+
 const stats = { today, newExpenses: 1, newPeople: 0, openSupport: null, startingSoon: [], activeTrips: 2 };
 yes(digestText(stats).includes("1 expense added"), "digest uses singular");
 yes(!digestText(stats).includes("support"), "digest hides support when unknown");
@@ -49,7 +63,7 @@ yes(digestText({ ...stats, openSupport: 3, startingSoon: Array.from({ length: 7 
 async function main() {
   const { runAdminDigest, runTripReminders } = await import("../src/lib/telegram-reminders");
   const fake = createFakeSupabase();
-  for (const t of ["profiles", "trips", "expenses", "telegram_notify_prefs", "telegram_sent_log", "support_requests", "personal_projects"]) fake.table(t);
+  for (const t of ["profiles", "trips", "expenses", "telegram_notify_prefs", "telegram_sent_log", "support_requests", "personal_projects", "travel_documents"]) fake.table(t);
   const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ADMIN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc", NOLINK = "dddddddd-dddd-4ddd-8ddd-dddddddddddd", ADMIN2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
   fake.table("profiles").push(
     { id: A, role: "user", full_name: "A", telegram_id: 111, created_at: "2026-11-03T12:00:00.000Z" },
@@ -99,6 +113,19 @@ async function main() {
   const third = await runTripReminders(db, addDaysISO(today, 2), noon);
   eq(third.sent, 1, "two days on only the other trip (now 1 day out) is reminded");
   eq((await runTripReminders(db, addDaysISO(today, 3), noon)).sent, 0, "nothing repeats");
+
+  // Documents nearing expiry
+  const { runDocumentReminders } = await import("../src/lib/telegram-reminders");
+  const doc = (id: string, user: string, kind: string, title: string, d: number, trip: string | null = null) => ({ id, user_id: user, kind, title, expiry_date: addDaysISO(today, d), trip_id: trip });
+  fake.table("travel_documents").push(doc("x1", A, "passport", "A Passport", 170), doc("x2", A, "visa", "Far Visa", 200), doc("x3", B, "id", "B ID", 5), doc("x4", A, "insurance", "Trip Insurance", 5, "t7"), doc("x5", NOLINK, "id", "No Telegram", 5), doc("x6", A, "id", "Ancient", -90));
+  sent.length = 0;
+  const dr = await runDocumentReminders(db, today, noon);
+  eq(dr.sent, 1, "only A's passport is reminded (B has reminders off; trip, unlinked, far and ancient documents are skipped)");
+  yes(sent[0].chat === 111 && sent[0].text.includes("A Passport"), "document reminder goes to the owner");
+  eq((await runDocumentReminders(db, today, noon)).sent, 0, "...once per step");
+  eq((await runDocumentReminders(db, addDaysISO(today, 1), noon)).sent, 0, "...and not again the next day");
+  fake.table("travel_documents").find((d: { id: string }) => d.id === "x1")!.expiry_date = addDaysISO(today, 100);
+  eq((await runDocumentReminders(db, today, noon)).sent, 1, "a renewed (new) expiry date can be reminded again");
 
   // Personal travel is reminded too (and a home project or a finished trip is not)
   const later10 = addDaysISO(today, 10);
