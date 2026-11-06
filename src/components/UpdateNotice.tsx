@@ -67,7 +67,7 @@ export function UpdateNotice() {
     <div
       role="status"
       aria-live="polite"
-      className="fixed bottom-4 left-4 right-4 z-[60] mx-auto max-w-md rounded-xl border bg-card p-4 shadow-lg sm:left-auto sm:right-4 sm:mx-0"
+      className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-[60] mx-auto max-w-md rounded-xl border bg-card p-4 shadow-lg sm:left-auto sm:right-4 sm:mx-0 md:bottom-4"
     >
       <div className="flex items-start gap-3">
         <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10">

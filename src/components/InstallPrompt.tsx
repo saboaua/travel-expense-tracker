@@ -101,7 +101,7 @@ export function InstallPrompt() {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-4 left-4 right-4 z-50 mx-auto max-w-md rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-md md:bottom-4 rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
