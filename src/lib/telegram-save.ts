@@ -5,6 +5,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { downloadFile, getFile } from "@/lib/telegram";
 import { runReceiptOcr, type OcrResult } from "@/lib/ocr";
+import { parseMrz, sanitizeDocumentFields } from "@/lib/mrz";
+import { parseDocumentText } from "@/lib/document-text";
 import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
 import { CURRENCIES, rateToUsd, toUsd } from "@/lib/currencies";
 import { KIND_META, GROCERY_CATEGORIES, type PersonalKind } from "@/lib/personal/constants";
@@ -236,6 +238,15 @@ export async function saveDocument(supabase: SupabaseClient, userId: string, fil
   if (known) fields = known;
   else if (aiOcrConfigured() && AI_IMAGE_TYPES.includes(mime)) {
     try { fields = await withTimeout(extractDocumentWithAi({ data: new Uint8Array(buf), mime }), 25000); } catch { note = "Could not read the details"; }
+  }
+  // AI off or failed: read the printed text on the server (passport lines, or labels like "Date of expiry")
+  if (!known && !fields.kind && !fields.expiry_date && !fields.document_number && AI_IMAGE_TYPES.includes(mime)) {
+    try {
+      const ocr = await withTimeout(runReceiptOcr(new File([new Uint8Array(buf)], name, { type: mime }), {}), 25000);
+      const mrz = parseMrz(ocr.rawText || "");
+      const printed = mrz ? sanitizeDocumentFields(mrz, todayISO()) : parseDocumentText(ocr.rawText || "", todayISO());
+      if (printed.kind || printed.expiry_date || printed.document_number) { fields = printed; note = "Read on the server without AI, please check the details"; }
+    } catch { /* keep what we have */ }
   }
   const kind: DocKind = fields.kind ?? "other";
   const title = `${kindLabel(kind)}${fields.issuing_country ? ` · ${fields.issuing_country}` : ""}`.slice(0, 120);

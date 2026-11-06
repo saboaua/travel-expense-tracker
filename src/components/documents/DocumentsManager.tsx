@@ -214,6 +214,8 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       setScanNote(
         source === "ai"
           ? "Details filled from your photo. Please check them, especially the expiry date, before saving."
+          : source === "ocr"
+          ? "The AI reader was not available, so we read the printed text on this device. Please check the number and expiry date carefully before saving."
           : "Read from the passport's machine-readable lines. Please check the details before saving."
       );
     } finally {

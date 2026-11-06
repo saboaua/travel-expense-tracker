@@ -2,10 +2,11 @@ import { compressReceiptImage } from "@/lib/compress-image";
 import { todayISO } from "@/lib/utils";
 import { runReceiptOcr } from "@/lib/ocr";
 import { parseMrz, sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
+import { parseDocumentText } from "@/lib/document-text";
 
 let aiUnavailable = false;
 
-type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "none"; reason?: string };
+type DocumentScan = { fields: DocumentFields; source: "ai" | "mrz" | "ocr" | "none"; reason?: string };
 
 const EMPTY: DocumentFields = { kind: null, document_number: null, issuing_country: null, expiry_date: null, holder_name: null };
 const today = () => todayISO();
@@ -57,6 +58,9 @@ export async function extractDocumentFields(file: File): Promise<DocumentScan> {
     const ocr = await runReceiptOcr(image, {});
     const mrz = parseMrz(ocr.rawText || "");
     if (mrz) return { fields: sanitizeDocumentFields(mrz, today()), source: "mrz" };
+    // No machine-readable lines (driver's license, ID card, visa, insurance): read the printed labels instead
+    const printed = parseDocumentText(ocr.rawText || "", today());
+    if (printed.expiry_date || printed.document_number) return { fields: printed, source: "ocr" };
   } catch {
     // unreadable image
   }

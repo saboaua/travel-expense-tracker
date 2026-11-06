@@ -28,6 +28,9 @@ const COUNTRIES: Record<string, string> = {
   MAR: "Morocco", ISR: "Israel", ARE: "United Arab Emirates", SAU: "Saudi Arabia", UTO: "Utopia (sample passport)",
 };
 
+/** Country names the on-device reader can recognise in printed text. */
+export const COUNTRY_NAMES: string[] = [...new Set(Object.values(COUNTRIES).filter((n) => !n.startsWith("Utopia")))];
+
 const WEIGHTS = [7, 3, 1];
 const charValue = (c: string): number => {
   if (c === "<") return 0;
