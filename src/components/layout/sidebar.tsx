@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { adminNavItems } from "@/lib/access";
@@ -45,6 +46,7 @@ export function Sidebar() {
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
+    await clearOfflineData();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

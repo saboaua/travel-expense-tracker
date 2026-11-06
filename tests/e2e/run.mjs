@@ -17,13 +17,14 @@ const BASE = `http://localhost:${APP_PORT}`;
 let failed = 0;
 const results = [];
 async function test(name, fn) {
+  if (process.env.E2E_ONLY && !name.includes(process.env.E2E_ONLY)) return; // run just the tests whose name contains this text
   const started = Date.now();
   try {
     await fn();
     results.push(`PASS ${name} (${((Date.now() - started) / 1000).toFixed(1)}s)`);
   } catch (e) {
     failed++;
-    results.push(`FAIL ${name}\n     ${String(e?.message || e).split("\n").slice(0, 6).join("\n     ")}`);
+    results.push(`FAIL ${name}\n     ${String(e?.message || e).split("\n").slice(0, process.env.E2E_ONLY ? 40 : 6).join("\n     ")}`);
   }
   console.log(results.at(-1));
 }
@@ -300,6 +301,75 @@ try {
     await page.getByText("No loyalty cards yet").waitFor();
     assert(fake.table("loyalty_cards").length === 0, "card removed from the database");
     await browser2.close();
+  });
+
+  await test("offline: loyalty cards and documents open with no connection, from the copy saved on the phone", async () => {
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    fake.storage.set(`sign/loyalty-cards/${PAT}/front.png`, PNG);
+    fake.table("loyalty_cards").push(
+      { id: "1c000000-0000-4000-8000-000000000001", user_id: PAT, store_name: "Greenfield Market", holder_name: null, category: "Rewards", card_number: "402188301177", barcode_format: "CODE128", color: null, image_path: `${PAT}/front.png`, back_image_path: null, created_at: new Date().toISOString() },
+      { id: "1c000000-0000-4000-8000-000000000002", user_id: PAT, store_name: "Blue Bottle", holder_name: null, category: null, card_number: "99887766", barcode_format: "CODE128", color: null, image_path: null, back_image_path: null, created_at: new Date().toISOString() }
+    );
+    fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000000aa", user_id: PAT, kind: "passport", title: "Offline Passport", issuing_country: "Aruba", document_number: "P1234567", expiry_date: addDays(today, 900), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    await ctx2.addInitScript(() => { try { localStorage.setItem("force-sw", "1"); } catch {} });
+    const page = await ctx2.newPage();
+    if (process.env.E2E_DEBUG) {
+      page.on("console", (m) => console.log("[console]", m.type(), m.text().slice(0, 200)));
+      page.on("pageerror", (e) => console.log("[pageerror]", String(e.stack || e).slice(0, 600)));
+      page.on("response", async (r) => { const u = r.url(); if (/\/_next\/static\/.*\.js/.test(u)) { const ct = r.headers()["content-type"] || ""; const body = await r.text().catch(() => ""); if (!/javascript/.test(ct) || body.startsWith("<")) console.log("[badjs]", r.status(), r.fromServiceWorker(), ct, u.slice(0, 120), JSON.stringify(body.slice(0, 80))); } });
+      page.on("requestfailed", (r) => console.log("[reqfailed]", r.url().slice(0, 120), r.failure()?.errorText));
+    }
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/loyalty`);
+      await page.getByTestId("loyalty-tile").first().waitFor();
+      // The service worker takes charge, then the app keeps its pages and data in the background
+      await page.waitForFunction(() => !!navigator.serviceWorker.controller, null, { timeout: 30000 });
+      await page.waitForFunction(() => !!localStorage.getItem("offline-warm"), null, { timeout: 150000 });
+      const kept = await page.evaluate(async () => (await (await caches.open("expense-pages-v1")).keys()).map((r) => new URL(r.url).pathname));
+      assert(kept.includes("/personal/loyalty") && kept.includes("/documents"), `pages kept for offline: ${kept.join(", ")}`);
+
+      await ctx2.setOffline(true);
+      await page.reload();
+      await page.getByTestId("loyalty-tile").first().waitFor({ timeout: 30000 });
+      assert((await page.getByTestId("loyalty-tile").count()) === 2, "both cards show with no connection");
+      assert(/offline/i.test(await page.getByTestId("offline-notice").innerText()), "the offline notice shows");
+      assert((await page.locator('[data-testid="loyalty-tile"] img').count()) === 1, "the saved front photo shows offline");
+      await page.getByRole("button", { name: "Open Greenfield Market" }).click();
+      await page.getByRole("dialog", { name: /Greenfield Market card/ }).waitFor();
+      assert((await page.getByTestId("card-number").innerText()) === "4021 8830 1177", "the barcode number opens offline");
+      assert((await page.getByRole("button", { name: "Edit" }).count()) === 0, "no Edit while offline");
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Add card" }).click();
+      await page.getByRole("alert").filter({ hasText: "offline" }).waitFor();
+
+      await page.goto(`${BASE}/documents`);
+      await page.getByText("Offline Passport").first().waitFor({ timeout: 30000 });
+
+      // A page that was never saved gives a small page that leads to the saved ones
+      await page.goto(`${BASE}/trips`);
+      await page.getByRole("heading", { name: "You are offline" }).waitFor();
+      await page.getByRole("link", { name: "Loyalty cards" }).click();
+      await page.getByTestId("loyalty-tile").first().waitFor({ timeout: 30000 });
+
+      // Back online: the copy is refreshed, and signing out removes everything kept on the phone
+      await ctx2.setOffline(false);
+      await page.reload();
+      await page.getByTestId("loyalty-tile").first().waitFor();
+      await page.getByRole("button", { name: /Sign out/ }).first().click().catch(async () => {
+        await page.getByRole("button", { name: /menu/i }).first().click();
+        await page.getByRole("button", { name: /Sign out/ }).first().click();
+      });
+      await page.waitForURL((u) => u.pathname === "/login");
+      const left = await page.evaluate(async () => ({ pages: (await caches.keys()).includes("expense-pages-v1"), warm: !!localStorage.getItem("offline-warm") }));
+      assert(!left.pages && !left.warm, "signing out removes the saved pages and data");
+    } finally {
+      fake.table("loyalty_cards").length = 0;
+      fake.table("travel_documents").length = 0;
+      await ctx2.close();
+    }
   });
 
   await test("one Business link; Trips and Reports switch inside it", async () => {

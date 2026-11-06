@@ -16,7 +16,10 @@ import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isC
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { cacheFile, documentsKey, fetchDocuments, savedFileUrls } from "@/lib/offline-data";
+import { browserKv, loadWithCache } from "@/lib/offline-store";
+import { useOnline } from "@/lib/use-online";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 /**
  * Lists and uploads documents. With a tripId it shows that trip's documents,
@@ -26,6 +29,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [docs, setDocs] = useState<TravelDocument[]>([]);
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -52,35 +56,47 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const preparedFile = useRef<File | null>(null);
   const handedOver = useRef(false);
 
+  const savedUrls = useRef<string[]>([]);
+  const online = useOnline();
+
   const load = useCallback(async () => {
     const supabase = createClient();
-    const { data, error } = await withColumnFallback(
-      (cols) => {
-        const q = supabase.from("travel_documents").select(cols).order("created_at", { ascending: false });
-        return tripId ? q.eq("trip_id", tripId) : q.is("trip_id", null);
-      },
-      DOCUMENT_COLS,
-      DOCUMENT_COLS_BASE
-    );
-    if (error) {
-      setError(/relation|schema cache/i.test(error.message) ? "Documents are not set up yet. Run supabase/migration_documents.sql in Supabase." : error.message);
+    // The session is read from the phone, so this also works with no connection
+    const { data: { session } } = await supabase.auth.getSession();
+    const userId = session?.user.id;
+    const res = userId
+      ? await loadWithCache(browserKv, documentsKey(userId, tripId), () => fetchDocuments(supabase, tripId))
+      : ({ ok: false, error: new Error("Sign in again to see your documents.") } as const);
+    if (!res.ok) {
+      const message = (res.error as { message?: string } | null)?.message || "Could not load your documents.";
+      setError(/relation|schema cache/i.test(message) ? "Documents are not set up yet. Run supabase/migration_documents.sql in Supabase." : message);
       setLoading(false);
       return;
     }
-    const list = (data || []) as unknown as TravelDocument[];
+    const list = res.data;
+    setSavedAt(res.fromCache ? res.savedAt : null);
     setDocs(list);
     onChange?.(list);
-    // Signed links are made up front so they open in one tap (no popup blocking on phones)
     const paths = list.map((d) => d.file_path).filter(Boolean) as string[];
-    if (paths.length) {
+    if (res.fromCache) {
+      // No connection: open the files that are saved on the phone
+      const local = await savedFileUrls(DOC_BUCKET, paths);
+      savedUrls.current.push(...Object.values(local));
+      setUrls(local);
+    } else if (paths.length) {
+      // Signed links are made up front so they open in one tap (no popup blocking on phones)
       const { data: signed } = await supabase.storage.from(DOC_BUCKET).createSignedUrls(paths, 3600);
       const map: Record<string, string> = {};
       signed?.forEach((s) => { if (s.path && s.signedUrl) map[s.path] = s.signedUrl; });
       setUrls(map);
+      // Keep a copy of each file for the next time there is no connection
+      (async () => { for (const p of paths.slice(0, 25)) await cacheFile(supabase, DOC_BUCKET, p); })();
     }
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- memoised on tripId; the Supabase client created each render is equivalent
   }, [tripId]);
+
+  useEffect(() => () => { savedUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   useEffect(() => { load(); }, [load]);
 
@@ -104,7 +120,15 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
 
+  /** Adding, editing and deleting need a connection until the offline queue covers documents. */
+  const needsConnection = () => {
+    if (online) return false;
+    setError("You are offline. Your documents are here to view, but adding or changing them needs a connection for now.");
+    return true;
+  };
+
   const startEdit = (d: TravelDocument) => {
+    if (needsConnection()) return;
     setError(null);
     setScanNote(null);
     setEditing(d);
@@ -231,6 +255,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const confirm = useConfirm();
   const remove = async (d: TravelDocument) => {
+    if (needsConnection()) return;
     if (!(await confirm({ title: "Delete document?", message: `Delete "${d.title}"?`, destructive: true }))) return;
     try {
       await removeTravelDocument(createClient(), d);
@@ -262,6 +287,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   }, [adding, cropping, title, number, country, expiry, notes, file, editing, saving]);
 
   const openAdd = () => {
+    if (needsConnection()) return;
     setEditing(null);
     setAdding(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
@@ -280,6 +306,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
+      {!tripId && <OfflineNotice savedAt={savedAt} />}
       {error && !adding && <Alert>{error}</Alert>}
 
       {loading ? (

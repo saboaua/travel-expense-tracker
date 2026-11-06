@@ -27,7 +27,7 @@ export function buildCsp({ nonce, dev = false, supabaseUrl, turnstile = false }:
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "blob:", ...(supabase ? [supabase] : ["https://*.supabase.co"]), "https://upload.wikimedia.org", "https://thumb.wikimedia.org"],
     "font-src": ["'self'", "data:"],
-    "connect-src": ["'self'", ...(supabase ? [supabase, ...(supabaseWs ? [supabaseWs] : [])] : ["https://*.supabase.co", "wss://*.supabase.co"]), ...(turnstile ? ["https://challenges.cloudflare.com"] : []), ...(dev ? ["ws:", "wss:"] : [])],
+    "connect-src": ["'self'", "blob:", ...(supabase ? [supabase, ...(supabaseWs ? [supabaseWs] : [])] : ["https://*.supabase.co", "wss://*.supabase.co"]), ...(turnstile ? ["https://challenges.cloudflare.com"] : []), ...(dev ? ["ws:", "wss:"] : [])],
     // On-device OCR runs in a worker served from /tesseract
     "worker-src": ["'self'", "blob:"],
     // Signed Supabase links open PDFs inside the document viewer

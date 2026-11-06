@@ -8,7 +8,7 @@ import { CardFace } from "./CardFace";
 import { Barcode } from "./Barcode";
 
 /** Checkout view: the card on the top third (flip to its back), a big high-contrast barcode and the number below. Escape or Done closes it. */
-export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClose: () => void; onEdit: () => void }) {
+export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClose: () => void; onEdit?: () => void }) {
   const [side, setSide] = useState<"front" | "back">("front");
 
   useEffect(() => {
@@ -53,7 +53,7 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
           </div>
 
           <div className="mt-auto flex gap-2.5">
-            <Button type="button" variant="outline" className="h-11 flex-1" onClick={onEdit}><Pencil className="h-4 w-4" /> Edit</Button>
+            {onEdit && <Button type="button" variant="outline" className="h-11 flex-1" onClick={onEdit}><Pencil className="h-4 w-4" /> Edit</Button>}
             <Button type="button" className="h-11 flex-1" onClick={onClose}>Done</Button>
           </div>
         </div>

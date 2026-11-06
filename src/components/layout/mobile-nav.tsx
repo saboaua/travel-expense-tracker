@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { adminNavItems } from "@/lib/access";
@@ -39,6 +40,7 @@ export function MobileNav() {
 
   const logout = async () => {
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
+    await clearOfflineData();
     await supabase.auth.signOut();
     setOpen(false);
     router.push("/login");

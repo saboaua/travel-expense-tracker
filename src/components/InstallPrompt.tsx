@@ -42,10 +42,6 @@ export function InstallPrompt() {
     const iosDevice = isIos();
     setIos(iosDevice);
 
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {});
-    }
-
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);

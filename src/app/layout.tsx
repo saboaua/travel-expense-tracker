@@ -9,6 +9,7 @@ import { AppHeight } from "@/components/layout/AppHeight";
 import { AppSplash } from "@/components/AppSplash";
 import { SPLASH_CSS, startupImages } from "@/lib/splash";
 import { ConfirmProvider } from "@/components/ui/confirm";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -61,6 +62,7 @@ export default async function RootLayout({
       <body className={`${inter.className} antialiased`}>
         <AppSplash />
         <ConfirmProvider>{children}</ConfirmProvider>
+        <ServiceWorkerRegister />
         <InstallPrompt />
         <UpdateNotice />
         <AppHeight />

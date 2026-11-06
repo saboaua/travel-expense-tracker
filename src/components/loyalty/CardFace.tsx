@@ -1,23 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useCachedPhoto } from "@/lib/use-cached-photo";
 import { cn } from "@/lib/utils";
 import { cardColor, type LoyaltyCard } from "@/lib/loyalty";
 import { LOYALTY_BUCKET } from "@/lib/loyalty-image";
 
-/** A short-lived link to a private card photo (null while loading or when there is no photo). */
+/** A link to a private card photo (null while loading or when there is no photo). Saved on the phone, so it also works offline. */
 export function useCardPhoto(path: string | null | undefined): string | null {
-  const [state, setState] = useState<{ path: string; url: string } | null>(null);
-  useEffect(() => {
-    if (!path) return;
-    let cancelled = false;
-    createClient().storage.from(LOYALTY_BUCKET).createSignedUrl(path, 3600).then(({ data }) => {
-      if (!cancelled && data?.signedUrl) setState({ path, url: data.signedUrl });
-    });
-    return () => { cancelled = true; };
-  }, [path]);
-  return path && state?.path === path ? state.url : null;
+  return useCachedPhoto(LOYALTY_BUCKET, path);
 }
 
 /** Only the design of the card: the saved front photo, or a colour block with the name and type. Never a barcode. */
