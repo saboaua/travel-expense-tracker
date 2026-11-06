@@ -1,3 +1,4 @@
+import { dayStartInstant, dayEndInstant } from "../src/lib/utils";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { addDaysISO, todayISO } from "../src/lib/utils";
@@ -28,5 +29,10 @@ const walk = (dir: string) => {
 walk("src");
 eq("no source file builds today's date from the UTC clock", bad, []);
 
+// a calendar day in Aruba (UTC-4) as exact instants: the last hour of the Aruba evening is already the next UTC day
+eq("Aruba day starts at 04:00 UTC", dayStartInstant("2026-11-05"), "2026-11-05T04:00:00.000Z");
+eq("Aruba day ends at 03:59:59.999 UTC next day", dayEndInstant("2026-11-05"), "2026-11-06T03:59:59.999Z");
+
 console.log(fail ? `${fail} FAILED` : "ALL PASSED");
 process.exit(fail ? 1 : 0);
+

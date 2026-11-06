@@ -33,6 +33,13 @@ export function todayISO(timeZone = "America/Aruba", now: Date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone }).format(now);
 }
 
+/** Aruba is UTC-4 all year (no daylight saving). */
+const ARUBA_OFFSET = "-04:00";
+
+/** The exact moment a calendar day starts and ends in the app's home time zone (Aruba), as an ISO instant. Independent of the browser's or the server's time zone. */
+export const dayStartInstant = (date: string) => new Date(`${date}T00:00:00.000${ARUBA_OFFSET}`).toISOString();
+export const dayEndInstant = (date: string) => new Date(`${date}T23:59:59.999${ARUBA_OFFSET}`).toISOString();
+
 /** A YYYY-MM-DD date moved by `days` (negative = earlier). Plain calendar maths, no time zone involved. */
 export function addDaysISO(date: string, days: number) {
   const d = new Date(`${date}T00:00:00Z`);

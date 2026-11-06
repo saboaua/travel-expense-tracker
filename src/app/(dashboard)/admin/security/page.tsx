@@ -2,7 +2,7 @@
 
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { addDaysISO, todayISO } from "@/lib/utils";
+import { addDaysISO, dayEndInstant, dayStartInstant, todayISO } from "@/lib/utils";
 import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -79,11 +79,8 @@ export default function AdminSecurityPage() {
     setLoading(true);
     setError(null);
     try {
-      // exact start and end of the chosen days in this browser's time zone
-      const params = new URLSearchParams({
-        from: new Date(`${from}T00:00:00`).toISOString(),
-        to: new Date(`${to}T23:59:59.999`).toISOString(),
-      });
+      // exact start and end of the chosen days in the app's time zone (Aruba), whatever the browser's zone is
+      const params = new URLSearchParams({ from: dayStartInstant(from), to: dayEndInstant(to) });
       if (eventType) params.set("eventType", eventType);
       if (severity) params.set("severity", severity);
       if (action) params.set("action", action);
