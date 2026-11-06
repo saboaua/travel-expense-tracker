@@ -90,8 +90,8 @@ export function CardForm({ userId, card, onSaved, onClose }: { userId: string; c
   }
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/70 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={card ? "Edit card" : "Add a card"} onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
-      <form onSubmit={save} className="max-h-[100dvh] w-full max-w-lg space-y-4 overflow-y-auto rounded-t-2xl bg-card p-4 text-card-foreground shadow-2xl sm:max-h-full sm:rounded-2xl sm:p-5">
+    <div className="app-frame fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/70 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={card ? "Edit card" : "Add a card"} onClick={(e) => e.target === e.currentTarget && !busy && onClose()}>
+      <form onSubmit={save} className="max-h-full w-full max-w-lg space-y-4 overflow-y-auto rounded-t-2xl bg-card p-4 text-card-foreground shadow-2xl sm:max-h-full sm:rounded-2xl sm:p-5">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-xl font-bold">{card ? "Edit card" : "Add a card"}</h2>
           <Button type="button" variant="outline" size="icon" className="h-11 w-11" onClick={onClose} disabled={busy} aria-label="Close"><X className="h-5 w-5" /></Button>

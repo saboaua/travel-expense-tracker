@@ -19,7 +19,7 @@ export function DocumentViewer({ title, url, path, onClose }: { title: string; u
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-black/80" role="dialog" aria-modal="true" aria-label={`Viewing ${title}`}>
+    <div className="app-frame fixed inset-0 z-[70] flex flex-col bg-black/80" role="dialog" aria-modal="true" aria-label={`Viewing ${title}`}>
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
         <p className="min-w-0 truncate font-medium">{title}</p>
         <div className="flex shrink-0 items-center gap-1">

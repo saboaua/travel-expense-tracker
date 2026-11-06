@@ -60,7 +60,7 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
     <ConfirmContext.Provider value={confirm}>
       {children}
       {o && (
-        <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 sm:items-center" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
+        <div className="app-frame fixed inset-0 z-[100] flex items-end justify-center bg-black/40 p-4 sm:items-center" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
           <div role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message" className="w-full max-w-sm rounded-xl border bg-background p-5 shadow-xl">
             <h2 id="confirm-title" className="text-base font-semibold">{o.title ?? (o.destructive ? "Are you sure?" : "Please confirm")}</h2>
             <p id="confirm-message" className="mt-2 whitespace-pre-line text-sm text-muted-foreground">{o.message}</p>

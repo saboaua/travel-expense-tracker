@@ -5,6 +5,7 @@ import "./globals.css";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotice } from "@/components/UpdateNotice";
 import { PullToRefresh } from "@/components/PullToRefresh";
+import { AppHeight } from "@/components/layout/AppHeight";
 import { AppSplash } from "@/components/AppSplash";
 import { SPLASH_CSS, startupImages } from "@/lib/splash";
 import { ConfirmProvider } from "@/components/ui/confirm";
@@ -62,6 +63,7 @@ export default async function RootLayout({
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <UpdateNotice />
+        <AppHeight />
         <PullToRefresh />
       </body>
     </html>

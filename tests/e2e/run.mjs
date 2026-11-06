@@ -162,6 +162,13 @@ try {
     const bottomOf = async () => (await nav.boundingBox()).y + (await nav.boundingBox()).height;
     const before = await bottomOf();
     assert(Math.abs(before - 700) < 1.5, `menu is not at the bottom of the screen (${before})`);
+    assert((await page.evaluate(() => document.documentElement.style.getPropertyValue("--app-h"))) !== "", "visible screen height was not published");
+    // If the visible screen is shorter than the layout viewport (browser bars), the menu follows the visible bottom
+    await page.setViewportSize({ width: 390, height: 640 });
+    await page.waitForTimeout(300);
+    assert(Math.abs((await bottomOf()) - 640) < 1.5, "menu did not follow a shorter screen");
+    await page.setViewportSize({ width: 390, height: 700 });
+    await page.waitForTimeout(300);
     // Make the page long enough to scroll, then scroll it to the end
     await page.evaluate(() => { const m = document.querySelector("#app-scroll main"); const pad = document.createElement("div"); pad.style.height = "2000px"; m.appendChild(pad); });
     await page.evaluate(() => document.getElementById("app-scroll").scrollTo(0, 99999));

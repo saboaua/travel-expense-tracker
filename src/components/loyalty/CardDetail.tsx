@@ -43,7 +43,7 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
   const tabBtn = (active: boolean) => cn("h-10 rounded-lg text-sm transition-colors", active ? "bg-background font-semibold shadow-sm" : "font-medium text-muted-foreground hover:text-foreground");
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/80 p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`${card.store_name} card`} onClick={(e) => e.target === e.currentTarget && onClose()}>
+    <div className="app-frame fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/80 p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`${card.store_name} card`} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="max-h-full w-full max-w-md space-y-4 overflow-y-auto rounded-2xl bg-card p-4 text-card-foreground shadow-2xl sm:p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">

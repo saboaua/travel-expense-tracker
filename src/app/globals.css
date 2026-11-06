@@ -82,3 +82,11 @@ input[type="date"]::-webkit-date-and-time-value {
   text-align: left;
   margin: 0;
 }
+
+/* Full-screen frames on phones are as tall as the visible screen (--app-h, set by AppHeight), never taller. */
+@media (max-width: 767px) {
+  .app-frame {
+    height: var(--app-h, 100dvh);
+    bottom: auto;
+  }
+}

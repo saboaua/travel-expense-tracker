@@ -98,7 +98,7 @@ export function ReceiptCropper({
   if (!url) return null;
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-black/95" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <div className="app-frame fixed inset-0 z-[70] flex flex-col bg-black/95" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
       <div className="flex items-center justify-between p-3 text-white">
         <p className="text-sm font-medium">{title}</p>
         <button type="button" onClick={onCancel} className="p-1" aria-label="Cancel crop">
@@ -110,7 +110,7 @@ export function ReceiptCropper({
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3">
         <div className="relative inline-block max-h-full max-w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={imgRef} src={url} alt="Crop source" className="block max-h-[70vh] max-w-full object-contain" />
+          <img ref={imgRef} src={url} alt="Crop source" className="block max-h-[60dvh] max-w-full object-contain" />
           <div
             className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move touch-none"
             style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.w}%`, height: `${crop.h}%` }}

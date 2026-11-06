@@ -61,7 +61,7 @@ export function MobileNav() {
   return (
     <>
       {open && (
-        <div className="fixed inset-0 z-40 md:hidden">
+        <div className="app-frame fixed inset-0 z-40 md:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setOpen(false)} />
           <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between">

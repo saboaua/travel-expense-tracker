@@ -29,8 +29,8 @@ export function ScanSheet({
 }) {
   const chosen = options.find((o) => o.key === selected);
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
-      <div className="flex max-h-[92vh] w-full max-w-md flex-col rounded-t-2xl bg-card p-4 shadow-xl sm:rounded-2xl">
+    <div className="app-frame fixed inset-0 z-[60] flex items-end justify-center bg-black/50 sm:items-center sm:p-4" role="dialog" aria-modal="true" aria-label={title}>
+      <div className="flex max-h-[92%] w-full max-w-md flex-col rounded-t-2xl bg-card p-4 shadow-xl sm:rounded-2xl">
         <div className="mb-3 flex items-center gap-3">
           {preview && (
             // eslint-disable-next-line @next/next/no-img-element
