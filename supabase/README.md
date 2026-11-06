@@ -33,6 +33,7 @@ each file says so when that is the case.
 | 25 | `migration_telegram_v3.sql` | Telegram: admin chat actions (confirmations) |
 | 26 | `migration_telegram_v4.sql` | Telegram: remembers handled updates so a receipt is never saved twice |
 | 27 | `migration_home_place.sql` | Home country and city on profiles (for Scan and Upload) |
+| 28 | `migration_loyalty.sql` | Loyalty card wallet: cards table, private photo bucket, "loyalty" role option for every role (after 3 and 14) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.

@@ -17,7 +17,8 @@ want_tables(name, fix) as (values
   ('audit_logs','migration_audit.sql'), ('security_events','migration_security_hardening.sql'), ('auth_throttle','migration_security_hardening.sql'),
   ('support_requests','migration_login_support.sql'),
   ('telegram_pending','migration_telegram.sql'), ('telegram_notify_prefs','migration_telegram_v2.sql'), ('telegram_sent_log','migration_telegram_v2.sql'),
-  ('telegram_admin_actions','migration_telegram_admin.sql'), ('app_secrets','migration_telegram_admin.sql'), ('telegram_updates','migration_telegram_v4.sql')
+  ('telegram_admin_actions','migration_telegram_admin.sql'), ('app_secrets','migration_telegram_admin.sql'), ('telegram_updates','migration_telegram_v4.sql'),
+  ('loyalty_cards','migration_loyalty.sql')
 ),
 want_columns(tbl, col, fix) as (values
   ('profiles','role','migration_admin.sql'), ('profiles','must_change_password','migration_admin.sql'),
@@ -48,7 +49,8 @@ want_triggers(name, fix) as (values
 ),
 want_buckets(id, fix) as (values
   ('receipts','create it in Storage (private); see schema.sql'), ('documents','migration_documents.sql'),
-  ('branding','create it in Storage (public); see migration_branding_roles.sql'), ('avatars','create it in Storage (public); see migration_profile.sql')
+  ('branding','create it in Storage (public); see migration_branding_roles.sql'), ('avatars','create it in Storage (public); see migration_profile.sql'),
+  ('loyalty-cards','migration_loyalty.sql')
 ),
 -- tables used only by the server: row security on and no rule for people is correct
 server_only(name) as (values ('telegram_pending'), ('telegram_updates'), ('app_secrets'), ('telegram_sent_log'), ('telegram_admin_actions'), ('auth_throttle')),
