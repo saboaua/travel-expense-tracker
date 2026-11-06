@@ -4,41 +4,19 @@ import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle, Camera, CheckCircle2, Clock, Crop, Eye, EyeOff, FileText, Loader2, Pencil, Plus, Trash2, ShieldCheck, Sparkles, FolderLock, Image as ImageIcon } from "lucide-react";
+import { Camera, Crop, FileText, Loader2, Plus, Sparkles } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { formatDate, todayISO } from "@/lib/utils";
-import { DOC_KINDS, documentStatus, expiryMeter, kindHasExpiry, kindLabel, maskNumber, type DocKind, type DocLevel, type TravelDocument } from "@/lib/documents";
+import { todayISO } from "@/lib/utils";
+import { DOC_KINDS, kindHasExpiry, type DocKind, type TravelDocument } from "@/lib/documents";
+import { DocumentList } from "@/components/documents/DocumentList";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, removeTravelDocument, saveTravelDocument, updateTravelDocument, type DocQuality } from "@/lib/document-upload";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
 import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
-
-const CHIP: Record<DocLevel, string> = {
-  ok: "bg-emerald-100 text-emerald-700",
-  soon: "bg-amber-100 text-amber-800",
-  critical: "bg-red-100 text-red-700",
-  expired: "bg-red-100 text-red-700",
-  none: "bg-muted text-muted-foreground",
-};
-const BAR: Record<DocLevel, string> = { ok: "bg-emerald-500", soon: "bg-amber-500", critical: "bg-red-500", expired: "bg-red-500", none: "bg-muted-foreground" };
-const NEEDS_ATTENTION: DocLevel[] = ["soon", "critical", "expired"];
-
-function Stat({ icon: Icon, label, value, hint, tone }: { icon: typeof Clock; label: string; value: number; hint: string; tone: string }) {
-  return (
-    <div className="rounded-xl border bg-card p-3">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg ${tone}`}><Icon className="h-4 w-4" /></span>
-      </div>
-      <p className="mt-1 text-2xl font-semibold leading-none">{value}</p>
-      <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>
-    </div>
-  );
-}
 
 /**
  * Lists and uploads documents. With a tripId it shows that trip's documents,
@@ -256,8 +234,23 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const today = todayISO();
 
+  const openAdd = () => {
+    setEditing(null);
+    setAdding(true);
+    setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
+  };
+
   return (
-    <div className="space-y-3">
+    <div className={tripId ? "space-y-3" : "space-y-6"}>
+      {!tripId && (
+        <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" aria-hidden="true" /> Documents</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Your passport and travel papers, close at hand.</p>
+          </div>
+          <Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>
+        </div>
+      )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
       {error && <Alert>{error}</Alert>}
@@ -267,93 +260,10 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       ) : docs.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">{tripId ? "No documents for this trip yet. Add your ticket, booking, visa or insurance so it is close at hand." : "No documents yet. Start with your passport."}</p>
       ) : (
-        <div className="space-y-4">
-          {!tripId && (() => {
-            const levels = docs.map((d) => documentStatus(d.kind, d.expiry_date, today).level);
-            const count = (f: (l: DocLevel) => boolean) => levels.filter(f).length;
-            const soon = count((l) => l === "soon" || l === "critical"), expired = count((l) => l === "expired");
-            return (
-              <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                <Stat icon={FolderLock} label="Total" value={docs.length} hint="Documents stored" tone="bg-primary/10 text-primary" />
-                <Stat icon={CheckCircle2} label="Valid" value={count((l) => l === "ok")} hint="Not close to expiry" tone="bg-emerald-100 text-emerald-700" />
-                <Stat icon={Clock} label="Expiring soon" value={soon} hint={soon ? "Renew these first" : "Nothing to renew"} tone="bg-amber-100 text-amber-800" />
-                <Stat icon={AlertTriangle} label="Expired" value={expired} hint={expired ? "Needs a new document" : "None expired"} tone="bg-red-100 text-red-700" />
-              </div>
-            );
-          })()}
-          {[
-            { key: "attention", title: "Needs attention", list: docs.filter((d) => NEEDS_ATTENTION.includes(documentStatus(d.kind, d.expiry_date, today).level)) },
-            { key: "rest", title: "Other documents", list: docs.filter((d) => !NEEDS_ATTENTION.includes(documentStatus(d.kind, d.expiry_date, today).level)) },
-          ].filter((g) => g.list.length > 0).map((g) => (
-            <section key={g.key} className="space-y-2">
-              {!tripId && <h3 className="flex items-center gap-2 text-sm font-semibold"><span className={`h-2 w-2 rounded-full ${g.key === "attention" ? "bg-amber-500" : "bg-emerald-500"}`} />{g.key === "rest" && !docs.some((d) => NEEDS_ATTENTION.includes(documentStatus(d.kind, d.expiry_date, today).level)) ? "Your documents" : g.title}<span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{g.list.length}</span></h3>}
-              <ul className="space-y-2">
-                {g.list.map((d) => {
-                  const meter = expiryMeter(d.kind, d.expiry_date, today);
-                  const url = d.file_path ? urls[d.file_path] : null;
-                  const isPdf = d.file_path?.toLowerCase().endsWith(".pdf");
-                  return (
-                    <li key={d.id} className="rounded-xl border p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                          {d.kind === "passport" ? <ShieldCheck className="h-5 w-5" /> : isPdf ? <FileText className="h-5 w-5" /> : <ImageIcon className="h-5 w-5" />}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="flex min-w-0 items-center gap-2">
-                            <span className="truncate font-medium">{d.title}</span>
-                            {meter && <span className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${CHIP[meter.level]}`}>{meter.label}</span>}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {kindLabel(d.kind)}
-                            {d.issuing_country ? ` · ${d.issuing_country}` : ""}
-                            {d.expiry_date ? ` · expires ${formatDate(d.expiry_date)}` : ""}
-                          </p>
-                          {d.document_number && (
-                            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                              <span>No. <span className="font-mono">{revealed.has(d.id) ? d.document_number : maskNumber(d.document_number)}</span></span>
-                              <button type="button" onClick={() => toggleReveal(d.id)} className="rounded p-0.5 hover:bg-accent" aria-label={revealed.has(d.id) ? "Hide number" : "Show number"}>
-                                {revealed.has(d.id) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                              </button>
-                            </p>
-                          )}
-                          {d.notes && <p className="truncate text-xs text-muted-foreground">{d.notes}</p>}
-                        </div>
-                        {d.file_path && (
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="icon"
-                            className="shrink-0"
-                            disabled={!url}
-                            onClick={() => url && d.file_path && setViewing({ title: d.title, url, path: d.file_path })}
-                            aria-label={`View ${d.title}`}
-                            title={url ? "View" : "Preparing preview\u2026"}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button type="button" variant="outline" size="icon" className="shrink-0" onClick={() => startEdit(d)} aria-label={`Edit ${d.title}`} title="Edit">
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => remove(d)} aria-label={`Delete ${d.title}`} title="Delete">
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      {meter && (
-                        <div className="mt-2.5" data-testid="expiry-meter">
-                          <div className="h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Time left before this document expires" aria-valuemin={0} aria-valuemax={100} aria-valuenow={meter.pct}>
-                            <div className={`h-full rounded-full ${BAR[meter.level]}`} style={{ width: `${meter.pct}%` }} />
-                          </div>
-                          <p className="mt-1 text-xs text-muted-foreground">{meter.caption}</p>
-                        </div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </section>
-          ))}
-        </div>
+        <DocumentList
+          docs={docs} urls={urls} revealed={revealed} toggleReveal={toggleReveal} today={today} compact={!!tripId}
+          onView={(d, url) => d.file_path && setViewing({ title: d.title, url, path: d.file_path })} onEdit={startEdit} onRemove={remove}
+        />
       )}
 
       {adding ? (
@@ -446,11 +356,11 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
             <Button type="button" variant="outline" onClick={reset} disabled={saving}>Cancel</Button>
           </div>
         </form>
-      ) : (
+      ) : tripId ? (
         <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { setEditing(null); setAdding(true); }}>
           <Plus className="h-4 w-4" /> Add document
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -1,13 +1,10 @@
 import Link from "next/link";
-import { ArrowLeft, FileText, ShieldCheck } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { loadPermissions } from "@/lib/access-server";
 import { createClient } from "@/lib/supabase/server";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
-import { currentPassport, kindLabel, passportStatus, type TravelDocument } from "@/lib/documents";
-import { formatDate, todayISO } from "@/lib/utils";
+import { kindLabel, type TravelDocument } from "@/lib/documents";
 import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
-
-const BADGE = { expired: "bg-red-100 text-red-700", critical: "bg-red-100 text-red-700", renew: "bg-amber-100 text-amber-800", ok: "bg-emerald-100 text-emerald-700" } as const;
 
 export default async function DocumentsPage() {
   const supabase = await createClient();
@@ -20,8 +17,6 @@ export default async function DocumentsPage() {
     DOCUMENT_COLS_BASE
   );
   const all = (data || []) as unknown as TravelDocument[];
-  const passport = currentPassport(all);
-  const status = passport?.expiry_date ? passportStatus(passport.expiry_date, todayISO()) : null;
 
   const tripDocs = all.filter((d) => d.trip_id);
   const tripIds = [...new Set(tripDocs.map((d) => d.trip_id as string))];
@@ -29,33 +24,13 @@ export default async function DocumentsPage() {
   const nameOf = new Map((trips || []).map((t) => [t.id, t.name]));
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 pb-24 md:p-8">
-      <div>
-        {canSeePersonal && (
-          <Link href="/personal" className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-3.5 w-3.5" /> Personal
-          </Link>
-        )}
-        <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" /> Documents</h1>
-        <p className="mt-1 text-muted-foreground">Your passport and travel papers, close at hand.</p>
-      </div>
-
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <div className="mb-3 flex items-center gap-2">
-          <ShieldCheck className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold">Passport</h2>
-          {status && <span className={`ml-auto rounded-full px-2.5 py-0.5 text-xs font-medium ${BADGE[status.level]}`}>{status.title}</span>}
-        </div>
-        {passport && status ? (
-          <p className="mb-4 text-sm text-muted-foreground">
-            Expires <strong className="text-foreground">{formatDate(passport.expiry_date as string)}</strong>
-            {status.daysLeft >= 0 ? ` (${status.daysLeft} days)` : ""}. {status.level === "ok" ? `Start renewing around ${formatDate(status.renewBy)}.` : status.message}
-          </p>
-        ) : (
-          <p className="mb-4 text-sm text-muted-foreground">Add your passport and we will remind you when to renew. Most destinations want it valid for 6+ months beyond your trip.</p>
-        )}
-        <DocumentsManager defaultKind="passport" />
-      </section>
+    <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-8">
+      {canSeePersonal && (
+        <Link href="/personal" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-3.5 w-3.5" /> Personal
+        </Link>
+      )}
+      <DocumentsManager defaultKind="passport" />
 
       {tripDocs.length > 0 && (
         <section className="rounded-xl border bg-card p-5 shadow-sm">
