@@ -53,9 +53,9 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, s
     <>
       <div className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex items-center justify-end gap-3">
-          <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Your receipts and trips are saved to the cloud as you go" : "You are offline. Changes will not save until you reconnect."}>
+          <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Online: your receipts and trips are saved to the cloud as you go" : "You are offline. Changes will not save until you reconnect."}>
             {online ? <ShieldCheck className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
-            {online ? "Auto-Sync ON" : "Offline"}
+            {online ? "Online" : "Offline"}
           </span>
           <NotificationBell notifications={notifications} />
         </div>
