@@ -14,9 +14,9 @@ each file says so when that is the case.
 | 6 | `migration_currencies.sql` | Admin-managed list of currencies |
 | 7 | `migration_categories.sql` | Admin-managed expense categories |
 | 8 | `migration_travel_categories.sql` | Admin-managed travel categories and category icons |
-| 9 | `migration_telegram.sql` | Telegram receipt upload |
-| 10 | `migration_telegram_admin.sql` | Telegram credentials managed by admins |
-| 11 | `migration_branding_roles.sql` | Branding settings and expanded roles |
+| 9 | `migration_branding_roles.sql` | Branding settings and expanded roles |
+| 10 | `migration_telegram.sql` | Telegram receipt upload |
+| 11 | `migration_telegram_admin.sql` | Telegram credentials managed by admins |
 | 12 | `migration_roles.sql` | Custom roles and per-feature access |
 | 13 | `migration_temp_password.sql` | Expiry for temporary passwords |
 | 14 | `migration_audit.sql` | Audit trail and security events |
@@ -29,6 +29,15 @@ each file says so when that is the case.
 | 21 | `migration_security_hardening.sql` | Stops users changing their own role and other fixes |
 | 22 | `migration_throttle_retention.sql` | Sign-in throttling counters and log retention |
 | 23 | `migration_duplicates.sql` | Photo fingerprint column and the duplicate receipt check |
+| 24 | `migration_telegram_v2.sql` | Telegram: message settings, sent log, held uploads |
+| 25 | `migration_telegram_v3.sql` | Telegram: admin chat actions (confirmations) |
+| 26 | `migration_telegram_v4.sql` | Telegram: remembers handled updates so a receipt is never saved twice |
+| 27 | `migration_home_place.sql` | Home country and city on profiles (for Scan and Upload) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
+
+## Checking the setup
+
+Run `check_setup.sql` in the SQL Editor at any time. It changes nothing; it lists every table, column, function, trigger and
+storage bucket the app expects, marks each OK or MISSING (with the file that fixes it), and lists anything extra the app does not use.
