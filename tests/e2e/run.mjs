@@ -196,7 +196,7 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
-    await page.getByRole("heading", { name: "Travel documents" }).waitFor();
+    await page.getByRole("heading", { name: "Documents", exact: true }).waitFor();
     const titles = await page.locator("section[aria-labelledby=doc-tiles-heading] p.truncate.font-bold").allInnerTexts();
     assert(titles.join("|") === "Visa / e-visa|Travel insurance", `tile order/content was: ${titles.join("|")}`);
     await page.getByText("Expires soon").first().waitFor();

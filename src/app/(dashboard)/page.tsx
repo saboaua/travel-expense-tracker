@@ -295,7 +295,7 @@ export default async function DashboardPage() {
       {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
       {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
 
-      {/* Travel documents: one tile per saved document, soonest to expire first */}
+      {/* Documents: one tile per saved document, soonest to expire first */}
       {myPerms.has("documents") && <DocumentTiles tiles={docTiles} total={accountDocs.length} />}
 
       {/* Without the Personal dashboard option the tiles stay here, so nobody loses the links */}

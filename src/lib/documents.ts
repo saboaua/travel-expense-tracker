@@ -6,12 +6,13 @@
  * beyond the day you travel/return. Renewals can take weeks, so we start nudging 3 months earlier.
  */
 
-export type DocKind = "passport" | "visa" | "id" | "ticket" | "booking" | "insurance" | "vaccination" | "other";
+export type DocKind = "passport" | "visa" | "id" | "license" | "ticket" | "booking" | "insurance" | "vaccination" | "other";
 
 export const DOC_KINDS: { value: DocKind; label: string; hasExpiry: boolean }[] = [
   { value: "passport", label: "Passport", hasExpiry: true },
   { value: "visa", label: "Visa / e-visa", hasExpiry: true },
   { value: "id", label: "ID card", hasExpiry: true },
+  { value: "license", label: "Driver's license", hasExpiry: true },
   { value: "ticket", label: "Ticket / boarding pass", hasExpiry: false },
   { value: "booking", label: "Hotel / booking", hasExpiry: false },
   { value: "insurance", label: "Travel insurance", hasExpiry: true },
@@ -248,6 +249,7 @@ export function expiryMeter(kind: string, expiry: string | null, today: string):
 export function numberLabel(kind: string): string {
   switch (kind) {
     case "visa": return "Application ID";
+    case "license": return "License No.";
     case "ticket": return "Booking ref";
     case "booking": return "Confirmation";
     case "insurance": return "Policy No.";

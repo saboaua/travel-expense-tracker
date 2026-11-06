@@ -156,6 +156,6 @@ export function buildScanOptions(input: {
       else if (p.kind === "personal_trip") out.push({ key: `ptrip:${p.id}`, kind: "ptrip", id: p.id, label: p.name, sub: ["Personal travel", p.destination].filter(Boolean).join(" · "), href: `/personal/travel/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });
     }
   }
-  if (input.canDocuments) out.push({ key: "document", kind: "document", label: "Document", sub: "Passport, visa, insurance…", href: "/documents" });
+  if (input.canDocuments) out.push({ key: "document", kind: "document", label: "Document", sub: "Passport, ID, driver's license…", href: "/documents" });
   return out;
 }

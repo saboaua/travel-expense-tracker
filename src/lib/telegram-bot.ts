@@ -169,7 +169,7 @@ async function handleUpload(supabase: Db, chatId: number, profile: Profile, file
 
   const held = { telegram_id: profile.telegram_id, file_id: file.file_id, file_name: file.file_name ?? null, mime: file.mime ?? null, saved_ref: null, saved_path: null };
 
-  // A passport, ID card or visa photo goes to Documents without being asked (unless the caption named a place)
+  // A passport, ID card, driver's license or visa photo goes to Documents without being asked (unless the caption named a place)
   const docOption = options.find((o) => o.kind === "document");
   if (docOption && !isPdf && !captionTarget(caption, options)) {
     const idDoc = await detectIdentityDocument(file);

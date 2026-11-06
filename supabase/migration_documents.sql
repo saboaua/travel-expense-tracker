@@ -6,7 +6,7 @@ create table if not exists public.travel_documents (
   user_id uuid not null references auth.users(id) on delete cascade,
   trip_id uuid references public.trips(id) on delete cascade,   -- null = general (passport, ID, ...)
   kind text not null default 'other'
-    check (kind in ('passport','visa','id','ticket','booking','insurance','vaccination','other')),
+    check (kind in ('passport','visa','id','license','ticket','booking','insurance','vaccination','other')),
   title text not null check (char_length(title) between 1 and 120),
   issuing_country text check (issuing_country is null or char_length(issuing_country) <= 80),
   expiry_date date,

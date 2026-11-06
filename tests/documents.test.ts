@@ -96,3 +96,15 @@ import { numberLabel, tileCountdown } from "../src/lib/documents";
   eq(tileCountdown("visa", "2026-11-05", t), null, "tile: expired documents show no countdown");
   eq(tileCountdown("visa", "2026-11-07", t), "1 day", "tile: singular day");
 }
+import { DOC_KINDS, kindLabel, kindHasExpiry } from "../src/lib/documents";
+import { sanitizeDocumentFields } from "../src/lib/mrz";
+{
+  eq(kindLabel("license"), "Driver's license", "license: has its own name");
+  eq(kindHasExpiry("license"), true, "license: has an expiry date");
+  eq(DOC_KINDS.some((k) => k.value === "license"), true, "license: offered in the document type list");
+  eq(numberLabel("license"), "License No.", "license: number label");
+  eq(documentStatus("license", "2026-11-26", "2026-11-06").level, "soon", "license: 20 days left is expiring soon");
+  eq(documentStatus("license", "2031-11-06", "2026-11-06").level, "ok", "license: years left is valid");
+  const f = sanitizeDocumentFields({ kind: "license", document_number: "A1234567", expiry_date: "2031-05-02", issuing_country: "Aruba", holder_name: "Patrick Fortin" }, "2026-11-06");
+  eq([f.kind, f.document_number, f.expiry_date], ["license", "A1234567", "2031-05-02"], "license: the reader's answer is accepted");
+}

@@ -202,12 +202,12 @@ export async function saveGrocery(supabase: SupabaseClient, userId: string, file
   };
 }
 
-/* ---------------- travel documents ---------------- */
+/* ---------------- documents ---------------- */
 
-const IDENTITY_KINDS: DocKind[] = ["passport", "id", "visa"];
+const IDENTITY_KINDS: DocKind[] = ["passport", "id", "license", "visa"];
 
 /**
- * Looks at a photo and says whether it is a passport, ID card or visa. Returns the fields it read (so saving does not
+ * Looks at a photo and says whether it is a passport, ID card, driver's license or visa. Returns the fields it read (so saving does not
  * read the photo again), or null for a receipt, anything unclear, or when the reader is not available. Never throws.
  */
 export async function detectIdentityDocument(file: TgFile): Promise<DocumentFields | null> {

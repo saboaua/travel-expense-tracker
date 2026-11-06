@@ -253,7 +253,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
         <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" aria-hidden="true" /> Documents</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Your passport and travel papers, close at hand.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid.</p>
           </div>
           <Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>
         </div>

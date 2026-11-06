@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, Download, Eye, FileText, IdCard, Plane, Plus, ShieldCheck, Stamp, Syringe, Hotel, Loader2 } from "lucide-react";
+import { BadgeCheck, Car, Download, Eye, FileText, IdCard, Plane, Plus, ShieldCheck, Stamp, Syringe, Hotel, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { createClient } from "@/lib/supabase/client";
@@ -32,6 +32,7 @@ const ICONS: Record<string, typeof FileText> = {
   passport: BadgeCheck,
   visa: Stamp,
   id: IdCard,
+  license: Car,
   ticket: Plane,
   booking: Hotel,
   insurance: ShieldCheck,
@@ -46,7 +47,7 @@ const CHIP: Record<DocLevel, string> = {
   none: "",
 };
 
-/** Travel documents on the business page: one tile per saved document, soonest to expire first. */
+/** Documents on the business page: one tile per saved document, soonest to expire first. */
 export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: number }) {
   const [viewing, setViewing] = useState<{ title: string; url: string; path: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
@@ -77,7 +78,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
     <section aria-labelledby="doc-tiles-heading" className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="doc-tiles-heading" className="text-lg font-bold">Travel documents</h2>
+          <h2 id="doc-tiles-heading" className="text-lg font-bold">Documents</h2>
           <p className="text-sm text-muted-foreground">Soonest to expire first</p>
         </div>
         <Link href="/documents" className="inline-flex h-10 shrink-0 items-center rounded-lg border bg-card px-4 text-sm font-semibold text-primary hover:bg-muted">
@@ -91,7 +92,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
         <Link href="/documents" className="flex min-h-[8rem] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:max-w-xs">
           <Plus className="h-6 w-6 text-primary" aria-hidden="true" />
           <span className="text-sm font-semibold text-foreground">Add a document</span>
-          <span className="text-xs">Passport, visa, insurance…</span>
+          <span className="text-xs">Passport, ID, driver's license…</span>
         </Link>
       ) : (
         <div className="grid grid-cols-1 gap-3 md:gap-4 sm:grid-cols-2 xl:grid-cols-3">
