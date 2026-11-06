@@ -71,6 +71,34 @@ function sanitize(raw: Record<string, unknown>, hints: OcrHints, today: string):
   };
 }
 
+type ModelInfo = { name?: string; supportedGenerationMethods?: string[] };
+
+/** The newest stable Flash model that can read images, from Google's own model list. Null when none qualifies. */
+export function pickModel(models: ModelInfo[]): string | null {
+  const bad = /(preview|exp|tts|image|lite|live|audio|thinking|latest|computer|robotics|embedding|8b|learnlm|gemma)/i;
+  const ranked = models
+    .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !bad.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map((m) => ({ id: (m.name as string).replace(/^models\//, ""), v: parseFloat((m.name as string).match(/gemini-([\d.]+)-flash/i)?.[1] || "0") }))
+    .sort((a, b) => b.v - a.v || a.id.length - b.id.length);
+  return ranked[0]?.id ?? null;
+}
+
+/** A model that worked (or was found) after the configured one was rejected; kept for the life of the server process. */
+let workingModel: string | null = null;
+/** For tests: forget the remembered model. */
+export function resetWorkingModel() { workingModel = null; }
+
+async function discoverModel(key: string): Promise<string | null> {
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(10000) });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { models?: ModelInfo[] };
+    return pickModel(json.models || []);
+  } catch {
+    return null;
+  }
+}
+
 async function askAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   prompt: string,
@@ -83,17 +111,29 @@ async function askAi(
   const base64 = Buffer.from(image.data instanceof ArrayBuffer ? new Uint8Array(image.data) : image.data).toString("base64");
   // An old OCR_MODEL left over from another provider is ignored
   const override = process.env.OCR_MODEL;
-  const model = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
+  const configured = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
 
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-    method: "POST",
-    headers: { "x-goog-api-key": key, "content-type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
-      generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(maxTokens, 2048), temperature: 0 },
-    }),
-    signal: AbortSignal.timeout(28000),
-  });
+  const call = (model: string) =>
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "content-type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(maxTokens, 2048), temperature: 0 },
+      }),
+      signal: AbortSignal.timeout(28000),
+    });
+
+  let res = await call(workingModel ?? configured);
+  // 404 means Google no longer has that model (they retire old ones). Ask which models exist now and use the newest Flash one.
+  if (res.status === 404) {
+    const found = await discoverModel(key);
+    if (found && found !== (workingModel ?? configured)) {
+      const retry = await call(found);
+      if (retry.ok) workingModel = found;
+      res = retry;
+    }
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -213,7 +253,7 @@ function buildDocumentPrompt(today: string) {
     '- "holder_name": the holder\'s given names and surname in normal capitalisation, or null',
     "Rules:",
     "- NEVER return the date of birth, personal ID / national number or any other field not listed above.",
-    "- For a driver's license use the expiry date (often field 4b or labelled Expires / Valid until), not the issue date (4a) and not the date of birth.",
+    "- For a driver\'s license use the field labelled Document number (not the administration / adm. number), and the expiry date (often field 4b or labelled Expires / Valid until), not the issue date (4a) and not the date of birth.",
     "- For a passport use the printed expiry date; the two machine-readable lines at the bottom can confirm it (YYMMDD after the nationality and birth date).",
     `- Today is ${today}. If a date is unreadable use null. Never guess.`,
   ].join("\n");
