@@ -243,3 +243,21 @@ export function expiryMeter(kind: string, expiry: string | null, today: string):
   if (kind === "passport" && daysLeft >= 0 && (st.level === "soon" || st.level === "critical")) caption += " · renew before travelling";
   return { level: st.level, label: st.label, pct, daysLeft, caption };
 }
+
+/** What the number on a document is called on its tile. */
+export function numberLabel(kind: string): string {
+  switch (kind) {
+    case "visa": return "Application ID";
+    case "ticket": return "Booking ref";
+    case "booking": return "Confirmation";
+    case "insurance": return "Policy No.";
+    default: return "Document No.";
+  }
+}
+
+/** "20 days left" for the tile's expiry line, only when the end is near; null otherwise (and for expired documents). */
+export function tileCountdown(kind: string, expiry: string | null, today: string): string | null {
+  const m = expiryMeter(kind, expiry, today);
+  if (!m || m.daysLeft < 0 || m.daysLeft > 90) return null;
+  return m.daysLeft === 0 ? "today" : `${m.daysLeft} ${m.daysLeft === 1 ? "day" : "days"}`;
+}

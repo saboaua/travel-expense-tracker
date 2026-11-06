@@ -87,3 +87,12 @@ import { expiryMeter } from "../src/lib/documents";
   eq(expiryMeter("passport", "2027-02-02", t)!.caption.includes("renew before travelling"), true, "meter: passport inside the 6-month rule says so");
   eq(expiryMeter("visa", "2026-11-06", t)!.pct, 4, "meter: a nearly expired bar is still visible");
 }
+import { numberLabel, tileCountdown } from "../src/lib/documents";
+{
+  const t = "2026-11-06";
+  eq([numberLabel("visa"), numberLabel("passport"), numberLabel("insurance"), numberLabel("ticket")], ["Application ID", "Document No.", "Policy No.", "Booking ref"], "tile: the number is called what the document calls it");
+  eq(tileCountdown("visa", "2026-11-26", t), "20 days", "tile: a document ending soon shows the countdown");
+  eq(tileCountdown("passport", "2035-08-21", t), null, "tile: a far-off expiry shows no countdown");
+  eq(tileCountdown("visa", "2026-11-05", t), null, "tile: expired documents show no countdown");
+  eq(tileCountdown("visa", "2026-11-07", t), "1 day", "tile: singular day");
+}

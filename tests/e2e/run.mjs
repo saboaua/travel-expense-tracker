@@ -191,6 +191,7 @@ try {
     const text = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
     assert(!text.includes("V12345678") && !text.includes("POL99887766"), "full document number leaked into a tile");
     assert(!text.includes("Trip-only Booking"), "trip document shown on the dashboard tiles");
+    assert(text.includes("(20 days)") && /application id/i.test(text) && /policy no/i.test(text), "tile countdown or number labels missing");
     docs.length = 0;
     await ctx.close();
   });

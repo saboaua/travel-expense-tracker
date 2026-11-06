@@ -11,7 +11,7 @@ import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
-import { currentPassport, documentStatus, kindLabel, maskNumber, renewalAlert, sortForTiles } from "@/lib/documents";
+import { currentPassport, documentStatus, kindLabel, maskNumber, numberLabel, renewalAlert, sortForTiles, tileCountdown } from "@/lib/documents";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
 import { loadPermissions } from "@/lib/access-server";
@@ -197,6 +197,8 @@ export default async function DashboardPage() {
       level: st.level,
       statusLabel: st.label,
       filePath: d.file_path,
+      numberLabel: numberLabel(d.kind),
+      countdown: tileCountdown(d.kind, d.expiry_date, todayISO()),
     };
   });
 
