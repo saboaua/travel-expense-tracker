@@ -170,6 +170,11 @@ try {
     assert(top > 500, "the content area did not scroll");
     assert((await page.evaluate(() => window.scrollY)) === 0, "the whole page scrolled instead of the content area");
     assert(Math.abs((await bottomOf()) - 700) < 1.5, "menu moved while scrolling");
+    // If the browser scrolls the page itself (as iOS can after the camera or keyboard), it is put back and the menu returns
+    await page.evaluate(() => { document.documentElement.style.minHeight = "3000px"; window.scrollTo(0, 400); });
+    await page.waitForTimeout(500);
+    assert((await page.evaluate(() => window.scrollY)) === 0, "page was left scrolled behind the frame");
+    assert(Math.abs((await bottomOf()) - 700) < 1.5, "menu did not come back after the page was scrolled");
     await ctx.close();
   });
 
@@ -296,6 +301,27 @@ try {
     await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "policy.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF") });
     await page.getByRole("dialog", { name: "Where does this go?" }).waitFor();
     await page.getByRole("button", { name: "Save to Document" }).waitFor();
+    await ctx.close();
+  });
+
+  await test("a PDF saved as a document from the dashboard opens the document form with the file", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "policy.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF") });
+    await page.getByRole("button", { name: "Save to Document" }).click();
+    await page.waitForURL((u) => u.pathname === "/documents", { timeout: 60_000 });
+    await page.getByText("policy.pdf").first().waitFor({ timeout: 15_000 });
+    await ctx.close();
+  });
+
+  await test("a photo sent to Documents from the dashboard goes on to the crop step", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "document", name: "license.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/documents?quick=1`);
+    await page.getByText("Crop to the part you need").waitFor({ timeout: 15_000 });
     await ctx.close();
   });
 

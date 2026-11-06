@@ -50,6 +50,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const [scanNote, setScanNote] = useState<string | null>(null);
   const camera = useRef<HTMLInputElement>(null);
   const preparedFile = useRef<File | null>(null);
+  const handedOver = useRef(false);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -87,7 +88,13 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   useEffect(() => {
     if (tripId || new URLSearchParams(window.location.search).get("quick") !== "1") return;
     takeQuickScan("document").then((f) => {
-      if (!f) return;
+      if (f) handedOver.current = true;
+      if (!f) {
+        if (handedOver.current) return; // development runs this effect twice; the first run already took the photo
+        // Opened from Scan / Upload but the photo did not come along: say so instead of showing an empty page
+        setError("We could not carry your photo over. Tap Add document and choose it again.");
+        return;
+      }
       setEditing(null);
       setAdding(true);
       pick(f, true);

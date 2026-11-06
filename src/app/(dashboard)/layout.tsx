@@ -2,6 +2,7 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { ScrollArea } from "@/components/layout/ScrollArea";
 import { OfflineSync } from "@/components/OfflineSync";
+import { ViewportGuard } from "@/components/layout/ViewportGuard";
 
 export default function DashboardLayout({
   children,
@@ -18,6 +19,7 @@ export default function DashboardLayout({
       </ScrollArea>
       <MobileNav />
       <OfflineSync />
+      <ViewportGuard />
     </div>
   );
 }

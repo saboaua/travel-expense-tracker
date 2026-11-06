@@ -10,6 +10,13 @@ const KEY = "quick-scan-v2";
 const LAST_KEY = "scan-last-v1";
 const MAX_AGE_MS = 10 * 60 * 1000;
 
+/**
+ * The photo itself is also kept in memory, which survives moving between pages inside the app and has no size limit.
+ * sessionStorage is the backup for a full page reload; a large photo can be too big for it (about 5 MB), and before
+ * this the hand-off then silently failed and the next page opened empty.
+ */
+let memory: { key: string; file: File; at: number; consumed: boolean; reason: string | null } | null = null;
+
 type Stored = { key: string; name: string; type: string; dataUrl: string; at: number; consumed?: boolean; reason?: string | null };
 
 function toDataUrl(file: File): Promise<string> {
@@ -22,14 +29,15 @@ function toDataUrl(file: File): Promise<string> {
 }
 
 export async function stashQuickScan(file: File, key: string, reason: string | null = null): Promise<boolean> {
+  memory = { key, file, at: Date.now(), consumed: false, reason };
   try {
     const dataUrl = await toDataUrl(file);
     const s: Stored = { key, name: file.name, type: file.type, dataUrl, at: Date.now(), reason };
     sessionStorage.setItem(KEY, JSON.stringify(s));
-    return true;
   } catch {
-    return false; // storage full or blocked: caller falls back to the normal page
+    /* storage full or blocked: the in-memory copy still carries the photo to the next page */
   }
+  return true;
 }
 
 async function toFile(s: Stored): Promise<File> {
@@ -50,6 +58,10 @@ function read(): Stored | null {
 
 /** Returns the waiting photo for this destination (once) or null. */
 export async function takeQuickScan(key: string): Promise<File | null> {
+  if (memory && memory.key === key && !memory.consumed && Date.now() - memory.at <= MAX_AGE_MS) {
+    memory.consumed = true;
+    return memory.file;
+  }
   try {
     const s = read();
     if (!s || s.key !== key || s.consumed) return null;
@@ -62,6 +74,7 @@ export async function takeQuickScan(key: string): Promise<File | null> {
 
 /** The photo and why it was sent here, without taking it. */
 export async function peekQuickScan(key: string): Promise<{ file: File; reason: string | null } | null> {
+  if (memory && memory.key === key && Date.now() - memory.at <= MAX_AGE_MS) return { file: memory.file, reason: memory.reason };
   try {
     const s = read();
     if (!s || s.key !== key) return null;
