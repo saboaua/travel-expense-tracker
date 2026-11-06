@@ -23,11 +23,14 @@ const NOT_A_PHOTO = /(flag|coat[_ ]of[_ ]arms|locator|location[_ ]map|\bmap\b|_m
 export const WIKI_THUMB_STEPS = [20, 40, 60, 120, 250, 330, 500, 960, 1280, 1920, 3840];
 export const WIKI_THUMB_SIZE = 1280;
 
-/** Only Wikimedia's picture server may be fetched through our photo route (so it cannot be used to reach anything else). */
+/** Wikipedia now hands out thumbnails from thumb.wikimedia.org (they used to come from upload.wikimedia.org); both are Wikimedia's own picture servers. */
+export const WIKIMEDIA_PICTURE_HOSTS = ["upload.wikimedia.org", "thumb.wikimedia.org"];
+
+/** Only Wikimedia's picture servers may be fetched through our photo route (so it cannot be used to reach anything else). */
 export function isAllowedPhotoUrl(raw: string | null | undefined): boolean {
   try {
     const u = new URL(String(raw));
-    return u.protocol === "https:" && u.hostname === "upload.wikimedia.org" && !u.username && !u.password && u.port === "";
+    return u.protocol === "https:" && WIKIMEDIA_PICTURE_HOSTS.includes(u.hostname) && !u.username && !u.password && u.port === "";
   } catch {
     return false;
   }

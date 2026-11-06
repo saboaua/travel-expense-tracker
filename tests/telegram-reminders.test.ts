@@ -75,6 +75,8 @@ async function main() {
   const mk = (id: string, user: string, name: string, s: number) => ({ id, user_id: user, name, destination: "X", start_date: addDaysISO(today, s), end_date: addDaysISO(today, s + 2), currency: "USD", status: "active" });
   fake.table("trips").push(mk("t7", A, "Seven", 7), mk("t1", B, "One", 1), mk("t3", A, "Three", 3), mk("t7n", NOLINK, "NoTelegram", 7), mk("a1", ADMIN, "AdminSeven", 5), mk("a2", ADMIN, "AdminNow", -1), mk("b1", ADMIN2, "OtherAdminTrip", 5), { ...mk("t7d", B, "Done", 7), status: "completed" });
   fake.table("telegram_notify_prefs").push({ user_id: B, enabled: true, trip_reminders: false, admin_alerts: true, quiet_start: 22, quiet_end: 7, tz: "America/Aruba" });
+  // the daily summary is sent at the real clock time; these tests are not about quiet hours (22:00 to 07:00 Aruba), so the admins have none and the tests pass at any time of day
+  for (const id of [ADMIN, ADMIN2]) fake.table("telegram_notify_prefs").push({ user_id: id, enabled: true, trip_reminders: true, admin_alerts: true, quiet_start: 0, quiet_end: 0, tz: "America/Aruba" });
   fake.table("expenses").push(
     { id: "e1", user_id: A, trip_id: "t7", created_at: "2026-11-04T10:00:00.000Z" },
     { id: "e2", user_id: A, trip_id: "t7", created_at: "2026-11-04T20:00:00.000Z" },

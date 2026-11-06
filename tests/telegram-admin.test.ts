@@ -56,6 +56,8 @@ async function main() {
     { id: USER, role: "user", email: "pat@x.com", full_name: "Pat", telegram_id: 300 },
     { id: OTHERADMIN, role: "admin", email: "root@x.com", full_name: "Root", telegram_id: null }
   );
+  // these tests are not about quiet hours (22:00 to 07:00 Aruba), so nobody has any: they pass at any time of day
+  for (const id of [ADMIN, ADMIN2, USER]) fake.table("telegram_notify_prefs").push({ user_id: id, enabled: true, trip_reminders: true, admin_alerts: true, quiet_start: 0, quiet_end: 0, tz: "America/Aruba" });
   fake.table("roles").push({ key: "assistant", label: "Assistant", permissions: [], known_features: [], is_system: true });
   await fake.listen(3197);
   const db = createClient("http://127.0.0.1:3197", SERVICE_KEY, { auth: { persistSession: false } });

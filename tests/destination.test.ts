@@ -14,3 +14,10 @@ eq(isAllowedPhotoUrl("https://upload.wikimedia.org:8443/x.jpg"), false, "other p
 eq(isAllowedPhotoUrl("//upload.wikimedia.org/x.jpg"), false, "not an absolute address");
 eq(isAllowedPhotoUrl(null), false, "missing refused");
 eq(photoProxyUrl(ok).startsWith("/api/destination-photo?u=https%3A%2F%2Fupload.wikimedia.org"), true, "proxy address encodes the original");
+
+const thumb = "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/02/Panama.jpeg/1280px-Panama.jpeg?utm_source=en.wikipedia.org&utm_campaign=api&utm_content=thumbnail";
+eq(isAllowedPhotoUrl(thumb), true, "thumb.wikimedia.org (where Wikipedia now serves thumbnails) is accepted");
+eq(isAllowedPhotoUrl("https://thumb.wikimedia.org.evil.example/x.png"), false, "look-alike thumb host refused");
+import { buildCsp } from "../src/lib/csp";
+const csp = buildCsp({ nonce: "x", supabaseUrl: "https://abc.supabase.co" });
+eq(/img-src[^;]*thumb\.wikimedia\.org/.test(csp) && /img-src[^;]*upload\.wikimedia\.org/.test(csp), true, "page policy lets images load from both Wikimedia picture hosts");
