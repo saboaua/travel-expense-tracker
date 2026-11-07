@@ -51,6 +51,8 @@ const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a)
   eq(kept(sw) !== undefined && kept(sw) === kept(warm), true, "service worker and app keep the same trip pages");
   const re = new RegExp((kept(warm) as string).slice(1, -1));
   const id = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
-  eq([re.test("/trips"), re.test(`/trips/${id}`), re.test(`/trips/${id}/expenses/${id}`), re.test(`/trips/${id}/report`), re.test("/trips/new"), re.test("/tripsx")], [true, true, true, false, false, false], "only the list, a trip and an expense page are kept");
+  const yes = ["/trips", "/trips/new", `/trips/${id}`, `/trips/${id}/edit`, `/trips/${id}/add-expense`, `/trips/${id}/expenses/${id}`, "/personal/projects", "/personal/projects/new", `/personal/projects/${id}`, `/personal/projects/${id}/edit`, `/personal/projects/${id}/expense`, `/personal/projects/${id}/expense/${id}`, "/personal/travel", `/personal/travel/${id}/expense/${id}`, "/personal/groceries", "/personal/groceries/new", "/personal/groceries/prices", `/personal/groceries/${id}`, `/personal/groceries/${id}/edit`];
+  const no = [`/trips/${id}/report`, "/tripsx", `/trips/${id}/x`, "/personal/groceries/zzz", "/admin", "/personal/projects/new/x"];
+  eq([yes.filter((p) => !re.test(p)), no.filter((p) => re.test(p))], [[], []], "the trip, project and grocery pages are kept, and nothing else");
   eq(sw.includes(`const PAGES = "${(store.match(/PAGES_CACHE = "([^"]+)"/) || [])[1]}"`), true, "service worker and app use the same page cache name");
 })();

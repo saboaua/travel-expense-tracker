@@ -21,7 +21,11 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { PERSONAL_EXPENSE_COLS } from "@/lib/columns";
+import { fetchProjectBundle, projectKey, type ProjectBundle } from "@/lib/offline-personal";
+import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
+import { browserOutbox } from "@/lib/outbox";
+import { deleteRow, isRowSave, makeRowApi, saveRow, waitingParents } from "@/lib/row-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 
 export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: PersonalKind; projectId: string; expenseId?: string }) {
@@ -47,31 +51,45 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   // When editing, keep the saved exchange rate until the currency is changed on purpose
   const [rateLocked, setRateLocked] = useState(!!expenseId);
   const [projectName, setProjectName] = useState("");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const { rate, setRate, source } = useUsdRate(currency, !rateLocked);
 
   // Default currency = the project's budget currency; load the expense when editing
   useEffect(() => {
-    const supabase = createClient();
-    supabase.from("personal_projects").select("name, currency").eq("id", projectId).single().then(({ data }) => {
-      if (data?.currency && !expenseId) setCurrency(data.currency);
-      if (data?.name) setProjectName(data.name);
-    });
-    if (!expenseId) return;
-    supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("id", expenseId).eq("project_id", projectId).single().then(async ({ data }) => {
-      if (!data) return setError("Expense not found");
+    (async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession(); // read from the phone, so it works offline
+      const uid = session?.user.id;
+      if (!uid) return;
+      const res = await loadWithCache<ProjectBundle>(browserKv, projectKey(uid, projectId), () => fetchProjectBundle(supabase, projectId));
+      const waiting = await browserOutbox.list().catch(() => []);
+      const waitingProject = waiting.find((i) => i.id === projectId && isRowSave(i) && i.table === "personal_projects");
+      const project = { ...(res.ok ? res.data.project : {}), ...(waitingProject && isRowSave(waitingProject) ? waitingProject.row : {}) } as Partial<ProjectBundle["project"]>;
+      setSavedAt(res.ok && res.fromCache ? res.savedAt : null);
+      if (project.currency && !expenseId) setCurrency(project.currency);
+      if (project.name) setProjectName(project.name);
+      if (!expenseId) return;
+      const w = waiting.find((i) => i.id === expenseId && isRowSave(i) && i.table === "personal_expenses");
+      const saved = res.ok ? res.data.expenses.find((x) => x.id === expenseId) : undefined;
+      const data = { ...(saved ?? {}), ...(w && isRowSave(w) ? { ...w.row, ...(w.path !== undefined ? { receipt_path: w.path } : {}) } : {}) } as Partial<ProjectBundle["expenses"][number]>;
+      if (!saved && !w) return setError("Expense not found");
       setMerchant(data.merchant || "");
-      setAmount(String(data.amount));
-      setCurrency(data.currency);
-      setRate(String(data.exchange_rate));
-      setCategory(data.category);
-      setDate(data.expense_date);
+      setAmount(String(data.amount ?? ""));
+      setCurrency(data.currency ?? "USD");
+      setRate(String(data.exchange_rate ?? 1));
+      setCategory(data.category ?? meta.categories[0]);
+      setDate(data.expense_date ?? todayISO());
       setNotes(data.notes || "");
-      setExistingPath(data.receipt_path);
+      setExistingPath(data.receipt_path ?? null);
       if (data.receipt_path) {
-        const { data: signed } = await supabase.storage.from("receipts").createSignedUrl(data.receipt_path, 3600);
-        if (signed?.signedUrl) setPreview(signed.signedUrl);
+        const kept = await browserBlobs.get(`receipts/${data.receipt_path}`).catch(() => null);
+        if (kept) setPreview(URL.createObjectURL(kept));
+        else if (navigator.onLine) {
+          const { data: signed } = await supabase.storage.from("receipts").createSignedUrl(data.receipt_path, 3600);
+          if (signed?.signedUrl) setPreview(signed.signedUrl);
+        }
       }
-    });
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads when the project or expense changes; the client and state setters are stable
   }, [projectId, expenseId]);
 
@@ -122,17 +140,9 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      let receiptPath = existingPath;
-      if (file) {
-        const path = `${user.id}/personal/${projectId}/${Date.now()}.jpg`;
-        const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { cacheControl: "3600", upsert: false });
-        if (upErr) throw upErr;
-        if (existingPath) await supabase.storage.from("receipts").remove([existingPath]).catch(() => {});
-        receiptPath = path;
-      }
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) throw new Error("Sign in again to save.");
 
       const row = {
         merchant: merchant.trim() || null,
@@ -143,13 +153,19 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
         category,
         expense_date: date,
         notes: notes.trim() || null,
-        receipt_path: receiptPath,
       };
-      const res = expenseId
-        ? await supabase.from("personal_expenses").update(row).eq("id", expenseId)
-        : await supabase.from("personal_expenses").insert({ ...row, user_id: user.id, project_id: projectId });
-      if (res.error) throw res.error;
-      router.push(back);
+      const waitingList = await browserOutbox.list().catch(() => []);
+      const parents = await waitingParents(browserOutbox, [projectId]);
+      await saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "personal_expenses", id: expenseId,
+        row: expenseId ? row : { ...row, project_id: projectId },
+        file, fileColumn: "receipt_path", bucket: "receipts", folder: `personal/${projectId}`, currentPath: existingPath,
+        dependsOn: parents, waiting: waitingList.find((i) => i.id === expenseId) ?? null,
+        keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
+        label: row.merchant || row.category, summary: `${meta.label} expense · ${expenseId ? "changed" : "new"}`,
+      });
+      // A project that is still waiting has no page of its own yet
+      router.push(parents.length ? meta.path : back);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -160,10 +176,18 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   const confirm = useConfirm();
   const remove = async () => {
     if (!expenseId || !(await confirm({ title: "Delete expense?", message: "Delete this expense?", destructive: true }))) return;
-    const supabase = createClient();
-    if (existingPath) await supabase.storage.from("receipts").remove([existingPath]).catch(() => {});
-    const { error } = await supabase.from("personal_expenses").delete().eq("id", expenseId);
-    if (error) return setError(error.message);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete.");
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_expenses", id: expenseId,
+        bucket: "receipts", paths: [existingPath], waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === expenseId) ?? null,
+        label: merchant || "Expense", summary: `${meta.label} expense · delete`,
+      });
+    } catch (err) {
+      return setError(err instanceof Error ? err.message : "Could not delete.");
+    }
     router.push(back);
     router.refresh();
   };
@@ -184,6 +208,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
           <CardDescription>Take a photo of the receipt and we will read merchant, amount and date for you.</CardDescription>
         </CardHeader>
         <CardContent>
+          <OfflineNotice savedAt={savedAt} writable />
           <form onSubmit={submit} className="space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>

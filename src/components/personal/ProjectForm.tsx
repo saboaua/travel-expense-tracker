@@ -12,7 +12,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { useCurrencies } from "@/lib/use-currencies";
-import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
+import { fetchProjectBundle, projectKey, type ProjectBundle } from "@/lib/offline-personal";
+import { browserKv, loadWithCache } from "@/lib/offline-store";
+import { browserOutbox } from "@/lib/outbox";
+import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 
 export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId?: string }) {
@@ -29,25 +33,30 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
   const [status, setStatus] = useState<"active" | "completed">("active");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!projectId) return;
-    createClient()
-      .from("personal_projects")
-      .select(PERSONAL_PROJECT_COLS)
-      .eq("id", projectId)
-      .single()
-      .then(({ data }) => {
-        if (!data) return;
-        setName(data.name);
-        setDestination(data.destination || "");
-        setDescription(data.description || "");
-        setStartDate(data.start_date || "");
-        setEndDate(data.end_date || "");
-        setBudget(data.budget != null ? String(data.budget) : "");
-        setCurrency(data.currency);
-        setStatus(data.status);
-      });
+    (async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession(); // read from the phone, so it works offline
+      const uid = session?.user.id;
+      if (!uid) return setError("Sign in again to open this.");
+      const res = await loadWithCache<ProjectBundle>(browserKv, projectKey(uid, projectId), () => fetchProjectBundle(supabase, projectId));
+      const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === projectId && i.userId === uid);
+      const waitingRow = waiting && isRowSave(waiting) && waiting.table === "personal_projects" ? waiting.row : null;
+      if (!res.ok && !waitingRow) return setError("Could not open this. Open it once while online.");
+      setSavedAt(res.ok && res.fromCache ? res.savedAt : null);
+      const data = { ...(res.ok ? res.data.project : {}), ...(waitingRow ?? {}) } as Partial<ProjectBundle["project"]>;
+      setName(data.name ?? "");
+      setDestination(data.destination || "");
+      setDescription(data.description || "");
+      setStartDate(data.start_date || "");
+      setEndDate(data.end_date || "");
+      setBudget(data.budget != null ? String(data.budget) : "");
+      setCurrency(data.currency ?? "USD");
+      setStatus(data.status ?? "active");
+    })();
   }, [projectId]);
 
   const submit = async (e: React.FormEvent) => {
@@ -57,10 +66,9 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
     setSaving(true);
     try {
       const supabase = createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) throw new Error("Sign in again to save.");
 
       const row = {
         name: name.trim(),
@@ -72,19 +80,15 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
         currency,
         status,
       };
+      const api = makeRowApi(supabase);
 
       if (projectId) {
-        const { error } = await supabase.from("personal_projects").update(row).eq("id", projectId);
-        if (error) throw error;
+        await saveRow({ api, store: browserOutbox, userId: uid, table: "personal_projects", id: projectId, row, waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === projectId) ?? null, label: row.name, summary: `${meta.label} · changed` });
         router.push(`${meta.path}/${projectId}`);
       } else {
-        const { data, error } = await supabase
-          .from("personal_projects")
-          .insert({ ...row, user_id: user.id, kind })
-          .select("id")
-          .single();
-        if (error) throw error;
-        router.push(`${meta.path}/${data.id}`);
+        const saved = await saveRow({ api, store: browserOutbox, userId: uid, table: "personal_projects", row: { ...row, kind }, label: row.name, summary: `${meta.label} · new` });
+        // A project that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
+        router.push(saved.queued ? meta.path : `${meta.path}/${saved.id}`);
       }
       router.refresh();
     } catch (err: unknown) {
@@ -103,6 +107,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
           <CardTitle>{projectId ? `Edit ${meta.noun}` : `New ${meta.noun}`}</CardTitle>
         </CardHeader>
         <CardContent>
+          <OfflineNotice savedAt={savedAt} writable />
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>

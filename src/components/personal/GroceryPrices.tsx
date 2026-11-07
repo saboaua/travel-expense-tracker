@@ -2,51 +2,28 @@
 
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowDown, ArrowLeft, ArrowUp, Minus, Plus, Search } from "lucide-react";
 import { Sparkline } from "@/components/personal/Sparkline";
 import { buildTracker, type TrackedItem, type TrackerRow } from "@/lib/personal/grocery";
-import { fetchAll } from "@/lib/personal/fetch-all";
+import { fetchPrices, pricesKey } from "@/lib/offline-grocery";
+import { useCachedQuery } from "@/lib/use-cached-query";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
 
 type Sort = "increase" | "recent" | "purchases" | "name";
 
 export function GroceryPrices() {
-  const [rows, setRows] = useState<TrackerRow[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data, loading, error, savedAt } = useCachedQuery<TrackerRow[]>((uid) => pricesKey(uid), (sb) => fetchPrices(sb), []);
+  const rows = useMemo(() => data ?? [], [data]);
   const [query, setQuery] = useState("");
   const [currency, setCurrency] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("increase");
   const [open, setOpen] = useState<string | null>(null);
-
-  useEffect(() => {
-    const supabase = createClient();
-    fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
-      supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").order("created_at", { ascending: false }).range(a, b)
-    )
-      .then((data) =>
-        setRows(
-          data.map((d) => ({
-            name: d.name,
-            normalized_name: d.normalized_name,
-            category: d.category,
-            unit_price: Number(d.unit_price),
-            quantity: Number(d.quantity),
-            unit: d.unit ?? null,
-            line_total: Number(d.line_total),
-            receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
-          }))
-        )
-      )
-      .catch((e) => setError(/relation|schema cache/i.test(e.message) ? "Personal tables not found. Run supabase/migration_personal.sql in Supabase." : e.message))
-      .finally(() => setLoading(false));
-  }, []);
 
   const tracked = useMemo(() => buildTracker(rows), [rows]);
   const currencies = useMemo(() => [...new Set(tracked.map((t) => t.currency))], [tracked]);
@@ -86,6 +63,7 @@ export function GroceryPrices() {
         <Link href="/personal/groceries/new"><Button className="gap-2"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
       </div>
 
+      <OfflineNotice savedAt={savedAt} />
       {error && <Alert>{error}</Alert>}
 
       <div className="flex flex-col gap-2 sm:flex-row">

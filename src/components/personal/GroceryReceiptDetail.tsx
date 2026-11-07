@@ -1,62 +1,75 @@
 "use client";
 
 import { useConfirm } from "@/components/ui/confirm";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, CloudOff, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { GROCERY_RECEIPT_COLS } from "@/lib/columns";
-
-type Receipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null };
-type Item = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null };
+import { fetchReceiptBundle, itemsWithWaiting, receiptKey, type ReceiptBundle } from "@/lib/offline-grocery";
+import { useCachedQuery } from "@/lib/use-cached-query";
+import { useOutbox } from "@/lib/use-outbox";
+import { applyRows, deleteRow, makeRowApi } from "@/lib/row-outbox";
+import { browserBlobs } from "@/lib/offline-store";
+import { browserOutbox } from "@/lib/outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 export function GroceryReceiptDetail({ id }: { id: string }) {
   const router = useRouter();
-  const [receipt, setReceipt] = useState<Receipt | null>(null);
-  const [items, setItems] = useState<Item[]>([]);
+  const { data: bundle, loading, error: loadError, savedAt, userId } = useCachedQuery<ReceiptBundle>((uid) => receiptKey(uid, id), (sb) => fetchReceiptBundle(sb, id), [id]);
+  const { items: pending } = useOutbox(userId);
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const receipt = useMemo(() => (bundle ? applyRows([bundle.receipt], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) }))[0] ?? null : null), [bundle, pending]);
+  const items = useMemo(() => itemsWithWaiting(id, bundle?.items ?? [], pending).map((x) => ({ ...x, quantity: Number(x.quantity), unit_price: Number(x.unit_price), line_total: Number(x.line_total) })), [bundle, pending, id]);
+  const waiting = pending.some((i) => i.id === id);
+  const path = receipt?.receipt_path ?? null;
 
   useEffect(() => {
-    const supabase = createClient();
+    if (!path) { setImage(null); return; }
+    let made: string | null = null;
+    let live = true;
     (async () => {
-      const [r, i] = await Promise.all([
-        supabase.from("grocery_receipts").select(GROCERY_RECEIPT_COLS).eq("id", id).single(),
-        supabase.from("grocery_items").select("id, name, category, quantity, unit_price, unit, line_total").eq("receipt_id", id).order("created_at"),
-      ]);
-      if (!r.data) return setError(r.error?.message || "Receipt not found");
-      setReceipt({ ...r.data, total: Number(r.data.total) });
-      setItems((i.data || []).map((x) => ({ ...x, quantity: Number(x.quantity), unit_price: Number(x.unit_price), line_total: Number(x.line_total) })));
-      if (r.data.receipt_path) {
-        const { data } = await supabase.storage.from("receipts").createSignedUrl(r.data.receipt_path, 3600);
-        if (data?.signedUrl) setImage(data.signedUrl);
-      }
+      const kept = await browserBlobs.get(`receipts/${path}`).catch(() => null);
+      if (kept) { made = URL.createObjectURL(kept); if (live) setImage(made); return; }
+      if (!navigator.onLine) return;
+      const { data } = await createClient().storage.from("receipts").createSignedUrl(path, 3600);
+      if (live && data?.signedUrl) setImage(data.signedUrl);
     })();
-  }, [id]);
+    return () => { live = false; if (made) URL.revokeObjectURL(made); };
+  }, [path]);
 
   const confirm = useConfirm();
   const remove = async () => {
     if (!receipt || !(await confirm({ title: "Delete receipt?", message: `Delete the ${receipt.store} receipt and its ${items.length} items?`, destructive: true }))) return;
-    const supabase = createClient();
-    if (receipt.receipt_path) await supabase.storage.from("receipts").remove([receipt.receipt_path]).catch(() => {});
-    const { error } = await supabase.from("grocery_receipts").delete().eq("id", id);
-    if (error) return setError(error.message);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete.");
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "grocery_receipts", id, bucket: "receipts", paths: [bundle?.receipt.receipt_path],
+        waiting: pending.find((i) => i.id === id) ?? null, label: receipt.store, summary: "Grocery receipt · delete",
+      });
+    } catch (err) {
+      return setError(err instanceof Error ? err.message : "Could not delete.");
+    }
     router.push("/personal/groceries");
     router.refresh();
   };
 
-  if (error) return <div className="p-8 text-sm text-red-600">{error}</div>;
-  if (!receipt) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
+  if (error || (loadError && !receipt)) return <div className="p-8 text-sm text-red-600">{error || loadError}</div>;
+  if (loading || !receipt) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   const fmt = (n: number) => formatCurrency(n, receipt.currency);
   const itemsSum = items.reduce((s, i) => s + i.line_total, 0);
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 pb-28 md:p-8">
       <Link href="/personal/groceries" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Groceries</Link>
+      <OfflineNotice savedAt={savedAt} writable />
+      {waiting && <p className="flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
       <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">{receipt.store}</h1>

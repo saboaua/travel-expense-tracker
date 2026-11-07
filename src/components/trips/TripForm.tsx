@@ -13,7 +13,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { ArrowLeft, FileText, Trash2, X } from "lucide-react";
 import { DOC_KINDS, type DocKind } from "@/lib/documents";
-import { DOC_ACCEPT, DOC_BUCKET, saveTravelDocument } from "@/lib/document-upload";
+import { DOC_ACCEPT, DOC_BUCKET } from "@/lib/document-upload";
+import { makeDocumentApi, saveDocument } from "@/lib/document-outbox";
+import { deleteRow, isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
+import { browserOutbox } from "@/lib/outbox";
+import { tripKey } from "@/lib/offline-data";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { useTravelCategories } from "@/lib/use-categories";
 import { useCurrencies } from "@/lib/use-currencies";
 import { TRIP_COLS } from "@/lib/columns";
@@ -40,28 +46,37 @@ export function TripForm({ tripId }: { tripId?: string }) {
   // Documents picked while creating a trip are uploaded right after the trip is saved
   const [pendingDocs, setPendingDocs] = useState<{ id: string; kind: DocKind; file: File }[]>([]);
   const [docKind, setDocKind] = useState<DocKind>("ticket");
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   useEffect(() => {
     if (!tripId) return;
-    createClient()
-      .from("trips")
-      .select(TRIP_COLS)
-      .eq("id", tripId)
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) setError(error?.message || "Trip not found");
-        else {
-          setName(data.name || "");
-          setDestination(data.destination || "");
-          setCategory(data.category || "");
-          setStartDate(data.start_date || "");
-          setEndDate(data.end_date || "");
-          setCurrency(data.currency || "USD");
-          setStatus(data.status === "completed" ? "completed" : "active");
-          setNotes(data.notes || "");
-        }
+    (async () => {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession(); // read from the phone, so it works offline
+      const uid = session?.user.id;
+      if (!uid) { setError("Sign in again to open this trip."); setLoaded(true); return; }
+      type Row = { name: string; destination: string | null; category: string | null; start_date: string; end_date: string | null; currency: string | null; status: string; notes: string | null };
+      const res = await loadWithCache<Row>(browserKv, tripKey(uid, tripId), () => supabase.from("trips").select(TRIP_COLS).eq("id", tripId).single() as unknown as PromiseLike<{ data: Row | null; error: unknown }>);
+      // A trip created or changed offline shows as it will be saved
+      const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId && i.userId === uid);
+      const waitingRow = waiting && isRowSave(waiting) && waiting.table === "trips" ? waiting.row : null;
+      if (!res.ok && !waitingRow) {
+        setError((res.error as { message?: string } | null)?.message || "Trip not found");
         setLoaded(true);
-      });
+        return;
+      }
+      setSavedAt(res.ok && res.fromCache ? res.savedAt : null);
+      const data = { ...(res.ok ? res.data : {}), ...(waitingRow ?? {}) } as Partial<Row>;
+      setName(data.name || "");
+      setDestination(data.destination || "");
+      setCategory(data.category || "");
+      setStartDate(data.start_date || "");
+      setEndDate(data.end_date || "");
+      setCurrency(data.currency || "USD");
+      setStatus(data.status === "completed" ? "completed" : "active");
+      setNotes(data.notes || "");
+      setLoaded(true);
+    })();
   }, [tripId]);
 
   // New trips default to the first admin-defined travel category
@@ -79,6 +94,9 @@ export function TripForm({ tripId }: { tripId?: string }) {
     setSaving(true);
     try {
       const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) throw new Error("Sign in again to save the trip.");
       const row = {
         name: name.trim(),
         destination: destination.trim() || null,
@@ -88,27 +106,29 @@ export function TripForm({ tripId }: { tripId?: string }) {
         currency,
         notes: notes.trim() || null,
       };
+      const api = makeRowApi(supabase);
+      const waiting = tripId ? (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId) ?? null : null;
 
       if (tripId) {
-        const { error } = await supabase.from("trips").update({ ...row, status, updated_at: new Date().toISOString() }).eq("id", tripId);
-        if (error) throw error;
+        await saveRow({ api, store: browserOutbox, userId: uid, table: "trips", id: tripId, row: { ...row, status, updated_at: new Date().toISOString() }, waiting, label: row.name, summary: "Trip · changed" });
         router.push(`/trips/${tripId}`);
       } else {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) throw new Error("Not authenticated");
-        const { data, error } = await supabase.from("trips").insert({ ...row, user_id: user.id, status: "active" }).select("id").single();
-        if (error) throw error;
+        const saved = await saveRow({ api, store: browserOutbox, userId: uid, table: "trips", row: { ...row, status: "active" }, label: row.name, summary: "Trip · new" });
         let failed = 0;
         for (const d of pendingDocs) {
           try {
-            await saveTravelDocument(supabase, user.id, { tripId: data.id, kind: d.kind, title: d.file.name.replace(/\.[^.]+$/, ""), file: d.file });
+            await saveDocument({
+              api: makeDocumentApi(supabase), store: browserOutbox, userId: uid, doc: null, tripId: saved.id,
+              fields: { kind: d.kind, title: d.file.name.replace(/\.[^.]+$/, "") }, file: d.file,
+              dependsOn: saved.queued ? [saved.id] : [],
+              keep: (path, blob) => browserBlobs.put(`${DOC_BUCKET}/${path}`, blob),
+            });
           } catch {
             failed++;
           }
         }
-        router.push(`/trips/${data.id}${failed ? `?docs_failed=${failed}` : ""}`);
+        // A trip that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
+        router.push(saved.queued ? "/trips" : `/trips/${saved.id}${failed ? `?docs_failed=${failed}` : ""}`);
       }
       router.refresh();
     } catch (err: unknown) {
@@ -124,17 +144,17 @@ export function TripForm({ tripId }: { tripId?: string }) {
     setSaving(true);
     try {
       const supabase = createClient();
-      // Remove the stored receipt images too, so no orphaned files are left behind
-      const { data: rows } = await supabase.from("expenses").select("receipt_path").eq("trip_id", tripId);
-      const paths = (rows || []).map((r) => r.receipt_path).filter(Boolean) as string[];
-      for (let i = 0; i < paths.length; i += 100) {
-        await supabase.storage.from("receipts").remove(paths.slice(i, i + 100)).catch(() => {});
-      }
-      const { data: docRows } = await supabase.from("travel_documents").select("file_path").eq("trip_id", tripId);
-      const docPaths = (docRows || []).map((r) => r.file_path).filter(Boolean) as string[];
-      if (docPaths.length) await supabase.storage.from(DOC_BUCKET).remove(docPaths).catch(() => {});
-      const { error } = await supabase.from("trips").delete().eq("id", tripId);
-      if (error) throw error;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete the trip.");
+      // The receipt photos and documents that go with the trip are looked up and removed when the delete is sent
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "trips", id: tripId, label: name || "Trip", summary: "Trip · delete",
+        sweep: [
+          { table: "expenses", fk: "trip_id", column: "receipt_path", bucket: "receipts" },
+          { table: "travel_documents", fk: "trip_id", column: "file_path", bucket: DOC_BUCKET },
+        ],
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId) ?? null,
+      });
       router.push("/trips");
       router.refresh();
     } catch (err: unknown) {
@@ -156,6 +176,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
           <CardDescription>{editing ? "Change the name, destination, dates, currency or status" : "Create a business trip to track its expenses"}</CardDescription>
         </CardHeader>
         <CardContent>
+          <OfflineNotice savedAt={savedAt} writable />
           {!loaded ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (

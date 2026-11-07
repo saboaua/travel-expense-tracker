@@ -383,6 +383,24 @@ try {
       assert((await page.getByText("Waiting to sync").count()) >= 1, "the changed expense shows as waiting");
       assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Trip Cafe", "nothing was sent while offline");
 
+      // A trip, a home project and a grocery receipt can be created with no connection
+      await page.goto(`${BASE}/trips/new`);
+      await page.locator("#name").fill("Offline Trip");
+      await page.locator("#startDate").fill(today);
+      await page.getByRole("button", { name: "Create trip" }).click();
+      await page.getByText("Offline Trip").first().waitFor({ timeout: 30000 });
+      assert((await page.getByText("Waiting to sync").count()) >= 1, "the new trip shows as waiting");
+      await page.goto(`${BASE}/personal/projects/new`);
+      await page.getByPlaceholder("Kitchen renovation").fill("Offline Kitchen");
+      await page.getByRole("button", { name: "Create project" }).click();
+      await page.getByText("Offline Kitchen").first().waitFor({ timeout: 30000 });
+      await page.goto(`${BASE}/personal/groceries/new`);
+      await page.getByText("Store", { exact: true }).locator("xpath=following::input[1]").fill("Offline Mart");
+      await page.getByText("Receipt total").locator("xpath=following::input[1]").fill("21.50");
+      await page.getByRole("button", { name: "Save receipt" }).click();
+      await page.getByText("Offline Mart").first().waitFor({ timeout: 15000 }).catch(async () => { throw new Error("no grocery row at " + page.url() + ": " + (await page.locator("body").innerText()).slice(0, 700)); });
+      assert(!fake.table("trips").some((t) => t.name === "Offline Trip") && !fake.table("personal_projects").some((t) => t.name === "Offline Kitchen"), "nothing was sent while offline");
+
       // A page that was never saved gives a small page that leads to the saved ones
       await page.goto(`${BASE}/reports`);
       await page.getByRole("heading", { name: "You are offline" }).waitFor();
@@ -396,6 +414,9 @@ try {
       await page.waitForFunction(() => !document.body.innerText.includes("Waiting to sync"), null, { timeout: 60000 });
       assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
       assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Edited Cafe", "the expense changed offline is saved once back online");
+      assert(fake.table("trips").some((t) => t.name === "Offline Trip" && t.user_id === PAT), "the trip created offline is saved once back online");
+      assert(fake.table("personal_projects").some((t) => t.name === "Offline Kitchen" && t.user_id === PAT && t.kind === "home_project"), "the project created offline is saved once back online");
+      assert(fake.table("grocery_receipts").some((t) => t.store === "Offline Mart" && Number(t.total) === 21.5), "the grocery receipt created offline is saved once back online");
       assert(fake.table("travel_documents").some((d) => d.title === "Offline Ticket" && d.user_id === PAT), "the document added offline is saved once back online");
       await page.getByRole("button", { name: /Sign out/ }).first().click().catch(async () => {
         await page.getByRole("button", { name: /menu/i }).first().click();

@@ -4,13 +4,16 @@ import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus, TrendingUp, ShoppingCart } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, CloudOff, Plus, TrendingUp, ShoppingCart } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
-import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ItemLite, type ReceiptLite } from "@/lib/personal/grocery";
-import { fetchAll } from "@/lib/personal/fetch-all";
+import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
+import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
+import { useCachedQuery } from "@/lib/use-cached-query";
+import { useOutbox } from "@/lib/use-outbox";
+import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 
 type Receipt = ReceiptLite & { store: string };
@@ -22,43 +25,41 @@ function shift(m: string, delta: number) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
-export function GroceryOverview() {
-  const [receipts, setReceipts] = useState<Receipt[]>([]);
-  const [items, setItems] = useState<ItemLite[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [currency, setCurrency] = useState<string | null>(null);
-  const [month, setMonth] = useState(monthOf(todayISO()));
+function ReceiptRow({ id, unsent, children }: { id: string; unsent: boolean; children: React.ReactNode }) {
+  return unsent
+    ? <div className="flex items-center justify-between rounded-xl border p-3">{children}</div>
+    : <Link href={`/personal/groceries/${id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
+}
 
+export function GroceryOverview() {
+  const today = todayISO();
+  const { data, loading, error, savedAt, userId } = useCachedQuery<Overview>((uid) => overviewKey(uid), (sb) => fetchOverview(sb, today), []);
+  const { items: pending } = useOutbox(userId);
+  const [picked, setPicked] = useState<string | null>(null);
+  const [month, setMonth] = useState(monthOf(today));
+  const [monthSet, setMonthSet] = useState(false);
+
+  const receipts = useMemo(
+    () => applyRows(data?.receipts ?? [], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) })) as Receipt[],
+    [data, pending]
+  );
+  const items = useMemo(() => overviewItemsWithWaiting(data?.items ?? [], pending), [data, pending]);
+  const waitingReceipts = useMemo(() => waitingRowIds(pending, "grocery_receipts"), [pending]);
+  // A receipt that has not reached the server has no page of its own yet
+  const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "grocery_receipts" && i.isNew).map((i) => i.id)), [pending]);
+  // Start on the month of the latest receipt, and on the most used currency
+  const mostUsed = useMemo(() => {
+    const counts = new Map<string, number>();
+    receipts.forEach((x) => counts.set(x.currency, (counts.get(x.currency) || 0) + 1));
+    return [...counts.entries()].sort((p, q) => q[1] - p[1])[0]?.[0] ?? null;
+  }, [receipts]);
+  const currency = picked ?? mostUsed;
+  const setCurrency = setPicked;
   useEffect(() => {
-    const supabase = createClient();
-    // Last 14 months are plenty for monthly comparison and keep the page quick
-    const from = `${shift(monthOf(todayISO()), -13)}-01`;
-    (async () => {
-      try {
-        const [r, i] = await Promise.all([
-          fetchAll<Receipt>((a, b) => supabase.from("grocery_receipts").select("id, store, purchase_date, total, currency").gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b)),
-          fetchAll<ItemLite & { grocery_receipts: unknown }>((a, b) =>
-            supabase.from("grocery_items").select("receipt_id, category, name, normalized_name, line_total, grocery_receipts!inner(purchase_date)").gte("grocery_receipts.purchase_date", from).range(a, b)
-          ),
-        ]);
-        const rs = r.map((x) => ({ ...x, total: Number(x.total) }));
-        setReceipts(rs);
-        setItems(i.map((x) => ({ ...x, line_total: Number(x.line_total) })));
-        if (rs[0]) {
-          const counts = new Map<string, number>();
-          rs.forEach((x) => counts.set(x.currency, (counts.get(x.currency) || 0) + 1));
-          setCurrency([...counts.entries()].sort((p, q) => q[1] - p[1])[0][0]);
-          setMonth(monthOf(rs[0].purchase_date));
-        }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Could not load";
-        setError(/relation|schema cache/i.test(msg) ? "Personal tables not found. Run supabase/migration_personal.sql in Supabase." : msg);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
+    if (monthSet || !data?.receipts.length) return;
+    setMonth(monthOf(data.receipts[0].purchase_date));
+    setMonthSet(true);
+  }, [data, monthSet]);
 
   const currencies = useMemo(() => [...new Set(receipts.map((r) => r.currency))], [receipts]);
   const cur = currency || "USD";
@@ -91,6 +92,7 @@ export function GroceryOverview() {
         </div>
       </div>
 
+      <OfflineNotice savedAt={savedAt} writable />
       {error && <Alert>{error}</Alert>}
 
       {!loading && !error && receipts.length === 0 && (
@@ -138,10 +140,10 @@ export function GroceryOverview() {
             <CardHeader><CardTitle className="text-base">Receipts in {monthLabel(month)}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
-                <Link key={r.id} href={`/personal/groceries/${r.id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">
-                  <div><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}</p></div>
+                <ReceiptRow key={r.id} id={r.id} unsent={unsent.has(r.id)}>
+                  <div><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
                   <p className="font-semibold">{fmt(r.total)}</p>
-                </Link>
+                </ReceiptRow>
               ))}
             </CardContent>
           </Card>

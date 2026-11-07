@@ -169,6 +169,8 @@ export interface SaveDocumentArgs {
   file?: File | null;
   prepared?: boolean;
   waiting?: OutboxItem | null;
+  /** Ids this document must wait for, such as a trip that has not been sent yet. */
+  dependsOn?: string[];
   online?: boolean;
   keep?: (path: string, blob: Blob) => Promise<void>;
 }
@@ -202,7 +204,7 @@ export async function saveDocument(a: SaveDocumentArgs): Promise<SaveDocumentRes
   };
   const item: DocumentSaveItem = {
     id, userId: a.userId, kind: DOCUMENT_SAVE, createdAt: Date.now(), status: "pending", error: null, attempts: 0,
-    isNew: !a.doc, tripId, row, path, blob, oldPaths: old,
+    isNew: !a.doc, tripId, row, path, blob, oldPaths: old, dependsOn: a.dependsOn?.length ? a.dependsOn : undefined,
     label: String(row.title),
     summary: a.doc ? "Document · changed" : "Document · new",
   };
@@ -211,7 +213,8 @@ export async function saveDocument(a: SaveDocumentArgs): Promise<SaveDocumentRes
 
   if (toSend.path && toSend.blob) await a.keep?.(toSend.path, toSend.blob).catch(() => {});
   const online = a.online ?? (typeof navigator === "undefined" || navigator.onLine !== false);
-  const outcome: PushOutcome = online ? await pushDocumentSave(a.api, toSend) : { kind: "offline" };
+  const blocked = !!toSend.dependsOn?.length && (await a.store.list()).some((i) => toSend.dependsOn!.includes(i.id));
+  const outcome: PushOutcome = online && !blocked ? await pushDocumentSave(a.api, toSend) : { kind: "offline" };
   if (outcome.kind === "synced") {
     if (prev) await a.store.remove(prev.id);
     return { doc, queued: false };

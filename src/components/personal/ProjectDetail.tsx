@@ -1,48 +1,45 @@
 "use client";
 
 import { useConfirm } from "@/components/ui/confirm";
-import { useCallback, useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw } from "lucide-react";
-import { KIND_META, type PersonalExpense, type PersonalKind, type PersonalProject } from "@/lib/personal/constants";
+import { ArrowLeft, Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw, CloudOff } from "lucide-react";
+import { KIND_META, type PersonalExpense, type PersonalKind } from "@/lib/personal/constants";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { Bars } from "@/components/personal/Bars";
 import { daysBetween, formatCurrency, formatDate } from "@/lib/utils";
-import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS } from "@/lib/columns";
+import { fetchProjectBundle, projectKey, type ProjectBundle } from "@/lib/offline-personal";
+import { useCachedQuery } from "@/lib/use-cached-query";
+import { useOutbox } from "@/lib/use-outbox";
+import { applyRows, deleteRow, isRowSave, makeRowApi, saveRow, waitingRowIds } from "@/lib/row-outbox";
+import { browserOutbox } from "@/lib/outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
   const router = useRouter();
   const confirm = useConfirm();
   const supabase = createClient();
-  const [project, setProject] = useState<PersonalProject | null>(null);
-  const [expenses, setExpenses] = useState<PersonalExpense[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: bundle, loading, error: loadError, savedAt, userId } = useCachedQuery<ProjectBundle>((uid) => projectKey(uid, id), (sb) => fetchProjectBundle(sb, id), [id]);
+  const { items: pending } = useOutbox(userId);
   const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    const [p, e] = await Promise.all([
-      supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("id", id).single(),
-      supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("project_id", id).order("expense_date", { ascending: false }),
-    ]);
-    if (p.error || !p.data) setError(p.error?.message || "Not found");
-    else setProject(p.data as PersonalProject);
-    setExpenses(((e.data as PersonalExpense[]) || []).map((x) => ({ ...x, amount: Number(x.amount), amount_usd: Number(x.amount_usd) })));
-    setLoading(false);
-  }, [supabase, id]);
-
-  useEffect(() => {
-    load();
-  }, [load]);
+  // Waiting changes show as if they were already saved
+  const project = useMemo(() => (bundle ? (applyRows([bundle.project], pending, "personal_projects")[0] ?? null) : null), [bundle, pending]);
+  const expenses = useMemo(
+    () => applyRows(bundle?.expenses ?? [], pending, "personal_expenses", (r) => r.project_id === id).map((x) => ({ ...x, amount: Number(x.amount), amount_usd: Number(x.amount_usd), currency: x.currency ?? "USD", category: x.category ?? "Other", receipt_path: x.receipt_path ?? null })) as PersonalExpense[],
+    [bundle, pending, id]
+  );
+  const waiting = useMemo(() => waitingRowIds(pending, "personal_expenses"), [pending]);
+  const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "personal_expenses" && i.isNew).map((i) => i.id)), [pending]);
 
   const { rate: budgetRate } = useUsdRate(project?.currency || "USD");
 
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
-  if (error || !project) return <div className="p-8 text-sm text-red-600">{error || "Not found"}</div>;
+  if (loadError || !project) return <div className="p-8 text-sm text-red-600">{loadError || "Not found"}</div>;
 
   const totalUsd = expenses.reduce((s, e) => s + e.amount_usd, 0);
 
@@ -68,17 +65,31 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
 
   const toggleStatus = async () => {
     const next = project.status === "active" ? "completed" : "active";
-    const { error } = await supabase.from("personal_projects").update({ status: next }).eq("id", id);
-    if (error) setError(error.message);
-    else setProject({ ...project, status: next });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to change this.");
+      await saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_projects", id, row: { status: next },
+        waiting: pending.find((i) => i.id === id) ?? null, label: project.name, summary: `${meta.label} · status`,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not change the status.");
+    }
   };
 
   const remove = async () => {
     if (!(await confirm({ title: "Delete project?", message: `Delete "${project.name}" and all its expenses? This cannot be undone.`, destructive: true }))) return;
-    const paths = expenses.map((e) => e.receipt_path).filter(Boolean) as string[];
-    if (paths.length) await supabase.storage.from("receipts").remove(paths).catch(() => {});
-    const { error } = await supabase.from("personal_projects").delete().eq("id", id);
-    if (error) return setError(error.message);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete this.");
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_projects", id, label: project.name, summary: `${meta.label} · delete`,
+        sweep: [{ table: "personal_expenses", fk: "project_id", column: "receipt_path", bucket: "receipts" }],
+        waiting: pending.find((i) => i.id === id) ?? null,
+      });
+    } catch (err) {
+      return setError(err instanceof Error ? err.message : "Could not delete.");
+    }
     router.push(meta.path);
     router.refresh();
   };
@@ -88,6 +99,8 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       <Link href={meta.path} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> {meta.plural}
       </Link>
+      <OfflineNotice savedAt={savedAt} writable />
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
@@ -156,18 +169,23 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
               <Link href={`${meta.path}/${id}/expense`}><Button className="gap-2"><Plus className="h-4 w-4" /> Add expense</Button></Link>
             </div>
           ) : (
-            expenses.map((e) => (
-              <Link key={e.id} href={`${meta.path}/${id}/expense/${e.id}`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-accent">
+            expenses.map((e) => {
+              const Row = ({ children }: { children: React.ReactNode }) => unsent.has(e.id)
+                ? <div className="flex items-center justify-between gap-3 rounded-xl border p-3">{children}</div>
+                : <Link href={`${meta.path}/${id}/expense/${e.id}`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
+              return (
+              <Row key={e.id}>
                 <div className="min-w-0">
                   <p className="truncate font-medium">{e.merchant || e.category}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{e.receipt_path ? " · receipt" : ""}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{e.receipt_path ? " · receipt" : ""}{waiting.has(e.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-semibold">{formatCurrency(e.amount_usd, "USD")}</p>
                   {e.currency !== "USD" && <p className="text-xs text-muted-foreground">{formatCurrency(e.amount, e.currency)}</p>}
                 </div>
-              </Link>
-            ))
+              </Row>
+              );
+            })
           )}
         </CardContent>
       </Card>

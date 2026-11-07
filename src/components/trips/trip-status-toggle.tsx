@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Circle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useConfirm } from "@/components/ui/confirm";
+import { makeRowApi, saveRow } from "@/lib/row-outbox";
+import { browserOutbox } from "@/lib/outbox";
 
 /**
  * Close/reopen a trip. The tone tells the story: a trip whose dates have passed but is still open
@@ -31,16 +33,22 @@ export function TripStatusToggle({
   const onChange = async (next: boolean) => {
     setCompleted(next);
     setSaving(true);
-    const { error } = await supabase
-      .from("trips")
-      .update({ status: next ? "completed" : "active", updated_at: new Date().toISOString() })
-      .eq("id", tripId);
-    setSaving(false);
-    if (error) {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to update the trip.");
+      await saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "trips", id: tripId,
+        row: { status: next ? "completed" : "active", updated_at: new Date().toISOString() },
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId) ?? null,
+        label: next ? "Trip complete" : "Trip reopened", summary: "Trip · status",
+      });
+    } catch (err) {
+      setSaving(false);
       setCompleted(!next);
-      await confirm({ title: "Could not update the trip", message: error.message, confirmLabel: "OK", hideCancel: true });
+      await confirm({ title: "Could not update the trip", message: err instanceof Error ? err.message : "Could not update the trip.", confirmLabel: "OK", hideCancel: true });
       return;
     }
+    setSaving(false);
     router.refresh();
   };
 

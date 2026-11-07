@@ -1,37 +1,35 @@
 "use client";
 
 import { Alert } from "@/components/ui/alert";
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Hammer, Plane, ChevronRight } from "lucide-react";
-import { KIND_META, type PersonalKind, type PersonalProject } from "@/lib/personal/constants";
+import { ArrowLeft, Plus, Hammer, Plane, ChevronRight, CloudOff } from "lucide-react";
+import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
+import { fetchProjects, projectsKey, type ProjectRow } from "@/lib/offline-personal";
+import { useCachedQuery } from "@/lib/use-cached-query";
+import { useOutbox } from "@/lib/use-outbox";
+import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
-type Row = PersonalProject & { personal_expenses: { amount_usd: number }[] };
+
+type Row = ProjectRow;
+const NEW_DEFAULTS = { personal_expenses: [], destination: null, description: null, start_date: null, end_date: null, budget: null, status: "active" };
 
 export function ProjectsList({ kind }: { kind: PersonalKind }) {
   const meta = KIND_META[kind];
   const Icon = kind === "home_project" ? Hammer : Plane;
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    createClient()
-      .from("personal_projects")
-      .select(`${PERSONAL_PROJECT_COLS}, personal_expenses(amount_usd)`)
-      .eq("kind", kind)
-      .order("created_at", { ascending: false })
-      .then(({ data, error }) => {
-        if (error) setError(/relation|schema cache/i.test(error.message) ? "Personal tables not found. Run supabase/migration_personal.sql in Supabase." : error.message);
-        else setRows((data as Row[]) || []);
-        setLoading(false);
-      });
-  }, [kind]);
+  const { data, loading, error, savedAt, userId } = useCachedQuery<ProjectRow[]>((uid) => projectsKey(uid, kind), (s) => fetchProjects(s, kind), [kind]);
+  const { items: pending } = useOutbox(userId);
+  const rows = useMemo(
+    () => applyRows(data ?? [], pending, "personal_projects", (r) => r.kind === kind).map((r) => ({ ...NEW_DEFAULTS, ...r })) as Row[],
+    [data, pending, kind]
+  );
+  const waiting = useMemo(() => waitingRowIds(pending, "personal_projects"), [pending]);
+  // A project that has not reached the server has no page of its own yet
+  const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "personal_projects" && i.isNew).map((i) => i.id)), [pending]);
 
   const total = (r: Row) => r.personal_expenses.reduce((s, e) => s + Number(e.amount_usd), 0);
   const active = rows.filter((r) => r.status === "active");
@@ -40,13 +38,15 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
   const card = (r: Row) => {
     const spent = total(r);
     const pctUsed = r.budget && r.currency === "USD" ? Math.min((spent / Number(r.budget)) * 100, 100) : null;
+    const Wrap = ({ children }: { children: React.ReactNode }) => (unsent.has(r.id) ? <div className="block">{children}</div> : <Link href={`${meta.path}/${r.id}`} className="group block">{children}</Link>);
     return (
-      <Link key={r.id} href={`${meta.path}/${r.id}`} className="group block">
+      <Wrap key={r.id}>
         <div className="h-full rounded-xl border bg-card p-5 shadow-sm transition-shadow group-hover:shadow-md">
           <div className="flex items-start justify-between gap-3">
             <h3 className="font-semibold leading-snug">{r.name}</h3>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </div>
+          {waiting.has(r.id) && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
           {(r.destination || r.start_date) && (
             <p className="mt-1 text-xs text-muted-foreground">
               {[r.destination, r.start_date ? formatDate(r.start_date) + (r.end_date ? ` – ${formatDate(r.end_date)}` : "") : null].filter(Boolean).join(" · ")}
@@ -63,7 +63,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
             </div>
           )}
         </div>
-      </Link>
+      </Wrap>
     );
   };
 
@@ -84,6 +84,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
         </Link>
       </div>
 
+      <OfflineNotice savedAt={savedAt} writable />
       {error && <Alert>{error}</Alert>}
 
       {!loading && !error && rows.length === 0 && (

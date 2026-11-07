@@ -6,12 +6,12 @@
 //  - Anything else offline gets a small page that links to the saved ones.
 // Saved pages are removed at sign-out (see clearOfflineData in src/lib/offline-store.ts).
 
-const CACHE = "expense-tracker-v5";
+const CACHE = "expense-tracker-v6";
 const PAGES = "expense-pages-v1"; // keep in step with PAGES_CACHE in src/lib/offline-store.ts
 const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"]; // keep in step with src/lib/offline-warm.ts
 // Trip pages are kept as they are visited (and the recent ones ahead of time); keep in step with KEPT_PAGE in src/lib/offline-warm.ts
-const KEPT_PAGE = /^\/trips(?:\/[0-9a-f-]{36}(?:\/expenses\/[0-9a-f-]{36})?)?$/;
-const MAX_TRIP_PAGES = 60;
+const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
+const MAX_TRIP_PAGES = 150;
 const SLOW_NETWORK_MS = 6000;
 const isKept = (pathname) => OFFLINE_PAGES.includes(pathname) || KEPT_PAGE.test(pathname);
 
@@ -26,6 +26,8 @@ const hubPage = () =>
       '<a href="/personal/loyalty" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Loyalty cards</a>' +
       '<a href="/documents" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Documents</a>' +
       '<a href="/trips" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Trips</a>' +
+      '<a href="/personal/projects" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Home projects</a>' +
+      '<a href="/personal/groceries" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Groceries</a>' +
       '<p style="margin:16px 0 0;font-size:14px">Receipts you save offline are sent when you are back online.</p></div></body></html>',
     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );

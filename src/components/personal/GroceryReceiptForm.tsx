@@ -18,7 +18,11 @@ import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery"
 import { extractGroceryReceipt } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS } from "@/lib/columns";
+import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Overview, type ReceiptBundle } from "@/lib/offline-grocery";
+import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
+import { browserOutbox, newId } from "@/lib/outbox";
+import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
 
@@ -50,30 +54,36 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const [note, setNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
 
   // New receipt: default to the currency of the latest receipt. Edit: load everything.
   useEffect(() => {
-    const supabase = createClient();
-    if (!receiptId) {
-      supabase.from("grocery_receipts").select("currency").order("purchase_date", { ascending: false }).limit(1).then(({ data }) => {
-        if (data?.[0]?.currency) setCurrency(data[0].currency);
-      });
-      return;
-    }
     (async () => {
-      const [r, i] = await Promise.all([
-        supabase.from("grocery_receipts").select(GROCERY_RECEIPT_COLS).eq("id", receiptId).single(),
-        supabase.from("grocery_items").select(GROCERY_ITEM_COLS).eq("receipt_id", receiptId).order("created_at"),
-      ]);
-      if (!r.data) return setError("Receipt not found");
-      setStore(r.data.store);
-      setDate(r.data.purchase_date);
-      setCurrency(r.data.currency);
-      setTotal(String(r.data.total));
-      setNotes(r.data.notes || "");
-      setExistingPath(r.data.receipt_path);
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession(); // read from the phone, so it works offline
+      const owner = session?.user.id;
+      if (!owner) return;
+      if (!receiptId) {
+        // Default to the currency most used on the receipts already saved
+        const saved = await browserKv.get<Overview>(overviewKey(owner)).catch(() => null);
+        const latest = saved?.value.receipts[0]?.currency;
+        if (latest) setCurrency(latest);
+        return;
+      }
+      const res = await loadWithCache<ReceiptBundle>(browserKv, receiptKey(owner, receiptId), () => fetchReceiptBundle(supabase, receiptId));
+      const waiting = (await browserOutbox.list().catch(() => [])).filter((i) => i.userId === owner);
+      const w = waiting.find((i) => i.id === receiptId && isRowSave(i) && i.table === "grocery_receipts");
+      if (!res.ok && !w) return setError("Could not open this receipt. Open it once while online.");
+      setSavedAt(res.ok && res.fromCache ? res.savedAt : null);
+      const head = { ...(res.ok ? res.data.receipt : {}), ...(w && isRowSave(w) ? { ...w.row, ...(w.path !== undefined ? { receipt_path: w.path } : {}) } : {}) } as Partial<ReceiptBundle["receipt"]>;
+      setStore(head.store ?? "");
+      setDate(head.purchase_date ?? todayISO());
+      setCurrency(head.currency ?? "USD");
+      setTotal(String(head.total ?? ""));
+      setNotes(head.notes || "");
+      setExistingPath(head.receipt_path ?? null);
       setRows(
-        (i.data || []).map((it) => ({
+        itemsWithWaiting(receiptId, res.ok ? res.data.items : [], waiting).map((it) => ({
           key: it.id,
           name: it.name,
           quantity: String(Number(it.quantity)),
@@ -83,9 +93,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           unit: it.unit || "",
         }))
       );
-      if (r.data.receipt_path) {
-        const { data: signed } = await supabase.storage.from("receipts").createSignedUrl(r.data.receipt_path, 3600);
-        if (signed?.signedUrl) setPreview(signed.signedUrl);
+      if (head.receipt_path) {
+        const kept = await browserBlobs.get(`receipts/${head.receipt_path}`).catch(() => null);
+        if (kept) setPreview(URL.createObjectURL(kept));
+        else if (navigator.onLine) {
+          const { data: signed } = await supabase.storage.from("receipts").createSignedUrl(head.receipt_path, 3600);
+          if (signed?.signedUrl) setPreview(signed.signedUrl);
+        }
       }
     })();
   }, [receiptId]);
@@ -161,62 +175,37 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
+      const { data: { session } } = await supabase.auth.getSession();
+      const owner = session?.user.id;
+      if (!owner) throw new Error("Sign in again to save.");
 
-      let receiptPath = existingPath;
-      if (file) {
-        const path = `${user.id}/personal/groceries/${Date.now()}.jpg`;
-        const { error: upErr } = await supabase.storage.from("receipts").upload(path, file, { cacheControl: "3600", upsert: false });
-        if (upErr) throw upErr;
-        receiptPath = path;
-      }
-
-      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, receipt_path: receiptPath };
-      let id = receiptId;
-      let oldItemIds: string[] = [];
-      let newItemIds: string[] = [];
-
-      if (receiptId) {
-        const { data: old } = await supabase.from("grocery_items").select("id").eq("receipt_id", receiptId);
-        oldItemIds = (old || []).map((o) => o.id);
-        const { error } = await supabase.from("grocery_receipts").update(head).eq("id", receiptId);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from("grocery_receipts").insert({ ...head, user_id: user.id }).select("id").single();
-        if (error) throw error;
-        id = data.id;
-      }
-
-      if (clean.length > 0) {
-        const { data: inserted, error } = await supabase.from("grocery_items").insert(
-          clean.map((r) => ({
-            receipt_id: id,
-            user_id: user.id,
-            name: r.name.trim(),
-            normalized_name: normalizeItemName(r.name),
-            category: r.category,
-            quantity: money(r.quantity),
-            unit_price: money(r.unit_price),
-            line_total: money(r.line_total),
-            ...(r.unit ? { unit: r.unit } : {}),
-          }))
-        ).select("id");
-        if (error) throw error;
-        newItemIds = (inserted || []).map((r) => r.id as string);
-      }
-      // Remove the previous items only after the new ones were stored. If that fails, undo the new
-      // ones so the receipt is not left with every line twice.
-      if (oldItemIds.length) {
-        const { error: delErr } = await supabase.from("grocery_items").delete().in("id", oldItemIds);
-        if (delErr) {
-          if (newItemIds.length) await supabase.from("grocery_items").delete().in("id", newItemIds);
-          throw new Error("Could not replace the previous items, so nothing was changed. Please try again.");
-        }
-      }
-      if (file && existingPath) await supabase.storage.from("receipts").remove([existingPath]).catch(() => {});
-
-      router.push(`${BACK}/${id}`);
+      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null };
+      // The items are made here, with their own ids, and replace the receipt's items when it is sent
+      const children = {
+        table: "grocery_items",
+        fk: "receipt_id",
+        rows: clean.map((r) => ({
+          id: newId(),
+          user_id: owner,
+          name: r.name.trim(),
+          normalized_name: normalizeItemName(r.name),
+          category: r.category,
+          quantity: money(r.quantity),
+          unit_price: money(r.unit_price),
+          line_total: money(r.line_total),
+          ...(r.unit ? { unit: r.unit } : {}),
+        })),
+      };
+      const waitingList = await browserOutbox.list().catch(() => []);
+      const saved = await saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: owner, table: "grocery_receipts", id: receiptId, row: head, children,
+        file, fileColumn: "receipt_path", bucket: "receipts", folder: "personal/groceries", currentPath: existingPath,
+        waiting: waitingList.find((i) => i.id === receiptId) ?? null,
+        keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
+        label: head.store, summary: `Grocery receipt · ${receiptId ? "changed" : "new"}`,
+      });
+      // A receipt that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
+      router.push(saved.queued && !receiptId ? BACK : `${BACK}/${saved.id}`);
       router.refresh();
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -240,6 +229,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           <CardDescription>Scan the receipt, then check the items. Prices are tracked per item over time.</CardDescription>
         </CardHeader>
         <CardContent>
+          <OfflineNotice savedAt={savedAt} writable />
           <form onSubmit={submit} className="space-y-5">
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>

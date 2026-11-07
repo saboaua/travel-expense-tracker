@@ -1,10 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Check, ChevronRight, MapPin, Plane, Search, X } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { CalendarDays, Check, CloudOff, ChevronRight, MapPin, Plane, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatCurrency, formatDateRange } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
+import { SYNCED_EVENT } from "@/lib/outbox";
+import { useOutbox } from "@/lib/use-outbox";
+import { OfflineNotice } from "@/components/OfflineNotice";
 import { groupCompletedByYear, matchesQuery, phaseLabel, sortActive, tripPhase, type ListTrip, type Phase } from "@/lib/trips-list";
 
 type Tab = "active" | "completed" | "all";
@@ -16,11 +22,11 @@ const PHASE_STYLE: Record<Phase, { accent: string; chip: string }> = {
   completed: { accent: "bg-slate-300 dark:bg-slate-600", chip: "border-border bg-muted text-muted-foreground" },
 };
 
-function TripCard({ trip, today }: { trip: ListTrip; today: string }) {
+function TripCard({ trip, today, waiting = false, unsent = false }: { trip: ListTrip; today: string; waiting?: boolean; unsent?: boolean }) {
   const phase = tripPhase(trip, today);
   const style = PHASE_STYLE[phase];
-  return (
-    <Link href={`/trips/${trip.id}`} className="group block focus-visible:outline-none">
+  // A trip that has not reached the server has no page of its own yet
+  const card = (
       <div className="relative h-full overflow-hidden rounded-xl border bg-card p-5 pl-6 shadow-sm transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary">
         <span className={cn("absolute inset-y-0 left-0 w-1.5", style.accent)} aria-hidden="true" />
         <div className="flex items-start justify-between gap-3">
@@ -31,6 +37,7 @@ function TripCard({ trip, today }: { trip: ListTrip; today: string }) {
           </span>
         </div>
 
+        {waiting && <p className="mt-2 flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
         <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
           {trip.destination && (
             <p className="flex items-center gap-1.5">
@@ -56,15 +63,15 @@ function TripCard({ trip, today }: { trip: ListTrip; today: string }) {
           </span>
         </div>
       </div>
-    </Link>
   );
+  return unsent ? <div className="block">{card}</div> : <Link href={`/trips/${trip.id}`} className="group block focus-visible:outline-none">{card}</Link>;
 }
 
-function Grid({ trips, today }: { trips: ListTrip[]; today: string }) {
+function Grid({ trips, today, waiting, unsent }: { trips: ListTrip[]; today: string; waiting: Set<string>; unsent: Set<string> }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {trips.map((t) => (
-        <TripCard key={t.id} trip={t} today={today} />
+        <TripCard key={t.id} trip={t} today={today} waiting={waiting.has(t.id)} unsent={unsent.has(t.id)} />
       ))}
     </div>
   );
@@ -82,7 +89,24 @@ function Heading({ title, count, right }: { title: string; count: number; right?
   );
 }
 
-export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }) {
+const NEW_TRIP_DEFAULTS = { destination: null, end_date: null, status: "active", total: 0, count: 0 };
+
+export function TripsList({ trips: saved, today }: { trips: ListTrip[]; today: string }) {
+  const router = useRouter();
+  const [userId, setUserId] = useState<string | null>(null);
+  const { items: pending } = useOutbox(userId);
+  useEffect(() => { createClient().auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null)); }, []);
+  useEffect(() => {
+    const again = () => router.refresh();
+    window.addEventListener(SYNCED_EVENT, again);
+    return () => window.removeEventListener(SYNCED_EVENT, again);
+  }, [router]);
+  const trips = useMemo(
+    () => applyRows(saved, pending, "trips").map((t) => ({ ...NEW_TRIP_DEFAULTS, ...t })),
+    [saved, pending]
+  );
+  const waiting = useMemo(() => waitingRowIds(pending, "trips"), [pending]);
+  const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "trips" && i.isNew).map((i) => i.id)), [pending]);
   const [tab, setTab] = useState<Tab>("active");
   const [query, setQuery] = useState("");
 
@@ -107,6 +131,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
 
   return (
     <div className="mt-6 space-y-6">
+      <OfflineNotice savedAt={null} writable />
       <div className="grid grid-cols-3 gap-3">
         {[
           { label: "Active", value: String(allActive) },
@@ -177,7 +202,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
       {showActive && active.length > 0 && (
         <section className="space-y-4">
           {tab === "all" && <Heading title="Active" count={active.length} />}
-          <Grid trips={active} today={today} />
+          <Grid trips={active} today={today} waiting={waiting} unsent={unsent} />
         </section>
       )}
 
@@ -186,7 +211,7 @@ export function TripsList({ trips, today }: { trips: ListTrip[]; today: string }
           {years.map((y) => (
             <section key={y.year} className="space-y-4">
               <Heading title={tab === "completed" ? y.year : `Completed · ${y.year}`} count={y.trips.length} right={formatCurrency(y.total, "USD")} />
-              <Grid trips={y.trips} today={today} />
+              <Grid trips={y.trips} today={today} waiting={waiting} unsent={unsent} />
             </section>
           ))}
         </div>
