@@ -19,6 +19,11 @@ import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { extractReceipt } from "@/lib/receipt-extract";
 import { EXPENSE_COLS } from "@/lib/columns";
+import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
+import { browserOutbox } from "@/lib/outbox";
+import { deleteExpenseChange, isExpenseUpdate, makeExpenseChangeApi, RECEIPT_BUCKET, saveExpenseChange, type ExpenseFields } from "@/lib/expense-outbox";
+import { expenseKey } from "@/lib/offline-data";
+import { OfflineNotice } from "@/components/OfflineNotice";
 
 
 export default function EditExpensePage() {
@@ -48,12 +53,28 @@ export default function EditExpensePage() {
   const [reading, setReading] = useState(false);
   const [readNote, setReadNote] = useState<string | null>(null);
 
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+
   useEffect(() => {
-    supabase.from("expenses").select(EXPENSE_COLS).eq("id", expenseId).eq("trip_id", tripId).single().then(async ({ data, error }) => {
-      if (error || !data) {
-        setError(error?.message || "Expense not found");
+    (async () => {
+      // The session is read from the phone, so this also works with no connection
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) { setError("Sign in again to open this expense."); setLoaded(true); return; }
+      type Row = ExpenseFields & { receipt_path: string | null };
+      const res = await loadWithCache<Row>(browserKv, expenseKey(uid, expenseId), () => supabase.from("expenses").select(EXPENSE_COLS).eq("id", expenseId).eq("trip_id", tripId).single() as unknown as PromiseLike<{ data: Row | null; error: unknown }>);
+      if (!res.ok) {
+        setError((res.error as { message?: string } | null)?.message || "Expense not found");
         setLoaded(true);
         return;
+      }
+      setSavedAt(res.fromCache ? res.savedAt : null);
+      // A change waiting to be sent shows as if it were already saved
+      const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === expenseId && i.userId === uid);
+      const data: Row = { ...res.data };
+      if (waiting && isExpenseUpdate(waiting)) {
+        Object.assign(data, waiting.fields);
+        if (waiting.path !== undefined) data.receipt_path = waiting.path;
       }
       setMerchant(data.merchant || "");
       setAmount(String(data.amount ?? ""));
@@ -64,11 +85,15 @@ export default function EditExpensePage() {
       setNotes(data.notes || "");
       setReceiptPath(data.receipt_path || null);
       if (data.receipt_path) {
-        const { data: signed } = await supabase.storage.from("receipts").createSignedUrl(data.receipt_path, 60 * 30);
-        if (signed?.signedUrl) setReceiptUrl(signed.signedUrl);
+        const kept = await browserBlobs.get(`${RECEIPT_BUCKET}/${data.receipt_path}`).catch(() => null);
+        if (kept) setReceiptUrl(URL.createObjectURL(kept));
+        else if (!res.fromCache) {
+          const { data: signed } = await supabase.storage.from(RECEIPT_BUCKET).createSignedUrl(data.receipt_path, 60 * 30);
+          if (signed?.signedUrl) setReceiptUrl(signed.signedUrl);
+        }
       }
       setLoaded(true);
-    });
+    })();
   }, [supabase, expenseId, tripId]);
 
   const usd = amount && !Number.isNaN(Number(amount)) && !Number.isNaN(Number(rate)) ? toUsd(Number(amount), Number(rate)) : null;
@@ -145,34 +170,18 @@ export default function EditExpensePage() {
     setSaving(true);
     setError(null);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-
-      let nextPath = receiptPath;
-      if (newFile) {
-        const ext = newFile.name.split(".").pop() || "jpg";
-        const fileName = `${user.id}/${tripId}/${Date.now()}.${ext}`;
-        const { error: uploadError } = await supabase.storage.from("receipts").upload(fileName, newFile, { cacheControl: "3600", upsert: false });
-        if (uploadError) throw uploadError;
-        nextPath = fileName;
-      }
-
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) throw new Error("Sign in again to save this expense.");
       const rateNum = Number(rate) || (currency === "USD" ? 1 : 0);
       const amountNum = parseFloat(amount);
-      const { error } = await supabase.from("expenses").update({
-        merchant: merchant || null,
-        amount: amountNum,
-        currency,
-        exchange_rate: rateNum,
-        amount_usd: toUsd(amountNum, rateNum),
-        category,
-        expense_date: expenseDate,
-        notes: notes || null,
-        receipt_path: nextPath,
-        updated_at: new Date().toISOString(),
-      }).eq("id", expenseId);
-      if (error) throw error;
-
+      await saveExpenseChange({
+        api: makeExpenseChangeApi(supabase), store: browserOutbox, userId: uid, expenseId, tripId,
+        fields: { merchant: merchant || null, amount: amountNum, currency, exchange_rate: rateNum, amount_usd: toUsd(amountNum, rateNum), category, expense_date: expenseDate, notes: notes || null },
+        file: newFile, currentPath: receiptPath,
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === expenseId) ?? null,
+        keep: (path, blob) => browserBlobs.put(`${RECEIPT_BUCKET}/${path}`, blob),
+      });
       router.push(`/trips/${tripId}`);
       router.refresh();
     } catch (err: unknown) {
@@ -185,9 +194,16 @@ export default function EditExpensePage() {
   const remove = async () => {
     if (!(await confirm({ title: "Delete expense?", message: "Delete this expense? This cannot be undone.", destructive: true }))) return;
     setSaving(true);
-    const { error } = await supabase.from("expenses").delete().eq("id", expenseId);
-    if (error) {
-      setError(error.message);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete this expense.");
+      await deleteExpenseChange({
+        api: makeExpenseChangeApi(supabase), store: browserOutbox, userId: session.user.id, tripId,
+        expense: { id: expenseId, merchant: merchant || null, receipt_path: receiptPath },
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === expenseId) ?? null,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete.");
       setSaving(false);
       return;
     }
@@ -206,6 +222,7 @@ export default function EditExpensePage() {
         <CardHeader>
           <CardTitle>Edit Expense</CardTitle>
           <CardDescription>Change the details, replace the receipt, or delete this entry</CardDescription>
+          <OfflineNotice savedAt={savedAt} writable />
         </CardHeader>
         <CardContent>
           {!loaded ? (

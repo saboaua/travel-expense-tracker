@@ -1,6 +1,9 @@
 /** Pages that open with no connection. The service worker keeps these (public/sw.js lists the same ones). */
 export const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"];
 
+/** Trip pages are kept as they are visited, and the recent ones ahead of time (public/sw.js has the same pattern). */
+export const KEPT_PAGE = /^\/trips(?:\/[0-9a-f-]{36}(?:\/expenses\/[0-9a-f-]{36})?)?$/;
+
 // Script, style and font files a page needs (hashed in production, with a ?v= stamp in development). They show up in the page's HTML, with or without the /_next/ prefix.
 const ASSET = /(?:\/_next\/)?static\/(?:chunks|css|media)\/[^"'\\\s<>]+\.(?:js|css|woff2)(?:\?[^"'\\\s<>]*)?/g;
 

@@ -318,6 +318,8 @@ try {
       { id: "1c000000-0000-4000-8000-000000000002", user_id: PAT, store_name: "Blue Bottle", holder_name: null, category: null, card_number: "99887766", barcode_format: "CODE128", color: null, image_path: null, back_image_path: null, created_at: new Date().toISOString() }
     );
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000000aa", user_id: PAT, kind: "passport", title: "Offline Passport", issuing_country: "Aruba", document_number: "P1234567", expiry_date: addDays(today, 900), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    const EXP_ID = "e0000000-0000-4000-8000-0000000000e1";
+    fake.table("expenses").push({ id: EXP_ID, trip_id: TRIP_ID, user_id: PAT, merchant: "Trip Cafe", amount: 12, currency: "USD", exchange_rate: 1, amount_usd: 12, category: "Meals", expense_date: today, notes: null, receipt_path: null, created_at: new Date().toISOString() });
     const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
     await ctx2.addInitScript(() => { try { localStorage.setItem("force-sw", "1"); } catch {} });
     const page = await ctx2.newPage();
@@ -369,8 +371,20 @@ try {
       await page.getByText("Offline Ticket").first().waitFor();
       assert(!fake.table("travel_documents").some((d) => d.title === "Offline Ticket"), "nothing was sent while offline");
 
+      // A trip, and an expense on it, can be changed with no connection
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByText("Trip Cafe").first().waitFor({ timeout: 30000 });
+      await page.goto(`${BASE}/trips/${TRIP_ID}/expenses/${EXP_ID}`);
+      const merchantInput = page.getByText("Merchant", { exact: true }).locator("xpath=following::input[1]");
+      await merchantInput.waitFor({ timeout: 30000 });
+      await merchantInput.fill("Edited Cafe");
+      await page.getByRole("button", { name: "Save changes" }).click();
+      await page.getByText("Edited Cafe").first().waitFor({ timeout: 30000 });
+      assert((await page.getByText("Waiting to sync").count()) >= 1, "the changed expense shows as waiting");
+      assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Trip Cafe", "nothing was sent while offline");
+
       // A page that was never saved gives a small page that leads to the saved ones
-      await page.goto(`${BASE}/trips`);
+      await page.goto(`${BASE}/reports`);
       await page.getByRole("heading", { name: "You are offline" }).waitFor();
       await page.getByRole("link", { name: "Loyalty cards" }).click();
       await page.getByTestId("loyalty-tile").first().waitFor({ timeout: 30000 });
@@ -381,6 +395,7 @@ try {
       await page.getByTestId("loyalty-tile").first().waitFor();
       await page.waitForFunction(() => !document.body.innerText.includes("Waiting to sync"), null, { timeout: 60000 });
       assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
+      assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Edited Cafe", "the expense changed offline is saved once back online");
       assert(fake.table("travel_documents").some((d) => d.title === "Offline Ticket" && d.user_id === PAT), "the document added offline is saved once back online");
       await page.getByRole("button", { name: /Sign out/ }).first().click().catch(async () => {
         await page.getByRole("button", { name: /menu/i }).first().click();

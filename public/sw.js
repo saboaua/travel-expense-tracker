@@ -6,10 +6,14 @@
 //  - Anything else offline gets a small page that links to the saved ones.
 // Saved pages are removed at sign-out (see clearOfflineData in src/lib/offline-store.ts).
 
-const CACHE = "expense-tracker-v4";
+const CACHE = "expense-tracker-v5";
 const PAGES = "expense-pages-v1"; // keep in step with PAGES_CACHE in src/lib/offline-store.ts
 const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"]; // keep in step with src/lib/offline-warm.ts
+// Trip pages are kept as they are visited (and the recent ones ahead of time); keep in step with KEPT_PAGE in src/lib/offline-warm.ts
+const KEPT_PAGE = /^\/trips(?:\/[0-9a-f-]{36}(?:\/expenses\/[0-9a-f-]{36})?)?$/;
+const MAX_TRIP_PAGES = 60;
 const SLOW_NETWORK_MS = 6000;
+const isKept = (pathname) => OFFLINE_PAGES.includes(pathname) || KEPT_PAGE.test(pathname);
 
 const HASHED = /[-.][0-9a-f]{8,}\.(?:js|css|woff2?)$/;
 
@@ -21,6 +25,7 @@ const hubPage = () =>
       '<p style="margin:0 0 16px">This page needs a connection. These are saved on your phone:</p>' +
       '<a href="/personal/loyalty" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Loyalty cards</a>' +
       '<a href="/documents" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Documents</a>' +
+      '<a href="/trips" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Trips</a>' +
       '<p style="margin:16px 0 0;font-size:14px">Receipts you save offline are sent when you are back online.</p></div></body></html>',
     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
@@ -48,14 +53,19 @@ function storable(res) {
 
 function keepPage(event, pathname, res) {
   const copy = res.clone();
-  const job = caches.open(PAGES).then((c) => c.put(pathname, copy));
+  const job = caches.open(PAGES).then(async (c) => {
+    await c.put(pathname, copy);
+    // Keep the saved trip pages to a sensible number: drop the oldest first
+    const trips = (await c.keys()).filter((r) => KEPT_PAGE.test(new URL(r.url).pathname));
+    for (const r of trips.slice(0, Math.max(0, trips.length - MAX_TRIP_PAGES))) await c.delete(r);
+  });
   try { event.waitUntil(job); } catch { /* the page already finished; the copy is still saved */ }
 }
 
 async function openPage(event) {
   const req = event.request;
   const url = new URL(req.url);
-  const keep = url.origin === self.location.origin && OFFLINE_PAGES.includes(url.pathname);
+  const keep = url.origin === self.location.origin && isKept(url.pathname);
   const network = (event.preloadResponse ? event.preloadResponse.then((r) => r || fetch(req)) : fetch(req))
     .then((res) => { if (keep && storable(res)) keepPage(event, url.pathname, res); return res; })
     .catch(() => null);
@@ -84,7 +94,7 @@ self.addEventListener("fetch", (event) => {
   if (url.origin !== self.location.origin) return;
 
   // The app asks for an offline page in the background so it is saved before it is needed
-  if (req.headers.get("x-offline-warm") && OFFLINE_PAGES.includes(url.pathname)) {
+  if (req.headers.get("x-offline-warm") && isKept(url.pathname)) {
     event.respondWith(
       fetch(req).then((res) => { if (storable(res)) keepPage(event, url.pathname, res); return res; })
     );

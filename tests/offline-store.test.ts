@@ -47,5 +47,10 @@ const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a)
   const store = readFileSync("src/lib/offline-store.ts", "utf8");
   const list = (src: string) => (src.match(/OFFLINE_PAGES\s*=\s*(\[[^\]]*\])/) || [])[1];
   eq(list(sw), list(warm), "service worker and app list the same offline pages");
+  const kept = (src: string) => (src.match(/KEPT_PAGE\s*=\s*(\/.*\/);/) || [])[1];
+  eq(kept(sw) !== undefined && kept(sw) === kept(warm), true, "service worker and app keep the same trip pages");
+  const re = new RegExp((kept(warm) as string).slice(1, -1));
+  const id = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
+  eq([re.test("/trips"), re.test(`/trips/${id}`), re.test(`/trips/${id}/expenses/${id}`), re.test(`/trips/${id}/report`), re.test("/trips/new"), re.test("/tripsx")], [true, true, true, false, false, false], "only the list, a trip and an expense page are kept");
   eq(sw.includes(`const PAGES = "${(store.match(/PAGES_CACHE = "([^"]+)"/) || [])[1]}"`), true, "service worker and app use the same page cache name");
 })();

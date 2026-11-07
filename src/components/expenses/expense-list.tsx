@@ -2,14 +2,17 @@
 
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Camera, Paperclip, Receipt, Search, Trash2 } from "lucide-react";
+import { Camera, CloudOff, Paperclip, Receipt, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatCurrency, formatDayHeading, todayISO } from "@/lib/utils";
 import { iconFor } from "@/lib/category-icons";
 import { useExpenseCategories } from "@/lib/use-categories";
+import { applyExpenseOutbox, deleteExpenseChange, makeExpenseChangeApi } from "@/lib/expense-outbox";
+import { browserOutbox, SYNCED_EVENT } from "@/lib/outbox";
+import { useOutbox } from "@/lib/use-outbox";
 
 interface Expense {
   id: string;
@@ -38,11 +41,22 @@ const usdOf = (e: Expense, fallbackCurrency: string) => {
   return code === "USD" ? Number(e.amount) : null;
 };
 
-export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
+export function ExpenseList({ expenses: saved, currency, tripId }: ExpenseListProps) {
   const router = useRouter();
   const supabase = createClient();
   const categories = useExpenseCategories();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+  const { items: waiting } = useOutbox(userId);
+  const expenses = useMemo(() => applyExpenseOutbox(saved, waiting), [saved, waiting]);
+  const waitingIds = useMemo(() => new Set(waiting.filter((i) => i.kind.startsWith("expense.")).map((i) => i.id)), [waiting]);
+  useEffect(() => { supabase.auth.getSession().then(({ data }) => setUserId(data.session?.user.id ?? null)); }, [supabase]);
+  // A waiting change was sent: show the saved list again
+  useEffect(() => {
+    const again = () => router.refresh();
+    window.addEventListener(SYNCED_EVENT, again);
+    return () => window.removeEventListener(SYNCED_EVENT, again);
+  }, [router]);
   const [query, setQuery] = useState("");
   const [cat, setCat] = useState<string | null>(null);
   const [sort, setSort] = useState<Sort>("newest");
@@ -56,13 +70,18 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
     const label = expense.merchant || "this expense";
     if (!(await confirm({ title: "Delete expense?", message: `Delete ${label}? This cannot be undone.`, destructive: true }))) return;
     setBusyId(expense.id);
-    const { error } = await supabase.from("expenses").delete().eq("id", expense.id);
-    if (error) {
-      await confirm({ title: "Could not delete", message: error.message, confirmLabel: "OK", hideCancel: true });
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete this expense.");
+      await deleteExpenseChange({
+        api: makeExpenseChangeApi(supabase), store: browserOutbox, userId: session.user.id, expense, tripId,
+        waiting: waiting.find((i) => i.id === expense.id) ?? null,
+      });
+    } catch (err) {
+      await confirm({ title: "Could not delete", message: err instanceof Error ? err.message : "Could not delete.", confirmLabel: "OK", hideCancel: true });
       setBusyId(null);
       return;
     }
-    if (expense.receipt_path) await supabase.storage.from("receipts").remove([expense.receipt_path]).catch(() => {});
     router.refresh();
     setBusyId(null);
   };
@@ -165,6 +184,12 @@ export function ExpenseList({ expenses, currency, tripId }: ExpenseListProps) {
                         <p className="flex items-center gap-1.5 truncate text-xs text-muted-foreground">
                           {!g.date && <span>{formatDayHeading(expense.expense_date, today)} ·</span>}
                           <span className="truncate">{expense.category || "Other"}</span>
+                          {waitingIds.has(expense.id) && (
+                            <span className="inline-flex items-center gap-0.5 text-amber-600" title="Waiting to sync">
+                              <CloudOff className="h-3 w-3" aria-hidden="true" />
+                              <span className="sr-only">Waiting to sync</span>
+                            </span>
+                          )}
                           {expense.receipt_path && (
                             <span className="inline-flex items-center gap-0.5 text-emerald-600" title="Receipt attached">
                               <Paperclip className="h-3 w-3" aria-hidden="true" />

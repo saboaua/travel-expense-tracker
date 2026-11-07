@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback } from "@/lib/columns";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import type { TravelDocument } from "@/lib/documents";
 import type { LoyaltyCard } from "@/lib/loyalty";
@@ -10,6 +10,7 @@ import { warmPages } from "@/lib/offline-warm";
 /** The queries behind the offline screens. The screens and the background warm-up use the same ones. */
 
 export const loyaltyKey = (userId: string) => `${userId}:loyalty`;
+export const expenseKey = (userId: string, expenseId: string) => `${userId}:expense:${expenseId}`;
 export const documentsKey = (userId: string, tripId: string | null) => `${userId}:documents:${tripId ?? "general"}`;
 
 export function fetchLoyaltyCards(supabase: SupabaseClient, userId: string) {
@@ -62,8 +63,27 @@ export async function warmOffline(supabase: SupabaseClient, userId: string): Pro
       if (c.back_image_path) await cacheFile(supabase, LOYALTY_BUCKET, c.back_image_path);
     }
   }
+  await warmTrips(supabase, userId).catch(() => {});
   const docs = await loadWithCache(browserKv, documentsKey(userId, null), () => fetchDocuments(supabase, null));
   if (docs.ok && !docs.fromCache) {
     for (const d of docs.data.slice(0, MAX_FILES)) if (d.file_path) await cacheFile(supabase, DOC_BUCKET, d.file_path);
   }
+}
+
+const RECENT_TRIPS = 6;
+
+/** The latest trips with their expenses: the pages, and a copy of each expense for the edit screen. */
+export async function warmTrips(supabase: SupabaseClient, userId: string): Promise<void> {
+  const { data: trips } = await supabase.from("trips").select("id").eq("user_id", userId).order("start_date", { ascending: false }).limit(RECENT_TRIPS);
+  if (!trips?.length) return;
+  const pages = ["/trips"];
+  for (const t of trips) {
+    pages.push(`/trips/${t.id}`);
+    const { data: expenses } = await supabase.from("expenses").select(EXPENSE_COLS).eq("trip_id", t.id).order("expense_date", { ascending: false }).limit(30);
+    for (const e of (expenses ?? []) as unknown as { id: string }[]) {
+      await browserKv.set(expenseKey(userId, e.id), e).catch(() => {});
+      if (pages.length < 40) pages.push(`/trips/${t.id}/expenses/${e.id}`);
+    }
+  }
+  await warmPages(pages);
 }
