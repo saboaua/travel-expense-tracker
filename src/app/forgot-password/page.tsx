@@ -37,9 +37,9 @@ export default function ForgotPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 p-4">
       <div className="w-full max-w-[420px]">
-        <div className="bg-white rounded-xl shadow-xl shadow-blue-900/5 border border-slate-100 p-8 sm:p-10">
+        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl shadow-blue-900/5 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 p-8 sm:p-10">
           <div className="flex justify-center mb-6">
             <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
               <Plane className="h-7 w-7 text-white" strokeWidth={2} />
@@ -51,8 +51,8 @@ export default function ForgotPasswordPage() {
               <div className="flex justify-center">
                 <CheckCircle className="h-12 w-12 text-green-500" />
               </div>
-              <h1 className="text-2xl font-bold text-slate-900">Check your email</h1>
-              <p className="text-slate-500 text-sm">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Check your email</h1>
+              <p className="text-slate-500 dark:text-slate-400 text-sm">
                 We sent a password reset link to <strong>{email}</strong>
               </p>
               <Link
@@ -66,17 +66,17 @@ export default function ForgotPasswordPage() {
           ) : (
             <>
               <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+                <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
                   Reset password
                 </h1>
-                <p className="text-slate-500 mt-2 text-sm">
+                <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
                   Enter your email and we&apos;ll send you a reset link
                 </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-1.5">
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-700">
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
                     Email
                   </label>
                   <div className="relative">
@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       autoComplete="email"
-                      className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                      className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
                     />
                   </div>
                 </div>
@@ -112,7 +112,7 @@ export default function ForgotPasswordPage() {
               <div className="mt-6 text-center">
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
                 >
                   <ArrowLeft className="h-4 w-4" />
                   Back to sign in

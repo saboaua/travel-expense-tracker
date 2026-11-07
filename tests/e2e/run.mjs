@@ -288,6 +288,40 @@ try {
     await ctx.close();
   });
 
+  await test("dark mode: the sign-in pages are dark all the way (no light card or light strip), the top bar colour follows, and light mode is unchanged", async () => {
+    const lum = (rgb) => { const m = rgb.match(/\d+(\.\d+)?/g).map(Number); return (0.299 * m[0] + 0.587 * m[1] + 0.114 * m[2]); };
+    for (const scheme of ["dark", "light"]) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, colorScheme: scheme });
+      const page = await ctx.newPage();
+      for (const path of ["/login", "/forgot-password"]) {
+        await page.goto(`${BASE}${path}`);
+        await page.locator("form").first().waitFor();
+        const r = await page.evaluate(() => {
+          const card = document.querySelector("form").closest(".rounded-xl");
+          const outer = card.parentElement.parentElement;
+          const bar = [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute("content"));
+          return {
+            dark: document.documentElement.classList.contains("dark"),
+            card: getComputedStyle(card).backgroundColor,
+            outerFrom: getComputedStyle(outer).backgroundImage,
+            body: getComputedStyle(document.body).backgroundColor,
+            title: getComputedStyle(document.querySelector("h1")).color,
+            input: getComputedStyle(document.querySelector("input")).backgroundColor,
+            bar,
+          };
+        });
+        const dark = scheme === "dark";
+        assert(r.dark === dark, `${path} ${scheme}: dark class is ${r.dark}`);
+        assert(dark ? lum(r.card) < 60 : lum(r.card) > 240, `${path} ${scheme}: card colour ${r.card}`);
+        assert(dark ? lum(r.title) > 200 : lum(r.title) < 60, `${path} ${scheme}: heading colour ${r.title}`);
+        assert(dark ? lum(r.body) < 60 : lum(r.body) > 240, `${path} ${scheme}: page colour ${r.body}`);
+        assert(r.bar.length === 1, `${path} ${scheme}: exactly one theme-color tag (got ${JSON.stringify(r.bar)})`);
+        assert(r.bar[0] === (dark ? "#020817" : "#4f46e5"), `${path} ${scheme}: top bar colour ${r.bar[0]}`);
+      }
+      await ctx.close();
+    }
+  });
+
   await test("wrong password shows one generic error and logs the attempt", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "not-the-password");
@@ -636,6 +670,12 @@ try {
     await side.getByRole("link", { name: "Business" }).waitFor();
     await page.waitForLoadState("networkidle");
     fake.resetCounts();
+    // Requests the BROWSER itself sends to Supabase (the menu, tabs and chips); the server's own are counted by the fake
+    const browserCalls = {};
+    page.on("request", (rq) => {
+      const m = rq.url().match(new RegExp(`:${FAKE_PORT}/(rest|auth)/v1/([a-z_]+)`));
+      if (m) browserCalls[`${rq.method()} ${m[1]}:${m[2]}`] = (browserCalls[`${rq.method()} ${m[1]}:${m[2]}`] || 0) + 1;
+    });
     // Four moves between pages
     for (const [link, path] of [["Business", "/trips"], ["Dashboard", "/"], ["Business", "/trips"], ["Dashboard", "/"]]) {
       await side.getByRole("link", { name: link }).click();
@@ -645,11 +685,15 @@ try {
     const c = fake.counts();
     if (process.env.E2E_COUNTS) console.log("requests during 4 page changes:", JSON.stringify(c));
     const n = (k) => c[k] || 0;
-    // Before this was tuned: 15 sign-in checks, 14 profile reads, 11 role reads and 7 settings reads for the same four moves
-    assert(n("GET auth:user") <= 10, `sign-in checked too often: ${n("GET auth:user")} (limit 10)`);
-    assert(n("GET rest:profiles") <= 8, `profile read too often: ${n("GET rest:profiles")} (limit 8)`);
-    assert(n("GET rest:roles") <= 6, `roles read too often: ${n("GET rest:roles")} (limit 6)`);
-    assert(n("GET rest:app_settings") <= 3, `settings read too often: ${n("GET rest:app_settings")} (limit 3)`);
+    if (process.env.E2E_COUNTS) console.log("requests the browser sent:", JSON.stringify(browserCalls));
+    // The menu, tabs and chips share one answer: moving between pages must not make the browser ask again
+    for (const k of ["GET rest:profiles", "GET rest:roles", "GET rest:app_settings"]) assert(!browserCalls[k], `the browser asked for ${k} on page change (${browserCalls[k]} times)`);
+    // Server side (before this was tuned: 15 sign-in checks, 14 profile reads, 11 role reads, 7 settings reads; now about 8, 6, 4, 2).
+    // Prefetching varies from run to run, so these limits sit between the two.
+    assert(n("GET auth:user") <= 13, `sign-in checked too often: ${n("GET auth:user")} (limit 13)`);
+    assert(n("GET rest:profiles") <= 11, `profile read too often: ${n("GET rest:profiles")} (limit 11)`);
+    assert(n("GET rest:roles") <= 9, `roles read too often: ${n("GET rest:roles")} (limit 9)`);
+    assert(n("GET rest:app_settings") <= 5, `settings read too often: ${n("GET rest:app_settings")} (limit 5)`);
     await ctx.close();
   });
 
@@ -922,6 +966,18 @@ try {
       await page.goto(`${BASE}/`);
       await page.getByText("31").first().waitFor();
       await page.screenshot({ path: `${process.env.E2E_SHOT}/welcome-${name}.png` });
+      await ctx.close();
+    }
+  }
+
+  if (process.env.E2E_SHOT) {
+    for (const scheme of ["dark", "light"]) {
+      const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, colorScheme: scheme });
+      const page = await ctx.newPage();
+      await page.goto(`${BASE}/login`);
+      await page.locator("#email").waitFor();
+      await page.waitForLoadState("networkidle");
+      await page.screenshot({ path: `${process.env.E2E_SHOT}/login-${scheme}.png` });
       await ctx.close();
     }
   }

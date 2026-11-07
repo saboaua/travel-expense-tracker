@@ -40,17 +40,22 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#4f46e5",
+  // No themeColor here: the head script below writes the one theme-color tag for the screen's real theme
 };
 
 const themeScript = `
 (function() {
+  var dark = false;
   try {
     var t = localStorage.getItem('theme');
-    if (t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-      document.documentElement.classList.add('dark');
-    }
+    dark = t === 'dark' || (!t && window.matchMedia('(prefers-color-scheme: dark)').matches);
   } catch (e) {}
+  if (dark) document.documentElement.classList.add('dark');
+  // The one top-bar colour tag, for the screen's real theme (the page's own switch can differ from the phone's setting)
+  var m = document.createElement('meta');
+  m.setAttribute('name', 'theme-color');
+  m.setAttribute('content', dark ? '#020817' : '#4f46e5');
+  document.head.appendChild(m);
 })();
 `;
 
