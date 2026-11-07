@@ -35,6 +35,7 @@ export const FEATURES: Feature[] = [
   { key: "currencies.manage", label: "Currencies", description: "Enable, disable and order currencies.", group: "Administration", paths: ["/admin/currencies"], defaultRoles: [] },
   { key: "branding.manage", label: "Branding", description: "App name, logo, colors, privacy policy and support email.", group: "Administration", paths: ["/admin/branding"], defaultRoles: [] },
   { key: "telegram.manage", label: "Telegram", description: "Bot token and notification settings.", group: "Administration", paths: ["/admin/telegram"], defaultRoles: [] },
+  { key: "help.manage", label: "Help topics", description: "Write the topics shown in the Help section.", group: "Administration", paths: ["/admin/help"], defaultRoles: ["assistant"] },
   { key: "support.view", label: "Support requests", description: "Read messages from the login contact form.", group: "Administration", paths: ["/admin/support"], defaultRoles: [] },
 ];
 

@@ -35,6 +35,8 @@ export const ROLE_COLS = "key, label, description, permissions, known_features, 
 export const SECURITY_EVENT_COLS = "id, created_at, event_type, severity, email_attempted, ip_address, country, origin, user_agent, user_id, details";
 export const AUDIT_LOG_COLS = "id, created_at, action, entity_type, entity_id, actor_id, actor_email, ip_address, origin, user_agent, details";
 
+export const HELP_TOPIC_COLS = "id, slug, title, category, summary, body, sort_order, published, updated_at";
+
 export const SUPPORT_REQUEST_COLS = "id, name, email, subject, message, status, created_at";
 
 export const TELEGRAM_PENDING_COLS = "telegram_id, file_id, file_name, mime";

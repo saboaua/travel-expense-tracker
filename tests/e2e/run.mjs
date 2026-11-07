@@ -58,6 +58,12 @@ const ADMIN = fake.addUser({ email: "admin@example.com", password: "Admin-Pass-1
 const ALICE = fake.addUser({ email: "alice@example.com", password: "Alice-Pass-123", role: "family", full_name: "Alice Sharer" });
 const BOB = fake.addUser({ email: "bob@example.com", password: "Bob-Pass-12345", role: "family", full_name: "Bob Partner" });
 fake.addUser({ email: "carol@example.com", password: "Carol-Pass-123", role: "family", full_name: "Carol Stranger" });
+fake.addUser({ email: "sam@example.com", password: "Sam-Pass-12345", role: "assistant", full_name: "Sam Assistant" });
+const HELP_AT = new Date().toISOString();
+fake.table("help_topics").push(
+  { id: "c0c0c0c0-0000-4000-8000-000000000001", slug: "add-to-home-screen", title: "Add the app to your home screen", category: "Getting started", summary: "Open it like any other app.", body: "## iPhone and iPad\n1. Open the app in **Safari**.\n2. Tap **Share**.\n3. Tap **Add to Home Screen**.\n\n> Tip: use Safari.", sort_order: 10, published: true, updated_at: HELP_AT },
+  { id: "c0c0c0c0-0000-4000-8000-000000000002", slug: "share-with-partner", title: "Share with a partner", category: "Sharing", summary: "Let someone you trust see a card.", body: "- A card\n- A trip", sort_order: 20, published: true, updated_at: HELP_AT },
+);
 const today = todayAruba();
 const TRIP_ID = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
 fake.table("trips").push({ id: TRIP_ID, user_id: PAT, name: "Miami Conference", destination: "Miami", category: "Business", start_date: addDays(today, -1), end_date: addDays(today, 2), currency: "USD", status: "active", notes: null, created_at: new Date().toISOString() });
@@ -1119,6 +1125,116 @@ try {
   await test("admin: Support page lists a request", async () => {
     await admin.page.goto(`${BASE}/admin/support`);
     await admin.page.getByText("Cannot log in").first().waitFor();
+  });
+
+  await test("help: every user reads the topics, search works, and both layouts fit", async () => {
+    const shot = async (page, name) => { if (process.env.E2E_SHOT) await page.screenshot({ path: `${process.env.E2E_SHOT}/${name}.png`, fullPage: false }); };
+    // desktop
+    const d = await newPage();
+    await signIn(d.page, "pat@example.com", "Correct-Horse-1");
+    await d.page.waitForURL((u) => u.pathname === "/");
+    await d.page.getByRole("link", { name: "Help" }).first().click();
+    await d.page.waitForURL((u) => u.pathname === "/help");
+    await d.page.getByText("Add the app to your home screen").first().waitFor();
+    await d.page.getByText("Choose a topic").waitFor();
+    await shot(d.page, "help-1-desktop-list");
+    await d.page.getByRole("link", { name: /Add the app to your home screen/ }).click();
+    await d.page.waitForURL((u) => u.pathname === "/help/add-to-home-screen");
+    await d.page.getByRole("heading", { name: "iPhone and iPad" }).waitFor();
+    assert((await d.page.getByText("Add to Home Screen").count()) >= 1, "step text missing");
+    assert(await d.page.getByText("Add the app to your home screen").first().isVisible(), "the list should stay beside the topic on desktop");
+    assert((await d.page.getByRole("link", { name: "Edit this topic" }).count()) === 0, "a plain user must not see Edit");
+    await shot(d.page, "help-2-desktop-topic");
+    await d.page.getByLabel("Search help").fill("trip");
+    await d.page.getByText("Share with a partner").first().waitFor();
+    assert((await d.page.getByRole("link", { name: /Add the app to your home screen/ }).count()) === 0, "search should hide other topics");
+    await d.page.getByLabel("Search help").fill("zzzz");
+    await d.page.getByText(/Nothing found/).waitFor();
+    // a plain user can not open the editor
+    await d.page.goto(`${BASE}/admin/help`);
+    await d.page.waitForURL((u) => !u.pathname.startsWith("/admin"), { timeout: 15000 });
+    await d.ctx.close();
+
+    // phone: the list, then one topic with a Back link, and the Help item in the menu
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("button", { name: "Menu" }).click();
+    await page.getByRole("link", { name: "Help" }).click();
+    await page.waitForURL((u) => u.pathname === "/help");
+    await page.getByText("Share with a partner").first().waitFor();
+    assert((await page.getByText("Choose a topic").isVisible()) === false, "the desktop hint must not show on a phone");
+    await shot(page, "help-3-phone-list");
+    await page.getByRole("link", { name: /Share with a partner/ }).click();
+    await page.getByRole("heading", { name: "Share with a partner", level: 1 }).waitFor();
+    assert((await page.getByRole("navigation", { name: "Help topics" }).isVisible()) === false, "the list should be hidden while reading a topic on a phone");
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    assert(!overflow, "the topic page scrolls sideways on a phone");
+    await shot(page, "help-4-phone-topic");
+    await page.getByRole("link", { name: "All topics" }).click();
+    await page.waitForURL((u) => u.pathname === "/help");
+    await ctx.close();
+  });
+
+  await test("help: admin and assistant can add, edit, hide and delete topics", async () => {
+    const shot = async (page, name) => { if (process.env.E2E_SHOT) await page.screenshot({ path: `${process.env.E2E_SHOT}/${name}.png`, fullPage: false }); };
+    await admin.page.goto(`${BASE}/admin/help`);
+    await admin.page.getByRole("heading", { name: "Help topics" }).waitFor();
+    await admin.page.getByText("Share with a partner").first().waitFor();
+    await admin.page.getByRole("button", { name: "New topic" }).click();
+    await admin.page.getByLabel("Title").fill("Reset your password");
+    await admin.page.getByLabel("Category").fill("Account");
+    await admin.page.getByLabel("Short description").fill("Get back into your account.");
+    await admin.page.locator("#help-body").fill("1. Open **Profile**.\n2. Tap **Change password**.\n\n<b>not html</b>");
+    await admin.page.getByLabel("Preview").getByText("Change password").waitFor();
+    await shot(admin.page, "help-5-admin-editor");
+    await admin.page.getByRole("button", { name: "Add topic" }).click();
+    await admin.page.getByText("Topic added.").waitFor();
+    const row = fake.table("help_topics").find((r) => r.title === "Reset your password");
+    assert(row && row.slug === "reset-your-password" && row.category === "Account" && row.published === true, "the new topic was not stored as expected");
+    // a second topic with the same title gets its own address
+    await admin.page.getByRole("button", { name: "New topic" }).click();
+    await admin.page.getByLabel("Title").fill("Reset your password");
+    await admin.page.getByRole("button", { name: "Add topic" }).click();
+    await admin.page.getByText("Topic added.").waitFor();
+    assert(fake.table("help_topics").some((r) => r.slug === "reset-your-password-2"), "a repeated title should get a numbered address");
+    // an empty title is refused with words, not a database error
+    await admin.page.getByRole("button", { name: "New topic" }).click();
+    await admin.page.getByRole("button", { name: "Add topic" }).click();
+    await admin.page.getByText("Give the topic a title.").waitFor();
+    await admin.page.getByRole("button", { name: "Cancel" }).click();
+    // edit, then make it a draft, then delete
+    const acct = admin.page.getByRole("region", { name: "Account" }); // the repeated title above landed in General
+    await acct.getByRole("button", { name: "Edit Reset your password", exact: true }).click();
+    await admin.page.getByLabel("Short description").fill("Updated text.");
+    await admin.page.getByRole("button", { name: "Save changes" }).click();
+    await admin.page.getByText("Topic saved.").waitFor();
+    assert(fake.table("help_topics").find((r) => r.slug === "reset-your-password").summary === "Updated text.", "edit not saved");
+    await acct.getByRole("button", { name: /Tap to make “Reset your password” a draft/ }).click();
+    await admin.page.getByText("Draft").first().waitFor();
+    assert(fake.table("help_topics").find((r) => r.slug === "reset-your-password").published === false, "draft switch not saved");
+    // the page shows the markup as text, never as HTML
+    await admin.page.goto(`${BASE}/help/reset-your-password`);
+    await admin.page.getByRole("heading", { name: "Reset your password", level: 1 }).waitFor();
+    assert((await admin.page.locator("article b").count()) === 0, "HTML in a topic must not become real markup");
+    assert((await admin.page.getByText("<b>not html</b>").count()) === 1, "HTML should show as plain text");
+    await admin.page.getByRole("link", { name: "Edit this topic" }).waitFor();
+    await admin.page.goto(`${BASE}/admin/help`);
+    await admin.page.getByRole("region", { name: "Account" }).getByRole("button", { name: "Delete Reset your password", exact: true }).click();
+    await admin.page.getByRole("button", { name: "Delete", exact: true }).click();
+    await admin.page.getByText("Topic deleted.").waitFor();
+    assert(!fake.table("help_topics").some((r) => r.slug === "reset-your-password"), "topic not deleted");
+    fake.table("help_topics").splice(0, fake.table("help_topics").length, ...fake.table("help_topics").filter((r) => !r.slug.startsWith("reset-your-password")));
+
+    // the assistant role can open the editor too
+    const sam = await newPage();
+    await signIn(sam.page, "sam@example.com", "Sam-Pass-12345");
+    await sam.page.waitForURL((u) => u.pathname === "/");
+    await sam.page.goto(`${BASE}/admin/help`);
+    await sam.page.getByRole("heading", { name: "Help topics" }).waitFor();
+    await sam.ctx.close();
   });
 
   await test("weather lives inside the welcome card on both views", async () => {

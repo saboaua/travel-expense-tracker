@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet } from "lucide-react";
+import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet, CircleHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { clearOfflineData } from "@/lib/offline-store";
@@ -52,7 +52,7 @@ export function MobileNav() {
     // Documents live inside Personal; a role that has Documents but not Personal still gets its own tab
     ...(perms.has("documents") && !personalShown ? [{ href: "/documents", label: "Docs", icon: FolderOpen }] : []),
   ];
-  const menuActive = pathname.startsWith("/admin") || pathname.startsWith("/profile");
+  const menuActive = pathname.startsWith("/admin") || pathname.startsWith("/profile") || pathname.startsWith("/help");
 
   return (
     <>
@@ -74,6 +74,15 @@ export function MobileNav() {
               )}
             >
               <User className="h-5 w-5" /> Profile
+            </Link>
+            <Link
+              href="/help"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                pathname.startsWith("/help") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
+              )}
+            >
+              <CircleHelp className="h-5 w-5" /> Help
             </Link>
 
             {adminItems.length > 0 && (

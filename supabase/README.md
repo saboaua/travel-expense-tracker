@@ -36,6 +36,7 @@ each file says so when that is the case.
 | 28 | `migration_loyalty.sql` | Loyalty card wallet: cards table, private photo bucket, "loyalty" role option for every role (after 3 and 14) |
 | 29 | `migration_documents_license.sql` | Driver's license as a document type (after 16) |
 | 30 | `migration_sharing.sql` | Partner sharing: loyalty cards (view only) and trip name, destination and dates. Closed tables, safe functions, leak failsafe, "Partner sharing" role option, off until an admin gives it to a role (after 3, 14, 28 and the audit migration) |
+| 31 | `migration_help.sql` | Help section: topics written by admin and the assistant role, readable by every signed-in user, with two starter topics (after 3) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.

@@ -8,7 +8,7 @@ eq(sorted(effectivePermissions({key:"admin",permissions:[],known_features:[]})),
 
 // seeded system roles behave like before roles existed
 eq(sorted(legacyPermissions("user")), ["documents","loyalty","personal","personal.dashboard","reports","trips"], "legacy user");
-eq(sorted(legacyPermissions("assistant")), ["documents","loyalty","personal","personal.dashboard","reports","trips","users.manage"], "legacy assistant");
+eq(sorted(legacyPermissions("assistant")), ["documents","help.manage","loyalty","personal","personal.dashboard","reports","trips","users.manage"], "legacy assistant");
 eq(sorted(legacyPermissions("whatever")), ["documents","loyalty","personal","personal.dashboard","reports","trips"], "unknown role -> user baseline");
 
 // reviewed roles use exactly what the admin ticked
@@ -53,7 +53,9 @@ eq(sanitizeLabel("   "), null, "blank label");
 // navigation
 import { adminNavItems } from "../src/lib/access";
 eq(adminNavItems("admin", new Set()).map(i=>i.label), ["Security","Global Settings"], "admin nav");
-eq(adminNavItems("assistant", legacyPermissions("assistant")), [{href:"/admin/users",label:"Users",kind:"users"}], "assistant keeps a direct Users link");
+eq(adminNavItems("assistant", legacyPermissions("assistant")), [{href:"/admin/settings",label:"Management",kind:"settings"}], "assistant now has two management options (users, help), so the menu shows the Management hub"
+);
+eq(adminNavItems("assistant", new Set(["users.manage"])), [{href:"/admin/users",label:"Users",kind:"users"}], "one delegated option still links straight to it");
 eq(adminNavItems("user", legacyPermissions("user")), [], "user has no management links");
 eq(adminNavItems("auditor", new Set(["security.view"])).map(i=>i.label), ["Security"], "auditor: security only");
 eq(adminNavItems("ops", new Set(["currencies.manage"])).map(i=>[i.label,i.href]), [["Currencies","/admin/currencies"]], "one feature -> direct link");

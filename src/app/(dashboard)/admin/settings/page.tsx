@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, Briefcase, LifeBuoy } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, Briefcase, LifeBuoy, CircleHelp } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -33,6 +33,13 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Travel Categories",
     description: "Manage the trip types offered when creating a trip.",
     icon: Briefcase,
+  },
+  {
+    href: "/admin/help",
+    feature: "help.manage",
+    title: "Help Topics",
+    description: "Write the guides users see under Help in the menu.",
+    icon: CircleHelp,
   },
   {
     href: "/admin/support",

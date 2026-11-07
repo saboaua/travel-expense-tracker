@@ -18,7 +18,7 @@ want_tables(name, fix) as (values
   ('support_requests','migration_login_support.sql'),
   ('telegram_pending','migration_telegram.sql'), ('telegram_notify_prefs','migration_telegram_v2.sql'), ('telegram_sent_log','migration_telegram_v2.sql'),
   ('telegram_admin_actions','migration_telegram_admin.sql'), ('app_secrets','migration_telegram_admin.sql'), ('telegram_updates','migration_telegram_v4.sql'),
-  ('loyalty_cards','migration_loyalty.sql')
+  ('loyalty_cards','migration_loyalty.sql'), ('help_topics','migration_help.sql')
 ),
 want_columns(tbl, col, fix) as (values
   ('profiles','role','migration_admin.sql'), ('profiles','must_change_password','migration_admin.sql'),

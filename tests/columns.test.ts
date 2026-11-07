@@ -54,6 +54,7 @@ check("LOYALTY_CARD_COLS", "loyalty_cards", C.LOYALTY_CARD_COLS);
 check("ROLE_COLS", "roles", C.ROLE_COLS);
 check("SECURITY_EVENT_COLS", "security_events", C.SECURITY_EVENT_COLS);
 check("AUDIT_LOG_COLS", "audit_logs", C.AUDIT_LOG_COLS);
+check("HELP_TOPIC_COLS", "help_topics", C.HELP_TOPIC_COLS);
 check("SUPPORT_REQUEST_COLS", "support_requests", C.SUPPORT_REQUEST_COLS);
 check("TELEGRAM_PENDING_COLS", "telegram_pending", C.TELEGRAM_PENDING_COLS);
 check("BRANDING_COLS", "app_settings", C.BRANDING_COLS);
