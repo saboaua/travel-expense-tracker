@@ -99,6 +99,60 @@ async function discoverModel(key: string): Promise<string | null> {
   }
 }
 
+export type AiCheck = {
+  keySet: boolean;
+  configuredModel: string;
+  /** What Google answered when listing models: a status number, or an error word. */
+  listStatus: number | string | null;
+  /** The newest Flash model Google lists that can read images. */
+  newestModel: string | null;
+  configuredListed: boolean | null;
+  /** A tiny test request with the configured model. */
+  callStatus: number | string | null;
+  callError: string | null;
+  verdict: string;
+};
+
+/** Checks the AI reader end to end without an image: key present, Google reachable, the model exists and answers. Never returns the key. */
+export async function diagnoseAi(): Promise<AiCheck> {
+  const key = process.env.GEMINI_API_KEY;
+  const override = process.env.OCR_MODEL;
+  const configuredModel = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
+  const out: AiCheck = { keySet: !!key, configuredModel, listStatus: null, newestModel: null, configuredListed: null, callStatus: null, callError: null, verdict: "" };
+  if (!key) {
+    out.verdict = "GEMINI_API_KEY is not set on the server. Add it in Vercel (Settings, Environment Variables) and redeploy.";
+    return out;
+  }
+  let models: ModelInfo[] = [];
+  try {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(10000) });
+    out.listStatus = res.status;
+    if (res.ok) models = ((await res.json()) as { models?: ModelInfo[] }).models || [];
+  } catch (e) {
+    out.listStatus = e instanceof Error ? e.name : "error";
+  }
+  out.newestModel = pickModel(models);
+  if (models.length) out.configuredListed = models.some((m) => m.name === `models/${configuredModel}`);
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(workingModel ?? configuredModel)}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: 'Reply with the JSON {"ok":true}' }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 64, temperature: 0 } }),
+      signal: AbortSignal.timeout(15000),
+    });
+    out.callStatus = res.status;
+    if (!res.ok) out.callError = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 240);
+  } catch (e) {
+    out.callStatus = e instanceof Error ? e.name : "error";
+  }
+  if (out.callStatus === 200) out.verdict = "Working: Gemini answered with the configured model. If scans still fall back to basic OCR, the photo itself could not be read (try a flatter, brighter photo).";
+  else if (out.listStatus === 400 || out.listStatus === 401 || out.listStatus === 403 || out.callStatus === 401 || out.callStatus === 403) out.verdict = "Google refused the key. Check GEMINI_API_KEY (copied whole, no spaces, the Generative Language API enabled for its project).";
+  else if (out.callStatus === 404) out.verdict = out.newestModel ? `The model ${configuredModel} no longer exists. The app will switch to ${out.newestModel} by itself, or set OCR_MODEL=${out.newestModel} in Vercel.` : `The model ${configuredModel} was not found and no replacement was listed. Check the key's access.`;
+  else if (out.callStatus === 429) out.verdict = "The key has hit its rate or quota limit (429). Wait, or check the billing and quota of the Google project.";
+  else out.verdict = "Gemini could not be reached or returned an unexpected answer. See the status codes.";
+  return out;
+}
+
 async function askAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   prompt: string,
