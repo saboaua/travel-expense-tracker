@@ -87,7 +87,7 @@ export default function AdminCurrenciesPage() {
 
       {error && <Alert>{error}</Alert>}
 
-      <AccordionGroup defaultOpen="available">
+      <AccordionGroup>
       <AccordionSection id="available" title="Available currencies" icon={<Coins />} summary={loading ? "Loading…" : `${rows.filter((r) => r.enabled).length} of ${rows.length} turned on`} description="Rate is USD per 1 unit. Leave it empty to use the live market rate.">
         <div className="space-y-3">
           {loading ? (

@@ -1278,24 +1278,26 @@ try {
     await shot(d.page, "acc-3-desktop-profile");
     await d.ctx.close();
 
-    // admin setup pages: first section open, one at a time
+    // admin setup pages: every section starts closed, one at a time
     await admin.page.goto(`${BASE}/admin/branding`);
     await open(admin.page, "Logo").waitFor();
-    assert(await expanded(admin.page, "Logo"), "Branding opens on its first section");
-    assert(!(await expanded(admin.page, "App name & color")), "the other Branding sections start closed");
+    for (const n of ["Logo", "App name & color", "Privacy policy & support", "Personal section"]) assert(!(await expanded(admin.page, n)), `Branding: ${n} should start closed`);
+    await open(admin.page, "Logo").click();
+    assert(await expanded(admin.page, "Logo"), "tapping Logo opens it");
     await open(admin.page, "App name & color").click();
     await admin.page.locator('input[value="E2E Expense App"]').waitFor({ state: "visible" });
     assert(!(await expanded(admin.page, "Logo")), "opening a Branding section closes the other");
     await shot(admin.page, "acc-4-admin-branding");
     await admin.page.goto(`${BASE}/admin/currencies`);
     await open(admin.page, "Available currencies").waitFor();
-    assert(await expanded(admin.page, "Available currencies"), "Currencies opens on the list");
+    for (const n of ["Available currencies", "Add a currency"]) assert(!(await expanded(admin.page, n)), `Currencies: ${n} should start closed`);
+    await open(admin.page, "Available currencies").click();
     await admin.page.locator('input[value="US Dollar"]').waitFor({ state: "visible" });
     await open(admin.page, "Add a currency").click();
     await admin.page.getByPlaceholder("Code").waitFor({ state: "visible" });
     await admin.page.goto(`${BASE}/admin/telegram`);
     await open(admin.page, "Bot setup").waitFor();
-    assert(await expanded(admin.page, "Bot setup"), "Telegram setup opens on Bot setup");
+    for (const n of ["Bot setup", "How this is set up"]) assert(!(await expanded(admin.page, n)), `Telegram setup: ${n} should start closed`);
   });
 
   await test("weather lives inside the welcome card on both views", async () => {

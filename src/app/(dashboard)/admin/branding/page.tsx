@@ -155,7 +155,7 @@ export default function AdminBrandingPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-      <AccordionGroup defaultOpen="logo">
+      <AccordionGroup>
       <AccordionSection id="logo" title="Logo" icon={<ImageIcon />} summary={logoUrl ? `Custom logo · ${logoSize}px on the login screen` : "Default logo"} description="Appears on the login screen and next to the app name in the sidebar">
         <div className="space-y-4">
           <div className="flex items-center gap-4">

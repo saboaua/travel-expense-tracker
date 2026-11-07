@@ -77,7 +77,7 @@ export default function AdminTelegramPage() {
         </p>
       </div>
 
-      <AccordionGroup defaultOpen="bot">
+      <AccordionGroup>
       <AccordionSection
         id="bot"
         title="Bot setup"
