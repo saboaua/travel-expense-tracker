@@ -27,6 +27,8 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Lifolio",
       startupImage: startupImages,
     },
+    // iOS decides "open as a web app" from this legacy tag too; Next only writes the newer mobile-web-app-capable
+    other: { "apple-mobile-web-app-capable": "yes" },
     icons: {
       icon: [{ url: iconHref(logoUrl, 192), sizes: "192x192", type: "image/png" }],
       apple: [{ url: iconHref(logoUrl, 180), sizes: "180x180", type: "image/png" }],

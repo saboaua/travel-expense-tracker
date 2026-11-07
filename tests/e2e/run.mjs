@@ -245,6 +245,32 @@ try {
     });
   }
 
+  /* ---------- installing as an app ---------- */
+  await test("install tags: the page and manifest say this is a standalone app, with a 180 touch icon and a separate maskable icon", async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(`${BASE}/login`);
+    const head = await page.evaluate(() => ({
+      capable: document.querySelector('meta[name="apple-mobile-web-app-capable"]')?.getAttribute("content"),
+      modern: document.querySelector('meta[name="mobile-web-app-capable"]')?.getAttribute("content"),
+      title: document.querySelector('meta[name="apple-mobile-web-app-title"]')?.getAttribute("content"),
+      touch: document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute("href"),
+      manifest: document.querySelector('link[rel="manifest"]')?.getAttribute("href"),
+    }));
+    assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
+    assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
+    assert(/^\/api\/icon\?v=\w+&size=180$/.test(head.touch || ""), `the touch icon is a 180 PNG link (got ${head.touch})`);
+    const m = await (await page.request.get(`${BASE}${head.manifest}`)).json();
+    assert(m.display === "standalone" && m.id === "/" && m.start_url === "/" && m.scope === "/", "the manifest asks for a standalone app inside this site");
+    assert(m.short_name === "Lifolio", "the manifest short name is Lifolio");
+    const maskable = m.icons.find((i) => i.purpose === "maskable"), plain = m.icons.filter((i) => i.purpose === "any");
+    assert(maskable && /maskable=1/.test(maskable.src) && plain.every((i) => !/maskable/.test(i.src)), "the maskable icon is its own image");
+    for (const src of [head.touch, maskable.src]) {
+      const r = await page.request.get(`${BASE}${src}`);
+      assert(r.ok() && /image\/png/.test(r.headers()["content-type"] || ""), `${src} is a PNG`);
+    }
+    await ctx.close();
+  });
+
   /* ---------- sign-in ---------- */
   await test("signed-out visitors are sent to the login page", async () => {
     const { ctx, page } = await newPage();

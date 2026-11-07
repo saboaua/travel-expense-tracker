@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
 import { getLogoUrl } from "@/lib/brand-icon";
-import { MASKABLE_SCALE, toIconPng } from "@/lib/icon-image";
+import { toIconPng } from "@/lib/icon-image";
 
 export const dynamic = "force-dynamic";
 
 const SIZES = [120, 152, 167, 180, 192, 512];
 
 /**
- * The app icon: the uploaded logo as a square PNG on white, which is what iPhones and Android need
- * (they ignore SVG and WebP, and fill transparent corners with black). With ?maskable=1 the logo is smaller,
- * leaving room for Android to crop the icon to a circle without cutting the logo. Without a logo the built-in icon is used.
+ * The app icon: the uploaded logo as a square PNG, which is what iPhones and Android need (they ignore SVG and WebP,
+ * and fill transparent corners with black). A logo that is a solid tile fills the whole icon with no white frame.
+ * With ?maskable=1 there is extra room, so Android can crop the icon to a circle without cutting the logo.
+ * Without a logo the built-in icon is used.
  */
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
     if (res.ok && (logoUrl || maskable)) {
       const input = Buffer.from(await res.arrayBuffer());
       try {
-        const png = await toIconPng(input, size, maskable ? MASKABLE_SCALE : undefined);
+        const png = await toIconPng(input, size, { maskable });
         return new NextResponse(new Uint8Array(png), { headers: { "Content-Type": "image/png", "Cache-Control": cache } });
       } catch {
         // The image could not be converted: send it as it is
