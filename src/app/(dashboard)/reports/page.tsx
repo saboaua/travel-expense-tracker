@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { MonthlyDownload } from "@/components/MonthlyDownload";
 import { MonthlyBars } from "@/components/reports/MonthlyBars";
@@ -61,6 +62,8 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
+  if (!user) redirect("/login");
 
   const [expenses, tripsRes] = await Promise.all([
     fetchAll<ExpenseRow>((a, b) =>

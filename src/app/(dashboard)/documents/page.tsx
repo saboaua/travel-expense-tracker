@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { loadPermissions } from "@/lib/access-server";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { kindLabel, type TravelDocument } from "@/lib/documents";
@@ -10,6 +11,8 @@ import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/col
 export default async function DocumentsPage() {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
+  if (!user) redirect("/login");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.id).single();
   const canSeePersonal = (await loadPermissions(supabase, (profile?.role as string) || "user")).has("personal");
   const { data } = await withColumnFallback(

@@ -15,6 +15,7 @@ import { currentPassport, documentStatus, kindLabel, maskNumber, numberLabel, re
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
 import { permissionsFromRoles, type RoleRecord } from "@/lib/access";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
@@ -33,6 +34,8 @@ function usdOf(e: Expense) {
 export default async function DashboardPage() {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
+  if (!user) redirect("/login");
   const uid = user?.id;
 
   // Wave 1: everything that only needs to know who is signed in, asked together

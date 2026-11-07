@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { Card, CardContent } from "@/components/ui/card";
 import { TripsList } from "@/components/trips/TripsList";
@@ -33,6 +34,8 @@ function tripTotal(trip: Trip) {
 export default async function TripsPage() {
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
+  if (!user) redirect("/login");
 
   const { data } = await supabase
     .from("trips")

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { ArrowLeft, Archive, Camera, CalendarDays, Clock, Download, MapPin, Pencil, Plus, Tag } from "lucide-react";
 import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
@@ -31,6 +32,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   const { docs_failed } = await searchParams;
   const supabase = await createClient();
   const user = await getCurrentUser();
+  // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
+  if (!user) redirect("/login");
 
   const { data: trip } = await supabase.from("trips").select(TRIP_COLS).eq("id", id).eq("user_id", user?.id).single();
   if (!trip) notFound();
