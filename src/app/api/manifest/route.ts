@@ -1,35 +1,14 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { iconHref } from "@/lib/brand-icon";
+import { getBrand, iconHref } from "@/lib/brand-icon";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  let name = "Travel Expense Tracker";
-  let theme = "#4f46e5";
-  let logoUrl: string | null = null;
-
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { auth: { persistSession: false } }
-    );
-
-    const { data } = await supabase
-      .from("app_settings")
-      .select("app_name, primary_color, logo_url")
-      .eq("id", 1)
-      .single();
-
-    if (data) {
-      if (data.app_name) name = data.app_name;
-      if (data.primary_color) theme = data.primary_color;
-      logoUrl = data.logo_url && /^https?:\/\//i.test(data.logo_url) ? data.logo_url : null;
-    }
-  } catch {
-    // use defaults
-  }
+export async function GET(request: Request) {
+  // Read from the one-minute shared copy, not from the database on every visit
+  const brand = await getBrand();
+  const name = brand.appName || "Travel Expense Tracker";
+  const theme = brand.primaryColor || "#4f46e5";
+  const logoUrl = brand.logoUrl;
 
   const icon = (size: number) => (logoUrl ? iconHref(logoUrl, size) : size >= 512 ? "/icon-512.png" : "/icon-192.png");
   // Android crops a maskable icon, so it gets its own copy with room around the logo
@@ -69,10 +48,12 @@ export async function GET() {
     ],
   };
 
+  // With ?v= the address changes whenever the contents do, so it can be kept for a day (by the phone and by the CDN)
+  const versioned = new URL(request.url).searchParams.has("v");
   return NextResponse.json(manifest, {
     headers: {
       "Content-Type": "application/manifest+json",
-      "Cache-Control": "public, max-age=60",
+      "Cache-Control": versioned ? "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800" : "public, max-age=300, s-maxage=300",
     },
   });
 }

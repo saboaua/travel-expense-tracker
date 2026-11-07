@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { ICON_RENDER, ICON_RENDER_SOURCE_FINGERPRINT, iconHref, iconVersion } from "../src/lib/brand-icon";
+import { ICON_RENDER, ICON_RENDER_SOURCE_FINGERPRINT, iconHref, iconVersion, manifestHref } from "../src/lib/brand-icon";
 import { toIconPng, tileColour } from "../src/lib/icon-image";
 
 let failed = 0;
@@ -24,6 +24,14 @@ const fingerprint = createHash("sha1").update(readFileSync(new URL("../src/lib/i
 eq(fingerprint, ICON_RENDER_SOURCE_FINGERPRINT, `icon-image.ts changed: raise ICON_RENDER (now ${ICON_RENDER}) and set ICON_RENDER_SOURCE_FINGERPRINT to "${fingerprint}" in src/lib/brand-icon.ts`);
 eq(iconHref("https://x/logo.png", 180).includes(`v=${iconVersion("https://x/logo.png")}${ICON_RENDER}&size=180`), true, "the icon link carries the logo version and the render number");
 eq(iconHref(null, 512, true), `/api/icon?v=0${ICON_RENDER}&size=512&maskable=1`, "the maskable link");
+
+/* ---- the manifest link changes whenever the manifest would, so it can be cached for a day ---- */
+const base = { logoUrl: "https://x/logo.png", appName: "Lifolio", primaryColor: "#4f46e5" };
+eq(manifestHref(base) === manifestHref({ ...base }), true, "same settings, same manifest link");
+eq(manifestHref(base) !== manifestHref({ ...base, appName: "Other" }), true, "a new name changes the manifest link");
+eq(manifestHref(base) !== manifestHref({ ...base, primaryColor: "#000000" }), true, "a new colour changes the manifest link");
+eq(manifestHref(base) !== manifestHref({ ...base, logoUrl: "https://x/new.png" }), true, "a new logo changes the manifest link");
+eq(manifestHref(base).startsWith("/api/manifest?v="), true, "manifest link shape");
 
 /* A dark rounded tile with a light symbol and transparent corners: like the Lifolio logo */
 const tileSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" rx="80" fill="#0b1a3a"/><rect x="120" y="100" width="90" height="200" fill="#3b82f6"/><rect x="190" y="220" width="110" height="70" fill="#67e8f9"/></svg>');

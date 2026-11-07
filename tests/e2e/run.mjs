@@ -259,7 +259,12 @@ try {
     assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
     assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
     assert(/^\/api\/icon\?v=\w+&size=180$/.test(head.touch || ""), `the touch icon is a 180 PNG link (got ${head.touch})`);
-    const m = await (await page.request.get(`${BASE}${head.manifest}`)).json();
+    assert(/^\/api\/manifest\?v=\w+$/.test(head.manifest || ""), `the manifest link carries a version (got ${head.manifest})`);
+    const mres = await page.request.get(`${BASE}${head.manifest}`);
+    assert(/max-age=86400/.test(mres.headers()["cache-control"] || ""), `the versioned manifest is kept for a day (got ${mres.headers()["cache-control"]})`);
+    const plainRes = await page.request.get(`${BASE}/api/manifest`);
+    assert(/max-age=300/.test(plainRes.headers()["cache-control"] || ""), "an unversioned manifest address is only kept briefly");
+    const m = await mres.json();
     assert(m.display === "standalone" && m.id === "/" && m.start_url === "/" && m.scope === "/", "the manifest asks for a standalone app inside this site");
     assert(m.short_name === "Lifolio", "the manifest short name is Lifolio");
     const maskable = m.icons.find((i) => i.purpose === "maskable"), plain = m.icons.filter((i) => i.purpose === "any");

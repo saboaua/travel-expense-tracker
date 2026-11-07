@@ -17,17 +17,20 @@ export function iconVersion(logoUrl: string | null | undefined): string {
 export const ICON_RENDER = "2";
 export const ICON_RENDER_SOURCE_FINGERPRINT = "2cf9b35b";
 
-/** The logo address and app name, read at most once a minute so pages stay fast. */
+export type Brand = { logoUrl: string | null; appName: string | null; primaryColor?: string | null };
+
+/** The logo address, app name and colour, read at most once a minute so pages (and the manifest) stay fast. */
 export const getBrand = unstable_cache(
-  async (): Promise<{ logoUrl: string | null; appName: string | null }> => {
+  async (): Promise<Brand> => {
     try {
       const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, { auth: { persistSession: false } });
-      const { data } = await supabase.from("app_settings").select("app_name, logo_url").eq("id", 1).single();
+      const { data } = await supabase.from("app_settings").select("app_name, logo_url, primary_color").eq("id", 1).single();
       const url = data?.logo_url as string | null | undefined;
       const name = (data?.app_name as string | null | undefined)?.trim();
-      return { logoUrl: url && /^https?:\/\//i.test(url) ? url : null, appName: name || null };
+      const colour = (data?.primary_color as string | null | undefined)?.trim();
+      return { logoUrl: url && /^https?:\/\//i.test(url) ? url : null, appName: name || null, primaryColor: colour && /^#[0-9a-f]{3,8}$/i.test(colour) ? colour : null };
     } catch {
-      return { logoUrl: null, appName: null };
+      return { logoUrl: null, appName: null, primaryColor: null };
     }
   },
   ["brand-settings"],
@@ -39,3 +42,11 @@ export const getLogoUrl = async () => (await getBrand()).logoUrl;
 
 /** Icon links that follow the logo and the drawing code: /api/icon?v=<version>&size=<px>. */
 export const iconHref = (logoUrl: string | null, size = 512, maskable = false) => `/api/icon?v=${iconVersion(logoUrl)}${ICON_RENDER}&size=${size}${maskable ? "&maskable=1" : ""}`;
+
+/**
+ * The manifest link changes whenever anything inside the manifest would (logo, name, colour, or the icon drawing),
+ * so the manifest itself can be kept by phones and the CDN for a day instead of being rebuilt on every visit.
+ */
+export function manifestHref(brand: Brand): string {
+  return `/api/manifest?v=${iconVersion(`${brand.logoUrl ?? ""}|${brand.appName ?? ""}|${brand.primaryColor ?? ""}`)}${ICON_RENDER}`;
+}
