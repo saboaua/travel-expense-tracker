@@ -234,7 +234,7 @@ export default function EditExpensePage() {
                 {shownImage ? (
                   <div className="relative">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={shownImage} alt="Receipt" className="w-full rounded-lg border max-h-80 object-contain bg-muted" />
+                    <img src={shownImage} alt="Receipt" decoding="async" className="w-full rounded-lg border max-h-80 object-contain bg-muted" />
                     {preview && <button type="button" onClick={clearNew} className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 text-white" aria-label="Cancel new receipt"><X className="h-4 w-4" /></button>}
                     {preview && <p className="absolute bottom-2 left-2 text-xs bg-black/60 text-white px-2 py-1 rounded">New receipt — save to keep it</p>}
                   </div>

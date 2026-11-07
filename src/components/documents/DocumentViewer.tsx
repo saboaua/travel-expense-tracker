@@ -36,7 +36,7 @@ export function DocumentViewer({ title, url, path, onClose }: { title: string; u
           <iframe src={url} title={title} className="h-full w-full max-w-4xl rounded-lg bg-white" />
         ) : kind === "image" ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={url} alt={title} className="max-h-full max-w-full rounded-lg object-contain" />
+          <img src={url} alt={title} decoding="async" className="max-h-full max-w-full rounded-lg object-contain" />
         ) : (
           <div className="rounded-xl bg-card p-6 text-center text-sm text-card-foreground">
             <p className="mb-3">This file type cannot be previewed here (for example HEIC photos from some phones).</p>

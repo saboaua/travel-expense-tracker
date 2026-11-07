@@ -104,7 +104,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
       {image && (
         <Card><CardHeader><CardTitle className="text-base">Receipt photo</CardTitle></CardHeader><CardContent>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="Receipt" className="w-full rounded-lg border" />
+          <img src={image} alt="Receipt" decoding="async" className="w-full rounded-lg border" />
         </CardContent></Card>
       )}
     </div>

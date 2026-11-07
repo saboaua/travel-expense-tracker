@@ -16,6 +16,7 @@ export function DestinationPhoto({ src }: { src: string }) {
       key={attempt}
       src={attempt === 0 ? photoProxyUrl(src) : src}
       alt=""
+      decoding="async"
       className="absolute inset-0 h-full w-full object-cover"
       referrerPolicy="no-referrer"
       onError={() => setAttempt((a) => (a === 0 ? 1 : 2))}

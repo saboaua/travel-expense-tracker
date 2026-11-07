@@ -66,7 +66,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, s
               <span className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary text-lg font-semibold text-primary-foreground">
                 {avatarUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatarUrl} alt="" className="h-full w-full object-cover" />
+                  <img src={avatarUrl} alt="" decoding="async" className="h-full w-full object-cover" />
                 ) : (
                   initials
                 )}

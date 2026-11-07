@@ -18,7 +18,7 @@ export function CardFace({ card, side = "front", className, children }: { card: 
     <div className={cn("relative overflow-hidden text-white", className)} style={{ background: cardColor(card) }} data-face={url ? "photo" : "color"}>
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={url} alt={`${card.store_name} card ${side}`} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={url} alt={`${card.store_name} card ${side}`} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" />
       ) : (
         <div className="flex h-full w-full flex-col items-center justify-center px-3 text-center">
           <p className="line-clamp-2 break-words px-6 text-[15px] font-bold leading-tight sm:text-xl">{card.store_name}</p>

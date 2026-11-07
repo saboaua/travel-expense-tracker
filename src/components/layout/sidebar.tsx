@@ -49,7 +49,7 @@ export function Sidebar() {
         <div className="flex items-center h-16 px-4 border-b gap-2.5">
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="h-8 w-8 object-contain rounded shrink-0" />
+            <img src={logoUrl} alt="" decoding="async" className="h-8 w-8 object-contain rounded shrink-0" />
           ) : (
             <div className="h-8 w-8 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: primaryColor }}>TE</div>
           )}

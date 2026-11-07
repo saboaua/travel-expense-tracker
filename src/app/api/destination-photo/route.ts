@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { isAllowedPhotoUrl, PHOTO_USER_AGENT } from "@/lib/destination";
+import { shrinkPhoto } from "@/lib/photo-resize";
 
 const MAX_BYTES = 6 * 1024 * 1024;
 
@@ -74,8 +75,9 @@ export async function GET(request: Request) {
     if (!res.ok || !/^image\/(jpeg|png|webp)/.test(type)) return new NextResponse("Not found", { status: 404 });
     const bytes = await res.arrayBuffer();
     if (bytes.byteLength > MAX_BYTES) return new NextResponse("Not found", { status: 404 });
-    return new NextResponse(bytes, {
-      headers: { "Content-Type": type, "Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff" },
+    const small = await shrinkPhoto(bytes);
+    return new NextResponse(small.body as unknown as BodyInit, {
+      headers: { "Content-Type": small.shrunk ? small.type : type, "Cache-Control": "private, max-age=604800", "X-Content-Type-Options": "nosniff" },
     });
   } catch {
     return new NextResponse("Not found", { status: 404 });
