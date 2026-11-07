@@ -119,6 +119,8 @@ export type AiCheck = {
   /** A tiny test request with the configured model. */
   callStatus: number | string | null;
   callError: string | null;
+  /** How long the test request took, in milliseconds. */
+  callMs: number | null;
   verdict: string;
 };
 
@@ -127,7 +129,7 @@ export async function diagnoseAi(): Promise<AiCheck> {
   const key = process.env.GEMINI_API_KEY;
   const override = process.env.OCR_MODEL;
   const configuredModel = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
-  const out: AiCheck = { keySet: !!key, configuredModel, listStatus: null, newestModel: null, configuredListed: null, callStatus: null, callError: null, verdict: "" };
+  const out: AiCheck = { keySet: !!key, configuredModel, listStatus: null, newestModel: null, configuredListed: null, callStatus: null, callError: null, callMs: null, verdict: "" };
   if (!key) {
     out.verdict = "GEMINI_API_KEY is not set on the server. Add it in Vercel (Settings, Environment Variables) and redeploy.";
     return out;
@@ -142,21 +144,24 @@ export async function diagnoseAi(): Promise<AiCheck> {
   }
   out.newestModel = pickModel(models);
   if (models.length) out.configuredListed = models.some((m) => m.name === `models/${configuredModel}`);
+  const t0 = Date.now();
   try {
     const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(workingModel ?? configuredModel)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: 'Reply with the JSON {"ok":true}' }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 64, temperature: 0 } }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(25000),
     });
     out.callStatus = res.status;
     if (!res.ok) out.callError = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 240);
   } catch (e) {
     out.callStatus = e instanceof Error ? e.name : "error";
   }
+  out.callMs = Date.now() - t0;
   if (out.callStatus === 200) out.verdict = "Working: Gemini answered with the configured model. If scans still fall back to basic OCR, the photo itself could not be read (try a flatter, brighter photo).";
   else if (out.listStatus === 400 || out.listStatus === 401 || out.listStatus === 403 || out.callStatus === 401 || out.callStatus === 403) out.verdict = "Google refused the key. Check GEMINI_API_KEY (copied whole, no spaces, the Generative Language API enabled for its project).";
   else if (out.callStatus === 404) out.verdict = out.newestModel ? `The model ${configuredModel} no longer exists. The app will switch to ${out.newestModel} by itself, or set OCR_MODEL=${out.newestModel} in Vercel.` : `The model ${configuredModel} was not found and no replacement was listed. Check the key's access.`;
+  else if (out.callStatus === "TimeoutError") out.verdict = `Google did not answer the test request within ${Math.round((out.callMs || 0) / 1000)} seconds. The model may be slow or overloaded: reload this page once to see if it is only a slow first call.`;
   else if (out.callStatus === 429) out.verdict = "The key has hit its rate or quota limit (429). Wait, or check the billing and quota of the Google project.";
   else out.verdict = "Gemini could not be reached or returned an unexpected answer. See the status codes.";
   return out;
