@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { getLogoUrl, iconHref } from "@/lib/brand-icon";
+import { getBrand, iconHref } from "@/lib/brand-icon";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -16,9 +16,9 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 const inter = Inter({ subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
-  const logoUrl = await getLogoUrl();
+  const { logoUrl, appName } = await getBrand();
   return {
-    title: "Travel Expense Tracker",
+    title: appName || "Travel Expense Tracker",
     description: "Scan receipts, track business travel expenses, and generate reports",
     manifest: "/api/manifest",
     appleWebApp: {

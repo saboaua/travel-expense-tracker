@@ -1,5 +1,7 @@
 import sharp from "sharp";
-import { iconVersion } from "../src/lib/brand-icon";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { ICON_RENDER, ICON_RENDER_SOURCE_FINGERPRINT, iconHref, iconVersion } from "../src/lib/brand-icon";
 import { toIconPng, tileColour } from "../src/lib/icon-image";
 
 let failed = 0;
@@ -16,6 +18,12 @@ eq(iconVersion(null), "0", "no logo: version 0");
 const a = iconVersion("https://x.supabase.co/storage/v1/object/public/branding/logo.png?t=1");
 const b = iconVersion("https://x.supabase.co/storage/v1/object/public/branding/logo.png?t=2");
 eq([a === iconVersion("https://x.supabase.co/storage/v1/object/public/branding/logo.png?t=1"), a !== b, a !== "0"], [true, true, true], "same address, same version; a new upload, a new version");
+
+/* ---- icon links must change whenever the drawing code changes (phones and the CDN keep them for a day) ---- */
+const fingerprint = createHash("sha1").update(readFileSync(new URL("../src/lib/icon-image.ts", import.meta.url))).digest("hex").slice(0, 8);
+eq(fingerprint, ICON_RENDER_SOURCE_FINGERPRINT, `icon-image.ts changed: raise ICON_RENDER (now ${ICON_RENDER}) and set ICON_RENDER_SOURCE_FINGERPRINT to "${fingerprint}" in src/lib/brand-icon.ts`);
+eq(iconHref("https://x/logo.png", 180).includes(`v=${iconVersion("https://x/logo.png")}${ICON_RENDER}&size=180`), true, "the icon link carries the logo version and the render number");
+eq(iconHref(null, 512, true), `/api/icon?v=0${ICON_RENDER}&size=512&maskable=1`, "the maskable link");
 
 /* A dark rounded tile with a light symbol and transparent corners: like the Lifolio logo */
 const tileSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" rx="80" fill="#0b1a3a"/><rect x="120" y="100" width="90" height="200" fill="#3b82f6"/><rect x="190" y="220" width="110" height="70" fill="#67e8f9"/></svg>');
