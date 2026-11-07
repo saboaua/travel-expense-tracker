@@ -29,9 +29,9 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
 
   const isQr = card.barcode_format === "QR";
   return (
-    <div className="app-frame fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/80 p-3 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`${card.store_name} card`} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div className="flex h-full max-h-[46rem] w-full max-w-md flex-col overflow-hidden rounded-2xl bg-card text-card-foreground shadow-2xl">
-        <CardFace card={card} side={side} className="h-1/3 min-h-[9rem] shrink-0 rounded-none">
+    <div className="app-frame fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 px-3 py-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6" role="dialog" aria-modal="true" aria-label={`${card.store_name} card`} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="mx-auto flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-card text-card-foreground shadow-2xl">
+        <CardFace card={card} side={side} className="h-28 shrink-0 rounded-none sm:h-40">
           <Button type="button" variant="outline" size="icon" className="absolute right-2 top-2 h-11 w-11 border-0 bg-black/35 text-white hover:bg-black/50 hover:text-white" onClick={onClose} aria-label="Close" autoFocus><X className="h-5 w-5" /></Button>
           {card.back_image_path && (
             <button type="button" onClick={() => setSide(side === "front" ? "back" : "front")} className="absolute bottom-2 right-2 flex h-9 items-center gap-1.5 rounded-full bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/60">
@@ -40,9 +40,9 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
           )}
         </CardFace>
 
-        <div className="flex min-h-0 flex-[2] flex-col gap-3 overflow-y-auto p-4">
+        <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
           <div className="rounded-xl border bg-white p-4 pb-3 text-black">
-            <Barcode value={card.card_number} format={card.barcode_format} label={`Barcode for ${displayNumber(card.card_number)}`} className={isQr ? "mx-auto block h-56 w-56 max-w-full" : "block h-32 w-full"} />
+            <Barcode value={card.card_number} format={card.barcode_format} label={`Barcode for ${displayNumber(card.card_number)}`} className={isQr ? "mx-auto block aspect-square w-full max-w-[16rem]" : "block h-32 w-full"} />
             <p className="mt-3 break-all text-center text-xl font-semibold tabular-nums tracking-[0.12em]" data-testid="card-number">{displayNumber(card.card_number)}</p>
             <p className="mt-1 text-center text-xs text-slate-500">{[formatLabel(card.barcode_format), card.holder_name].filter(Boolean).join(" · ")}</p>
           </div>
@@ -52,7 +52,7 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
             <p>Turn your screen brightness up so the scanner can read the code. We keep the screen awake while this is open.</p>
           </div>
 
-          <div className="mt-auto flex gap-2.5">
+          <div className="flex gap-2.5">
             {onEdit && <Button type="button" variant="outline" className="h-11 flex-1" onClick={onEdit}><Pencil className="h-4 w-4" /> Edit</Button>}
             <Button type="button" className="h-11 flex-1" onClick={onClose}>Done</Button>
           </div>

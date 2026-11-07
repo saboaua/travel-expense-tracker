@@ -266,6 +266,16 @@ try {
     assert((await page.getByTestId("card-number").innerText()) === "4021 8830 1177", "number shown in groups");
     assert((await page.locator('[role="dialog"] svg[aria-label^="Barcode for"] rect').count()) > 10, "barcode bars drawn");
     assert(/brightness/i.test(await page.getByRole("dialog").innerText()), "brightness tip shown");
+    {
+      // the sheet sits in the middle of a phone screen, fully visible, and the barcode fills its width
+      const sheet = await page.locator('[role="dialog"] > div').boundingBox();
+      const top = sheet.y, bottom = 844 - (sheet.y + sheet.height);
+      assert(top >= 0 && bottom >= 0, "the sheet is fully on screen");
+      assert(Math.abs(top - bottom) < 24, `the sheet is centred on the phone (top ${Math.round(top)}, bottom ${Math.round(bottom)})`);
+      assert(sheet.width > 390 * 0.9, "the sheet uses the phone width");
+      const bars = await page.locator('[role="dialog"] svg[aria-label^="Barcode for"]').boundingBox();
+      assert(bars.width > sheet.width * 0.8, "the barcode fills the card width");
+    }
     await page.keyboard.press("Escape");
     await page.getByRole("dialog").waitFor({ state: "detached" });
     // edit: front and back, upload then crop
