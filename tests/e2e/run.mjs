@@ -68,6 +68,7 @@ const today = todayAruba();
 const TRIP_ID = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
 fake.table("trips").push({ id: TRIP_ID, user_id: PAT, name: "Miami Conference", destination: "Miami", category: "Business", start_date: addDays(today, -1), end_date: addDays(today, 2), currency: "USD", status: "active", notes: null, created_at: new Date().toISOString() });
 fake.table("support_requests").push({ id: "b0a6a8a2-0000-4000-8000-000000000001", name: "Casey", email: "casey@example.com", subject: "Cannot log in", message: "Reset please", status: "new", created_at: new Date().toISOString() });
+fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000003", created_at: new Date().toISOString(), action: "expenses.created", entity_type: "expenses", entity_id: "e1", actor_id: PAT, actor_email: "pat@example.com", details: { merchant: "Uber", amount: 5.45, currency: "USD", category: "Transport" } });
 fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", created_at: new Date().toISOString(), action: "role.update", entity_type: "role", entity_id: "user", actor_id: ADMIN, actor_email: "admin@example.com", details: {} });
 
 /* ---------------- start everything ---------------- */
@@ -1126,6 +1127,11 @@ try {
     await admin.page.locator("span.font-medium", { hasText: "Login failed" }).first().waitFor();
     await admin.page.getByRole("button", { name: /Audit trail/ }).click();
     await admin.page.getByText("role.update").first().waitFor();
+    // amounts are masked: Uber · *.*5 USD, never 5.45
+    await admin.page.getByText("Uber \u00b7 *.*5 USD").waitFor();
+    assert((await admin.page.getByText("5.45").count()) === 0, "the real amount must not be on the page");
+    const raw = await admin.page.evaluate(async () => (await fetch("/api/admin/security")).text());
+    assert(!raw.includes("5.45") && raw.includes("*.*5"), "the real amount must not even be sent to the browser");
   });
 
   await test("admin: Branding page loads the saved settings", async () => {

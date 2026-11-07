@@ -1,3 +1,4 @@
+import { maskAuditRows } from "@/lib/audit-privacy";
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
@@ -79,7 +80,8 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       events: events.data || [],
-      audits: audits.data || [],
+      // amounts never leave the server in full: the trail shows what happened, not how much (see lib/audit-privacy.ts)
+      audits: maskAuditRows(audits.data || []),
       eventsError: events.error?.message || null,
       auditsError: audits.error?.message || null,
     });
