@@ -5,8 +5,8 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette, Upload, ImageIcon, Plane } from "lucide-react";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
+import { Palette, Upload, ImageIcon, Plane, FileText, User } from "lucide-react";
 import { BRANDING_COLS, BRANDING_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 function getErrorMessage(err: unknown): string {
@@ -155,14 +155,9 @@ export default function AdminBrandingPage() {
       </div>
 
       <form onSubmit={handleSave} className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Logo</CardTitle>
-          <CardDescription>
-            Appears on the login screen and next to the app name in the sidebar
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <AccordionGroup defaultOpen="logo">
+      <AccordionSection id="logo" title="Logo" icon={<ImageIcon />} summary={logoUrl ? `Custom logo · ${logoSize}px on the login screen` : "Default logo"} description="Appears on the login screen and next to the app name in the sidebar">
+        <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-xl border bg-muted flex items-center justify-center overflow-hidden">
               {logoUrl ? (
@@ -229,14 +224,10 @@ export default function AdminBrandingPage() {
             </div>
             <p className="text-xs text-muted-foreground">Height of the logo on the login screen (32 to 200 px). Width follows the image.</p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>App name & color</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <AccordionSection id="name-color" title="App name & color" icon={<Palette />} summary={`${appName || "No name"} · ${primaryColor}`}>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">App name</label>
@@ -294,18 +285,16 @@ export default function AdminBrandingPage() {
             </div>
 
           </div>
-        </CardContent>
-      </Card>
+        </AccordionSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Privacy policy & support</CardTitle>
-          <CardDescription>
-            Shown from the login screen. &quot;Privacy Policy&quot; opens /privacy with the text below, and &quot;Contact
-            Support&quot; opens /contact, a form whose messages appear under Global Settings &rarr; Support Requests.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <AccordionSection
+        id="privacy"
+        title="Privacy policy & support"
+        icon={<FileText />}
+        summary={[privacyPolicy.trim() ? "Policy published" : "No policy yet", supportEmail.trim()].filter(Boolean).join(" · ")}
+        description={<>Shown from the login screen. &quot;Privacy Policy&quot; opens /privacy with the text below, and &quot;Contact Support&quot; opens /contact, a form whose messages appear under Global Settings &rarr; Support Requests.</>}
+      >
+        <div className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="privacy" className="text-sm font-medium">
               Privacy policy text
@@ -335,24 +324,22 @@ export default function AdminBrandingPage() {
               Shown on the contact page. If the server has a RESEND_API_KEY, new messages are also emailed here.
             </p>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal section</CardTitle>
-          <CardDescription>
-            Lets each person track their own groceries, home projects and personal trips. That data is private to the
-            user: admins cannot see it. Turn this off to hide the section for everyone.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <AccordionSection
+        id="personal-section"
+        title="Personal section"
+        icon={<User />}
+        summary={personalEnabled ? "On for everyone" : "Off for everyone"}
+        description="Lets each person track their own groceries, home projects and personal trips. That data is private to the user: admins cannot see it. Turn this off to hide the section for everyone."
+      >
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={personalEnabled} onChange={(e) => setPersonalEnabled(e.target.checked)} />
             Enable the Personal section
           </label>
-        </CardContent>
-      </Card>
+        </AccordionSection>
+      </AccordionGroup>
 
       {error && <Alert>{error}</Alert>}
       {saved && (

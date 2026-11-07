@@ -5,8 +5,8 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Coins } from "lucide-react";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
+import { Coins, Plus } from "lucide-react";
 
 type CurrencyRow = {
   code: string;
@@ -87,14 +87,9 @@ export default function AdminCurrenciesPage() {
 
       {error && <Alert>{error}</Alert>}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Available currencies</CardTitle>
-          <CardDescription>
-            Rate is USD per 1 unit. Leave it empty to use the live market rate.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <AccordionGroup defaultOpen="available">
+      <AccordionSection id="available" title="Available currencies" icon={<Coins />} summary={loading ? "Loading…" : `${rows.filter((r) => r.enabled).length} of ${rows.length} turned on`} description="Rate is USD per 1 unit. Leave it empty to use the live market rate.">
+        <div className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
@@ -131,22 +126,18 @@ export default function AdminCurrenciesPage() {
               </div>
             ))
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Add a currency</CardTitle>
-        </CardHeader>
-        <CardContent>
+      <AccordionSection id="add" title="Add a currency" icon={<Plus />} summary="Code, name and rate">
           <form onSubmit={add} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <Input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={3} />
             <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required className="sm:col-span-2" />
             <Input placeholder="USD rate" type="number" step="0.000001" value={rate} onChange={(e) => setRate(e.target.value)} />
             <Button type="submit" className="sm:col-span-4">Add</Button>
           </form>
-        </CardContent>
-      </Card>
+        </AccordionSection>
+      </AccordionGroup>
     </div>
   );
 }

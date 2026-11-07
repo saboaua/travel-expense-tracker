@@ -6,7 +6,7 @@ import { CreditCard, Loader2, Plane, Share2, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccordionSection } from "@/components/ui/accordion";
 import { useConfirm } from "@/components/ui/confirm";
 import { Modal } from "@/components/sharing/Modal";
 import { InviteAnswer } from "@/components/sharing/InviteAnswer";
@@ -45,12 +45,6 @@ export function SharingCard() {
     setNames(out);
   }, [shares]);
   useEffect(() => { loadNames(); }, [loadNames]);
-
-  // The bell links to /profile#sharing; this card appears after the page has loaded, so scroll to it once it is there
-  const shown = !!overview && overview.available;
-  useEffect(() => {
-    if (shown && typeof window !== "undefined" && window.location.hash === "#sharing") document.getElementById("sharing")?.scrollIntoView({ block: "start" });
-  }, [shown]);
 
   if (!overview || !overview.available) return null;
   const o = overview;
@@ -113,14 +107,15 @@ export function SharingCard() {
   const atLimit = active.length >= SHARING_LIMITS.partners;
 
   return (
-    <Card id="sharing" className="scroll-mt-20">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Share2 className="h-5 w-5" aria-hidden="true" /> Sharing</CardTitle>
-        <CardDescription>
-          Show a loyalty card or a trip to someone you trust. They can only look: they cannot change or delete anything, and they never see expenses, receipts or notes. Nothing is shared unless you pick it.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+    <>
+    <AccordionSection
+      id="sharing"
+      title="Sharing"
+      icon={<Share2 />}
+      summary={!o.enabled ? "Off" : `${active.length} of ${SHARING_LIMITS.partners} partners`}
+      badge={o.incoming.length > 0 ? { text: o.incoming.length === 1 ? "1 invite waiting" : `${o.incoming.length} invites waiting`, tone: "attention" } : null}
+      description="Show a loyalty card or a trip to someone you trust. They can only look: they cannot change or delete anything, and they never see expenses, receipts or notes. Nothing is shared unless you pick it."
+    >
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}
         {notice && <p className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm" role="status">{notice}</p>}
 
@@ -199,7 +194,7 @@ export function SharingCard() {
             </div>
           </>
         )}
-      </CardContent>
+    </AccordionSection>
 
       {adding === "email" && (
         <Modal title="Add a partner" onClose={closeAdd}>
@@ -230,6 +225,6 @@ export function SharingCard() {
           <div className="mt-4 flex justify-end"><Button type="button" onClick={closeAdd}>OK</Button></div>
         </Modal>
       )}
-    </Card>
+    </>
   );
 }

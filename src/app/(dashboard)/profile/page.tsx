@@ -6,7 +6,8 @@ import { createClient } from "@/lib/supabase/client";
 import { compressAvatarImage } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 import { Camera, User } from "lucide-react";
 import { PasswordCard } from "@/components/profile/PasswordCard";
 import { TelegramCard } from "@/components/profile/TelegramCard";
@@ -248,12 +249,14 @@ export default function ProfilePage() {
       </Card>
 
       {/* Edit form */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Personal Information</CardTitle>
-          <CardDescription>Update your profile details</CardDescription>
-        </CardHeader>
-        <CardContent>
+      <AccordionGroup>
+      <AccordionSection
+        id="personal"
+        title="Personal information"
+        icon={<User />}
+        summary={[displayName, title].filter(Boolean).join(" · ") || "Your name, title and company"}
+        description="Update your profile details"
+      >
           <form onSubmit={handleSave} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -333,8 +336,7 @@ export default function ProfilePage() {
               {loading ? "Saving..." : "Save Changes"}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+      </AccordionSection>
 
       <SharingCard />
 
@@ -343,6 +345,7 @@ export default function ProfilePage() {
       <PasswordCard />
 
       <TelegramCard />
+      </AccordionGroup>
     </div>
   );
 }

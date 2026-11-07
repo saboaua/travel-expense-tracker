@@ -2,10 +2,10 @@
 
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
-import { Send } from "lucide-react";
+import { Send, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 
 export default function AdminTelegramPage() {
   const [enabled, setEnabled] = useState(false);
@@ -77,14 +77,16 @@ export default function AdminTelegramPage() {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Bot setup</CardTitle>
-          <CardDescription>
-            Paste the token from @BotFather. It is stored on the server and is never shown again.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
+      <AccordionGroup defaultOpen="bot">
+      <AccordionSection
+        id="bot"
+        title="Bot setup"
+        icon={<Send />}
+        summary={loading ? "Loading…" : tokenConfigured ? `Token saved${botUsername ? ` · @${botUsername.replace(/^@/, "")}` : ""}` : "No token yet"}
+        badge={loading ? null : enabled && tokenConfigured ? { text: "On", tone: "good" } : { text: "Off", tone: "neutral" }}
+        description="Paste the token from @BotFather. It is stored on the server and is never shown again."
+      >
+        <div className="space-y-4">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : (
@@ -152,21 +154,19 @@ export default function AdminTelegramPage() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>How this is set up</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-muted-foreground space-y-2">
+      <AccordionSection id="how" title="How this is set up" icon={<BookOpen />} summary="Four steps">
+        <div className="text-sm text-muted-foreground space-y-2">
           <p>1. Create the bot with @BotFather and copy the token.</p>
           <p>2. Paste it here. The server checks it with Telegram before saving.</p>
           <p>3. Click Save and set webhook so Telegram can deliver messages.</p>
           <p>4. Users open Settings, enable Telegram, and get a one-time bot link.</p>
           <p>The token is not stored in the repo or shown in the browser after save.</p>
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
+      </AccordionGroup>
     </div>
   );
 }

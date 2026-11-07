@@ -921,7 +921,7 @@ try {
     const pat = await signedIn("pat@example.com", "Correct-Horse-1");
 
     // 1. Sharing is off until Alice turns it on; she invites an email with no account and one that has an account
-    await a.page.goto(`${BASE}/profile`);
+    await a.page.goto(`${BASE}/profile#sharing`);
     await a.page.locator("#sharing").getByText("Sharing is off").waitFor();
     await a.page.getByRole("button", { name: "Turn on sharing" }).click();
     const invite = async (page, email) => {
@@ -964,7 +964,7 @@ try {
     assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 0, "no cards before accepting");
 
     // 4. Bob accepts on his profile
-    await b.page.goto(`${BASE}/profile`);
+    await b.page.goto(`${BASE}/profile#sharing`);
     await b.page.locator("#sharing").getByRole("button", { name: "Accept" }).click();
     await b.page.locator("#sharing").getByText("Approved").waitFor();
     await shot(b.page, "share-3-bob-profile", "#sharing");
@@ -1052,7 +1052,7 @@ try {
     await a.page.waitForFunction(() => document.querySelector('[data-testid="share-with"] [role="switch"]')?.getAttribute("aria-checked") === "false");
     assert((await api(b.page, "/api/sharing/trips")).body.trips.length === 0, "Bob no longer sees the trip");
     assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 1, "the card is still shared");
-    await a.page.goto(`${BASE}/profile`);
+    await a.page.goto(`${BASE}/profile#sharing`);
     await a.page.locator("#sharing").getByText("Approved").first().waitFor();
     await shot(a.page, "share-8-owner-profile", "#sharing");
     const bobRow = a.page.locator("#sharing li").filter({ hasText: "bob" }).filter({ hasText: "Approved" });
@@ -1119,7 +1119,7 @@ try {
 
   await test("admin: Branding page loads the saved settings", async () => {
     await admin.page.goto(`${BASE}/admin/branding`);
-    await admin.page.locator('input[value="E2E Expense App"]').waitFor();
+    await admin.page.locator('input[value="E2E Expense App"]').waitFor({ state: "attached" });
   });
 
   await test("admin: Support page lists a request", async () => {
@@ -1235,6 +1235,67 @@ try {
     await sam.page.goto(`${BASE}/admin/help`);
     await sam.page.getByRole("heading", { name: "Help topics" }).waitFor();
     await sam.ctx.close();
+  });
+
+  await test("profile and setup pages: sections are closed rows that open one at a time, and a link opens its section", async () => {
+    const shot = async (page, name) => { if (process.env.E2E_SHOT) await page.screenshot({ path: `${process.env.E2E_SHOT}/${name}.png`, fullPage: false }); };
+    const open = (page, name) => page.getByRole("button", { name: new RegExp(`^${name}`) });
+    const expanded = async (page, name) => (await open(page, name).getAttribute("aria-expanded")) === "true";
+    // phone profile
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/profile`);
+    await open(page, "Personal information").waitFor();
+    for (const n of ["Personal information", "Password", "Home place"]) assert(!(await expanded(page, n)), `${n} should start closed`);
+    assert(!(await page.locator("#firstName").isVisible()), "the form fields must be hidden while the section is closed");
+    await shot(page, "acc-1-phone-closed");
+    await open(page, "Personal information").click();
+    await page.locator("#firstName").waitFor({ state: "visible" });
+    await page.locator("#firstName").fill("Patrick");
+    await open(page, "Password").click();
+    await page.locator("#newPassword").waitFor({ state: "visible" });
+    assert(!(await expanded(page, "Personal information")), "opening one section closes the other");
+    assert(!(await page.locator("#firstName").isVisible()), "the closed section hides its fields");
+    await open(page, "Personal information").click();
+    assert((await page.locator("#firstName").inputValue()) === "Patrick", "what was typed must survive closing and opening a section");
+    await shot(page, "acc-2-phone-open");
+    await open(page, "Personal information").click();
+    assert(!(await expanded(page, "Personal information")), "tapping an open row closes it");
+    const wide = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+    assert(!wide, "the profile scrolls sideways on a phone");
+    await ctx.close();
+
+    // a link with #password opens that section on its own
+    const d = await newPage();
+    await signIn(d.page, "pat@example.com", "Correct-Horse-1");
+    await d.page.waitForURL((u) => u.pathname === "/");
+    await d.page.goto(`${BASE}/profile#password`);
+    await d.page.locator("#newPassword").waitFor({ state: "visible" });
+    assert(await expanded(d.page, "Password"), "the #password link should open the Password section");
+    await shot(d.page, "acc-3-desktop-profile");
+    await d.ctx.close();
+
+    // admin setup pages: first section open, one at a time
+    await admin.page.goto(`${BASE}/admin/branding`);
+    await open(admin.page, "Logo").waitFor();
+    assert(await expanded(admin.page, "Logo"), "Branding opens on its first section");
+    assert(!(await expanded(admin.page, "App name & color")), "the other Branding sections start closed");
+    await open(admin.page, "App name & color").click();
+    await admin.page.locator('input[value="E2E Expense App"]').waitFor({ state: "visible" });
+    assert(!(await expanded(admin.page, "Logo")), "opening a Branding section closes the other");
+    await shot(admin.page, "acc-4-admin-branding");
+    await admin.page.goto(`${BASE}/admin/currencies`);
+    await open(admin.page, "Available currencies").waitFor();
+    assert(await expanded(admin.page, "Available currencies"), "Currencies opens on the list");
+    await admin.page.locator('input[value="US Dollar"]').waitFor({ state: "visible" });
+    await open(admin.page, "Add a currency").click();
+    await admin.page.getByPlaceholder("Code").waitFor({ state: "visible" });
+    await admin.page.goto(`${BASE}/admin/telegram`);
+    await open(admin.page, "Bot setup").waitFor();
+    assert(await expanded(admin.page, "Bot setup"), "Telegram setup opens on Bot setup");
   });
 
   await test("weather lives inside the welcome card on both views", async () => {

@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PasswordHints, PasswordInput } from "@/components/auth/PasswordInput";
 import { PASSWORD_RULE, friendlyAuthError, passwordFormProblem, retryOnNetwork } from "@/lib/password-policy";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccordionSection } from "@/components/ui/accordion";
 import { Key } from "lucide-react";
 
 export function PasswordCard() {
@@ -50,15 +50,7 @@ export function PasswordCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Key className="h-5 w-5" />
-          Change Password
-        </CardTitle>
-        <CardDescription>Update your account password</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <AccordionSection id="password" title="Password" icon={<Key />} summary="Change how you sign in" description="Update your account password">
         <form onSubmit={handlePasswordChange} noValidate className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="newPassword" className="text-sm font-medium">
@@ -103,7 +95,6 @@ export function PasswordCard() {
             {pwLoading ? "Updating..." : "Update Password"}
           </Button>
         </form>
-      </CardContent>
-    </Card>
+    </AccordionSection>
   );
 }

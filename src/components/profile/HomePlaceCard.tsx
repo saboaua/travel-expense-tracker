@@ -9,7 +9,7 @@ import { countryName } from "@/lib/scan-destination";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccordionSection } from "@/components/ui/accordion";
 
 /** Where the person lives. Scan and Upload use it to tell a receipt from home apart from one from a trip. */
 export function HomePlaceCard() {
@@ -59,12 +59,13 @@ export function HomePlaceCard() {
 
   if (!available) return null;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Home className="h-5 w-5" aria-hidden="true" /> Home place</CardTitle>
-        <CardDescription>Where you live. When you scan a receipt here, it is suggested as personal (like groceries) instead of a business trip.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <AccordionSection
+      id="home-place"
+      title="Home place"
+      icon={<Home />}
+      summary={[city.trim(), country.trim()].filter(Boolean).join(", ") || "Not set"}
+      description="Where you live. When you scan a receipt here, it is suggested as personal (like groceries) instead of a business trip."
+    >
         <form onSubmit={save} className="space-y-4">
           {error && <Alert>{error}</Alert>}
           {saved && <Alert variant="success">Saved</Alert>}
@@ -86,7 +87,6 @@ export function HomePlaceCard() {
             </Button>
           </div>
         </form>
-      </CardContent>
-    </Card>
+    </AccordionSection>
   );
 }

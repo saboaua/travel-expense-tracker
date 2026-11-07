@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { AccordionSection } from "@/components/ui/accordion";
 import { Check, Copy, ExternalLink, Send } from "lucide-react";
 import { TelegramPrefs } from "@/components/profile/TelegramPrefs";
 
@@ -86,17 +86,15 @@ export function TelegramCard() {
   if (!featureOn) return null;
 
   return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Send className="h-5 w-5" />
-            Telegram
-          </CardTitle>
-          <CardDescription>
-            Enable it to send receipts and documents from Telegram: business trips, groceries, home projects, personal travel and documents
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
+      <AccordionSection
+        id="telegram"
+        title="Telegram"
+        icon={<Send />}
+        summary={status?.linked ? "Send receipts and documents from your phone" : "Not connected"}
+        badge={status?.linked ? { text: "Connected", tone: "good" } : null}
+        description="Enable it to send receipts and documents from Telegram: business trips, groceries, home projects, personal travel and documents"
+      >
+        <div className="space-y-3">
           <p className="text-sm">
             Status:{" "}
             {status?.linked ? (
@@ -158,7 +156,7 @@ export function TelegramCard() {
           {tgError && (
             <Alert>{tgError}</Alert>
           )}
-        </CardContent>
-      </Card>
+        </div>
+      </AccordionSection>
   );
 }
