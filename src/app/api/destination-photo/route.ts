@@ -51,12 +51,25 @@ export async function GET(request: Request) {
   const src = params.get("u");
   if (!isAllowedPhotoUrl(src)) return new NextResponse("Not found", { status: 404 });
   try {
-    const res = await fetch(src as string, {
-      headers: { "User-Agent": PHOTO_USER_AGENT, Accept: "image/*" },
-      redirect: "follow",
-      signal: AbortSignal.timeout(8000),
-    });
-    if (!isAllowedPhotoUrl(res.url)) return new NextResponse("Not found", { status: 404 }); // a redirect must stay on Wikimedia
+    // Redirects are followed by hand so every hop is checked BEFORE it is requested (never a request to a host we did not allow)
+    let target = src as string;
+    let res: Response | null = null;
+    for (let hop = 0; hop < 4; hop++) {
+      const r = await fetch(target, {
+        headers: { "User-Agent": PHOTO_USER_AGENT, Accept: "image/*" },
+        redirect: "manual",
+        signal: AbortSignal.timeout(8000),
+      });
+      if (r.status >= 300 && r.status < 400) {
+        const next = new URL(r.headers.get("location") || "", target).toString();
+        if (!isAllowedPhotoUrl(next)) return new NextResponse("Not found", { status: 404 });
+        target = next;
+        continue;
+      }
+      res = r;
+      break;
+    }
+    if (!res) return new NextResponse("Not found", { status: 404 });
     const type = res.headers.get("content-type") || "";
     if (!res.ok || !/^image\/(jpeg|png|webp)/.test(type)) return new NextResponse("Not found", { status: 404 });
     const bytes = await res.arrayBuffer();

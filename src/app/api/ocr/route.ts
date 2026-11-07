@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
 
@@ -7,19 +8,6 @@ export const maxDuration = 30;
 
 const MAX_BYTES = 6 * 1024 * 1024;
 const HOURLY_LIMIT = 60;
-const calls = new Map<string, number[]>(); // best-effort per-instance limiter to cap API cost
-
-function allowed(userId: string) {
-  const now = Date.now();
-  const recent = (calls.get(userId) || []).filter((t) => now - t < 3600 * 1000);
-  if (recent.length >= HOURLY_LIMIT) {
-    calls.set(userId, recent);
-    return false;
-  }
-  recent.push(now);
-  calls.set(userId, recent);
-  return true;
-}
 
 /** Reads a receipt photo with AI. The client falls back to on-device OCR if this returns an error. */
 export async function POST(request: Request) {
@@ -32,7 +20,7 @@ export async function POST(request: Request) {
   if (!aiOcrConfigured()) {
     return NextResponse.json({ error: "AI OCR is not configured", configured: false, reason: "not_configured" }, { status: 503 });
   }
-  if (!allowed(user.id)) {
+  if (!(await rateLimit(`ocr:${user.id}`, HOURLY_LIMIT, 3600))) {
     return NextResponse.json({ error: "Too many scans this hour", reason: "limit" }, { status: 429 });
   }
 

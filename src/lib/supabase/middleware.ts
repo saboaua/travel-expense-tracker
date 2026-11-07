@@ -33,7 +33,6 @@ const PUBLIC_PREFIXES = [
   "/api/cron/",
   "/api/manifest",
   "/api/icon",
-  "/api/fx",
   "/api/version",
 ];
 
