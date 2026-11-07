@@ -154,6 +154,34 @@ try {
     await ctx.close();
   });
 
+  /* ---------- app icon ---------- */
+  await test("installed app: a changed logo shows the icon notice with the steps, and Got it remembers", async () => {
+    const { ctx, page } = await newPage();
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "standalone", { get: () => true });
+      try { localStorage.setItem("app-icon-version-seen", "old-logo"); } catch {}
+    });
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const notice = page.getByTestId("icon-update-notice");
+    await notice.waitFor({ timeout: 30_000 });
+    assert(/Add to Home Screen/.test(await notice.innerText()) || /install it again/.test(await notice.innerText()), "the notice says how to get the new icon");
+    await notice.getByRole("button", { name: "Got it" }).click();
+    await notice.waitFor({ state: "detached" });
+    assert((await page.evaluate(() => localStorage.getItem("app-icon-version-seen"))) !== "old-logo", "the new icon version is remembered");
+    await ctx.close();
+  });
+
+  await test("in a normal browser tab the icon notice never shows", async () => {
+    const { ctx, page } = await newPage();
+    await page.addInitScript(() => { try { localStorage.setItem("app-icon-version-seen", "old-logo"); } catch {} });
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.waitForTimeout(12_000);
+    assert((await page.getByTestId("icon-update-notice").count()) === 0, "no notice outside the installed app");
+    await ctx.close();
+  });
+
   /* ---------- sign-in ---------- */
   await test("signed-out visitors are sent to the login page", async () => {
     const { ctx, page } = await newPage();

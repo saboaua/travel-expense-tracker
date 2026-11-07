@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { iconHref } from "@/lib/brand-icon";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   let name = "Travel Expense Tracker";
   let theme = "#4f46e5";
-  let hasLogo = false;
+  let logoUrl: string | null = null;
 
   try {
     const supabase = createClient(
@@ -24,17 +25,17 @@ export async function GET() {
     if (data) {
       if (data.app_name) name = data.app_name;
       if (data.primary_color) theme = data.primary_color;
-      hasLogo = !!data.logo_url;
+      logoUrl = data.logo_url && /^https?:\/\//i.test(data.logo_url) ? data.logo_url : null;
     }
   } catch {
     // use defaults
   }
 
-  const iconSrc = hasLogo ? "/api/icon" : "/icon-512.png";
+  const icon = (size: number) => (logoUrl ? iconHref(logoUrl, size) : size >= 512 ? "/icon-512.png" : "/icon-192.png");
 
   const manifest = {
     name,
-    short_name: name.slice(0, 12),
+    short_name: "Lifolio",
     description: "Scan receipts, track business travel expenses, and generate reports",
     start_url: "/",
     scope: "/",
@@ -44,19 +45,19 @@ export async function GET() {
     orientation: "portrait-primary",
     icons: [
       {
-        src: iconSrc,
+        src: icon(192),
         sizes: "192x192",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: iconSrc,
+        src: icon(512),
         sizes: "512x512",
         type: "image/png",
         purpose: "any",
       },
       {
-        src: iconSrc,
+        src: icon(512),
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",

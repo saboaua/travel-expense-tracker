@@ -1,9 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { getLogoUrl, iconHref } from "@/lib/brand-icon";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { InstallPrompt } from "@/components/InstallPrompt";
 import { UpdateNotice } from "@/components/UpdateNotice";
+import { IconUpdateNotice } from "@/components/IconUpdateNotice";
 import { PullToRefresh } from "@/components/PullToRefresh";
 import { AppHeight } from "@/components/layout/AppHeight";
 import { AppSplash } from "@/components/AppSplash";
@@ -13,21 +15,24 @@ import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 const inter = Inter({ subsets: ["latin"] });
 
-export const metadata: Metadata = {
-  title: "Travel Expense Tracker",
-  description: "Scan receipts, track business travel expenses, and generate reports",
-  manifest: "/api/manifest",
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: "default",
-    title: "Expenses",
-    startupImage: startupImages,
-  },
-  icons: {
-    icon: "/api/icon",
-    apple: "/api/icon",
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const logoUrl = await getLogoUrl();
+  return {
+    title: "Travel Expense Tracker",
+    description: "Scan receipts, track business travel expenses, and generate reports",
+    manifest: "/api/manifest",
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: "default",
+      title: "Lifolio",
+      startupImage: startupImages,
+    },
+    icons: {
+      icon: [{ url: iconHref(logoUrl, 192), sizes: "192x192", type: "image/png" }],
+      apple: [{ url: iconHref(logoUrl, 180), sizes: "180x180", type: "image/png" }],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -65,6 +70,7 @@ export default async function RootLayout({
         <ServiceWorkerRegister />
         <InstallPrompt />
         <UpdateNotice />
+        <IconUpdateNotice />
         <AppHeight />
         <PullToRefresh />
       </body>

@@ -192,7 +192,7 @@ export default function AdminBrandingPage() {
                 onChange={handleLogoUpload}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                PNG, JPG, SVG or WebP. Wide logos are fine.
+                PNG, JPG, SVG or WebP. Wide logos are fine. The home screen icon is made from this logo on a white square. iPhones copy the icon only when the app is added, so people who already installed it are told in the app how to refresh it.
               </p>
             </div>
           </div>
