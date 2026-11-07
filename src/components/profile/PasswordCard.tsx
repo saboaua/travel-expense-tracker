@@ -4,7 +4,8 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { PasswordHints, PasswordInput } from "@/components/auth/PasswordInput";
+import { PASSWORD_RULE, friendlyAuthError, passwordFormProblem, retryOnNetwork } from "@/lib/password-policy";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Key } from "lucide-react";
 
@@ -22,18 +23,15 @@ export function PasswordCard() {
     setPwError(null);
     setPwSaved(false);
 
-    if (newPassword.length < 6) {
-      setPwError("Password must be at least 6 characters");
-      return;
-    }
-    if (newPassword !== confirmPassword) {
-      setPwError("Passwords do not match");
+    const problem = passwordFormProblem(newPassword, confirmPassword);
+    if (problem) {
+      setPwError(problem);
       return;
     }
 
     setPwLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      const { error } = await retryOnNetwork(() => supabase.auth.updateUser({ password: newPassword }));
       if (error) throw error;
       fetch("/api/auth/password-changed", {
         method: "POST",
@@ -45,7 +43,7 @@ export function PasswordCard() {
       setConfirmPassword("");
       setTimeout(() => setPwSaved(false), 4000);
     } catch (err: unknown) {
-      setPwError(err instanceof Error ? err.message : "Failed to update password");
+      setPwError(friendlyAuthError(err, "Failed to update password"));
     } finally {
       setPwLoading(false);
     }
@@ -61,33 +59,36 @@ export function PasswordCard() {
         <CardDescription>Update your account password</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handlePasswordChange} className="space-y-4">
+        <form onSubmit={handlePasswordChange} noValidate className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="newPassword" className="text-sm font-medium">
               New Password
             </label>
-            <Input
+            <PasswordInput
               id="newPassword"
-              type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="At least 6 characters"
+              placeholder="At least 8 characters"
               autoComplete="new-password"
+              inputClassName="flex h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
           </div>
           <div className="space-y-2">
             <label htmlFor="confirmPassword" className="text-sm font-medium">
               Confirm New Password
             </label>
-            <Input
+            <PasswordInput
               id="confirmPassword"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Repeat new password"
               autoComplete="new-password"
+              inputClassName="flex h-10 w-full min-w-0 rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             />
           </div>
+
+          <p className="text-xs text-muted-foreground">{PASSWORD_RULE}</p>
+          <PasswordHints password={newPassword} confirm={confirmPassword} />
 
           {pwError && (
             <Alert>{pwError}</Alert>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Mail, ArrowLeft, Plane, CheckCircle } from "lucide-react";
+import { friendlyAuthError, retryOnNetwork } from "@/lib/password-policy";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -18,12 +19,15 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
+    let error: { message?: string } | null = null;
+    try {
+      ({ error } = await retryOnNetwork(() => supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/reset-password` })));
+    } catch (e) {
+      error = e as Error;
+    }
 
     if (error) {
-      setError(error.message);
+      setError(friendlyAuthError(error, "Could not send the reset email."));
       setLoading(false);
       return;
     }

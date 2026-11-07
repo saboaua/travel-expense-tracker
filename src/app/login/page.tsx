@@ -7,6 +7,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Turnstile } from "@/components/Turnstile";
 import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
+import { NETWORK_MESSAGE } from "@/lib/password-policy";
 
 const EXPIRED_MESSAGE =
   "Your temporary password has expired. Please ask an administrator to generate a new one.";
@@ -90,7 +91,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch {
-      setError("Network error. Please try again.");
+      setError(NETWORK_MESSAGE);
       setLoading(false);
     }
   };
@@ -171,8 +172,9 @@ export default function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
-                  tabIndex={-1}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:text-slate-600 transition-colors"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

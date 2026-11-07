@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   let source = "profile";
   try {
     const body = await request.json();
-    if (body?.source === "first_login") source = "first_login";
+    if (body?.source === "first_login" || body?.source === "reset") source = body.source;
   } catch {
     // no body
   }

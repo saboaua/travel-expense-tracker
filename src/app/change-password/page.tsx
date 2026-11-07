@@ -4,63 +4,48 @@ import { Alert } from "@/components/ui/alert";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
+import { PasswordHints, PasswordInput } from "@/components/auth/PasswordInput";
+import { PASSWORD_RULE, friendlyAuthError, passwordFormProblem, retryOnNetwork } from "@/lib/password-policy";
 
 export default function ChangePasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
   const supabase = createClient();
 
-  const passwordStrength = (pw: string) => {
-    if (pw.length < 8) return { ok: false, msg: "At least 8 characters" };
-    if (!/[A-Z]/.test(pw)) return { ok: false, msg: "Include an uppercase letter" };
-    if (!/[a-z]/.test(pw)) return { ok: false, msg: "Include a lowercase letter" };
-    if (!/[0-9]/.test(pw)) return { ok: false, msg: "Include a number" };
-    return { ok: true, msg: "Strong password" };
-  };
-
-  const strength = passwordStrength(password);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
-    if (!strength.ok) {
-      setError(strength.msg);
-      return;
-    }
-
-    if (password !== confirm) {
-      setError("Passwords do not match");
+    const problem = passwordFormProblem(password, confirm);
+    if (problem) {
+      setError(problem);
       return;
     }
 
     setLoading(true);
 
     try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        password,
-      });
+      const { error: updateError } = await retryOnNetwork(() => supabase.auth.updateUser({ password }));
 
       if (updateError) throw updateError;
 
       const {
         data: { user },
-      } = await supabase.auth.getUser();
+      } = await retryOnNetwork(() => supabase.auth.getUser());
 
       if (user) {
-        const { error: clearErr } = await supabase
+        const { error: clearErr } = await retryOnNetwork(async () => await supabase
           .from("profiles")
           .update({
             must_change_password: false,
             temp_password_expires_at: null,
             updated_at: new Date().toISOString(),
           })
-          .eq("id", user.id);
+          .eq("id", user.id));
         if (clearErr) {
           // Expiry column missing (migration not run yet): clear the flag alone
           const { error: flagErr } = await supabase
@@ -81,9 +66,7 @@ export default function ChangePasswordPage() {
       router.push("/");
       router.refresh();
     } catch (err: unknown) {
-      const message =
-        err instanceof Error ? err.message : "Failed to update password";
-      setError(message);
+      setError(friendlyAuthError(err, "Failed to update password"));
       setLoading(false);
     }
   };
@@ -107,60 +90,39 @@ export default function ChangePasswordPage() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             <div className="space-y-1.5">
               <label htmlFor="password" className="block text-sm font-medium text-slate-700">
                 New password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  className="w-full h-11 pl-10 pr-11 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-              {password && (
-                <p
-                  className={`text-xs mt-1 ${
-                    strength.ok ? "text-green-600" : "text-amber-600"
-                  }`}
-                >
-                  {strength.msg}
-                </p>
-              )}
+              <PasswordInput
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                left={<Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />}
+                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+              />
+              <p className="text-xs text-slate-400">{PASSWORD_RULE}</p>
             </div>
 
             <div className="space-y-1.5">
               <label htmlFor="confirm" className="block text-sm font-medium text-slate-700">
                 Confirm password
               </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  id="confirm"
-                  type={showPassword ? "text" : "password"}
-                  value={confirm}
-                  onChange={(e) => setConfirm(e.target.value)}
-                  required
-                  minLength={8}
-                  autoComplete="new-password"
-                  className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
-                />
-              </div>
+              <PasswordInput
+                id="confirm"
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                required
+                minLength={8}
+                autoComplete="new-password"
+                left={<Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />}
+                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 bg-slate-50/50 text-slate-900 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+              />
+              <PasswordHints password={password} confirm={confirm} />
             </div>
 
             {error && (

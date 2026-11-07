@@ -186,6 +186,12 @@ export function createFakeSupabase() {
         return send(res, 200, session(users.get(id)));
       }
     }
+    if (p === "/user" && req.method === "PUT") {
+      const id = tokens.get(String(req.headers.authorization || "").replace(/^Bearer /, ""));
+      if (!id) return send(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
+      if (body.password) { users.get(id).password = body.password; log.push({ table: "auth", op: "password-update" }); }
+      return send(res, 200, userJson(users.get(id)));
+    }
     if (p === "/user") {
       const id = tokens.get(String(req.headers.authorization || "").replace(/^Bearer /, ""));
       return id ? send(res, 200, userJson(users.get(id))) : send(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
@@ -238,6 +244,7 @@ export function createFakeSupabase() {
       let body = {};
       if (/json/.test(String(req.headers["content-type"])) && raw.length) { try { body = JSON.parse(raw.toString()); } catch { body = {}; } }
       try {
+        if (dropUserUpdates > 0 && req.method === "PUT" && url.pathname === "/auth/v1/user") { dropUserUpdates--; return req.socket.destroy(); }
         if (url.pathname.startsWith("/auth/v1")) return authApi(req, res, url, body);
         if (url.pathname.startsWith("/rest/v1")) return rest(req, res, url, body);
         if (url.pathname.startsWith("/storage/v1/object")) return storageApi(req, res, url, raw);
@@ -249,8 +256,11 @@ export function createFakeSupabase() {
     });
   });
 
+  let dropUserUpdates = 0;
   return {
     db, table, seed, addUser, log, storage,
+    /** The next n password updates lose their connection, as on a bad mobile network. */
+    dropNextPasswordUpdates: (n = 1) => { dropUserUpdates = n; },
     listen: (port) => new Promise((r) => server.listen(port, "127.0.0.1", r)),
     close: () => new Promise((r) => server.close(r)),
   };

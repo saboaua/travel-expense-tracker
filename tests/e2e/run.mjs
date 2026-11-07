@@ -50,6 +50,7 @@ fake.seed("currencies", [
 for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
+fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
 const ADMIN = fake.addUser({ email: "admin@example.com", password: "Admin-Pass-123", role: "admin", full_name: "Ada Admin" });
 const today = todayAruba();
 const TRIP_ID = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
@@ -109,6 +110,49 @@ try {
     await page.locator("#password").fill(password);
     await page.locator('button[type="submit"]').click();
   }
+
+  /* ---------- passwords ---------- */
+  await test("new password screen: shows what is wrong, hides the text until the eye is tapped, and survives a dropped connection", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "newbie@example.com", "Temp-Pass-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/change-password`);
+    await page.waitForLoadState("networkidle");
+    const pw = page.locator("#password"), cf = page.locator("#confirm");
+    assert((await pw.getAttribute("type")) === "password", "the new password is hidden while typing");
+    assert((await cf.getAttribute("type")) === "password", "the confirmation is hidden while typing");
+    await pw.fill("abc");
+    await page.locator('button[type="submit"]').click();
+    assert((await page.locator("form [role=alert]").innerText()).includes("At least 8 characters"), "a short password gets an error message");
+    await pw.fill("abcdefgh1");
+    await page.locator('button[type="submit"]').click();
+    assert((await page.locator("form [role=alert]").innerText()).includes("uppercase"), "a missing capital gets an error message");
+    await pw.fill("Brand-New-Pass1");
+    await cf.fill("Brand-New-Pass2");
+    assert((await page.getByTestId("password-match").innerText()).includes("do not match"), "the mismatch shows while typing");
+    await page.locator('button[type="submit"]').click();
+    assert((await page.locator("form [role=alert]").innerText()).includes("Passwords do not match"), "a different confirmation gets an error message");
+    assert(fake.log.filter((l) => l.table === "auth" && l.op === "password-update").length === 0, "nothing was saved yet");
+    await page.getByRole("button", { name: "Show password" }).first().click();
+    assert((await pw.getAttribute("type")) === "text", "the eye shows the password");
+    await page.getByRole("button", { name: "Hide password" }).first().click();
+    assert((await pw.getAttribute("type")) === "password", "and hides it again");
+    await cf.fill("Brand-New-Pass1");
+    assert((await page.getByTestId("password-match").innerText()).includes("match"), "a matching pair is confirmed");
+    fake.dropNextPasswordUpdates(1); // the first try loses its connection ("Load failed" on a phone)
+    await page.locator('button[type="submit"]').click();
+    await page.waitForURL((u) => u.pathname === "/", { timeout: 20_000 });
+    assert(fake.log.some((l) => l.table === "auth" && l.op === "password-update"), "the retry saved the password");
+    await ctx.close();
+  });
+
+  await test("reset link: an expired link says so, and the page exists", async () => {
+    const { ctx, page } = await newPage();
+    await page.goto(`${BASE}/reset-password?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired`);
+    await page.getByText("This link no longer works").waitFor();
+    await page.getByRole("link", { name: "Send a new link" }).waitFor();
+    await ctx.close();
+  });
 
   /* ---------- sign-in ---------- */
   await test("signed-out visitors are sent to the login page", async () => {
