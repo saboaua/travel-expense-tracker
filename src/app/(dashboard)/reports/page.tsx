@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/session";
 import { MonthlyDownload } from "@/components/MonthlyDownload";
 import { MonthlyBars } from "@/components/reports/MonthlyBars";
 import { CategoryDonut } from "@/components/reports/CategoryDonut";
@@ -59,9 +60,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const year = Number.isFinite(requested) ? Math.min(Math.max(requested, 2000), currentYear + 1) : currentYear;
 
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
 
   const [expenses, tripsRes] = await Promise.all([
     fetchAll<ExpenseRow>((a, b) =>

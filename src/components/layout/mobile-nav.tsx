@@ -10,7 +10,8 @@ import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { adminNavItems } from "@/lib/access";
-import { useAccess } from "@/lib/use-access";
+import { resetAccessCache, useAccess } from "@/lib/use-access";
+import { resetBrandCache, useBrand } from "@/lib/use-brand";
 
 const baseItems = [
   { href: "/", label: "Home", icon: Home, feature: null },
@@ -22,25 +23,16 @@ export function MobileNav() {
   const router = useRouter();
   const supabase = createClient();
   const [open, setOpen] = useState(false);
-  const pathnameKey = pathname;
-  const { role, perms } = useAccess(pathnameKey);
-  const [personalEnabled, setPersonalEnabled] = useState(true);
+  const { role, perms } = useAccess();
+  const { personalEnabled } = useBrand();
 
   useEffect(() => { setOpen(false); }, [pathname]);
-
-  useEffect(() => {
-    async function loadRole() {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
-      if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
-    }
-    loadRole();
-  }, [supabase]);
 
   const logout = async () => {
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await clearOfflineData();
+    resetAccessCache();
+    resetBrandCache();
     await supabase.auth.signOut();
     setOpen(false);
     router.push("/login");

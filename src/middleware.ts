@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { updateSession } from "@/lib/supabase/middleware";
+import { resolveSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
 import { canAccessPath, ruleForPath } from "@/lib/access";
@@ -9,7 +9,7 @@ import { buildCsp, cspHeaderName, makeNonce } from "@/lib/csp";
 
 async function handle(request: NextRequest) {
   // First refresh the session
-  const response = await updateSession(request);
+  const { response, user } = await resolveSession(request);
 
   // If updateSession already redirected (e.g. to /login), respect it
   if (response.headers.get("location")) {
@@ -46,10 +46,6 @@ async function handle(request: NextRequest) {
       },
     }
   );
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
 
   if (user) {
     const { data: profile } = await supabase

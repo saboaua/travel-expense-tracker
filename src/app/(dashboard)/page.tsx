@@ -14,7 +14,8 @@ import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, documentStatus, kindLabel, maskNumber, numberLabel, renewalAlert, sortForTiles, tileCountdown } from "@/lib/documents";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
-import { loadPermissions } from "@/lib/access-server";
+import { permissionsFromRoles, type RoleRecord } from "@/lib/access";
+import { getCurrentUser } from "@/lib/supabase/session";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
@@ -31,105 +32,107 @@ function usdOf(e: Expense) {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getCurrentUser();
+  const uid = user?.id;
 
-  const { data: profileData } = await withColumnFallback(
-    (cols) => supabase.from("profiles").select(cols).eq("id", user?.id).single(),
-    PROFILE_HOME_PLACE_COLS,
-    PROFILE_HOME_COLS
-  );
-  const profile = profileData as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
-
-  const { data: trips } = await supabase
-    .from("trips")
-    .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
-    .eq("user_id", user?.id)
-    .order("start_date", { ascending: true });
-
-  // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
-  const { data: docData } = await withColumnFallback(
-    (cols) => supabase.from("travel_documents").select(cols).eq("user_id", user?.id),
-    DOCUMENT_TILE_COLS,
-    DOCUMENT_TILE_COLS_BASE
-  );
+  // Wave 1: everything that only needs to know who is signed in, asked together
+  const [profileRes, tripsRes, docRes, flagRes, rolesRes] = await Promise.all([
+    withColumnFallback(
+      (cols) => supabase.from("profiles").select(cols).eq("id", uid).single(),
+      PROFILE_HOME_PLACE_COLS,
+      PROFILE_HOME_COLS
+    ),
+    supabase
+      .from("trips")
+      .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
+      .eq("user_id", uid)
+      .order("start_date", { ascending: true }),
+    // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
+    withColumnFallback(
+      (cols) => supabase.from("travel_documents").select(cols).eq("user_id", uid),
+      DOCUMENT_TILE_COLS,
+      DOCUMENT_TILE_COLS_BASE
+    ),
+    supabase.from("app_settings").select("personal_enabled").eq("id", 1).single(),
+    supabase.from("roles").select("key, label, permissions, known_features"),
+  ]);
+  const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
+  const trips = tripsRes.data;
   type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null };
-  const docRows = (docData || []) as unknown as DocRow[];
+  const docRows = (docRes.data || []) as unknown as DocRow[];
+  const role = (profile?.role as string) || "user";
+  const roleRows = rolesRes.error ? null : ((rolesRes.data || []) as RoleRecord[]);
+  const myPerms = permissionsFromRoles(role, roleRows);
+  const personalAllowed = !(flagRes.data && flagRes.data.personal_enabled === false);
+
   const passportAlert = renewalAlert(currentPassport(docRows.filter((d) => d.kind === "passport")), trips || [], todayISO());
   const docCounts: Record<string, number> = {};
   for (const d of docRows) if (d.trip_id) docCounts[d.trip_id] = (docCounts[d.trip_id] || 0) + 1;
-  // Security alerts are only for admins (the same people who can open Admin > Security)
-  let securityNotifications: ReturnType<typeof buildSecurityNotifications> = [];
-  const myPerms = await loadPermissions(supabase, (profile?.role as string) || "user");
-  if (myPerms.has("security.view")) {
-    const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
-    const { data: events } = await supabase
-      .from("security_events")
-      .select("event_type, severity, created_at")
-      .in("severity", ["warning", "critical"])
-      .gte("created_at", since)
-      .order("created_at", { ascending: false })
-      .limit(300);
-    securityNotifications = buildSecurityNotifications(events || [], Date.now());
-  }
+
+  // Which trip the hero shows (decides which destination photo to look up)
+  const todayStr = todayISO();
+  const endOfTrip = (t: { start_date: string; end_date: string | null }) => t.end_date || t.start_date;
+  const openTrips = (trips || []).filter((t) => t.status === "active");
+  const featuredTrip =
+    openTrips.filter((t) => t.start_date <= todayStr && endOfTrip(t) >= todayStr).sort((x, y) => x.start_date.localeCompare(y.start_date))[0] ||
+    openTrips.filter((t) => t.start_date > todayStr).sort((x, y) => x.start_date.localeCompare(y.start_date))[0] ||
+    openTrips.filter((t) => endOfTrip(t) < todayStr).sort((x, y) => y.start_date.localeCompare(x.start_date))[0] ||
+    null;
+
+  // Wave 2: what depends on the role, the personal switch or the hero trip, all asked together
+  const wantsSecurity = myPerms.has("security.view");
+  const wantsSummary = myPerms.has("personal") && personalAllowed;
+  const wantsDash = myPerms.has("personal.dashboard") && personalAllowed;
+  const monthStart = `${todayISO().slice(0, 7)}-01`;
+  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashPj, dashCu, destinationInfo] = await Promise.all([
+    // Security alerts are only for admins (the same people who can open Admin > Security)
+    wantsSecurity
+      ? supabase
+          .from("security_events")
+          .select("event_type, severity, created_at")
+          .in("severity", ["warning", "critical"])
+          .gte("created_at", new Date(Date.now() - 24 * 3_600_000).toISOString())
+          .order("created_at", { ascending: false })
+          .limit(300)
+      : null,
+    // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
+    wantsSummary ? supabase.from("grocery_receipts").select("total, currency").eq("user_id", uid).gte("purchase_date", monthStart) : null,
+    wantsSummary ? supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("user_id", uid).eq("status", "active") : null,
+    // Active home projects and personal trips: places a scanned receipt can go
+    wantsSummary ? supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", uid).eq("status", "active").order("created_at", { ascending: false }) : null,
+    // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
+    wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
+    wantsDash ? supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000) : null,
+    wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, start_date, end_date").eq("user_id", uid) : null,
+    wantsDash ? supabase.from("currencies").select("code, usd_rate") : null,
+    featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,
+  ]);
+
+  const securityNotifications = eventsRes ? buildSecurityNotifications(eventsRes.data || [], Date.now()) : [];
   // Admin only: new app options nobody has reviewed yet
-  let accessNotifications: ReturnType<typeof buildAccessNotification> = [];
-  if ((profile?.role as string) === "admin") {
-    const { data: roleRows } = await supabase.from("roles").select("key, label, known_features");
-    accessNotifications = buildAccessNotification(roleRows || []);
-  }
+  const accessNotifications = role === "admin" ? buildAccessNotification(roleRows || []) : [];
   const notifications = [
     ...securityNotifications,
     ...accessNotifications,
     ...buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() }),
   ].sort((a, b) => ({ urgent: 0, warning: 1, info: 2 })[a.severity] - ({ urgent: 0, warning: 1, info: 2 })[b.severity]);
 
-  // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
   let personalSummary: ReturnType<typeof summarizePersonal> | null = null;
-  if (myPerms.has("personal")) {
-    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
-    if (!(flag && flag.personal_enabled === false)) {
-      const monthStart = `${todayISO().slice(0, 7)}-01`;
-      const [g, pr] = await Promise.all([
-        supabase.from("grocery_receipts").select("total, currency").eq("user_id", user?.id).gte("purchase_date", monthStart),
-        supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("user_id", user?.id).eq("status", "active"),
-      ]);
-      if (!g.error && !pr.error) personalSummary = summarizePersonal(g.data, pr.data as never);
-    }
+  if (groceryRes && summaryProjectsRes && !groceryRes.error && !summaryProjectsRes.error) {
+    personalSummary = summarizePersonal(groceryRes.data, summaryProjectsRes.data as never);
   }
 
-  // Active home projects and personal trips: places a scanned receipt can go
   let scanProjects: { id: string; kind: string; name: string; destination: string | null; start_date: string | null; end_date: string | null; status: string | null }[] = [];
-  let personalOn = false;
-  if (myPerms.has("personal")) {
-    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
-    if (!(flag && flag.personal_enabled === false)) {
-      personalOn = true;
-      const pj = await supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", user?.id).eq("status", "active").order("created_at", { ascending: false });
-      if (!pj.error) scanProjects = (pj.data || []) as typeof scanProjects;
-    }
-  }
+  const personalOn = wantsSummary;
+  if (scanProjectsRes && !scanProjectsRes.error) scanProjects = (scanProjectsRes.data || []) as typeof scanProjects;
 
-  // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
   let dashRows: DashboardRow[] | null = null;
   let dashProjects: DashboardProject[] = [];
-  if (myPerms.has("personal.dashboard")) {
-    const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
-    if (!(flag && flag.personal_enabled === false)) {
-      const [ex, gr, pj, cu] = await Promise.all([
-        supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", user?.id).order("expense_date", { ascending: false }).limit(5000),
-        supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", user?.id).order("purchase_date", { ascending: false }).limit(5000),
-        supabase.from("personal_projects").select("id, name, kind, status, start_date, end_date").eq("user_id", user?.id),
-        supabase.from("currencies").select("code, usd_rate"),
-      ]);
-      if (!ex.error && !gr.error && !pj.error) {
-        const rates: Record<string, number> = {};
-        for (const c of cu.data || []) if (c.usd_rate && Number(c.usd_rate) > 0) rates[String(c.code).toUpperCase()] = Number(c.usd_rate);
-        dashRows = buildRows(ex.data, gr.data, rates);
-        dashProjects = (pj.data || []) as DashboardProject[];
-      }
-    }
+  if (dashEx && dashGr && dashPj && !dashEx.error && !dashGr.error && !dashPj.error) {
+    const rates: Record<string, number> = {};
+    for (const c of dashCu?.data || []) if (c.usd_rate && Number(c.usd_rate) > 0) rates[String(c.code).toUpperCase()] = Number(c.usd_rate);
+    dashRows = buildRows(dashEx.data, dashGr.data, rates);
+    dashProjects = (dashPj.data || []) as DashboardProject[];
   }
 
   const today = todayISO();
@@ -148,7 +151,6 @@ export default async function DashboardPage() {
   // Featured = in progress, else the soonest upcoming, else the latest trip that has passed
   // but is still active (receipts can keep coming in until it is marked completed)
   const featured = ongoing[0] || upcoming[0] || ended[0] || null;
-  const destinationInfo = featured ? await getDestinationInfo(featured.destination) : null;
 
   const isPassed = (t: { start_date: string; end_date: string | null }) => endOf(t) < today;
 

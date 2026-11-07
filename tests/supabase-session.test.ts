@@ -102,7 +102,9 @@ async function main() {
   eq("sign-out clears the auth cookies", authCookies(), []);
   eq("sign-out told the server", state.calls.logout, 1);
   r = await updateSession(req("/"));
-  eq("after sign-out the dashboard redirects to /login", [r.status, new URL(r.headers.get("location") || "http://x/").pathname], [307, "/login"]);
+  eq("after sign-out the start address shows the sign-in screen in place (no redirect: iOS installs a redirecting page as a bookmark)", [r.status, r.headers.get("location"), r.headers.get("x-middleware-rewrite")?.endsWith("/login")], [200, null, true]);
+  r = await updateSession(req("/trips"));
+  eq("after sign-out other pages redirect to /login", [r.status, new URL(r.headers.get("location") || "http://x/").pathname], [307, "/login"]);
   r = await updateSession(req("/login"));
   eq("after sign-out /login stays reachable", r.status, 200);
 
@@ -133,7 +135,9 @@ async function main() {
   // ---- no cookies at all ----
   jar.clear();
   r = await updateSession(req("/"));
-  eq("no cookies -> /login", [r.status, new URL(r.headers.get("location") || "http://x/").pathname], [307, "/login"]);
+  eq("no cookies -> sign-in screen at the start address", [r.status, r.headers.get("location"), r.headers.get("x-middleware-rewrite")?.endsWith("/login")], [200, null, true]);
+  r = await updateSession(req("/trips"));
+  eq("no cookies -> other pages redirect to /login", [r.status, new URL(r.headers.get("location") || "http://x/").pathname], [307, "/login"]);
 
   server.close();
   process.exit(fail ? 1 : 0);

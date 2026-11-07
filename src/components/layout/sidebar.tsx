@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -12,41 +11,21 @@ import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { adminNavItems } from "@/lib/access";
-import { useAccess } from "@/lib/use-access";
+import { resetAccessCache, useAccess } from "@/lib/use-access";
+import { resetBrandCache, useBrand } from "@/lib/use-brand";
 
 export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const supabase = createClient();
-  const { role, perms } = useAccess(pathname);
-  const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [appName, setAppName] = useState("Expense Tracker");
-  const [primaryColor, setPrimaryColor] = useState("#4f46e5");
-  const [personalEnabled, setPersonalEnabled] = useState(true);
-
-  useEffect(() => {
-    async function load() {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { data: settings } = await supabase.from("app_settings").select("app_name, logo_url, primary_color").eq("id", 1).single();
-      if (settings) {
-        setAppName(settings.app_name || "Expense Tracker");
-        setLogoUrl(settings.logo_url);
-        if (settings.primary_color) {
-          setPrimaryColor(settings.primary_color);
-          document.documentElement.style.setProperty("--brand-primary", settings.primary_color);
-        }
-      }
-      // Separate query so the sidebar keeps working before the personal migration has been run
-      const { data: flag } = await supabase.from("app_settings").select("personal_enabled").eq("id", 1).single();
-      if (flag && flag.personal_enabled === false) setPersonalEnabled(false);
-      if (!user) return;
-    }
-    load();
-  }, [supabase, pathname]);
+  const { role, perms } = useAccess();
+  const { appName, logoUrl, primaryColor, personalEnabled } = useBrand();
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await clearOfflineData();
+    resetAccessCache();
+    resetBrandCache();
     await supabase.auth.signOut();
     router.push("/login");
     router.refresh();

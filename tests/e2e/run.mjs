@@ -623,6 +623,31 @@ try {
     await ctx.close();
   });
 
+  await test("moving between pages does not re-ask who is signed in, what the role may do, or the app settings", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const side = page.locator("aside");
+    await side.getByRole("link", { name: "Business" }).waitFor();
+    await page.waitForLoadState("networkidle");
+    fake.resetCounts();
+    // Four moves between pages
+    for (const [link, path] of [["Business", "/trips"], ["Dashboard", "/"], ["Business", "/trips"], ["Dashboard", "/"]]) {
+      await side.getByRole("link", { name: link }).click();
+      await page.waitForURL((u) => u.pathname === path);
+      await page.waitForLoadState("networkidle");
+    }
+    const c = fake.counts();
+    if (process.env.E2E_COUNTS) console.log("requests during 4 page changes:", JSON.stringify(c));
+    const n = (k) => c[k] || 0;
+    // Before this was tuned: 15 sign-in checks, 14 profile reads, 11 role reads and 7 settings reads for the same four moves
+    assert(n("GET auth:user") <= 10, `sign-in checked too often: ${n("GET auth:user")} (limit 10)`);
+    assert(n("GET rest:profiles") <= 8, `profile read too often: ${n("GET rest:profiles")} (limit 8)`);
+    assert(n("GET rest:roles") <= 6, `roles read too often: ${n("GET rest:roles")} (limit 6)`);
+    assert(n("GET rest:app_settings") <= 3, `settings read too often: ${n("GET rest:app_settings")} (limit 3)`);
+    await ctx.close();
+  });
+
   /* ---------- scan and upload ---------- */
   const JPEG = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
   await test("Upload with one active trip goes straight to its form, with a Change button", async () => {

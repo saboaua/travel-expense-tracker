@@ -34,6 +34,7 @@ function splitTop(s) {
 }
 
 export function createFakeSupabase() {
+  const counts = {};
   const db = {};
   const users = new Map(); // id -> { id, email, password }
   const tokens = new Map(); // access token -> user id
@@ -243,6 +244,7 @@ export function createFakeSupabase() {
       const url = new URL(req.url || "/", "http://x");
       let body = {};
       if (/json/.test(String(req.headers["content-type"])) && raw.length) { try { body = JSON.parse(raw.toString()); } catch { body = {}; } }
+      counts[`${req.method} ${url.pathname.replace(/^\/rest\/v1\//, "rest:").replace(/^\/auth\/v1\//, "auth:")}`] = (counts[`${req.method} ${url.pathname.replace(/^\/rest\/v1\//, "rest:").replace(/^\/auth\/v1\//, "auth:")}`] || 0) + 1;
       try {
         if (dropUserUpdates > 0 && req.method === "PUT" && url.pathname === "/auth/v1/user") { dropUserUpdates--; return req.socket.destroy(); }
         if (url.pathname.startsWith("/auth/v1")) return authApi(req, res, url, body);
@@ -258,6 +260,9 @@ export function createFakeSupabase() {
 
   let dropUserUpdates = 0;
   return {
+    /** How many requests reached each endpoint ("GET rest:profiles", "GET auth:user", ...) since the last reset. */
+    counts: () => ({ ...counts }),
+    resetCounts: () => { for (const k of Object.keys(counts)) delete counts[k]; },
     db, table, seed, addUser, log, storage,
     /** The next n password updates lose their connection, as on a bad mobile network. */
     dropNextPasswordUpdates: (n = 1) => { dropUserUpdates = n; },

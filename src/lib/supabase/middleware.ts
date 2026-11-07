@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { verifiedUser, type SessionUser } from "@/lib/supabase/verified-user";
 
 type CookieToSet = {
   name: string;
@@ -40,7 +41,8 @@ function isPublic(pathname: string) {
   return PUBLIC_PREFIXES.some((p) => pathname.startsWith(p));
 }
 
-export async function updateSession(request: NextRequest) {
+/** The refreshed response (session cookies) plus the signed-in person, so later steps need not ask again. */
+export async function resolveSession(request: NextRequest): Promise<{ response: NextResponse; user: SessionUser | null }> {
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -71,15 +73,13 @@ export async function updateSession(request: NextRequest) {
   );
 
   // Refresh session if expired
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await verifiedUser(supabase);
 
   const pathname = request.nextUrl.pathname;
 
   // Public routes (webhook, login, icons, etc.) must never be redirected
   if (isPublic(pathname)) {
-    return supabaseResponse;
+    return { response: supabaseResponse, user };
   }
 
   // Protect dashboard routes
@@ -91,9 +91,9 @@ export async function updateSession(request: NextRequest) {
     if (pathname === "/") {
       const rewrite = NextResponse.rewrite(url, { request });
       supabaseResponse.cookies.getAll().forEach((c) => rewrite.cookies.set(c));
-      return rewrite;
+      return { response: rewrite, user };
     }
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), user };
   }
 
   // Redirect logged-in users away from auth pages
@@ -103,8 +103,12 @@ export async function updateSession(request: NextRequest) {
   ) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
-    return NextResponse.redirect(url);
+    return { response: NextResponse.redirect(url), user };
   }
 
-  return supabaseResponse;
+  return { response: supabaseResponse, user };
+}
+
+export async function updateSession(request: NextRequest) {
+  return (await resolveSession(request)).response;
 }

@@ -70,6 +70,13 @@ export function legacyPermissions(roleKey: string): Set<string> {
   return effectivePermissions({ key: roleKey === "assistant" || roleKey === "admin" ? roleKey : "user", permissions: [], known_features: [] });
 }
 
+/** Same answer as loadPermissions, worked out from roles already fetched (null = the roles table could not be read). */
+export function permissionsFromRoles(roleKey: string, rows: RoleRecord[] | null): Set<string> {
+  if (roleKey === "admin") return new Set(FEATURE_KEYS);
+  const row = rows?.find((r) => r.key === roleKey);
+  return row ? effectivePermissions(row) : legacyPermissions(roleKey);
+}
+
 /** Features an admin has not reviewed yet for this role (shown as "New"). */
 export function unreviewedFeatures(role: Pick<RoleRecord, "key" | "known_features">): Feature[] {
   if (role.key === "admin") return [];
