@@ -25,7 +25,7 @@ const mock = (list: () => Response, gen: (u: string) => Response) => {
   eq([r.keySet, r.verdict.includes("GEMINI_API_KEY is not set")], [false, true], "no key: says so");
 
   process.env.GEMINI_API_KEY = "secret-test-key";
-  mock(() => json(200, { models: [m("gemini-2.5-flash")] }), () => json(200, { candidates: [] }));
+  mock(() => json(200, { models: [m("gemini-3.8-flash")] }), () => json(200, { candidates: [] }));
   r = await diagnoseAi();
   eq([r.keySet, r.callStatus, r.configuredListed, r.verdict.startsWith("Working")], [true, 200, true, true], "healthy: working");
   eq(JSON.stringify(r).includes("secret-test-key"), false, "the key never appears in the answer");
@@ -42,7 +42,7 @@ const mock = (list: () => Response, gen: (u: string) => Response) => {
   r = await diagnoseAi();
   eq(r.verdict.includes("refused the key"), true, "403: says the key was refused");
 
-  mock(() => json(200, { models: [m("gemini-2.5-flash")] }), () => json(429, { error: { message: "quota" } }));
+  mock(() => json(200, { models: [m("gemini-3.8-flash")] }), () => json(429, { error: { message: "quota" } }));
   r = await diagnoseAi();
   eq([r.callStatus, r.verdict.includes("429")], [429, true], "429: quota message");
 

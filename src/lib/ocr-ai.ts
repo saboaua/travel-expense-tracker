@@ -8,7 +8,7 @@ import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 
-const DEFAULT_MODEL = "gemini-2.5-flash"; // override with OCR_MODEL (a Gemini model name)
+const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
 
 export function aiOcrConfigured() {
@@ -73,13 +73,22 @@ function sanitize(raw: Record<string, unknown>, hints: OcrHints, today: string):
 
 type ModelInfo = { name?: string; supportedGenerationMethods?: string[] };
 
+/** Compares version parts as numbers, so 3.10 is newer than 3.8. */
+function cmpVersion(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const d = (a[i] || 0) - (b[i] || 0);
+    if (d) return d;
+  }
+  return 0;
+}
+
 /** The newest stable Flash model that can read images, from Google's own model list. Null when none qualifies. */
 export function pickModel(models: ModelInfo[]): string | null {
   const bad = /(preview|exp|tts|image|lite|live|audio|thinking|latest|computer|robotics|embedding|8b|learnlm|gemma)/i;
   const ranked = models
     .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !bad.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
-    .map((m) => ({ id: (m.name as string).replace(/^models\//, ""), v: parseFloat((m.name as string).match(/gemini-([\d.]+)-flash/i)?.[1] || "0") }))
-    .sort((a, b) => b.v - a.v || a.id.length - b.id.length);
+    .map((m) => ({ id: (m.name as string).replace(/^models\//, ""), v: ((m.name as string).match(/gemini-([\d.]+)-flash/i)?.[1] || "0").split(".").map(Number) }))
+    .sort((a, b) => cmpVersion(b.v, a.v) || a.id.length - b.id.length);
   return ranked[0]?.id ?? null;
 }
 

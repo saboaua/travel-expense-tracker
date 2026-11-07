@@ -24,8 +24,8 @@ const json = (status: number, body: unknown) => new Response(JSON.stringify(body
 globalThis.fetch = (async (url: string | URL | Request) => {
   const u = String(url);
   calls.push(u.replace("https://generativelanguage.googleapis.com/v1beta/", ""));
-  if (u.includes("/models?")) return json(200, { models: [m("gemini-2.5-flash"), m("gemini-4-flash")] });
-  if (u.includes("models/gemini-2.5-flash:")) return json(404, { error: { message: "models/gemini-2.5-flash is not found" } });
+  if (u.includes("/models?")) return json(200, { models: [m("gemini-3.8-flash"), m("gemini-4-flash")] });
+  if (u.includes("models/gemini-3.8-flash:")) return json(404, { error: { message: "models/gemini-3.8-flash is not found" } });
   if (u.includes("models/gemini-4-flash:")) return json(200, okBody);
   return json(500, {});
 }) as typeof fetch;
@@ -37,7 +37,7 @@ globalThis.fetch = (async (url: string | URL | Request) => {
   const img = { data: new Uint8Array([1, 2, 3]), mime: "image/jpeg" };
   const f = await extractDocumentWithAi(img);
   eq([f.kind, f.document_number, f.expiry_date, f.issuing_country], ["license", "DA0546795", "2031-03-13", "Aruba"], "retired model: the document is still read");
-  eq(calls, ["models/gemini-2.5-flash:generateContent", "models?pageSize=200", "models/gemini-4-flash:generateContent"], "retired model: tries, lists models, retries with the newest");
+  eq(calls, ["models/gemini-3.8-flash:generateContent", "models?pageSize=200", "models/gemini-4-flash:generateContent"], "retired model: tries, lists models, retries with the newest");
   calls.length = 0;
   await extractDocumentWithAi(img);
   eq(calls, ["models/gemini-4-flash:generateContent"], "later reads go straight to the model that worked");
