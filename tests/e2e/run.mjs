@@ -359,6 +359,15 @@ try {
 
       await page.goto(`${BASE}/documents`);
       await page.getByText("Offline Passport").first().waitFor({ timeout: 30000 });
+      // A document added with no connection waits on the phone
+      await page.getByRole("button", { name: "Add document" }).first().click();
+      await page.getByRole("dialog", { name: "Add document" }).waitFor({ timeout: 10000 }).catch(async () => { throw new Error("form did not open: " + (await page.locator("body").innerText()).slice(0, 400)); });
+      await page.getByRole("dialog", { name: "Add document" }).locator('input[maxlength="120"]').fill("Offline Ticket");
+      await page.getByRole("dialog", { name: "Add document" }).locator('input[type="date"]').fill(addDays(today, 400));
+      await page.getByRole("button", { name: "Save document" }).click();
+      await page.getByTestId("docs-waiting").waitFor({ timeout: 8000 }).catch(async () => { const idb = await page.evaluate(() => new Promise((res) => { const r = indexedDB.open("expense-tracker-offline"); r.onsuccess = () => { const g = r.result.transaction("expenses").objectStore("expenses").getAll(); g.onsuccess = () => res(JSON.stringify(g.result.map((i) => ({ id: i.id, kind: i.kind, u: i.userId, trip: i.tripId, st: i.status })))); }; })); throw new Error("no waiting note; outbox=" + idb + " dialog=" + (await page.locator("body").innerText()).slice(-500)); });
+      await page.getByText("Offline Ticket").first().waitFor();
+      assert(!fake.table("travel_documents").some((d) => d.title === "Offline Ticket"), "nothing was sent while offline");
 
       // A page that was never saved gives a small page that leads to the saved ones
       await page.goto(`${BASE}/trips`);
@@ -372,6 +381,7 @@ try {
       await page.getByTestId("loyalty-tile").first().waitFor();
       await page.waitForFunction(() => !document.body.innerText.includes("Waiting to sync"), null, { timeout: 60000 });
       assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
+      assert(fake.table("travel_documents").some((d) => d.title === "Offline Ticket" && d.user_id === PAT), "the document added offline is saved once back online");
       await page.getByRole("button", { name: /Sign out/ }).first().click().catch(async () => {
         await page.getByRole("button", { name: /menu/i }).first().click();
         await page.getByRole("button", { name: /Sign out/ }).first().click();

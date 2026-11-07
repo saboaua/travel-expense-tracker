@@ -3,8 +3,8 @@
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Crop, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Camera, CloudOff, Crop, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,13 +12,15 @@ import { todayISO } from "@/lib/utils";
 import { DOC_KINDS, kindHasExpiry, type DocKind, type TravelDocument } from "@/lib/documents";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { takeQuickScan } from "@/lib/quick-scan";
-import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, removeTravelDocument, saveTravelDocument, updateTravelDocument, type DocQuality } from "@/lib/document-upload";
+import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, type DocQuality } from "@/lib/document-upload";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { extractDocumentFields, scanFailureMessage } from "@/lib/document-extract";
 import { cacheFile, documentsKey, fetchDocuments, savedFileUrls } from "@/lib/offline-data";
-import { browserKv, loadWithCache } from "@/lib/offline-store";
-import { useOnline } from "@/lib/use-online";
+import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
+import { applyDocumentOutbox, deleteDocument, isDocumentSave, makeDocumentApi, saveDocument } from "@/lib/document-outbox";
+import { browserOutbox, SYNCED_EVENT } from "@/lib/outbox";
+import { useOutbox } from "@/lib/use-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
 
 /**
@@ -27,6 +29,8 @@ import { OfflineNotice } from "@/components/OfflineNotice";
  */
 export function DocumentsManager({ tripId = null, defaultKind = "other", onChange }: { tripId?: string | null; defaultKind?: DocKind; onChange?: (docs: TravelDocument[]) => void }) {
   const [docs, setDocs] = useState<TravelDocument[]>([]);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [localUrls, setLocalUrls] = useState<Record<string, string>>({});
   const [urls, setUrls] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -57,13 +61,19 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const handedOver = useRef(false);
 
   const savedUrls = useRef<string[]>([]);
-  const online = useOnline();
+  const { items: waiting } = useOutbox(userId);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  const visibleDocs = useMemo(() => applyDocumentOutbox(docs, waiting, tripId), [docs, waiting, tripId]);
+  const waitingIds = useMemo(() => new Set(waiting.filter((i) => i.kind.startsWith("document.")).map((i) => i.id)), [waiting]);
+  const waitingHere = visibleDocs.filter((d) => waitingIds.has(d.id)).length;
 
   const load = useCallback(async () => {
     const supabase = createClient();
     // The session is read from the phone, so this also works with no connection
     const { data: { session } } = await supabase.auth.getSession();
     const userId = session?.user.id;
+    setUserId(userId ?? null);
     const res = userId
       ? await loadWithCache(browserKv, documentsKey(userId, tripId), () => fetchDocuments(supabase, tripId))
       : ({ ok: false, error: new Error("Sign in again to see your documents.") } as const);
@@ -76,7 +86,6 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     const list = res.data;
     setSavedAt(res.fromCache ? res.savedAt : null);
     setDocs(list);
-    onChange?.(list);
     const paths = list.map((d) => d.file_path).filter(Boolean) as string[];
     if (res.fromCache) {
       // No connection: open the files that are saved on the phone
@@ -93,12 +102,29 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       (async () => { for (const p of paths.slice(0, 25)) await cacheFile(supabase, DOC_BUCKET, p); })();
     }
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- memoised on tripId; the Supabase client created each render is equivalent
   }, [tripId]);
 
   useEffect(() => () => { savedUrls.current.forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!loading) onChangeRef.current?.(visibleDocs); }, [visibleDocs, loading]);
+
+  // Something waiting on the phone was sent: reload the list
+  useEffect(() => {
+    window.addEventListener(SYNCED_EVENT, load);
+    return () => window.removeEventListener(SYNCED_EVENT, load);
+  }, [load]);
+
+  // Files that are waiting to be sent open from the phone's copy
+  useEffect(() => {
+    const made: string[] = [];
+    const map: Record<string, string> = {};
+    for (const i of waiting) {
+      if (isDocumentSave(i) && i.blob && i.path) { const u = URL.createObjectURL(i.blob); made.push(u); map[i.path] = u; }
+    }
+    setLocalUrls(map);
+    return () => made.forEach((u) => URL.revokeObjectURL(u));
+  }, [waiting]);
 
   // A photo or PDF sent here by Scan or Upload on the dashboard: open the form with it, as if it had just been picked
   useEffect(() => {
@@ -120,15 +146,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
 
-  /** Adding, editing and deleting need a connection until the offline queue covers documents. */
-  const needsConnection = () => {
-    if (online) return false;
-    setError("You are offline. Your documents are here to view, but adding or changing them needs a connection for now.");
-    return true;
-  };
-
   const startEdit = (d: TravelDocument) => {
-    if (needsConnection()) return;
     setError(null);
     setScanNote(null);
     setEditing(d);
@@ -162,11 +180,17 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setSaving(true);
     try {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not signed in");
+      // Read from the phone, so it works with no connection
+      const { data: { session } } = await supabase.auth.getSession();
+      const uid = session?.user.id;
+      if (!uid) throw new Error("Sign in again to save the document.");
       const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file, prepared: !!cropped && file === preparedFile.current };
-      if (editing) await updateTravelDocument(supabase, user.id, editing, fields);
-      else await saveTravelDocument(supabase, user.id, { tripId, ...fields });
+      const { file: picked, prepared, ...rest } = fields;
+      await saveDocument({
+        api: makeDocumentApi(supabase), store: browserOutbox, userId: uid, doc: editing, tripId, fields: rest, file: picked, prepared,
+        waiting: waiting.find((i) => i.id === editing?.id) ?? null,
+        keep: (path, blob) => browserBlobs.put(`${DOC_BUCKET}/${path}`, blob),
+      });
       reset();
       await load();
     } catch (err) {
@@ -255,10 +279,12 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
 
   const confirm = useConfirm();
   const remove = async (d: TravelDocument) => {
-    if (needsConnection()) return;
     if (!(await confirm({ title: "Delete document?", message: `Delete "${d.title}"?`, destructive: true }))) return;
     try {
-      await removeTravelDocument(createClient(), d);
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete the document.");
+      await deleteDocument({ api: makeDocumentApi(supabase), store: browserOutbox, userId: session.user.id, doc: d, waiting: waiting.find((i) => i.id === d.id) ?? null });
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete.");
@@ -287,7 +313,6 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   }, [adding, cropping, title, number, country, expiry, notes, file, editing, saving]);
 
   const openAdd = () => {
-    if (needsConnection()) return;
     setEditing(null);
     setAdding(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
@@ -306,16 +331,17 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
-      {!tripId && <OfflineNotice savedAt={savedAt} />}
+      {!tripId && <OfflineNotice savedAt={savedAt} writable />}
+      {waitingHere > 0 && <p data-testid="docs-waiting" className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> {waitingHere} waiting to sync</p>}
       {error && !adding && <Alert>{error}</Alert>}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
-      ) : docs.length === 0 && !adding ? (
+      ) : visibleDocs.length === 0 && !adding ? (
         <p className="text-sm text-muted-foreground">{tripId ? "No documents for this trip yet. Add your ticket, booking, visa or insurance so it is close at hand." : "No documents yet. Start with your passport."}</p>
       ) : (
         <DocumentList
-          docs={docs} urls={urls} revealed={revealed} toggleReveal={toggleReveal} today={today} compact={!!tripId}
+          docs={visibleDocs} urls={{ ...urls, ...localUrls }} revealed={revealed} toggleReveal={toggleReveal} today={today} compact={!!tripId}
           onView={(d, url) => d.file_path && setViewing({ title: d.title, url, path: d.file_path })} onEdit={startEdit} onRemove={remove}
         />
       )}

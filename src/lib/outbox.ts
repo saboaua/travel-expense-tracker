@@ -123,6 +123,8 @@ const NOUNS: Record<string, [string, string]> = {
   "expense.create": ["receipt", "receipts"],
   "loyalty.save": ["card", "cards"],
   "loyalty.delete": ["card", "cards"],
+  "document.save": ["document", "documents"],
+  "document.delete": ["document", "documents"],
 };
 
 /** "receipt" / "receipts" when every item is that kind, otherwise "change" / "changes". */
