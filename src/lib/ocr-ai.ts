@@ -94,17 +94,31 @@ export function pickModel(models: ModelInfo[]): string | null {
 
 /** A model that worked (or was found) after the configured one was rejected; kept for the life of the server process. */
 let workingModel: string | null = null;
+let workingSince = 0;
+const REMEMBER_MS = 10 * 60 * 1000; // after that the configured model gets another chance
+const remember = (m: string) => { workingModel = m; workingSince = Date.now(); };
+const remembered = () => (workingModel && Date.now() - workingSince < REMEMBER_MS ? workingModel : null);
 /** For tests: forget the remembered model. */
-export function resetWorkingModel() { workingModel = null; }
+export function resetWorkingModel() { workingModel = null; workingSince = 0; }
 
-async function discoverModel(key: string): Promise<string | null> {
+/** Models to fall back on, best first: stable Flash, then preview Flash, then Lite. Newest first within each group. */
+export function fallbackModels(models: ModelInfo[]): string[] {
+  const skip = /(tts|image|live|audio|embedding|robotics|computer|8b|learnlm|gemma|thinking|latest|exp)/i;
+  return models
+    .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !skip.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map((m) => { const id = (m.name as string).replace(/^models\//, ""); return { id, rank: (/lite/i.test(id) ? 2 : 0) + (/preview/i.test(id) ? 1 : 0), v: (id.match(/gemini-([\d.]+)-flash/i)?.[1] || "0").split(".").map(Number) }; })
+    .sort((a, b) => a.rank - b.rank || cmpVersion(b.v, a.v))
+    .map((m) => m.id);
+}
+
+async function discoverModels(key: string): Promise<string[]> {
   try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(10000) });
-    if (!res.ok) return null;
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return [];
     const json = (await res.json()) as { models?: ModelInfo[] };
-    return pickModel(json.models || []);
+    return fallbackModels(json.models || []);
   } catch {
-    return null;
+    return [];
   }
 }
 
@@ -171,7 +185,7 @@ export async function diagnoseAi(): Promise<AiCheck> {
     .filter((n) => n !== configuredModel)
     .slice(0, 4);
   const [main, ...rest] = await Promise.all([
-    probe(key, workingModel ?? configuredModel, "default", {}),
+    probe(key, remembered() ?? configuredModel, "default", {}),
     probe(key, configuredModel, "thinking minimal", { thinkingConfig: { thinkingLevel: "minimal" } }),
     probe(key, configuredModel, "thinking off (budget 0)", { thinkingConfig: { thinkingBudget: 0 } }),
     ...others.map((n) => probe(key, n, "default", {})),
@@ -184,6 +198,7 @@ export async function diagnoseAi(): Promise<AiCheck> {
   else if (out.listStatus === 400 || out.listStatus === 401 || out.listStatus === 403 || out.callStatus === 401 || out.callStatus === 403) out.verdict = "Google refused the key. Check GEMINI_API_KEY (copied whole, no spaces, the Generative Language API enabled for its project).";
   else if (out.callStatus === 404) out.verdict = out.newestModel ? `The model ${configuredModel} no longer exists. The app will switch to ${out.newestModel} by itself, or set OCR_MODEL=${out.newestModel} in Vercel.` : `The model ${configuredModel} was not found and no replacement was listed. Check the key's access.`;
   else if (out.callStatus === "TimeoutError") out.verdict = `Google did not answer the test request within ${Math.round((out.callMs || 0) / 1000)} seconds. The model may be slow or overloaded. See probes for other models and settings.`;
+  else if (out.callStatus === 503 || out.callStatus === 500) out.verdict = `Google says ${configuredModel} is busy (${out.callStatus}). Scans switch to another model by themselves while it is busy (see probes for which ones answer).`;
   else if (out.callStatus === 429) out.verdict = "The key has hit its rate or quota limit (429). Wait, or check the billing and quota of the Google project.";
   else out.verdict = "Gemini could not be reached or returned an unexpected answer. See the status codes.";
   return out;
@@ -203,7 +218,7 @@ async function askAi(
   const override = process.env.OCR_MODEL;
   const configured = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
 
-  const call = (model: string) =>
+  const call = (model: string, ms: number) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
@@ -211,19 +226,25 @@ async function askAi(
         contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(maxTokens, 2048), temperature: 0 },
       }),
-      signal: AbortSignal.timeout(28000),
-    });
+      signal: AbortSignal.timeout(ms),
+    }).catch(() => null); // null: no answer in time
 
-  let res = await call(workingModel ?? configured);
-  // 404 means Google no longer has that model (they retire old ones). Ask which models exist now and use the newest Flash one.
-  if (res.status === 404) {
-    const found = await discoverModel(key);
-    if (found && found !== (workingModel ?? configured)) {
-      const retry = await call(found);
-      if (retry.ok) workingModel = found;
-      res = retry;
+  // Google retires models (404), and busy ones answer 429/5xx or not at all. Then try the next best model from Google's own list.
+  const RETRY = new Set([404, 429, 500, 502, 503, 504]);
+  const first = remembered() ?? configured;
+  const tried = [first];
+  let res = await call(first, 12000);
+  if (!res || RETRY.has(res.status)) {
+    const next = (await discoverModels(key)).filter((m) => !tried.includes(m)).slice(0, 2);
+    for (const m of next) {
+      tried.push(m);
+      const r = await call(m, 8000);
+      if (r && (r.ok || !res)) res = r;
+      if (r?.ok) { remember(m); break; }
+      if (r && !RETRY.has(r.status)) break;
     }
   }
+  if (!res) throw new Error("AI OCR request failed (timeout)");
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
