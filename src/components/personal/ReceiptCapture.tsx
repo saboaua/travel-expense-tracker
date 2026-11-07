@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, Upload, X, Loader2 } from "lucide-react";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
@@ -13,6 +13,8 @@ export function ReceiptCapture({
   maxSide = 1600,
   onFile,
   onClear,
+  incoming,
+  onIncomingTaken,
 }: {
   preview: string | null;
   busy: boolean;
@@ -20,9 +22,19 @@ export function ReceiptCapture({
   maxSide?: number;
   onFile: (file: File, previewUrl: string) => void;
   onClear: () => void;
+  /** A photo sent here from elsewhere (Scan on the dashboard): it goes to the crop step like a photo picked here. */
+  incoming?: File | null;
+  onIncomingTaken?: () => void;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [pending, setPending] = useState<File | null>(null);
+
+  useEffect(() => {
+    if (!incoming) return;
+    setPending(incoming);
+    onIncomingTaken?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- takes each handed-over photo once
+  }, [incoming]);
 
   const finish = async (file: File) => {
     setPending(null);

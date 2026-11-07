@@ -15,7 +15,7 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
-import { extractGroceryReceipt } from "@/lib/receipt-extract";
+import { extractGroceryReceipt, howRead } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Overview, type ReceiptBundle } from "@/lib/offline-grocery";
@@ -55,6 +55,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [incoming, setIncoming] = useState<File | null>(null);
 
   // New receipt: default to the currency of the latest receipt. Edit: load everything.
   useEffect(() => {
@@ -110,14 +111,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     if (receiptId || quickHandled.current || categoryNames.length === 0) return;
     quickHandled.current = true;
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
-    takeQuickScan("grocery").then((f) => {
-      if (!f) return;
-      setFile(f);
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result as string);
-      reader.readAsDataURL(f);
-      scan(f);
-    });
+    // The photo goes to the crop step first, then is read, the same as a photo picked on this screen
+    takeQuickScan("grocery").then((f) => { if (f) setIncoming(f); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [categoryNames.length]);
 
@@ -143,7 +138,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       );
       setNote(
         r.items.length > 0
-          ? `Read ${r.items.length} items (${r.source === "ai" ? "AI" : "basic OCR"}). Check names and prices before saving.`
+          ? `Read ${r.items.length} items (${howRead(r)}). Check names and prices before saving.`
           : "No items could be read. Add them below, or save just the total."
       );
     } catch {
@@ -234,6 +229,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>
               <ReceiptCapture
+                incoming={incoming}
+                onIncomingTaken={() => setIncoming(null)}
                 preview={preview}
                 busy={scanning}
                 busyLabel="Reading items..."

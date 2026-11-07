@@ -16,7 +16,7 @@ import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
-import { extractReceipt } from "@/lib/receipt-extract";
+import { extractReceipt, howRead } from "@/lib/receipt-extract";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
@@ -52,6 +52,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   const [rateLocked, setRateLocked] = useState(!!expenseId);
   const [projectName, setProjectName] = useState("");
   const [savedAt, setSavedAt] = useState<number | null>(null);
+  const [incoming, setIncoming] = useState<File | null>(null);
   const { rate, setRate, source } = useUsdRate(currency, !rateLocked);
 
   // Default currency = the project's budget currency; load the expense when editing
@@ -105,7 +106,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       if (r.currency && r.currency !== currency && currencies.some((c) => c.code === r.currency)) { setRateLocked(false); setCurrency(r.currency); filled.push(`currency (${r.currency})`); }
       const cat = r.category ? meta.categories.find((c) => c.toLowerCase() === r.category!.toLowerCase()) : null;
       if (cat) { setCategory(cat); filled.push("category"); }
-      setNote(filled.length ? `Auto-filled (${r.source === "ai" ? "AI" : "basic OCR"}): ${filled.join(", ")}. Please verify before saving.` : "Could not read this receipt. Enter the details manually.");
+      setNote(filled.length ? `Auto-filled (${howRead(r)}): ${filled.join(", ")}. Please verify before saving.` : "Could not read this receipt. Enter the details manually.");
     } catch {
       setNote("Could not read this receipt. Enter the details manually.");
     } finally {
@@ -117,14 +118,8 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   const scanKey = `${kind === "home_project" ? "project" : "ptrip"}:${projectId}`;
   useEffect(() => {
     if (expenseId || new URLSearchParams(window.location.search).get("quick") !== "1") return;
-    takeQuickScan(scanKey).then((f) => {
-      if (!f) return;
-      setFile(f);
-      const reader = new FileReader();
-      reader.onload = () => setPreview(reader.result as string);
-      reader.readAsDataURL(f);
-      scan(f);
-    });
+    // The photo goes to the crop step first, then is read, the same as a photo picked on this screen
+    takeQuickScan(scanKey).then((f) => { if (f) setIncoming(f); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the form opens
   }, []);
 
@@ -213,6 +208,8 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>
               <ReceiptCapture
+                incoming={incoming}
+                onIncomingTaken={() => setIncoming(null)}
                 preview={preview}
                 busy={scanning}
                 onFile={(f, url) => { setFile(f); setPreview(url); scan(f); }}

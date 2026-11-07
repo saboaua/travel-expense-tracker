@@ -12,7 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft, Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
-import { extractReceipt } from "@/lib/receipt-extract";
+import { extractReceipt, howRead } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
 import { takeQuickScan } from "@/lib/quick-scan";
@@ -144,7 +144,7 @@ export default function AddExpensePage() {
         setCategory(matchedCategory.name);
         filled.push("category");
       }
-      const how = result.source === "ai" ? "AI" : "basic OCR";
+      const how = howRead(result);
       setOcrNote(
         filled.length > 0
           ? `Auto-filled (${how}): ${filled.join(", ")}. Please verify before saving.`

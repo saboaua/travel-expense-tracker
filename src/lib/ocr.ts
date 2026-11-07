@@ -18,6 +18,8 @@ export interface OcrResult {
   category: string | null;
   rawText: string;
   source: "ai" | "tesseract";
+  /** Why the AI reader was not used, when basic OCR had to step in (see aiFallbackText). */
+  aiReason?: string;
 }
 
 type OcrImageSource = File | string | Uint8Array | ArrayBuffer;

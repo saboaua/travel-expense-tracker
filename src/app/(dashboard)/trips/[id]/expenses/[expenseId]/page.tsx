@@ -17,7 +17,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency } from "@/lib/utils";
 import { compressReceiptImage } from "@/lib/compress-image";
-import { extractReceipt } from "@/lib/receipt-extract";
+import { extractReceipt, howRead } from "@/lib/receipt-extract";
 import { EXPENSE_COLS } from "@/lib/columns";
 import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
 import { browserOutbox } from "@/lib/outbox";
@@ -150,7 +150,7 @@ export default function EditExpensePage() {
       }
       const cat = result.category ? categories.find((c) => c.name.toLowerCase() === result.category!.toLowerCase()) : null;
       if (cat) { setCategory(cat.name); found.push("category"); }
-      const how = result.source === "ai" ? "AI" : "basic OCR";
+      const how = howRead(result);
       setReadNote(found.length ? `Read again (${how}): ${found.join(", ")}. Check the details, then save.` : "Could not read anything from this receipt. Enter the details by hand.");
     } catch (e) {
       setReadNote(e instanceof Error ? e.message : "Reading failed. Enter the details by hand.");

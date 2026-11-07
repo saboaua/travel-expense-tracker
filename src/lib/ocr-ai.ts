@@ -195,6 +195,8 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
 }
 
 export type GroceryScan = {
+  /** Why the AI reader was not used, when basic OCR had to step in. */
+  aiReason?: string;
   store: string | null;
   date: string | null;
   total: number | null;

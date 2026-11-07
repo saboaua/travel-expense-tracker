@@ -56,7 +56,13 @@ function SectionTitle({ dot, title, count, right }: { dot: string; title: string
 /** View, Edit and Delete: three buttons on a wide screen, one menu on a phone. */
 function RowActions({ doc, canView, onView, onEdit, onRemove }: { doc: TravelDocument; canView: boolean; onView: () => void; onEdit: () => void; onRemove: () => void }) {
   const menu = useRef<HTMLDetailsElement>(null);
+  const [up, setUp] = useState(false);
   const close = () => menu.current?.removeAttribute("open");
+  // Open upward when the menu would run under the bottom bar or off the screen
+  const placeMenu = () => {
+    const box = menu.current?.getBoundingClientRect();
+    if (box && menu.current?.open) setUp(window.innerHeight - 96 - box.bottom < 170 && box.top > 170);
+  };
   const item = "flex w-full items-center gap-2 rounded-md px-3 py-2.5 text-left text-sm hover:bg-accent";
   return (
     <>
@@ -69,11 +75,11 @@ function RowActions({ doc, canView, onView, onEdit, onRemove }: { doc: TravelDoc
         <Button type="button" variant="outline" size="icon" onClick={onEdit} aria-label={`Edit ${doc.title}`} title="Edit"><Pencil className="h-4 w-4" /></Button>
         <Button type="button" variant="ghost" size="icon" className="text-red-600" onClick={onRemove} aria-label={`Delete ${doc.title}`} title="Delete"><Trash2 className="h-4 w-4" /></Button>
       </div>
-      <details ref={menu} className="relative shrink-0 md:hidden">
+      <details ref={menu} onToggle={placeMenu} className="relative shrink-0 md:hidden">
         <summary className="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-lg text-muted-foreground hover:bg-accent [&::-webkit-details-marker]:hidden" aria-label={`More actions for ${doc.title}`}>
           <MoreVertical className="h-5 w-5" />
         </summary>
-        <div className="absolute right-0 z-20 mt-1 w-40 rounded-lg border bg-card p-1 shadow-lg">
+        <div className={cn("absolute right-0 z-20 w-40 rounded-lg border bg-card p-1 shadow-lg", up ? "bottom-full mb-1" : "mt-1")}>
           {doc.file_path && canView && <button type="button" className={item} onClick={() => { close(); onView(); }}><Eye className="h-4 w-4" /> View</button>}
           <button type="button" className={item} onClick={() => { close(); onEdit(); }}><Pencil className="h-4 w-4" /> Edit</button>
           <button type="button" className={cn(item, "text-red-600")} onClick={() => { close(); onRemove(); }}><Trash2 className="h-4 w-4" /> Delete</button>
@@ -91,8 +97,9 @@ function DocumentTile({ doc, today, url, revealed, toggleReveal, onView, onEdit,
   const isPdf = doc.file_path?.toLowerCase().endsWith(".pdf");
   const Icon = doc.kind === "passport" ? ShieldCheck : isPdf ? FileText : ImageIcon;
   return (
-    <li className="relative overflow-hidden rounded-xl border bg-card p-4 pl-5 shadow-sm sm:pl-6 md:p-5 md:pl-7">
-      <span className={cn("absolute inset-y-0 left-0 w-1.5", meter ? ACCENT[st.level] : "bg-muted-foreground/30")} aria-hidden="true" />
+    <li className="relative rounded-xl border bg-card p-4 pl-5 shadow-sm sm:pl-6 md:p-5 md:pl-7">
+      {/* No overflow clipping on the card, so the phone menu can open over the cards below; the bar rounds itself */}
+      <span className={cn("absolute inset-y-0 left-0 w-1.5 rounded-l-xl", meter ? ACCENT[st.level] : "bg-muted-foreground/30")} aria-hidden="true" />
       <div className="grid items-center gap-x-6 gap-y-3 md:grid-cols-[minmax(0,1fr)_minmax(0,20rem)_auto]">
         <div className="flex min-w-0 items-center gap-3 pr-10 md:pr-0">
           <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl md:h-11 md:w-11", ICON_TILE[st.level])}><Icon className="h-5 w-5" aria-hidden="true" /></div>

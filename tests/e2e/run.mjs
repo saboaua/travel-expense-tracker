@@ -494,6 +494,36 @@ try {
     await ctx.close();
   });
 
+  await test("a photo sent to Groceries from the dashboard goes on to the crop step, and the document menu on a phone opens over the cards below", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?quick=1`);
+    await page.getByText(/Crop/).first().waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
+  await test("on a phone the document row menu is not cut off by its card", async () => {
+    fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/documents`);
+    const more = page.locator("summary[aria-label^='More actions']").first();
+    await more.waitFor();
+    await more.click();
+    const del = page.getByRole("button", { name: "Delete", exact: true }).first();
+    await del.waitFor();
+    // Whatever is at the middle of the Delete button must be the button itself: a clipped menu would show the card behind it
+    const hit = await del.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); return !!top && el.contains(top); });
+    const why = hit ? "" : await del.evaluate((el) => { const r = el.getBoundingClientRect(); const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2); const clip = []; for (let n = el.parentElement; n; n = n.parentElement) { const o = getComputedStyle(n).overflow; if (o !== "visible") clip.push(`${n.tagName}.${String(n.className).slice(0, 40)}:${o}`); } return `top=${top?.tagName}.${String(top?.className).slice(0, 50)} rect=${Math.round(r.y)}+${Math.round(r.height)} clippers=${clip.join(" | ")}`; });
+    assert(hit, "the menu is not cut off by its card " + why);
+    await ctx.close();
+  });
+
   await test("documents: Add document is a popup whose buttons stay on screen, with a guard against losing what was typed", async () => {
     const docs = fake.table("travel_documents");
     for (let i = 1; i <= 6; i++) docs.push({ id: `d0c00000-0000-4000-8000-00000000020${i}`, user_id: PAT, kind: "visa", title: `Visa ${i}`, issuing_country: "USA", document_number: null, expiry_date: addDays(today, 300 + i), trip_id: null, file_path: null, created_at: new Date().toISOString() });
