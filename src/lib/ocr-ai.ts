@@ -156,7 +156,7 @@ export async function diagnoseAi(): Promise<AiCheck> {
   }
   let models: ModelInfo[] = [];
   try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(10000) });
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) });
     out.listStatus = res.status;
     if (res.ok) models = ((await res.json()) as { models?: ModelInfo[] }).models || [];
   } catch (e) {
@@ -164,37 +164,26 @@ export async function diagnoseAi(): Promise<AiCheck> {
   }
   out.newestModel = pickModel(models);
   if (models.length) out.configuredListed = models.some((m) => m.name === `models/${configuredModel}`);
-  const t0 = Date.now();
-  try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(workingModel ?? configuredModel)}:generateContent`, {
-      method: "POST",
-      headers: { "x-goog-api-key": key, "content-type": "application/json" },
-      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: 'Reply with the JSON {"ok":true}' }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 64, temperature: 0 } }),
-      signal: AbortSignal.timeout(25000),
-    });
-    out.callStatus = res.status;
-    if (!res.ok) out.callError = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 240);
-  } catch (e) {
-    out.callStatus = e instanceof Error ? e.name : "error";
-  }
-  out.callMs = Date.now() - t0;
-  if (out.callStatus !== 200) {
-    // Try other Flash models, and the configured one with less thinking, side by side
-    const others = models
-      .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !/(tts|image|live|audio|embedding|robotics|computer)/i.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
-      .map((m) => (m.name as string).replace(/^models\//, ""))
-      .filter((n) => n !== configuredModel)
-      .slice(0, 4);
-    out.probes = await Promise.all([
-      probe(key, configuredModel, "thinking minimal", { thinkingConfig: { thinkingLevel: "minimal" } }),
-      probe(key, configuredModel, "thinking off (budget 0)", { thinkingConfig: { thinkingBudget: 0 } }),
-      ...others.map((n) => probe(key, n, "default", {})),
-    ]);
-  }
+  // Everything is tried at the same time so the whole check stays well inside the server's time limit
+  const others = models
+    .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !/(tts|image|live|audio|embedding|robotics|computer)/i.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
+    .map((m) => (m.name as string).replace(/^models\//, ""))
+    .filter((n) => n !== configuredModel)
+    .slice(0, 4);
+  const [main, ...rest] = await Promise.all([
+    probe(key, workingModel ?? configuredModel, "default", {}),
+    probe(key, configuredModel, "thinking minimal", { thinkingConfig: { thinkingLevel: "minimal" } }),
+    probe(key, configuredModel, "thinking off (budget 0)", { thinkingConfig: { thinkingBudget: 0 } }),
+    ...others.map((n) => probe(key, n, "default", {})),
+  ]);
+  out.callStatus = main.status;
+  out.callError = main.error;
+  out.callMs = main.ms;
+  if (main.status !== 200) out.probes = rest;
   if (out.callStatus === 200) out.verdict = "Working: Gemini answered with the configured model. If scans still fall back to basic OCR, the photo itself could not be read (try a flatter, brighter photo).";
   else if (out.listStatus === 400 || out.listStatus === 401 || out.listStatus === 403 || out.callStatus === 401 || out.callStatus === 403) out.verdict = "Google refused the key. Check GEMINI_API_KEY (copied whole, no spaces, the Generative Language API enabled for its project).";
   else if (out.callStatus === 404) out.verdict = out.newestModel ? `The model ${configuredModel} no longer exists. The app will switch to ${out.newestModel} by itself, or set OCR_MODEL=${out.newestModel} in Vercel.` : `The model ${configuredModel} was not found and no replacement was listed. Check the key's access.`;
-  else if (out.callStatus === "TimeoutError") out.verdict = `Google did not answer the test request within ${Math.round((out.callMs || 0) / 1000)} seconds. The model may be slow or overloaded: reload this page once to see if it is only a slow first call.`;
+  else if (out.callStatus === "TimeoutError") out.verdict = `Google did not answer the test request within ${Math.round((out.callMs || 0) / 1000)} seconds. The model may be slow or overloaded. See probes for other models and settings.`;
   else if (out.callStatus === 429) out.verdict = "The key has hit its rate or quota limit (429). Wait, or check the billing and quota of the Google project.";
   else out.verdict = "Gemini could not be reached or returned an unexpected answer. See the status codes.";
   return out;
