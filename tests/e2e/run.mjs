@@ -1000,6 +1000,17 @@ try {
     const cards = (await api(b.page, "/api/sharing/loyalty")).body.cards;
     assert(cards.length === 1 && !("user_id" in cards[0]) && !("image_path" in cards[0]), "the shared card carries no owner id or storage path");
     assert((await b.page.getByTestId("loyalty-tile").count()) === 0, "Bob's own wallet is untouched (the shared card is not one of his cards)");
+    // the Personal page tile: his own count on the left, what is shared with him on the right
+    await b.page.goto(`${BASE}/personal`);
+    const hubTile = b.page.getByRole("link", { name: /Loyalty cards/ });
+    await hubTile.getByText(/\d+ cards?/).waitFor(); // (the fake database has no row level security, so this own-count is only checked in the real database)
+    await hubTile.getByTestId("tile-shared").waitFor();
+    assert((await hubTile.getByTestId("tile-shared").innerText()) === "1 shared", "the Loyalty cards tile shows how many cards are shared with him");
+    await shot(b.page, "share-5b-personal-tile");
+    // someone with nothing shared sees no right-hand count
+    await c.page.goto(`${BASE}/personal`);
+    await c.page.getByRole("link", { name: /Loyalty cards/ }).getByText(/\d+ cards?/).waitFor();
+    assert((await c.page.getByTestId("tile-shared").count()) === 0, "no shared count when nothing is shared");
 
     // 7. The trip: Alice shares it; Bob sees name, destination and dates only
     await a.page.goto(`${BASE}/trips/${ATRIP}`);
