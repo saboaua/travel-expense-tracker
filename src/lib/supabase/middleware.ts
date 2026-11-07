@@ -86,6 +86,13 @@ export async function updateSession(request: NextRequest) {
   if (!user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    // The app's start address must not redirect: iOS saves a redirecting page as a plain bookmark (opens in the Safari view with an X)
+    // instead of an app. So signed-out visitors see the sign-in screen AT "/" (a rewrite keeps the address).
+    if (pathname === "/") {
+      const rewrite = NextResponse.rewrite(url, { request });
+      supabaseResponse.cookies.getAll().forEach((c) => rewrite.cookies.set(c));
+      return rewrite;
+    }
     return NextResponse.redirect(url);
   }
 

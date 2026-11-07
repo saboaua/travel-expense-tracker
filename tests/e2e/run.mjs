@@ -272,11 +272,14 @@ try {
   });
 
   /* ---------- sign-in ---------- */
-  await test("signed-out visitors are sent to the login page", async () => {
+  await test("signed-out visitors see the login screen at / (no redirect, so iOS installs it as an app)", async () => {
     const { ctx, page } = await newPage();
-    await page.goto(`${BASE}/`);
+    const res = await page.goto(`${BASE}/`);
+    assert(res.status() === 200 && !res.request().redirectedFrom(), "the start address must not redirect");
+    assert(new URL(page.url()).pathname === "/", "should stay at /");
+    await page.locator("#email").waitFor();
+    await page.goto(`${BASE}/trips`);
     await page.waitForURL(/\/login/);
-    assert(await page.locator("#email").isVisible(), "login form not shown");
     await ctx.close();
   });
 
@@ -301,7 +304,7 @@ try {
     const left = (await ctx.cookies()).filter((c) => c.name.startsWith("sb-") && c.value);
     assert(left.length === 0, `session cookie still set after sign-out: ${left.map((c) => c.name).join(", ")}`);
     await page.goto(`${BASE}/`);
-    await page.waitForURL(/\/login/);
+    await page.locator("#email").waitFor();
     await ctx.close();
   });
 

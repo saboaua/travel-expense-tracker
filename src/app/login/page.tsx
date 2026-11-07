@@ -2,7 +2,6 @@
 
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Turnstile } from "@/components/Turnstile";
@@ -33,7 +32,6 @@ export default function LoginPage() {
   const [appName, setAppName] = useState("Travel Expense Tracker");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
   const [logoSize, setLogoSize] = useState(56);
-  const router = useRouter();
   const supabase = createClient();
 
   useEffect(() => {
@@ -88,8 +86,8 @@ export default function LoginPage() {
         return;
       }
 
-      router.push("/");
-      router.refresh();
+      // The sign-in screen can now be shown at "/" itself, so a soft navigation to "/" would not swap the page: reload it
+      window.location.replace("/");
     } catch {
       setError(NETWORK_MESSAGE);
       setLoading(false);
