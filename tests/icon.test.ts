@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { iconVersion } from "../src/lib/brand-icon";
-import { toIconPng } from "../src/lib/icon-image";
+import { MASKABLE_SCALE, toIconPng } from "../src/lib/icon-image";
 
 let failed = 0;
 const eq = (got: unknown, want: unknown, msg: string) => {
@@ -29,6 +29,23 @@ eq([a === iconVersion("https://x.supabase.co/storage/v1/object/public/branding/l
     const corner = await sharp(png).extract({ left: 0, top: 0, width: 1, height: 1 }).raw().toBuffer();
     eq([...corner], [255, 255, 255], `${name}: the corner is white, not black`);
   }
+  /* ---- maskable: the logo stays inside the circle Android may crop to ---- */
+  const square = await sharp({ create: { width: 400, height: 400, channels: 3, background: "#000000" } }).png().toBuffer();
+  const mask = await toIconPng(square, 512, MASKABLE_SCALE);
+  const { data, info } = await sharp(mask).raw().toBuffer({ resolveWithObject: true });
+  let minX = 512, maxX = 0, minY = 512, maxY = 0;
+  for (let y = 0; y < info.height; y++) for (let x = 0; x < info.width; x++) if (data[(y * info.width + x) * info.channels] < 128) { minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  const radius = 0.4 * 512;
+  const farthest = Math.max(...[[minX, minY], [maxX, minY], [minX, maxY], [maxX, maxY]].map(([x, y]) => Math.hypot(x - 256, y - 256)));
+  eq([maxX - minX > 270, maxX - minX < 300], [true, true], "maskable: the logo fills about 56% of the width");
+  eq(farthest <= radius + 2, true, `maskable: the logo's corners stay inside the safe circle (${Math.round(farthest)} of ${Math.round(radius)})`);
+  const normal = await toIconPng(square, 512);
+  eq((await sharp(normal).metadata()).width, 512, "the normal icon is still 512");
+  const nd = await sharp(normal).raw().toBuffer({ resolveWithObject: true });
+  let nMin = 512, nMax = 0;
+  for (let x = 0; x < 512; x++) if (nd.data[(256 * 512 + x) * nd.info.channels] < 128) { nMin = Math.min(nMin, x); nMax = Math.max(nMax, x); }
+  eq(nMax - nMin > 400, true, "the normal icon fills about 80% (bigger than the maskable one)");
+
   const big = await toIconPng(wide, 512);
   eq((await sharp(big).metadata()).width, 512, "512 size");
   console.log(failed ? `${failed} FAILED` : "all icon checks passed");

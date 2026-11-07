@@ -26,4 +26,4 @@ export const getLogoUrl = unstable_cache(
 );
 
 /** Icon links that follow the logo: /api/icon?v=<version>&size=<px>. */
-export const iconHref = (logoUrl: string | null, size = 512) => `/api/icon?v=${iconVersion(logoUrl)}&size=${size}`;
+export const iconHref = (logoUrl: string | null, size = 512, maskable = false) => `/api/icon?v=${iconVersion(logoUrl)}&size=${size}${maskable ? "&maskable=1" : ""}`;

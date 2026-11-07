@@ -94,3 +94,40 @@ input[type="date"]::-webkit-date-and-time-value {
 .app-frame {
   margin: 0 !important;
 }
+
+/* Touch behaviour that makes the installed app feel like an app and not a web page */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+/* No grey flash on tap, no double-tap-zoom delay */
+a,
+button,
+summary,
+label,
+select,
+[role="button"],
+[role="tab"],
+[role="menuitem"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* Pressing and holding a control must not select its text or open the iPhone callout. Ordinary text is not affected. */
+button,
+summary,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+nav a {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+/* Anything a person may want to copy stays selectable even inside a control */
+input,
+textarea,
+[contenteditable="true"],
+.select-text {
+  -webkit-user-select: text;
+  user-select: text;
+}

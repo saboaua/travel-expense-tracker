@@ -43,7 +43,7 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
         <div className="flex min-h-0 flex-col gap-3 overflow-y-auto p-4">
           <div className="rounded-xl border bg-white p-4 pb-3 text-black">
             <Barcode value={card.card_number} format={card.barcode_format} label={`Barcode for ${displayNumber(card.card_number)}`} className={isQr ? "mx-auto block aspect-square w-full max-w-[16rem]" : "block h-32 w-full"} />
-            <p className="mt-3 break-all text-center text-xl font-semibold tabular-nums tracking-[0.12em]" data-testid="card-number">{displayNumber(card.card_number)}</p>
+            <p className="mt-3 select-text break-all text-center text-xl font-semibold tabular-nums tracking-[0.12em]" data-testid="card-number">{displayNumber(card.card_number)}</p>
             <p className="mt-1 text-center text-xs text-slate-500">{[formatLabel(card.barcode_format), card.holder_name].filter(Boolean).join(" · ")}</p>
           </div>
 

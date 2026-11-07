@@ -60,7 +60,8 @@ fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", crea
 
 /* ---------------- start everything ---------------- */
 await fake.listen(FAKE_PORT);
-const app = spawn("npx", ["next", "dev", "-p", String(APP_PORT), "-H", "localhost"], {
+// E2E_PROD=1 runs against a production build (made beforehand with tests/e2e/build-prod.sh), which is how phones get the app
+const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", String(APP_PORT), "-H", "localhost"], {
   env: {
     ...process.env,
     NEXT_PUBLIC_SUPABASE_URL: `http://127.0.0.1:${FAKE_PORT}`,
@@ -181,6 +182,68 @@ try {
     assert((await page.getByTestId("icon-update-notice").count()) === 0, "no notice outside the installed app");
     await ctx.close();
   });
+
+  /* ---------- touch behaviour ---------- */
+  await test("controls do not flash grey or select text on long press, while inputs and card numbers stay selectable", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("button", { name: "Scan" }).waitFor();
+    const style = await page.evaluate(() => {
+      const css = (el, prop) => getComputedStyle(el)[prop];
+      const btn = document.querySelector("button");
+      const probe = document.createElement("input");
+      const num = document.createElement("p");
+      num.className = "select-text";
+      document.body.append(probe, num);
+      const out = {
+        btnSelect: css(btn, "userSelect") || css(btn, "webkitUserSelect"),
+        btnTouch: css(btn, "touchAction"),
+        btnTap: css(btn, "webkitTapHighlightColor"),
+        inputSelect: css(probe, "userSelect") || css(probe, "webkitUserSelect"),
+        textSelect: css(num, "userSelect") || css(num, "webkitUserSelect"),
+      };
+      probe.remove(); num.remove();
+      return out;
+    });
+    assert(style.btnSelect === "none", `buttons do not select text (got ${style.btnSelect})`);
+    assert(style.btnTouch === "manipulation", `buttons skip the double-tap delay (got ${style.btnTouch})`);
+    assert(/rgba\(0, 0, 0, 0\)|transparent/.test(style.btnTap), `no grey flash on tap (got ${style.btnTap})`);
+    assert(style.inputSelect === "text", `fields stay selectable (got ${style.inputSelect})`);
+    assert(style.textSelect === "text", `text marked select-text stays selectable (got ${style.textSelect})`);
+    await ctx.close();
+  });
+
+  /* ---------- loading screens ---------- */
+  // Needs E2E_PROD=1: the loading screens are fetched ahead of the tap by link prefetching, which `next dev` does not do
+  for (const [href, label, from] of [["/reports", "Reports", "/trips"], ["/trips", "Trips", "/"], ["/documents", "Documents", "/"]]) {
+    if (!process.env.E2E_PROD) continue;
+    await test(`tapping ${label} shows a loading skeleton at once while the server is slow, then the page`, async () => {
+      const { ctx, page } = await newPage();
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      if (from !== "/") await page.goto(`${BASE}${from}`);
+      await page.waitForLoadState("networkidle");
+      await page.waitForTimeout(3000); // links prefetch their loading screen shortly after the page opens, as on a phone
+      let delayed = 0;
+      await page.route(new RegExp(`${href}(\\?|$)`), async (route) => {
+        const req = route.request();
+        if (req.headers()["rsc"] || /_rsc=/.test(req.url())) { delayed++; await new Promise((r) => setTimeout(r, 4000)); }
+        await route.continue();
+      });
+      const link = page.locator(`a[href="${href}"]:visible`).first();
+      await link.waitFor();
+      const t0 = Date.now();
+      await link.click();
+      await page.getByTestId("page-skeleton").first().waitFor({ timeout: 2500 });
+      const seenAfter = Date.now() - t0;
+      assert(seenAfter < 2000, `the skeleton showed after ${seenAfter} ms, well before the page`);
+      assert(delayed > 0, "the server really was slow");
+      await page.waitForURL((u) => u.pathname === href);
+      await page.getByTestId("page-skeleton").first().waitFor({ state: "detached", timeout: 20_000 });
+      await ctx.close();
+    });
+  }
 
   /* ---------- sign-in ---------- */
   await test("signed-out visitors are sent to the login page", async () => {
@@ -534,6 +597,9 @@ try {
   /* ---------- scan and upload ---------- */
   const JPEG = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
   await test("Upload with one active trip goes straight to its form, with a Change button", async () => {
+    // Earlier tests (the offline ones) add trips; this check needs Pat to have exactly one active trip
+    const trips = fake.table("trips");
+    for (let i = trips.length - 1; i >= 0; i--) if (trips[i].user_id === PAT && trips[i].id !== TRIP_ID) trips.splice(i, 1);
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");

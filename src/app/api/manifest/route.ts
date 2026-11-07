@@ -32,6 +32,8 @@ export async function GET() {
   }
 
   const icon = (size: number) => (logoUrl ? iconHref(logoUrl, size) : size >= 512 ? "/icon-512.png" : "/icon-192.png");
+  // Android crops a maskable icon, so it gets its own copy with room around the logo
+  const maskableIcon = iconHref(logoUrl, 512, true);
 
   const manifest = {
     name,
@@ -57,7 +59,7 @@ export async function GET() {
         purpose: "any",
       },
       {
-        src: icon(512),
+        src: maskableIcon,
         sizes: "512x512",
         type: "image/png",
         purpose: "maskable",
