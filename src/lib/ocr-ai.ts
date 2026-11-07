@@ -121,10 +121,30 @@ export type AiCheck = {
   callError: string | null;
   /** How long the test request took, in milliseconds. */
   callMs: number | null;
+  /** Other models and settings tried side by side, when the main test did not succeed. */
+  probes?: { model: string; setting: string; status: number | string; ms: number; error: string | null }[];
   verdict: string;
 };
 
 /** Checks the AI reader end to end without an image: key present, Google reachable, the model exists and answers. Never returns the key. */
+async function probe(key: string, model: string, setting: string, extra: Record<string, unknown>) {
+  const t0 = Date.now();
+  let status: number | string = "error", error: string | null = null;
+  try {
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+      method: "POST",
+      headers: { "x-goog-api-key": key, "content-type": "application/json" },
+      body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: 'Reply with the JSON {"ok":true}' }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 64, temperature: 0, ...extra } }),
+      signal: AbortSignal.timeout(12000),
+    });
+    status = res.status;
+    if (!res.ok) error = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+  } catch (e) {
+    status = e instanceof Error ? e.name : "error";
+  }
+  return { model, setting, status, ms: Date.now() - t0, error };
+}
+
 export async function diagnoseAi(): Promise<AiCheck> {
   const key = process.env.GEMINI_API_KEY;
   const override = process.env.OCR_MODEL;
@@ -158,6 +178,19 @@ export async function diagnoseAi(): Promise<AiCheck> {
     out.callStatus = e instanceof Error ? e.name : "error";
   }
   out.callMs = Date.now() - t0;
+  if (out.callStatus !== 200) {
+    // Try other Flash models, and the configured one with less thinking, side by side
+    const others = models
+      .filter((m) => m.name && /^models\/gemini-[\d.]+-flash/i.test(m.name) && !/(tts|image|live|audio|embedding|robotics|computer)/i.test(m.name) && (m.supportedGenerationMethods || []).includes("generateContent"))
+      .map((m) => (m.name as string).replace(/^models\//, ""))
+      .filter((n) => n !== configuredModel)
+      .slice(0, 4);
+    out.probes = await Promise.all([
+      probe(key, configuredModel, "thinking minimal", { thinkingConfig: { thinkingLevel: "minimal" } }),
+      probe(key, configuredModel, "thinking off (budget 0)", { thinkingConfig: { thinkingBudget: 0 } }),
+      ...others.map((n) => probe(key, n, "default", {})),
+    ]);
+  }
   if (out.callStatus === 200) out.verdict = "Working: Gemini answered with the configured model. If scans still fall back to basic OCR, the photo itself could not be read (try a flatter, brighter photo).";
   else if (out.listStatus === 400 || out.listStatus === 401 || out.listStatus === 403 || out.callStatus === 401 || out.callStatus === 403) out.verdict = "Google refused the key. Check GEMINI_API_KEY (copied whole, no spaces, the Generative Language API enabled for its project).";
   else if (out.callStatus === 404) out.verdict = out.newestModel ? `The model ${configuredModel} no longer exists. The app will switch to ${out.newestModel} by itself, or set OCR_MODEL=${out.newestModel} in Vercel.` : `The model ${configuredModel} was not found and no replacement was listed. Check the key's access.`;
