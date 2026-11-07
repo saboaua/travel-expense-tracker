@@ -4,6 +4,7 @@ import { ScrollArea } from "@/components/layout/ScrollArea";
 import { OfflineSync } from "@/components/OfflineSync";
 import { ViewportGuard } from "@/components/layout/ViewportGuard";
 import { OfflineWarm } from "@/components/OfflineWarm";
+import { SharingPopups } from "@/components/sharing/SharingPopups";
 
 export default function DashboardLayout({
   children,
@@ -21,6 +22,7 @@ export default function DashboardLayout({
       <MobileNav />
       <OfflineSync />
       <OfflineWarm />
+      <SharingPopups />
       <ViewportGuard />
     </div>
   );

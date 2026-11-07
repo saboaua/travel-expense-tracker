@@ -8,6 +8,7 @@
 import { spawn } from "node:child_process";
 import { chromium } from "playwright";
 import { createFakeSupabase, SERVICE_KEY, ANON_KEY } from "./fake-supabase.mjs";
+import { createSharingBackend } from "./sharing-backend.mjs";
 
 const APP_PORT = Number(process.env.E2E_APP_PORT || 3100);
 const FAKE_PORT = Number(process.env.E2E_FAKE_PORT || 54399);
@@ -41,6 +42,8 @@ fake.seed("roles", [
   { key: "assistant", label: "Assistant", description: "Assistant", permissions: ["trips", "reports", "personal", "documents", "loyalty", "users.manage"], known_features: FEATURES, is_system: true },
   { key: "admin", label: "Admin", description: "Admin", permissions: FEATURES, known_features: FEATURES, is_system: true },
 ]);
+// A role that has the Partner sharing option (off for every other role until an admin turns it on)
+fake.table("roles").push({ id: "family-role", key: "family", label: "Family", description: "Has partner sharing", permissions: ["trips", "personal", "documents", "loyalty", "sharing"], known_features: [...FEATURES, "sharing"], is_system: false, created_at: new Date().toISOString() });
 fake.seed("app_settings", [{ id: 1, app_name: "E2E Expense App", logo_url: null, primary_color: "#4f46e5", login_logo_size: 56, privacy_policy: "", support_email: "help@example.com", personal_enabled: true }]);
 fake.seed("currencies", [
   { code: "USD", name: "US Dollar", usd_rate: 1, enabled: true, sort_order: 1 },
@@ -52,6 +55,9 @@ for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
 const ADMIN = fake.addUser({ email: "admin@example.com", password: "Admin-Pass-123", role: "admin", full_name: "Ada Admin" });
+const ALICE = fake.addUser({ email: "alice@example.com", password: "Alice-Pass-123", role: "family", full_name: "Alice Sharer" });
+const BOB = fake.addUser({ email: "bob@example.com", password: "Bob-Pass-12345", role: "family", full_name: "Bob Partner" });
+fake.addUser({ email: "carol@example.com", password: "Carol-Pass-123", role: "family", full_name: "Carol Stranger" });
 const today = todayAruba();
 const TRIP_ID = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c3d";
 fake.table("trips").push({ id: TRIP_ID, user_id: PAT, name: "Miami Conference", destination: "Miami", category: "Business", start_date: addDays(today, -1), end_date: addDays(today, 2), currency: "USD", status: "active", notes: null, created_at: new Date().toISOString() });
@@ -59,6 +65,9 @@ fake.table("support_requests").push({ id: "b0a6a8a2-0000-4000-8000-000000000001"
 fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", created_at: new Date().toISOString(), action: "role.update", entity_type: "role", entity_id: "user", actor_id: ADMIN, actor_email: "admin@example.com", details: {} });
 
 /* ---------------- start everything ---------------- */
+// The sharing functions run as the real SQL from supabase/migration_sharing.sql on a real Postgres engine (PGlite)
+const sharingDb = await createSharingBackend(fake);
+fake.setRpcHook(sharingDb.hook);
 await fake.listen(FAKE_PORT);
 // E2E_PROD=1 runs against a production build (made beforehand with tests/e2e/build-prod.sh), which is how phones get the app
 const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", String(APP_PORT), "-H", "localhost"], {
@@ -885,6 +894,179 @@ try {
   });
 
   /* ---------- admin pages ---------- */
+
+  /* ---------- partner sharing ---------- */
+  await test("sharing: invite by email, accept, share a card and a trip, the partner sees only that, and revoking removes it", async () => {
+    const CARD = "a1a1a1a1-0000-4000-8000-000000000001";
+    const ATRIP = "a1a1a1a1-0000-4000-8000-000000000002";
+    fake.table("loyalty_cards").push({ id: CARD, user_id: ALICE, store_name: "Greenfield Market", holder_name: null, category: "Rewards", card_number: "402188301177", barcode_format: "CODE128", color: null, image_path: null, created_at: new Date().toISOString() });
+    fake.table("trips").push({ id: ATRIP, user_id: ALICE, name: "Lisbon Summit", destination: "Lisbon", category: "Business", start_date: addDays(today, 10), end_date: addDays(today, 14), currency: "USD", status: "active", notes: "SECRET-NOTES", created_at: new Date().toISOString() });
+    fake.table("expenses").push({ id: "a1a1a1a1-0000-4000-8000-000000000003", trip_id: ATRIP, user_id: ALICE, merchant: "SECRET-HOTEL", amount: 987.65, currency: "USD", exchange_rate: 1, amount_usd: 987.65, category: "Lodging", expense_date: addDays(today, 10), notes: null, receipt_path: "x/secret-receipt.jpg", created_at: new Date().toISOString() });
+
+    const phone = async () => { const c = await browser.newContext({ viewport: { width: 390, height: 844 } }); c.setDefaultTimeout(60_000); return { ctx: c, page: await c.newPage() }; };
+    const signedIn = async (email, password) => { const x = await phone(); await signIn(x.page, email, password); await x.page.waitForURL((u) => u.pathname === "/"); return x; };
+    const shot = async (page, name, sel) => { if (process.env.E2E_SHOT) await (sel ? page.locator(sel).screenshot({ path: `${process.env.E2E_SHOT}/${name}.png` }) : page.screenshot({ path: `${process.env.E2E_SHOT}/${name}.png`, fullPage: false })); };
+    const api = async (page, path, opts = {}) => { const r = await page.request.fetch(`${BASE}${path}`, { maxRedirects: 0, ...opts }); let body = null; try { body = await r.json(); } catch { /* not json */ } return { status: r.status(), body }; };
+    const post = (page, path, data, headers = {}) => api(page, path, { method: "POST", data, headers });
+
+    const a = await signedIn("alice@example.com", "Alice-Pass-123");
+    const b = await signedIn("bob@example.com", "Bob-Pass-12345");
+    const c = await signedIn("carol@example.com", "Carol-Pass-123");
+    const pat = await signedIn("pat@example.com", "Correct-Horse-1");
+
+    // 1. Sharing is off until Alice turns it on; she invites an email with no account and one that has an account
+    await a.page.goto(`${BASE}/profile`);
+    await a.page.locator("#sharing").getByText("Sharing is off").waitFor();
+    await a.page.getByRole("button", { name: "Turn on sharing" }).click();
+    const invite = async (page, email) => {
+      await page.getByRole("button", { name: "Add a partner" }).click();
+      await page.locator("#partner-email").fill(email);
+      await page.getByRole("button", { name: "Next", exact: true }).click();
+      await page.getByRole("dialog", { name: "Send an invite?" }).waitFor();
+      assert((await page.getByRole("dialog").innerText()).includes(email), "the confirm step names the email");
+      await page.getByRole("button", { name: "Send invite" }).click();
+      const done = page.getByRole("dialog", { name: "Invite sent" });
+      await done.waitFor();
+      const text = await done.innerText();
+      await page.getByRole("button", { name: "OK" }).click();
+      return text;
+    };
+    const unknownAnswer = await invite(a.page, "nobody@nowhere.test");
+    const knownAnswer = await invite(a.page, "bob@example.com");
+    assert(unknownAnswer === knownAnswer, `an email with no account must get the very same answer:\n${unknownAnswer}\n${knownAnswer}`);
+    assert(!/no user|not found|no account/i.test(knownAnswer), "the answer never says whether the email has an account");
+    assert((await a.page.locator("#sharing").getByText("Pending").count()) === 2, "both invites show as Pending");
+
+    // 2. Bob sees the invite as a popup and on the bell; Later keeps it on the bell, and the popup does not nag again
+    await b.page.reload();
+    const popup = b.page.getByRole("dialog", { name: "Sharing invite" });
+    await popup.waitFor();
+    await shot(b.page, "share-1-invite-popup");
+    assert(/alice/i.test(await popup.innerText()) && /Nothing is shared until you accept/.test(await popup.innerText()), "the popup names the sender and says nothing is shared yet");
+    await popup.getByRole("button", { name: "Later" }).click();
+    await b.page.reload();
+    await b.page.getByRole("button", { name: /Notifications, 1 need attention/ }).waitFor();
+    assert((await b.page.getByRole("dialog", { name: "Sharing invite" }).count()) === 0, "the popup shows once per invite");
+    await b.page.getByRole("button", { name: /Notifications/ }).click();
+    await shot(b.page, "share-2-bell");
+    assert(await b.page.getByText("alice wants to share with you").isVisible(), "the bell explains the invite");
+    // Carol has no invite
+    assert((await api(c.page, "/api/sharing")).body.incoming.length === 0, "a stranger sees no invite");
+    assert((await api(c.page, "/api/sharing")).body.partners.length === 0, "a stranger sees no partners");
+
+    // 3. Nothing is shared before Bob accepts, even if Alice tries
+    assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 0, "no cards before accepting");
+
+    // 4. Bob accepts on his profile
+    await b.page.goto(`${BASE}/profile`);
+    await b.page.locator("#sharing").getByRole("button", { name: "Accept" }).click();
+    await b.page.locator("#sharing").getByText("Approved").waitFor();
+    await shot(b.page, "share-3-bob-profile", "#sharing");
+
+    // 5. Alice is told once; she shares the card with the switch. Nothing else is shared
+    await a.page.goto(`${BASE}/personal/loyalty`);
+    await a.page.getByRole("dialog", { name: "Invite accepted" }).waitFor();
+    await a.page.getByRole("button", { name: "OK" }).click();
+    await a.page.getByRole("button", { name: "Open Greenfield Market" }).click();
+    const sw = a.page.getByTestId("share-with").getByRole("switch", { name: /with bob/i });
+    await sw.waitFor();
+    assert((await sw.getAttribute("aria-checked")) === "false", "nothing is shared by default");
+    assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 0, "approval alone shares nothing");
+    await shot(a.page, "share-4-owner-card");
+    await sw.click();
+    await a.page.waitForFunction(() => document.querySelector('[data-testid="share-with"] [role="switch"]')?.getAttribute("aria-checked") === "true");
+
+    // 6. Bob sees that one card, view only
+    await b.page.goto(`${BASE}/personal/loyalty`);
+    const tile = b.page.getByTestId("shared-tile");
+    await tile.waitFor();
+    await shot(b.page, "share-5-shared-card-list");
+    assert(/Shared by alice/.test(await tile.innerText()), "the tile says who shared it");
+    await tile.getByRole("button").click();
+    const dlg = b.page.getByRole("dialog", { name: /Greenfield Market card/ });
+    await dlg.waitFor();
+    await shot(b.page, "share-6-shared-card-open");
+    assert((await dlg.getByTestId("card-number").innerText()) === "4021 8830 1177", "the number is shown for scanning");
+    assert((await dlg.getByRole("button", { name: "Edit" }).count()) === 0, "a shared card cannot be edited");
+    assert((await dlg.getByTestId("share-with").count()) === 0, "a shared card cannot be re-shared");
+    assert(/cannot change or delete/.test(await dlg.getByTestId("shared-note").innerText()), "the card says it is view only");
+    await b.page.keyboard.press("Escape");
+    const cards = (await api(b.page, "/api/sharing/loyalty")).body.cards;
+    assert(cards.length === 1 && !("user_id" in cards[0]) && !("image_path" in cards[0]), "the shared card carries no owner id or storage path");
+    assert((await b.page.getByTestId("loyalty-tile").count()) === 0, "Bob's own wallet is untouched (the shared card is not one of his cards)");
+
+    // 7. The trip: Alice shares it; Bob sees name, destination and dates only
+    await a.page.goto(`${BASE}/trips/${ATRIP}`);
+    const tsw = a.page.getByTestId("share-with").getByRole("switch", { name: /with bob/i });
+    await tsw.waitFor();
+    await tsw.click();
+    await a.page.waitForFunction(() => document.querySelector('[data-testid="share-with"] [role="switch"]')?.getAttribute("aria-checked") === "true");
+    await b.page.goto(`${BASE}/trips`);
+    const st = b.page.getByTestId("shared-trip");
+    await st.waitFor();
+    await shot(b.page, "share-7-shared-trip");
+    const stText = await st.innerText();
+    assert(/Lisbon Summit/.test(stText) && /Lisbon/.test(stText) && /Shared by alice/.test(stText), "name, destination and who shared it");
+    const bobPage = await b.page.content();
+    for (const secret of ["SECRET-NOTES", "SECRET-HOTEL", "987.65", "secret-receipt"]) assert(!bobPage.includes(secret), `Bob's page must not contain ${secret}`);
+    const tripsJson = await api(b.page, "/api/sharing/trips");
+    assert(JSON.stringify(Object.keys(tripsJson.body.trips[0]).sort()) === JSON.stringify(["destination", "end_date", "kind", "name", "share_id", "shared_by", "start_date", "trip_id"]), "the trip has exactly these fields");
+    assert(!/SECRET|987\.65|receipt/.test(JSON.stringify(tripsJson.body)), "no expense, note or receipt in the trip answer");
+
+    // 8. A stranger gets nothing, and a role without the option is refused
+    assert((await api(c.page, "/api/sharing/loyalty")).body.cards.length === 0, "Carol sees no cards");
+    assert((await api(c.page, "/api/sharing/trips")).body.trips.length === 0, "Carol sees no trips");
+    assert((await api(c.page, `/api/sharing/photo/${CARD}`)).status === 404, "Carol cannot get the card photo");
+    assert((await api(pat.page, "/api/sharing")).body.available === false, "a role without the option sees sharing as unavailable");
+    assert((await post(pat.page, "/api/sharing/invite", { email: "bob@example.com" })).status === 403, "a role without the option cannot invite");
+    assert((await api(pat.page, "/api/sharing/trips")).status === 403, "a role without the option cannot read shared trips");
+
+    // 9. Safety checks on the routes
+    assert((await post(a.page, "/api/sharing/invite", { email: "x@y.com" }, { origin: "https://evil.example" })).status === 403, "a request from another site is refused");
+    assert((await post(a.page, "/api/sharing/invite", { email: "not an email" })).status === 400, "a bad email is refused");
+    assert((await post(a.page, "/api/sharing/share", { partnership_id: "nope", kind: "trip", item_id: ATRIP })).status === 400, "a bad id is refused");
+    assert((await post(b.page, "/api/sharing/share", { partnership_id: (await api(b.page, "/api/sharing")).body.partners[0].id, kind: "loyalty_card", item_id: CARD })).status === 404, "Bob cannot share Alice's card");
+    assert((await post(a.page, "/api/sharing/invite", { email: "self@example.com" })).status === 200, "a third invite is accepted");
+    assert((await post(a.page, "/api/sharing/invite", { email: "alice@example.com" })).status === 400, "inviting yourself is refused");
+    let last = 200;
+    for (const n of [1, 2, 3, 4]) last = (await post(a.page, "/api/sharing/invite", { email: `extra${n}@example.com` })).status;
+    assert(last === 429, `the daily invite limit stops further invites (got ${last})`);
+
+    // 10. The kill switch hides everything at once
+    await sharingDb.setKill(true);
+    assert((await api(b.page, "/api/sharing")).body.available === false, "with the kill switch on, sharing is unavailable");
+    assert((await api(b.page, "/api/sharing/loyalty")).status === 403, "and nothing can be read");
+    await sharingDb.setKill(false);
+    assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 1, "switching it back restores the shares");
+
+    // 11. Revoking one item, then ending the pairing
+    await a.page.goto(`${BASE}/trips/${ATRIP}`);
+    await a.page.getByTestId("share-with").getByRole("switch", { name: /with bob/i }).click();
+    await a.page.getByRole("alertdialog").getByRole("button", { name: "Stop sharing" }).click();
+    await a.page.waitForFunction(() => document.querySelector('[data-testid="share-with"] [role="switch"]')?.getAttribute("aria-checked") === "false");
+    assert((await api(b.page, "/api/sharing/trips")).body.trips.length === 0, "Bob no longer sees the trip");
+    assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 1, "the card is still shared");
+    await a.page.goto(`${BASE}/profile`);
+    await a.page.locator("#sharing").getByText("Approved").first().waitFor();
+    await shot(a.page, "share-8-owner-profile", "#sharing");
+    const bobRow = a.page.locator("#sharing li").filter({ hasText: "bob" }).filter({ hasText: "Approved" });
+    await bobRow.getByRole("button", { name: /Stop sharing with all/ }).click();
+    await a.page.getByRole("alertdialog").getByRole("button", { name: "Stop sharing" }).click();
+    await a.page.locator("#sharing").getByText("Approved").waitFor({ state: "detached" });
+    assert((await api(b.page, "/api/sharing/loyalty")).body.cards.length === 0, "after ending the pairing Bob sees nothing");
+    assert((await api(b.page, `/api/sharing/photo/${CARD}`)).status === 404, "and gets no photo link");
+    await b.page.goto(`${BASE}/personal/loyalty`);
+    await b.page.getByText("No loyalty cards yet").waitFor();
+    assert((await b.page.getByTestId("shared-tile").count()) === 0, "the Shared with you section is gone");
+
+    // 12. Everything was logged
+    const kinds = new Set((await sharingDb.events()).map((e) => e.event_type));
+    for (const k of ["sharing_on", "sharing_invite", "sharing_accept", "sharing_share", "sharing_unshare", "sharing_end"]) assert(kinds.has(k), `the security log has ${k}`);
+    assert(!kinds.has("leak_blocked"), "nothing tripped the leak failsafe");
+    void BOB;
+    for (const x of [a, b, c, pat]) await x.ctx.close();
+  });
+
   await test("normal users cannot open admin pages", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

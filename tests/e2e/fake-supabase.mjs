@@ -41,6 +41,7 @@ export function createFakeSupabase() {
   const refresh = new Map(); // refresh token -> user id
   const storage = new Map();
   const log = [];
+  let rpcHook = null;
 
   const table = (name) => (db[name] ||= []);
   const seed = (name, rows) => { db[name] = rows.map((r) => ({ id: randomUUID(), created_at: new Date().toISOString(), ...r })); };
@@ -248,6 +249,13 @@ export function createFakeSupabase() {
       try {
         if (dropUserUpdates > 0 && req.method === "PUT" && url.pathname === "/auth/v1/user") { dropUserUpdates--; return req.socket.destroy(); }
         if (url.pathname.startsWith("/auth/v1")) return authApi(req, res, url, body);
+        if (rpcHook && url.pathname.startsWith("/rest/v1/rpc/")) {
+          const uid = tokens.get(String(req.headers.authorization || "").replace(/^Bearer /, ""));
+          return Promise.resolve(rpcHook(url.pathname.slice("/rest/v1/rpc/".length), body, uid)).then(
+            (r) => (r ? send(res, r.status, r.body) : rest(req, res, url, body)),
+            (e) => send(res, 500, { message: String(e) }),
+          );
+        }
         if (url.pathname.startsWith("/rest/v1")) return rest(req, res, url, body);
         if (url.pathname.startsWith("/storage/v1/object")) return storageApi(req, res, url, raw);
         send(res, 404, { message: "not found" });
@@ -263,7 +271,9 @@ export function createFakeSupabase() {
     /** How many requests reached each endpoint ("GET rest:profiles", "GET auth:user", ...) since the last reset. */
     counts: () => ({ ...counts }),
     resetCounts: () => { for (const k of Object.keys(counts)) delete counts[k]; },
-    db, table, seed, addUser, log, storage,
+    db, table, seed, addUser, log, storage, users,
+    /** Hand some database functions to something else (the sharing tests use real SQL). hook(fn, args, userId) returns {status, body} or undefined. */
+    setRpcHook: (h) => { rpcHook = h; },
     /** The next n password updates lose their connection, as on a bad mobile network. */
     dropNextPasswordUpdates: (n = 1) => { dropUserUpdates = n; },
     listen: (port) => new Promise((r) => server.listen(port, "127.0.0.1", r)),

@@ -14,6 +14,7 @@ import { PassportBalloon } from "@/components/documents/PassportBalloon";
 import { currentPassport, documentStatus, kindLabel, maskNumber, numberLabel, renewalAlert, sortForTiles, tileCountdown } from "@/lib/documents";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
+import { buildSharingNotifications, type SharingOverview } from "@/lib/sharing";
 import { permissionsFromRoles, type RoleRecord } from "@/lib/access";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
@@ -86,8 +87,9 @@ export default async function DashboardPage() {
   const wantsSecurity = myPerms.has("security.view");
   const wantsSummary = myPerms.has("personal") && personalAllowed;
   const wantsDash = myPerms.has("personal.dashboard") && personalAllowed;
+  const wantsSharing = myPerms.has("sharing");
   const monthStart = `${todayISO().slice(0, 7)}-01`;
-  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashPj, dashCu, destinationInfo] = await Promise.all([
+  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashPj, dashCu, destinationInfo, sharingRes] = await Promise.all([
     // Security alerts are only for admins (the same people who can open Admin > Security)
     wantsSecurity
       ? supabase
@@ -109,13 +111,17 @@ export default async function DashboardPage() {
     wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, start_date, end_date").eq("user_id", uid) : null,
     wantsDash ? supabase.from("currencies").select("code, usd_rate") : null,
     featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,
+    // Partner sharing: invites waiting for an answer show on the bell (only for roles that have the option)
+    wantsSharing ? supabase.rpc("sharing_overview") : null,
   ]);
 
   const securityNotifications = eventsRes ? buildSecurityNotifications(eventsRes.data || [], Date.now()) : [];
   // Admin only: new app options nobody has reviewed yet
   const accessNotifications = role === "admin" ? buildAccessNotification(roleRows || []) : [];
+  const sharingNotifications = sharingRes && !sharingRes.error ? buildSharingNotifications(sharingRes.data as SharingOverview) : [];
   const notifications = [
     ...securityNotifications,
+    ...sharingNotifications,
     ...accessNotifications,
     ...buildNotifications({ passportAlert, trips: trips || [], docCounts, today: todayISO() }),
   ].sort((a, b) => ({ urgent: 0, warning: 1, info: 2 })[a.severity] - ({ urgent: 0, warning: 1, info: 2 })[b.severity]);

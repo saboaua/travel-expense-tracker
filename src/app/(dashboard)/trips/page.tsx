@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Plus, Plane } from "lucide-react";
 import { todayISO } from "@/lib/utils";
 import { BusinessTabs } from "@/components/layout/BusinessTabs";
+import { SharedTrips } from "@/components/sharing/SharedTrips";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
 type Trip = {
@@ -87,6 +88,8 @@ export default async function TripsPage() {
       ) : (
         <TripsList trips={listTrips} today={todayISO()} />
       )}
+
+      <SharedTrips kind="trip" />
     </div>
   );
 }

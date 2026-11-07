@@ -127,6 +127,7 @@ const SECURITY_LABELS: Record<string, string> = {
   temp_password_expired: "Expired temporary password used",
   login_failed: "Failed logins",
   protection_degraded: "Sign-in protection degraded",
+  leak_blocked: "Sharing switched itself off: a possible data leak was blocked",
 };
 
 const ago = (ms: number) => {

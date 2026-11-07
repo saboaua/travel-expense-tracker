@@ -1,5 +1,6 @@
 "use client";
 
+import { ShareWith } from "@/components/sharing/ShareWith";
 import { useConfirm } from "@/components/ui/confirm";
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -124,6 +125,8 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
           <Button variant="outline" size="icon" aria-label="Delete" className="text-red-600" onClick={remove}><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
+
+      {kind === "personal_trip" && <ShareWith kind="personal_trip" itemId={id} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Card><CardHeader className="pb-2"><CardDescription>Total spent</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{formatCurrency(totalUsd, "USD")}</p><p className="text-xs text-muted-foreground">{expenses.length} expense{expenses.length !== 1 ? "s" : ""}</p></CardContent></Card>

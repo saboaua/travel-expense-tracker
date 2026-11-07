@@ -1,5 +1,6 @@
 "use client";
 
+import { SharedTrips } from "@/components/sharing/SharedTrips";
 import { Alert } from "@/components/ui/alert";
 import { useMemo } from "react";
 import Link from "next/link";
@@ -103,6 +104,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{active.map(card)}</div>
         </section>
       )}
+      {kind === "personal_trip" && <SharedTrips kind="personal_trip" />}
       {done.length > 0 && (
         <section className="space-y-4">
           <h2 className="text-lg font-semibold">Completed</h2>

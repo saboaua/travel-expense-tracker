@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { adminNavItems } from "@/lib/access";
 import { resetAccessCache, useAccess } from "@/lib/use-access";
+import { resetSharingCache } from "@/lib/use-sharing";
 import { resetBrandCache, useBrand } from "@/lib/use-brand";
 
 export function Sidebar() {
@@ -25,6 +26,7 @@ export function Sidebar() {
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await clearOfflineData();
     resetAccessCache();
+    resetSharingCache();
     resetBrandCache();
     await supabase.auth.signOut();
     router.push("/login");

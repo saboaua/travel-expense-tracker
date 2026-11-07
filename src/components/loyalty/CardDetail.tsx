@@ -6,9 +6,10 @@ import { Button } from "@/components/ui/button";
 import { displayNumber, formatLabel, type LoyaltyCard } from "@/lib/loyalty";
 import { CardFace } from "./CardFace";
 import { Barcode } from "./Barcode";
+import { ShareWith } from "@/components/sharing/ShareWith";
 
 /** Checkout view: the card on the top third (flip to its back), a big high-contrast barcode and the number below. Escape or Done closes it. */
-export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClose: () => void; onEdit?: () => void }) {
+export function CardDetail({ card, onClose, onEdit, shared, canShare = true }: { card: LoyaltyCard; onClose: () => void; onEdit?: () => void; shared?: { by: string; photoUrl: string | null }; canShare?: boolean }) {
   const [side, setSide] = useState<"front" | "back">("front");
 
   useEffect(() => {
@@ -31,9 +32,9 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
   return (
     <div className="app-frame fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 px-3 py-[max(0.75rem,env(safe-area-inset-top))] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:p-6" role="dialog" aria-modal="true" aria-label={`${card.store_name} card`} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div className="mx-auto flex max-h-full w-full max-w-md flex-col overflow-hidden rounded-2xl bg-card text-card-foreground shadow-2xl">
-        <CardFace card={card} side={side} className="h-28 shrink-0 rounded-none sm:h-40">
+        <CardFace card={card} side={side} photoUrl={shared ? shared.photoUrl : undefined} className="h-28 shrink-0 rounded-none sm:h-40">
           <Button type="button" variant="outline" size="icon" className="absolute right-2 top-2 h-11 w-11 border-0 bg-black/35 text-white hover:bg-black/50 hover:text-white" onClick={onClose} aria-label="Close" autoFocus><X className="h-5 w-5" /></Button>
-          {card.back_image_path && (
+          {!shared && card.back_image_path && (
             <button type="button" onClick={() => setSide(side === "front" ? "back" : "front")} className="absolute bottom-2 right-2 flex h-9 items-center gap-1.5 rounded-full bg-black/45 px-3 text-xs font-semibold text-white backdrop-blur-sm hover:bg-black/60">
               <FlipHorizontal className="h-4 w-4" aria-hidden="true" /> {side === "front" ? "Show back" : "Show front"}
             </button>
@@ -51,6 +52,9 @@ export function CardDetail({ card, onClose, onEdit }: { card: LoyaltyCard; onClo
             <Sun className="mt-0.5 h-4 w-4 shrink-0 text-amber-700 dark:text-amber-300" aria-hidden="true" />
             <p>Turn your screen brightness up so the scanner can read the code. We keep the screen awake while this is open.</p>
           </div>
+
+          {shared && <p className="rounded-xl border bg-muted/50 p-3 text-center text-xs text-muted-foreground" data-testid="shared-note">Shared by {shared.by}. You can show and scan this card, but you cannot change or delete it.</p>}
+          {!shared && onEdit && canShare && <ShareWith kind="loyalty_card" itemId={card.id} />}
 
           <div className="flex gap-2.5">
             {onEdit && <Button type="button" variant="outline" className="h-11 flex-1" onClick={onEdit}><Pencil className="h-4 w-4" /> Edit</Button>}

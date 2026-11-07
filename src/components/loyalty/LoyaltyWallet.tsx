@@ -16,6 +16,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 import { CardFace } from "./CardFace";
 import { CardDetail } from "./CardDetail";
 import { CardForm } from "./CardForm";
+import { SharedCards } from "@/components/sharing/SharedCards";
 
 const sortCards = (cards: LoyaltyCard[]) => [...cards].sort((a, b) => a.store_name.localeCompare(b.store_name, undefined, { sensitivity: "base" }));
 
@@ -156,7 +157,9 @@ export function LoyaltyWallet() {
         </>
       )}
 
-      {open && !editing && <CardDetail card={open} onClose={() => setOpen(null)} onEdit={() => setEditing(open)} />}
+      <SharedCards />
+
+      {open && !editing && <CardDetail card={open} onClose={() => setOpen(null)} onEdit={() => setEditing(open)} canShare={!waitingIds.has(open.id)} />}
       {editing && userId && <CardForm key={editing === "new" ? "new" : editing.id} userId={userId} card={editing === "new" ? null : editing} waiting={editing === "new" ? null : waiting.find((i) => i.id === editing.id)} onSaved={saved} onClose={() => setEditing(null)} />}
     </div>
   );

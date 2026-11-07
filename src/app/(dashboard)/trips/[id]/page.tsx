@@ -1,3 +1,4 @@
+import { ShareWith } from "@/components/sharing/ShareWith";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -153,6 +154,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
           )}
         </div>
       </div>
+
+      <ShareWith kind="trip" itemId={id} />
 
       <TripStatusToggle tripId={id} status={trip.status} ended={passed} endLabel={formatDateRange(endDate)} />
 

@@ -27,6 +27,7 @@ export const FEATURES: Feature[] = [
   { key: "loyalty", label: "Loyalty cards", description: "Store cards with a scannable barcode, kept in Personal.", group: "App", paths: ["/personal/loyalty"], defaultRoles: ["user", "assistant"] },
   { key: "personal", label: "Personal", description: "Groceries, home projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
   { key: "personal.dashboard", label: "Personal dashboard", description: "Business / Personal switch on the home page, with spending charts for personal receipts.", group: "App", paths: [], defaultRoles: ["user", "assistant"] },
+  { key: "sharing", label: "Partner sharing", description: "Share loyalty cards (view only) and a trip's destination and dates with an approved partner.", group: "App", paths: [], defaultRoles: [] },
   { key: "documents", label: "Documents & passport", description: "Passport, visas and trip documents.", group: "App", paths: ["/documents"], defaultRoles: ["user", "assistant"] },
   { key: "users.manage", label: "Create users", description: "Create users and reset temporary passwords (not roles).", group: "Administration", paths: ["/admin/users"], defaultRoles: ["assistant"] },
   { key: "security.view", label: "Security & audit", description: "See security events and the audit log.", group: "Administration", paths: ["/admin/security"], defaultRoles: [] },

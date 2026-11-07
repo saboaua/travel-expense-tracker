@@ -11,9 +11,11 @@ export function useCardPhoto(path: string | null | undefined): string | null {
 }
 
 /** Only the design of the card: the saved front photo, or a colour block with the name and type. Never a barcode. */
-export function CardFace({ card, side = "front", className, children }: { card: LoyaltyCard; side?: "front" | "back"; className?: string; children?: React.ReactNode }) {
+export function CardFace({ card, side = "front", className, children, photoUrl }: { card: LoyaltyCard; side?: "front" | "back"; className?: string; children?: React.ReactNode; photoUrl?: string | null }) {
+  // photoUrl is set for a card a partner shared: its photo comes from the sharing route, never from this person's storage
   const path = side === "back" ? card.back_image_path : card.image_path;
-  const url = useCardPhoto(path);
+  const stored = useCardPhoto(photoUrl !== undefined ? null : path);
+  const url = photoUrl !== undefined ? photoUrl : stored;
   return (
     <div className={cn("relative overflow-hidden text-white", className)} style={{ background: cardColor(card) }} data-face={url ? "photo" : "color"}>
       {url ? (
