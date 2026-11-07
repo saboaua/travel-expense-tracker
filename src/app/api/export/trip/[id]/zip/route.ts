@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { buildTripWorkbook } from "@/lib/export";
 import JSZip from "jszip";
+import { isOwnReceiptPath } from "@/lib/receipt-path";
 import { EXPENSE_COLS, TRIP_EXPORT_COLS } from "@/lib/columns";
 
 export async function GET(
@@ -77,6 +78,9 @@ export async function GET(
 
   for (const exp of expenses || []) {
     if (!exp.receipt_path) continue;
+    // The download below uses the service key, so the path stored on the row must never be trusted on its own:
+    // a person can save any text in their own expense, and it must not reach another person's files.
+    if (!isOwnReceiptPath(exp.receipt_path, user.id)) continue;
     try {
       const { data, error } = await storageClient.storage
         .from("receipts")
@@ -84,7 +88,8 @@ export async function GET(
 
       if (error || !data) continue;
 
-      const ext = exp.receipt_path.split(".").pop() || "jpg";
+      const rawExt = (exp.receipt_path.split(".").pop() || "").toLowerCase();
+      const ext = /^[a-z0-9]{1,5}$/.test(rawExt) ? rawExt : "jpg"; // never let the stored text shape the file name inside the zip
       const datePart = exp.expense_date || "unknown";
       const merchantPart = (exp.merchant || "receipt")
         .replace(/[^a-z0-9-_]/gi, "_")
