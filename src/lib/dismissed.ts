@@ -3,6 +3,7 @@
  * and adding it back does not bring them back; the browser copy is only a fast start and works offline.
  * Pure helpers (unit-tested) are at the top, the browser/database part is below.
  */
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { SNOOZE_DAYS } from "@/lib/notifications";
 
 export type Dismissed = Record<string, number>;
@@ -44,7 +45,7 @@ function writeLocalDismissed(d: Dismissed) {
   try { localStorage.setItem(DISMISSED_STORAGE_KEY, JSON.stringify(d)); } catch { /* private mode: the account copy still holds it */ }
 }
 
-type Db = { from: (t: string) => any; auth: { getSession: () => Promise<{ data: { session: { user: { id: string } } | null } }> } };
+type Db = SupabaseClient;
 
 /** Reads the account copy. Returns null when it cannot be read (offline, signed out, or the migration is not run yet). */
 async function readRemote(db: Db): Promise<{ id: string; list: Dismissed } | null> {
