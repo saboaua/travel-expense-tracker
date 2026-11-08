@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarDays, Check, CloudOff, ChevronRight, MapPin, Plane, Search, X } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarPlus, Check, CloudOff, ChevronRight, MapPin, Plane, RefreshCw, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatCurrency, formatDateRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +11,8 @@ import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { SYNCED_EVENT } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { CalendarSheet } from "@/components/trips/CalendarSheet";
+import { MARK_EVENT, markState, readMark, type CalendarMark, type MarkState } from "@/lib/trip-calendar";
 import { groupCompletedByYear, matchesQuery, phaseLabel, sortActive, tripPhase, type ListTrip, type Phase } from "@/lib/trips-list";
 
 type Tab = "active" | "completed" | "all";
@@ -22,12 +24,52 @@ const PHASE_STYLE: Record<Phase, { accent: string; chip: string }> = {
   completed: { accent: "bg-slate-300 dark:bg-slate-600", chip: "border-border bg-muted text-muted-foreground" },
 };
 
-function TripCard({ trip, today, waiting = false, unsent = false }: { trip: ListTrip; today: string; waiting?: boolean; unsent?: boolean }) {
+const CAL_STYLE: Record<MarkState, { label: string; className: string; Icon: typeof CalendarPlus }> = {
+  none: { label: "Calendar", className: "border-primary/25 bg-primary/10 text-primary hover:bg-primary/15", Icon: CalendarPlus },
+  added: { label: "Added", className: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300", Icon: CalendarCheck },
+  changed: { label: "Update", className: "border-amber-300 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300", Icon: RefreshCw },
+};
+
+/** Calendar button on a trip card: Calendar → Added, or Update once the trip's dates or place change. */
+function CalendarButton({ trip, mark, onOpen }: { trip: ListTrip; mark: CalendarMark | null; onOpen: () => void }) {
+  const state = markState(trip, mark);
+  const { label, className, Icon } = CAL_STYLE[state];
+  const aria = state === "none" ? `Add ${trip.name} to calendar` : state === "added" ? `${trip.name} is in your calendar` : `${trip.name} changed, update calendar`;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={aria}
+      className={cn("pointer-events-auto relative z-10 inline-flex h-11 items-center gap-1.5 rounded-full border pl-3 pr-3.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", className)}
+    >
+      <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+      {label}
+    </button>
+  );
+}
+
+function TripCard({
+  trip,
+  today,
+  waiting = false,
+  unsent = false,
+  mark = null,
+  onCalendar,
+}: {
+  trip: ListTrip;
+  today: string;
+  waiting?: boolean;
+  unsent?: boolean;
+  mark?: CalendarMark | null;
+  onCalendar?: (trip: ListTrip) => void;
+}) {
   const phase = tripPhase(trip, today);
   const style = PHASE_STYLE[phase];
   // A trip that has not reached the server has no page of its own yet
+  // Upcoming and in-progress trips that are already saved can go to the phone's calendar
+  const canCalendar = !unsent && !!onCalendar && (phase === "upcoming" || phase === "ongoing");
   const card = (
-      <div className="relative h-full overflow-hidden rounded-xl border bg-card p-5 pl-6 shadow-sm transition-shadow group-hover:shadow-md group-focus-visible:ring-2 group-focus-visible:ring-primary">
+      <div className="pointer-events-none relative h-full overflow-hidden rounded-xl border bg-card p-5 pl-6 shadow-sm transition-shadow group-hover:shadow-md group-has-[a:focus-visible]:ring-2 group-has-[a:focus-visible]:ring-primary">
         <span className={cn("absolute inset-y-0 left-0 w-1.5", style.accent)} aria-hidden="true" />
         <div className="flex items-start justify-between gap-3">
           <h3 className="font-semibold leading-snug">{trip.name}</h3>
@@ -51,27 +93,39 @@ function TripCard({ trip, today, waiting = false, unsent = false }: { trip: List
           </p>
         </div>
 
-        <div className="mt-4 flex items-end justify-between border-t pt-4">
+        <div className="mt-4 flex items-end justify-between gap-3 border-t pt-4">
           <div>
             <p className="text-2xl font-bold tracking-tight">{formatCurrency(trip.total, "USD")}</p>
             <p className="text-xs text-muted-foreground">
               {trip.count} expense{trip.count !== 1 ? "s" : ""}
             </p>
           </div>
-          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
-          </span>
+          <div className="flex items-center gap-2">
+            {canCalendar && <CalendarButton trip={trip} mark={mark} onOpen={() => onCalendar?.(trip)} />}
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-muted text-muted-foreground transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            </span>
+          </div>
         </div>
       </div>
   );
-  return unsent ? <div className="block">{card}</div> : <Link href={`/trips/${trip.id}`} className="group block focus-visible:outline-none">{card}</Link>;
+  if (unsent) return <div className="block [&>div]:pointer-events-auto">{card}</div>;
+  // The whole card opens the trip; the calendar button sits above the link so it is its own control (no button inside a link)
+  return (
+    <div className="group relative h-full">
+      <Link href={`/trips/${trip.id}`} aria-label={`Open ${trip.name}`} className="absolute inset-0 z-0 rounded-xl focus-visible:outline-none" />
+      {card}
+    </div>
+  );
 }
 
-function Grid({ trips, today, waiting, unsent }: { trips: ListTrip[]; today: string; waiting: Set<string>; unsent: Set<string> }) {
+type CalendarProps = { marks: Record<string, CalendarMark | null>; onCalendar: (trip: ListTrip) => void };
+
+function Grid({ trips, today, waiting, unsent, marks, onCalendar }: { trips: ListTrip[]; today: string; waiting: Set<string>; unsent: Set<string> } & CalendarProps) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {trips.map((t) => (
-        <TripCard key={t.id} trip={t} today={today} waiting={waiting.has(t.id)} unsent={unsent.has(t.id)} />
+        <TripCard key={t.id} trip={t} today={today} waiting={waiting.has(t.id)} unsent={unsent.has(t.id)} mark={marks[t.id] ?? null} onCalendar={onCalendar} />
       ))}
     </div>
   );
@@ -109,6 +163,28 @@ export function TripsList({ trips: saved, today }: { trips: ListTrip[]; today: s
   const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "trips" && i.isNew).map((i) => i.id)), [pending]);
   const [tab, setTab] = useState<Tab>("active");
   const [query, setQuery] = useState("");
+
+  // Which trips this device has sent to a calendar (kept on the phone; the app cannot look inside the calendar)
+  const [marks, setMarks] = useState<Record<string, CalendarMark | null>>({});
+  const tripIds = trips.map((t) => t.id).join(",");
+  useEffect(() => {
+    const load = () => setMarks(Object.fromEntries(tripIds.split(",").filter(Boolean).map((id) => [id, readMark(id)])));
+    load();
+    window.addEventListener(MARK_EVENT, load);
+    window.addEventListener("storage", load);
+    return () => {
+      window.removeEventListener(MARK_EVENT, load);
+      window.removeEventListener("storage", load);
+    };
+  }, [tripIds]);
+  const [calendarTrip, setCalendarTrip] = useState<ListTrip | null>(null);
+  const closeCalendar = useCallback(() => setCalendarTrip(null), []);
+  const [toast, setToast] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 3500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const filtered = useMemo(() => trips.filter((t) => matchesQuery(t, query)), [trips, query]);
   const active = useMemo(() => sortActive(filtered, today), [filtered, today]);
@@ -202,7 +278,7 @@ export function TripsList({ trips: saved, today }: { trips: ListTrip[]; today: s
       {showActive && active.length > 0 && (
         <section className="space-y-4">
           {tab === "all" && <Heading title="Active" count={active.length} />}
-          <Grid trips={active} today={today} waiting={waiting} unsent={unsent} />
+          <Grid trips={active} today={today} waiting={waiting} unsent={unsent} marks={marks} onCalendar={setCalendarTrip} />
         </section>
       )}
 
@@ -211,9 +287,20 @@ export function TripsList({ trips: saved, today }: { trips: ListTrip[]; today: s
           {years.map((y) => (
             <section key={y.year} className="space-y-4">
               <Heading title={tab === "completed" ? y.year : `Completed · ${y.year}`} count={y.trips.length} right={formatCurrency(y.total, "USD")} />
-              <Grid trips={y.trips} today={today} waiting={waiting} unsent={unsent} />
+              <Grid trips={y.trips} today={today} waiting={waiting} unsent={unsent} marks={marks} onCalendar={setCalendarTrip} />
             </section>
           ))}
+        </div>
+      )}
+
+      {calendarTrip && <CalendarSheet trip={calendarTrip} mark={marks[calendarTrip.id] ?? null} onClose={closeCalendar} onAdded={setToast} />}
+
+      {toast && (
+        <div role="status" className="fixed inset-x-4 bottom-[calc(5.5rem+env(safe-area-inset-bottom))] z-[70] mx-auto flex max-w-sm items-center gap-3 rounded-2xl bg-slate-900 px-4 py-3 text-white shadow-xl md:bottom-6">
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-500">
+            <Check className="h-[18px] w-[18px]" aria-hidden="true" />
+          </span>
+          <span className="text-sm font-semibold">{toast}</span>
         </div>
       )}
     </div>

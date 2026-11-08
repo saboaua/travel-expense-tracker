@@ -19,6 +19,7 @@ type Trip = {
   start_date: string;
   end_date: string | null;
   status: string;
+  notes?: string | null;
   expenses?: Expense[];
 };
 
@@ -40,7 +41,7 @@ export default async function TripsPage() {
 
   const { data } = await supabase
     .from("trips")
-    .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
+    .select("id, name, destination, start_date, end_date, status, notes, expenses(amount, amount_usd, currency)")
     .eq("user_id", user?.id)
     .order("start_date", { ascending: false });
 
@@ -52,6 +53,7 @@ export default async function TripsPage() {
     start_date: t.start_date,
     end_date: t.end_date,
     status: t.status,
+    notes: t.notes ?? null,
     total: tripTotal(t),
     count: t.expenses?.length || 0,
   }));

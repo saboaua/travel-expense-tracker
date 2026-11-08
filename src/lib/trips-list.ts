@@ -9,6 +9,8 @@ export type ListTrip = {
   status: string;
   total: number;
   count: number;
+  /** For the calendar event's notes */
+  notes?: string | null;
 };
 
 export type Phase = "ongoing" | "upcoming" | "ended" | "completed";
