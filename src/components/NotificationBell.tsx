@@ -3,22 +3,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Bell, BellRing, Info, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { loadDismissed, readLocalDismissed, rememberDismissed } from "@/lib/dismissed";
 import { badgeLabel, isDismissible, topSeverity, visibleNotifications, type AppNotification, type Severity } from "@/lib/notifications";
 
-const STORAGE_KEY = "notifications-dismissed";
 
 const BADGE: Record<Severity, string> = { urgent: "bg-red-600 text-white", warning: "bg-amber-500 text-white", info: "bg-primary text-primary-foreground" };
 const ICON_WRAP: Record<Severity, string> = { urgent: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300", warning: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300", info: "bg-primary/10 text-primary" };
 const ICON: Record<Severity, typeof Info> = { urgent: AlertTriangle, warning: BellRing, info: Info };
-
-function readDismissed(): Record<string, number> {
-  try {
-    const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    return raw && typeof raw === "object" ? raw : {};
-  } catch {
-    return {};
-  }
-}
 
 /**
  * Bell with a count bubble. The panel lists what needs attention, most important first.
@@ -31,7 +23,13 @@ export function NotificationBell({ notifications }: { notifications: AppNotifica
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => { setDismissed(readDismissed()); }, []);
+  useEffect(() => {
+    setDismissed(readLocalDismissed());
+    // the account's list: closed notices stay closed after the app is removed from the home screen and added back
+    let live = true;
+    loadDismissed(createClient()).then((d) => { if (live) setDismissed(d); });
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -57,7 +55,7 @@ export function NotificationBell({ notifications }: { notifications: AppNotifica
   const dismiss = (id: string) => {
     const next = { ...dismissed, [id]: Date.now() };
     setDismissed(next);
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); } catch { /* private mode: comes back next visit */ }
+    void rememberDismissed(createClient(), id).then(setDismissed);
   };
 
   return (

@@ -5,6 +5,8 @@ import Link from "next/link";
 import { BellRing, X } from "lucide-react";
 import type { RenewalAlert } from "@/lib/documents";
 import { daysBetween, formatDate, todayISO } from "@/lib/utils";
+import { createClient } from "@/lib/supabase/client";
+import { loadDismissed, readLocalDismissed, rememberDismissed } from "@/lib/dismissed";
 
 const SNOOZE_DAYS = 7;
 // Three tones: red only when it needs action now (expired, or about to be, or it blocks a booked trip), amber while there is time
@@ -25,19 +27,22 @@ export function PassportBalloon({ alert }: { alert: RenewalAlert }) {
   const [hidden, setHidden] = useState(true); // hidden until we know it was not dismissed
 
   useEffect(() => {
-    try {
-      const at = Number(localStorage.getItem(key));
-      setHidden(Boolean(at) && Date.now() - at < SNOOZE_DAYS * 86_400_000 && alert.level !== "expired");
-    } catch {
-      setHidden(false);
-    }
+    let live = true;
+    const decide = (list: Record<string, number>) => {
+      let at = list[key] ?? 0;
+      try { at = Math.max(at, Number(localStorage.getItem(key)) || 0); } catch { /* older copy: none */ }
+      return Boolean(at) && Date.now() - at < SNOOZE_DAYS * 86_400_000 && alert.level !== "expired";
+    };
+    setHidden(decide(readLocalDismissed()));
+    loadDismissed(createClient()).then((d) => { if (live) setHidden(decide(d)); });
+    return () => { live = false; };
   }, [key, alert.level]);
 
   if (hidden) return null;
 
   const dismiss = () => {
     setHidden(true);
-    try { localStorage.setItem(key, String(Date.now())); } catch { /* private mode: it simply comes back next visit */ }
+    void rememberDismissed(createClient(), key);
   };
 
   return (

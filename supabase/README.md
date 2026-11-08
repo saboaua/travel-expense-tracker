@@ -39,6 +39,7 @@ each file says so when that is the case.
 | 31 | `migration_help.sql` | Help section: topics written by admin and the assistant role, readable by every signed-in user, with two starter topics (after 3) |
 | 32 | `migration_help_telegram.sql` | Help topic "Connect Telegram" (after 31; never overwrites your edits) |
 | 33 | `migration_help_guides.sql` | Help topics: create a trip, add a trip receipt, import a grocery receipt, export a trip report (after 31) |
+| 34 | `migration_dismissed_notices.sql` | Closed notices (bell, passport banner) are remembered on the account, so reinstalling the app does not bring them back (after 3) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
