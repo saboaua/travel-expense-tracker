@@ -1,50 +1,80 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
-import { Tabs } from "@/components/ui/tabs";
 import { useState } from "react";
-import { ShoppingBasket, Tag } from "lucide-react";
+import { Briefcase, ShoppingBasket } from "lucide-react";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 import { CategoryManager } from "@/components/admin/category-manager";
 
-const TABS = [
-  { id: "travel", label: "Travel receipts" },
-  { id: "grocery", label: "Groceries" },
+const TRAVEL_TABS = [
+  { id: "receipts", label: "Receipts" },
+  { id: "trips", label: "Trip types" },
 ] as const;
 
+/** All category lists in one place: Travel (receipt categories and trip types) and Groceries. One section open at a time. */
 export default function AdminCategoriesPage() {
-  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("travel");
+  const [tab, setTab] = useState<(typeof TRAVEL_TABS)[number]["id"]>("receipts");
+  const [counts, setCounts] = useState<{ receipts?: number; trips?: number; grocery?: number }>({});
+
+  const n = (v: number | undefined, one: string, many: string) => (v === undefined ? null : `${v} ${v === 1 ? one : many}`);
+  const travelSummary = [n(counts.receipts, "receipt category", "receipt categories"), n(counts.trips, "trip type", "trip types")].filter(Boolean).join(" · ") || "Receipt categories and trip types";
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
-      <PageHeader title="Receipt Categories" description={<>Edit, reorder or create the categories offered on each kind of receipt.</>} />
+      <BackLink href="/admin/settings">Global Settings</BackLink>
+      <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts and trips.</>} />
 
-      <Tabs label="Category groups" value={tab} onChange={(id) => setTab(id as typeof tab)} options={TABS.map((t) => ({ id: t.id, label: t.label }))} />
+      <AccordionGroup defaultOpen="travel">
+        <AccordionSection id="travel" title="Travel" icon={<Briefcase />} summary={travelSummary}>
+          <Tabs
+            semantics="group"
+            label="Travel lists"
+            value={tab}
+            onChange={(id) => setTab(id as typeof tab)}
+            options={TRAVEL_TABS.map((t) => ({ id: t.id, label: t.label }))}
+            fullWidth
+          />
+          {/* both lists stay mounted (one hidden), so a name being typed is not lost when switching */}
+          <div hidden={tab !== "receipts"}>
+            <CategoryManager
+              table="categories"
+              noun="category"
+              subtitle="Shown as buttons when adding a travel receipt. Disabled ones are hidden from new expenses."
+              addTitle="Add a category"
+              addPlaceholder="e.g. Parking"
+              deleteWarning="Delete this category? Existing expenses will keep the old name."
+              defaultIcon="tag"
+              onCount={(v) => setCounts((c) => ({ ...c, receipts: v }))}
+            />
+          </div>
+          <div hidden={tab !== "trips"}>
+            <CategoryManager
+              table="travel_categories"
+              noun="trip type"
+              subtitle="Shown as buttons when creating or editing a trip. Disabled ones are hidden from new trips."
+              addTitle="Add a trip type"
+              addPlaceholder="e.g. Training"
+              deleteWarning="Delete this trip type? Existing trips will keep the old name."
+              defaultIcon="briefcase"
+              onCount={(v) => setCounts((c) => ({ ...c, trips: v }))}
+            />
+          </div>
+        </AccordionSection>
 
-      {tab === "travel" ? (
-        <CategoryManager
-          key="travel"
-          embedded
-          table="categories"
-          title="Travel receipts"
-          subtitle="Categories shown as buttons when adding a travel receipt. Disabled ones are hidden from new expenses."
-          addHint="New categories appear immediately in the receipt forms."
-          deleteWarning="Delete this category? Existing expenses will keep the old name."
-          headerIcon={Tag}
-          defaultIcon="tag"
-        />
-      ) : (
-        <CategoryManager
-          key="grocery"
-          embedded
-          table="grocery_categories"
-          title="Groceries"
-          subtitle="Categories for grocery receipt items. They drive the monthly category summary and the AI scan."
-          addHint="New categories appear immediately in the grocery receipt form."
-          deleteWarning="Delete this category? Existing grocery items will keep the old name."
-          headerIcon={ShoppingBasket}
-          defaultIcon="shopping-basket"
-        />
-      )}
+        <AccordionSection id="groceries" title="Groceries" icon={<ShoppingBasket />} summary={n(counts.grocery, "item category", "item categories") ?? "Item categories"}>
+          <CategoryManager
+            table="grocery_categories"
+            noun="item category"
+            subtitle="Categories for grocery receipt items. They drive the monthly category summary and the AI scan."
+            addTitle="Add an item category"
+            addPlaceholder="e.g. Snacks"
+            deleteWarning="Delete this category? Existing grocery items will keep the old name."
+            defaultIcon="shopping-basket"
+            onCount={(v) => setCounts((c) => ({ ...c, grocery: v }))}
+          />
+        </AccordionSection>
+      </AccordionGroup>
     </div>
   );
 }

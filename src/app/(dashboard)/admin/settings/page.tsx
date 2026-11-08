@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, Briefcase, LifeBuoy, CircleHelp } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -24,16 +24,9 @@ const sections: { href: string; feature: string; title: string; description: str
   {
     href: "/admin/categories",
     feature: "categories.manage",
-    title: "Receipt Categories",
-    description: "Edit or create categories for travel receipts and groceries.",
+    title: "Categories",
+    description: "Travel receipts and trip types, and grocery items.",
     icon: Tag,
-  },
-  {
-    href: "/admin/travel-categories",
-    feature: "categories.manage",
-    title: "Travel Categories",
-    description: "Manage the trip types offered when creating a trip.",
-    icon: Briefcase,
   },
   {
     href: "/admin/help",
@@ -70,7 +63,7 @@ export default function AdminSettingsPage() {
   const visible = sections.filter((s) => role === "admin" || perms.has(s.feature));
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
-      <PageHeader title="Global Settings" description={<>Configure branding, currencies, receipt and travel categories, Telegram, and users.</>} />
+      <PageHeader title="Global Settings" description={<>Configure branding, currencies, categories, Telegram, and users.</>} />
 
       {loaded && visible.length === 0 && <p className="text-sm text-muted-foreground">Nothing here is available for your role.</p>}
 

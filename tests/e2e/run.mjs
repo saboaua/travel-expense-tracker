@@ -1364,6 +1364,40 @@ try {
     assert((await admin.page.getByText("This Month").count()) === 0, "spending tiles should no longer be on the business view");
   });
 
+  await test("admin: Categories is one page: Travel (receipts and trip types) and Groceries, one section open at a time", async () => {
+    const cats = [
+      ["categories", "Meals", 1], ["categories", "Transport", 2], ["travel_categories", "Business", 1], ["grocery_categories", "Produce", 1],
+    ];
+    for (const [t, name, n] of cats) fake.table(t).push({ id: `00000000-0000-4000-8000-0000000c${fake.table(t).length}${n}${t.length}`, name, icon: null, enabled: true, sort_order: n });
+    await admin.page.goto(`${BASE}/admin/settings`);
+    assert((await admin.page.getByText("Receipt Categories").count()) === 0 && (await admin.page.getByText("Travel Categories").count()) === 0, "the two old cards are gone");
+    await admin.page.getByRole("link", { name: /^Categories/ }).click();
+    await admin.page.getByRole("heading", { name: "Categories", level: 1 }).waitFor();
+    const travel = admin.page.getByRole("button", { name: /^Travel/ });
+    const groceries = admin.page.getByRole("button", { name: /^Groceries/ });
+    assert((await travel.getAttribute("aria-expanded")) === "true", "Travel starts open");
+    await admin.page.getByText("2 receipt categories").waitFor();
+    // receipts: two rows, the second can move up, the first cannot
+    await admin.page.getByLabel("Move Meals up").waitFor();
+    assert(await admin.page.getByLabel("Move Meals up").isDisabled(), "the first row cannot move up");
+    await admin.page.getByLabel("Move Transport up").click();
+    await admin.page.waitForFunction(() => document.querySelectorAll('input[aria-label="Name of category"]')[0]?.value === "Transport");
+    // trip types tab
+    await admin.page.getByRole("button", { name: "Trip types" }).click();
+    await admin.page.getByLabel("Move Business down").waitFor();
+    // add a trip type, it appears in the list
+    await admin.page.locator("#travel_categories-name").fill("Training");
+    await admin.page.locator("form").filter({ has: admin.page.locator("#travel_categories-name") }).getByRole("button", { name: "Add" }).click();
+    await admin.page.getByLabel("Move Training up").waitFor();
+    // groceries opens, travel closes
+    await groceries.click();
+    assert((await groceries.getAttribute("aria-expanded")) === "true" && (await travel.getAttribute("aria-expanded")) === "false", "only one section is open");
+    await admin.page.getByLabel("Move Produce down").waitFor();
+    // the old link still works
+    await admin.page.goto(`${BASE}/admin/travel-categories`);
+    await admin.page.waitForURL(/\/admin\/categories#travel/);
+  });
+
   if (process.env.E2E_SHOT) {
     // Optional: screenshots of the welcome card with weather, for a visual check (E2E_SHOT=/some/folder)
     for (const [name, vp] of [["desktop", { width: 1280, height: 700 }], ["phone", { width: 390, height: 844 }]]) {
