@@ -37,6 +37,7 @@ each file says so when that is the case.
 | 29 | `migration_documents_license.sql` | Driver's license as a document type (after 16) |
 | 30 | `migration_sharing.sql` | Partner sharing: loyalty cards (view only) and trip name, destination and dates. Closed tables, safe functions, leak failsafe, "Partner sharing" role option, off until an admin gives it to a role (after 3, 14, 28 and the audit migration) |
 | 31 | `migration_help.sql` | Help section: topics written by admin and the assistant role, readable by every signed-in user, with two starter topics (after 3) |
+| 32 | `migration_help_telegram.sql` | Help topic "Connect Telegram" (after 31; never overwrites your edits) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
