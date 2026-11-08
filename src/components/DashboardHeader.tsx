@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { ShieldCheck, WifiOff } from "lucide-react";
+import { Cloud, Smartphone } from "lucide-react";
 import { ScanLauncher } from "@/components/scan/ScanLauncher";
 import type { HomePlace, ScanOption } from "@/lib/scan-destination";
 import { NotificationBell } from "@/components/NotificationBell";
@@ -53,8 +53,8 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, s
     <>
       <div className="rounded-xl border bg-card p-4 shadow-sm md:p-5">
         <div className="flex items-center justify-end gap-3">
-          <span className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Online: your receipts and trips are saved to the cloud as you go" : "You are offline. Changes will not save until you reconnect."}>
-            {online ? <ShieldCheck className="h-4 w-4" /> : <WifiOff className="h-4 w-4" />}
+          <span data-testid="connection" data-online={online} className={`inline-flex shrink-0 items-center gap-1.5 text-xs font-medium ${online ? "text-primary" : "text-amber-600"}`} title={online ? "Online: your receipts and trips are saved to the cloud as you go" : "You are offline: showing what is saved on this device. New expenses wait and are sent when you reconnect."}>
+            {online ? <Cloud className="h-4 w-4" aria-hidden="true" /> : <Smartphone className="h-4 w-4" aria-hidden="true" />}
             {online ? "Online" : "Offline"}
           </span>
           <NotificationBell notifications={notifications} />

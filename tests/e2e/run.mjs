@@ -857,6 +857,24 @@ try {
     await ctx.close();
   });
 
+  await test("home: the connection chip shows a cloud when online and a phone (saved here) when offline", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const chip = page.getByTestId("connection");
+    await chip.waitFor();
+    assert((await chip.innerText()) === "Online" && (await chip.getAttribute("data-online")) === "true", "online chip text");
+    assert((await chip.locator("svg.lucide-cloud").count()) === 1, "a cloud icon while online");
+    await ctx.setOffline(true);
+    await page.waitForFunction(() => document.querySelector('[data-testid="connection"]')?.getAttribute("data-online") === "false");
+    assert((await chip.innerText()) === "Offline", "offline chip text");
+    assert((await chip.locator("svg.lucide-smartphone").count()) === 1 && (await chip.locator("svg.lucide-cloud").count()) === 0, "a phone icon while offline");
+    await ctx.setOffline(false);
+    await page.waitForFunction(() => document.querySelector('[data-testid="connection"]')?.getAttribute("data-online") === "true");
+    assert((await chip.locator("svg.lucide-cloud").count()) === 1, "the cloud is back when the connection returns");
+    await ctx.close();
+  });
+
   await test("outbox: an expense saved with no connection waits, shows in the pill and Waiting page, and is sent when back online (also one saved before kinds existed)", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
