@@ -1,5 +1,5 @@
 /**
- * Trip reminders and the admin digest. The daily job (api/cron/telegram) calls these with the service role.
+ * Trip and document reminders. The daily job (api/cron/telegram) calls these with the service role.
  * Texts are built by pure functions so they can be tested without a database.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -111,78 +111,4 @@ export async function runDocumentReminders(supabase: SupabaseClient, today: stri
     else out.skipped++;
   }
   return out;
-}
-
-/* ---------------- admin digest ---------------- */
-
-export type DigestStats = {
-  today: string;
-  newExpenses: number;
-  newPeople: number;
-  openSupport: number | null;
-  startingSoon: { name: string; start_date: string }[];
-  activeTrips: number;
-};
-
-/** One admin's own summary: only their trips and expenses, plus the two admin duties (sign-ups, support). */
-export function digestText(s: DigestStats): string {
-  const lines = [`📊 <b>Your daily summary</b> · ${s.today}`, ""];
-  lines.push(`Yesterday: ${s.newExpenses} ${s.newExpenses === 1 ? "expense" : "expenses"} added`);
-  lines.push(`Trips in progress: ${s.activeTrips}`);
-  if (s.startingSoon.length) {
-    lines.push("", "Starting this week:");
-    for (const t of s.startingSoon.slice(0, 5)) lines.push(`• ${escapeHtml(t.name)} (${formatDateRange(t.start_date, null)})`);
-    if (s.startingSoon.length > 5) lines.push(`• and ${s.startingSoon.length - 5} more`);
-  }
-  if (s.newPeople || s.openSupport) {
-    lines.push("", "<b>Admin</b>");
-    if (s.newPeople) lines.push(`New sign-ups: ${s.newPeople}`);
-    if (s.openSupport) lines.push(`Open support requests: ${s.openSupport}`);
-  }
-  return lines.join("\n");
-}
-
-/** Reads every row of a query, 1000 at a time (the server never returns more than that in one go). */
-async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null }>): Promise<T[]> {
-  const all: T[] = [];
-  for (let from = 0; ; from += 1000) {
-    const { data } = await page(from, from + 999);
-    all.push(...(data || []));
-    if (!data || data.length < 1000) return all;
-  }
-}
-
-/** Aruba has no daylight saving, so a local day is a fixed 04:00 UTC to 04:00 UTC window. */
-const dayStartUtc = (date: string) => `${date}T04:00:00.000Z`;
-
-export async function gatherDigest(supabase: SupabaseClient, today: string, adminId: string): Promise<DigestStats> {
-  const yesterday = addDaysISO(today, -1);
-  const from = dayStartUtc(yesterday);
-  const to = dayStartUtc(today);
-  const exp = await fetchAll((f, t) => supabase.from("expenses").select("id").eq("user_id", adminId).gte("created_at", from).lt("created_at", to).order("id").range(f, t));
-  const [people, trips, soon, support] = await Promise.all([
-    supabase.from("profiles").select("id").gte("created_at", from).lt("created_at", to),
-    supabase.from("trips").select("id").eq("user_id", adminId).eq("status", "active").lte("start_date", today),
-    supabase.from("trips").select("name, start_date").eq("user_id", adminId).eq("status", "active").gt("start_date", today).lte("start_date", addDaysISO(today, 7)).order("start_date"),
-    supabase.from("support_requests").select("id").eq("status", "new"),
-  ]);
-  return {
-    today,
-    newExpenses: exp.length,
-    newPeople: (people.data || []).length,
-    openSupport: support.error ? null : (support.data || []).length,
-    startingSoon: (soon.data || []) as { name: string; start_date: string }[],
-    activeTrips: (trips.data || []).length,
-  };
-}
-
-/** Every admin gets a summary of their own data, never anyone else's. */
-export async function runAdminDigest(supabase: SupabaseClient, today: string) {
-  const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin").not("telegram_id", "is", null);
-  let sent = 0;
-  for (const a of admins || []) {
-    const stats = await gatherDigest(supabase, today, a.id as string);
-    if ((await sendToUser(supabase, a.id as string, "admin_alert", digestText(stats), { dedupeKey: `digest:${today}` })) === "sent") sent++;
-  }
-  return sent;
 }

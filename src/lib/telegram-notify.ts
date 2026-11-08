@@ -5,7 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendMessage } from "@/lib/telegram";
 
-export type NotifyKind = "trip_reminder" | "document_reminder" | "admin_alert" | "system";
+export type NotifyKind = "trip_reminder" | "document_reminder" | "summary" | "admin_alert" | "system";
 
 export type NotifyPrefs = {
   /** Master switch */
@@ -45,7 +45,8 @@ export type SendDecision = { send: boolean; reason: "ok" | "off" | "kind_off" | 
 /** `urgent` messages (an admin alert about a break-in, say) ignore quiet hours but never the switches. */
 export function shouldSend(prefs: NotifyPrefs, kind: NotifyKind, now: Date, urgent = false): SendDecision {
   if (!prefs.enabled) return { send: false, reason: "off" };
-  if ((kind === "trip_reminder" || kind === "document_reminder") && !prefs.trip_reminders) return { send: false, reason: "kind_off" };
+  // the weekly summary shares the "reminders" switch: one setting for everything about your own trips
+  if ((kind === "trip_reminder" || kind === "document_reminder" || kind === "summary") && !prefs.trip_reminders) return { send: false, reason: "kind_off" };
   if (kind === "admin_alert" && !prefs.admin_alerts) return { send: false, reason: "kind_off" };
   if (!urgent && inQuietHours(localHour(now, prefs.tz), prefs.quiet_start, prefs.quiet_end)) return { send: false, reason: "quiet" };
   return { send: true, reason: "ok" };

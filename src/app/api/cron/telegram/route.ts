@@ -4,7 +4,9 @@ import { timingSafeEqual } from "crypto";
 import { todayISO } from "@/lib/utils";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { pruneUpdates } from "@/lib/telegram-updates";
-import { runAdminDigest, runDocumentReminders, runTripReminders } from "@/lib/telegram-reminders";
+import { getBotConfig } from "@/lib/telegram";
+import { runDocumentReminders, runTripReminders } from "@/lib/telegram-reminders";
+import { runAdminHealth, runUserSummaries } from "@/lib/telegram-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +18,7 @@ function authorized(req: Request) {
   return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
 }
 
-/** Daily job (see vercel.json): trip and document reminders to travellers, then the summary to admins. Vercel sends the CRON_SECRET. */
+/** Daily job (see vercel.json): trip and document reminders to travellers, then the weekly summary (Mondays) to everyone and the health summary to admins. Vercel sends the CRON_SECRET. */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "Service role key missing" }, { status: 503 });
@@ -25,9 +27,11 @@ export async function GET(req: Request) {
   try {
     const reminders = await runTripReminders(supabase, today);
     const documents = await runDocumentReminders(supabase, today);
-    const digestSent = await runAdminDigest(supabase, today);
+    const summaries = await runUserSummaries(supabase, today);
+    const bot = await getBotConfig().catch(() => null);
+    const healthSent = await runAdminHealth(supabase, today, { bot: { configured: !!bot, enabled: !!bot?.enabled } });
     await pruneUpdates(supabase);
-    return NextResponse.json({ ok: true, today, reminders, documents, digestSent });
+    return NextResponse.json({ ok: true, today, reminders, documents, summaries, healthSent });
   } catch (e) {
     console.error("[cron] telegram", e instanceof Error ? e.message : e);
     await notifyJobFailure(supabase, "Telegram reminders");

@@ -40,7 +40,7 @@ export function TelegramPrefs() {
   return (
     <div className="space-y-3 rounded-lg border p-3">
       <label className="flex min-h-11 items-center justify-between gap-3 text-sm font-medium">
-        <span>Messages from the app<span className="block text-xs font-normal text-muted-foreground">Reminders and alerts in Telegram. Receipts you send still work.</span></span>
+        <span>Messages from the app<span className="block text-xs font-normal text-muted-foreground">Reminders, your weekly summary (Mondays) and alerts in Telegram. Receipts you send still work.</span></span>
         <input type="checkbox" checked={prefs.enabled} onChange={(e) => save({ enabled: e.target.checked })} className="h-5 w-5" />
       </label>
       <div className={`flex flex-wrap items-center gap-2 text-sm ${prefs.enabled ? "" : "opacity-50"}`}>

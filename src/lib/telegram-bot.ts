@@ -3,12 +3,12 @@
  * Uses the service role, so every query is limited to the linked person's own id.
  */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { answerCallback, sendMessage } from "@/lib/telegram";
+import { answerCallback, getBotConfig, sendMessage } from "@/lib/telegram";
 import { PERSONAL_PROJECT_COLS, TELEGRAM_PENDING_COLS, TELEGRAM_PENDING_COLS_V2, isMissingColumn } from "@/lib/columns";
 import { loadPermissions } from "@/lib/access-server";
 import { buildScanOptions, type ScanOption } from "@/lib/scan-destination";
 import { requestNewUser, requestRoleChange, resolveAdminAction } from "@/lib/telegram-admin";
-import { digestText, gatherDigest } from "@/lib/telegram-reminders";
+import { gatherHealth, gatherUserSummary, healthText, summaryIsEmpty, userSummaryText } from "@/lib/telegram-summary";
 import { applyNotifyCommand, captionTarget, parseCommand } from "@/lib/telegram-commands";
 import { escapeHtml, loadPrefs, savePrefs } from "@/lib/telegram-notify";
 import { removeSaved, detectIdentityDocument, saveBusiness, saveDocument, saveGrocery, savePersonalExpense, type Saved, type TgFile } from "@/lib/telegram-save";
@@ -38,11 +38,12 @@ const HELP = [
   "",
   "/trips — pick a default trip",
   "/recent — last expenses",
+  "/summary — your trips and spending",
   "/notify — messages from the app",
   "/help — this message",
 ].join("\n");
 
-const ADMIN_HELP = ["", "Admins:", "/digest — your own daily summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
+const ADMIN_HELP = ["", "Admins:", "/health — app health summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
 
 export async function handleMessage(supabase: Db, message: TgMessage) {
   const chatId = message.chat.id;
@@ -68,9 +69,14 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
     const priv = message.chat.type === "private";
     return cmd.name === "newuser" ? requestNewUser(supabase, chatId, priv, profile, cmd.args) : requestRoleChange(supabase, chatId, priv, profile, cmd.args);
   }
-  if (cmd?.name === "digest") {
+  if (cmd?.name === "summary") {
+    const summary = await gatherUserSummary(supabase, todayISO(), profile.id);
+    return void (await sendMessage(chatId, summaryIsEmpty(summary) ? "Nothing to report yet: no trips planned and no spending this month." : userSummaryText(summary)));
+  }
+  if (cmd?.name === "health" || cmd?.name === "digest") {
     if (profile.role !== "admin") return void (await sendMessage(chatId, "That command is for admins."));
-    return void (await sendMessage(chatId, digestText(await gatherDigest(supabase, todayISO(), profile.id))));
+    const bot = await getBotConfig();
+    return void (await sendMessage(chatId, healthText(await gatherHealth(supabase, todayISO(), { bot: { configured: !!bot, enabled: !!bot?.enabled } }))));
   }
   if (cmd?.name === "notify") {
     const prefs = await loadPrefs(supabase, profile.id);

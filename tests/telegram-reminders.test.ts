@@ -3,7 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { createFakeSupabase, SERVICE_KEY } from "./e2e/fake-supabase.mjs";
 import { addDaysISO } from "../src/lib/utils";
-import { digestText, documentReminderText, documentTier, reminderText, reminderTier } from "../src/lib/telegram-reminders";
+import { documentReminderText, documentTier, reminderText, reminderTier } from "../src/lib/telegram-reminders";
 
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 const yes = (c: unknown, m: string) => eq(!!c, true, m);
@@ -54,14 +54,8 @@ yes(documentReminderText({ id: "1", user_id: "u", kind: "passport", title: "Dutc
 yes(documentReminderText({ id: "1", user_id: "u", kind: "passport", title: "P", expiry_date: addDaysISO(today, 170) }, 170).includes("6+ months"), "passport text mentions the 6-month rule");
 yes(documentReminderText({ id: "1", user_id: "u", kind: "visa", title: "ESTA", expiry_date: addDaysISO(today, -3) }, -3).includes("expired 3 days ago"), "expired text");
 
-const stats = { today, newExpenses: 1, newPeople: 0, openSupport: null, startingSoon: [], activeTrips: 2 };
-yes(digestText(stats).includes("1 expense added"), "digest uses singular");
-yes(!digestText(stats).includes("support"), "digest hides support when unknown");
-yes(!digestText(stats).includes("Starting this week"), "digest hides empty list");
-yes(digestText({ ...stats, openSupport: 3, startingSoon: Array.from({ length: 7 }, (_, i) => ({ name: `T${i}`, start_date: addDaysISO(today, 2) })) }).includes("and 2 more"), "digest trims long list");
-
 async function main() {
-  const { runAdminDigest, runTripReminders } = await import("../src/lib/telegram-reminders");
+  const { runTripReminders } = await import("../src/lib/telegram-reminders");
   const fake = createFakeSupabase();
   for (const t of ["profiles", "trips", "expenses", "telegram_notify_prefs", "telegram_sent_log", "support_requests", "personal_projects", "travel_documents"]) fake.table(t);
   const A = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", B = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", ADMIN = "cccccccc-cccc-4ccc-8ccc-cccccccccccc", NOLINK = "dddddddd-dddd-4ddd-8ddd-dddddddddddd", ADMIN2 = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
@@ -140,16 +134,6 @@ async function main() {
   eq((await runTripReminders(db, later10, noon)).sent, 1, "a personal trip a week out is reminded");
   yes(sent[0].text.includes("Beach Week") && sent[0].text.includes("(personal)"), "...as personal travel");
   eq((await runTripReminders(db, later10, noon)).sent, 0, "...once only");
-
-  sent.length = 0;
-  eq(await runAdminDigest(db, today), 2, "each linked admin gets a summary");
-  const toBoss = sent.find((m) => m.chat === 999)!.text, toBoss2 = sent.find((m) => m.chat === 888)!.text;
-  yes(toBoss !== toBoss2, "two admins never get the same summary");
-  yes(toBoss.includes("1 expense added") && toBoss.includes("AdminSeven"), "admin one sees only their own expense and trip");
-  yes(!toBoss.includes("OtherAdminTrip") && !toBoss.includes("Three"), "...and nobody else's trips");
-  yes(toBoss2.includes("2 expenses added") && toBoss2.includes("OtherAdminTrip") && !toBoss2.includes("AdminSeven"), "admin two sees only their own");
-  yes(toBoss.includes("New sign-ups: 1") && toBoss.includes("Open support requests: 1"), "admin duties (sign-ups, support) are shown");
-  eq(await runAdminDigest(db, today), 0, "digest goes once a day");
 
   await fake.close();
   globalThis.fetch = realFetch;
