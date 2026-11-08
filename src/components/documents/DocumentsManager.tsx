@@ -1,10 +1,11 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CloudOff, Crop, FileText, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { Camera, CloudOff, Crop, Loader2, Plus, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -321,13 +322,11 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   return (
     <div className={tripId ? "space-y-3" : "space-y-6"}>
       {!tripId && (
-        <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><FileText className="h-7 w-7" aria-hidden="true" /> Documents</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Your passport, ID, driver&apos;s license and travel papers, close at hand. We keep track of what is still valid.</p>
-          </div>
-          <Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>
-        </div>
+        <PageHeader
+          title="Documents"
+          description="Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid."
+          actions={<Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>}
+        />
       )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}

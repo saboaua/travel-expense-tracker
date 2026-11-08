@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, CheckCircle2, Circle } from "lucide-react";
+import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useConfirm } from "@/components/ui/confirm";
 import { makeRowApi, saveRow } from "@/lib/row-outbox";
@@ -54,11 +54,12 @@ export function TripStatusToggle({
 
   const pastOpen = !completed && !!ended;
   const tone = completed
-    ? "border-emerald-200 bg-emerald-50/60"
+    ? "border-emerald-200 bg-emerald-50/60 dark:border-emerald-900/60 dark:bg-emerald-950/30"
     : pastOpen
-      ? "border-amber-200 bg-amber-50/60"
+      ? "border-amber-200 bg-amber-50/60 dark:border-amber-900/60 dark:bg-amber-950/30"
       : "bg-card";
-  const Icon = completed ? CheckCircle2 : pastOpen ? AlertTriangle : Circle;
+  // A neutral state has no icon: the switch already says it's off
+  const Icon = completed ? CheckCircle2 : pastOpen ? AlertTriangle : null;
   const iconTone = completed ? "text-emerald-600" : pastOpen ? "text-amber-600" : "text-muted-foreground";
 
   const title = completed ? "Trip complete" : pastOpen ? `Trip ended ${endLabel || ""}`.trim() : "Mark trip complete";
@@ -71,7 +72,7 @@ export function TripStatusToggle({
   return (
     <div className={`flex items-center justify-between gap-4 rounded-xl border p-4 ${tone}`}>
       <div className="flex min-w-0 items-start gap-3">
-        <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden="true" />
+        {Icon && <Icon className={`mt-0.5 h-5 w-5 shrink-0 ${iconTone}`} aria-hidden="true" />}
         <div className="min-w-0">
           <p className="font-medium">{title}</p>
           <p className="text-sm text-muted-foreground">{text}</p>

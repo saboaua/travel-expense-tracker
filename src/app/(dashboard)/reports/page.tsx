@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
@@ -15,13 +16,14 @@ import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarRange, Download, F
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string };
 
-function Delta({ pct, suffix }: { pct: number | null; suffix: string }) {
-  if (pct == null) return <span className="text-xs text-muted-foreground">{suffix}</span>;
+/** The change against an earlier period; with nothing to compare against it says so instead of "vs last month" with no number */
+function Delta({ pct, suffix, empty }: { pct: number | null; suffix: string; empty: string }) {
+  if (pct == null) return <span className="text-xs text-muted-foreground">{empty}</span>;
   const up = pct > 0;
   const Icon = up ? ArrowUpRight : ArrowDownRight;
   return (
     <span className="inline-flex items-center gap-1 text-xs">
-      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium ${pct === 0 ? "bg-muted text-muted-foreground" : up ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+      <span className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 font-medium ${pct === 0 ? "bg-muted text-muted-foreground" : up ? "bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300" : "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"}`}>
         {pct !== 0 && <Icon className="h-3 w-3" />}
         {pct > 0 ? "+" : ""}
         {pct}%
@@ -99,12 +101,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-8">
       <BusinessTabs />
-      <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold md:text-3xl">Reports</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Business travel spending in USD, using the rate saved with each expense</p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
+      <PageHeader
+        title="Reports"
+        description="Business travel spending in USD, using the rate saved with each expense"
+        actions={<>
           <nav className="flex items-center gap-1 rounded-full border bg-card p-1" aria-label="Report year">
             {years.map((y) => (
               <Link
@@ -120,11 +120,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <a href={`/api/export/year/${year}/excel`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
             <Download className="h-4 w-4" /> Export {year}
           </a>
-        </div>
-      </div>
+        </>}
+      />
 
       {s.missingUsd > 0 && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900" role="status">
+        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100" role="status">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
             {s.missingUsd} expense{s.missingUsd !== 1 ? "s were" : " was"} saved in another currency without a USD value, so {s.missingUsd !== 1 ? "they are" : "it is"} not counted in these totals. Open the trip and add the exchange rate to include {s.missingUsd !== 1 ? "them" : "it"}.
@@ -143,10 +143,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         <>
           <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
             <Tile icon={Wallet} label={`${year} total`} value={fmt(s.total)}>
-              <Delta pct={s.yearChangePct} suffix={s.prevYearTotal > 0 ? `vs ${year - 1}` : `no ${year - 1} data`} />
+              <Delta pct={s.yearChangePct} suffix={`vs ${year - 1}`} empty={`no ${year - 1} data`} />
             </Tile>
             <Tile icon={CalendarRange} label={isCurrent ? "This month" : "Peak month"} value={fmt(s.focusMonthTotal)}>
-              {isCurrent ? <Delta pct={s.focusMonthChangePct} suffix="vs last month" /> : <span className="text-xs text-muted-foreground">{MONTH_LONG[s.focusMonthIndex]}</span>}
+              {isCurrent ? <Delta pct={s.focusMonthChangePct} suffix="vs last month" empty="no spending last month" /> : <span className="text-xs text-muted-foreground">{MONTH_LONG[s.focusMonthIndex]}</span>}
             </Tile>
             <Tile icon={Plane} label="Trips" value={String(tripRows.length)}>
               <span className="text-xs text-muted-foreground">{s.expenseCount} expense{s.expenseCount !== 1 ? "s" : ""}</span>

@@ -1,9 +1,10 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useMemo, useState } from "react";
-import { ChevronRight, CircleHelp, Search, X } from "lucide-react";
+import { ChevronRight, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -83,10 +84,7 @@ function Shell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 pb-24 md:p-8">
-      <div className={cn(onArticle && "hidden md:block")}>
-        <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><CircleHelp className="h-7 w-7" aria-hidden="true" /> Help</h1>
-        <p className="mt-1 text-muted-foreground">Short guides for getting the most out of the app.</p>
-      </div>
+      <PageHeader className={cn(onArticle && "hidden md:flex")} title="Help" description="Short guides for getting the most out of the app." />
       <div className="md:grid md:grid-cols-[19rem_minmax(0,1fr)] md:items-start md:gap-8">
         {/* Phone: the list OR the topic, one at a time. Desktop: both side by side. */}
         <nav aria-label="Help topics" className={cn("md:sticky md:top-6 md:max-h-[calc(100vh-8rem)] md:overflow-y-auto md:pr-1", onArticle && "hidden md:block")}>{list}</nav>

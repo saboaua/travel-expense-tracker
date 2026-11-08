@@ -1,5 +1,6 @@
 "use client";
 
+import { applyBrandColor } from "@/lib/brand-color";
 import { useEffect, useSyncExternalStore } from "react";
 import { createClient } from "@/lib/supabase/client";
 
@@ -36,6 +37,7 @@ async function fetchBrand(): Promise<void> {
     if (s.primary_color) {
       next.primaryColor = s.primary_color;
       document.documentElement.style.setProperty("--brand-primary", s.primary_color);
+      applyBrandColor(s.primary_color);
     }
   }
   if (flagRes.data) next.personalEnabled = flagRes.data.personal_enabled !== false;

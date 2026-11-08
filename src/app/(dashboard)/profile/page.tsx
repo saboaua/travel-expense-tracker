@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -187,12 +188,7 @@ export default function ProfilePage() {
 
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Profile</h1>
-        <p className="text-muted-foreground mt-1">
-          Manage your personal information, password, and integrations
-        </p>
-      </div>
+      <PageHeader title="Profile" description={<>Manage your personal information, password, and integrations</>} />
 
       {/* Avatar + basic info card */}
       <Card>

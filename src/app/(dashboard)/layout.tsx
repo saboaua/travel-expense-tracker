@@ -14,7 +14,7 @@ export default function DashboardLayout({
   return (
     // On phones this is a fixed-size frame: the content scrolls inside it and the bottom menu is part of the frame,
     // so the menu is always at the bottom of the screen however the page is scrolled or bounced.
-    <div className="app-frame bg-background max-md:fixed max-md:inset-0 max-md:flex max-md:flex-col md:min-h-screen print:!static">
+    <div className="app-frame bg-page max-md:fixed max-md:inset-0 max-md:flex max-md:flex-col md:min-h-screen print:!static">
       <Sidebar />
       <ScrollArea>
         <main className="pb-6 md:pb-8">{children}</main>

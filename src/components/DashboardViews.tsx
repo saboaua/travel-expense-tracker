@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs } from "@/components/ui/tabs";
 import dynamic from "next/dynamic";
 import { useEffect, useState, type ReactNode } from "react";
 import { Briefcase, Wallet } from "lucide-react";
@@ -37,29 +38,17 @@ export function DashboardViews({ rows, projects, today, personalTiles, children 
     }
   };
 
-  const tab = (v: View, label: string, Icon: typeof Briefcase) => (
-    <button
-      type="button"
-      role="tab"
-      id={`dash-tab-${v}`}
-      aria-selected={view === v}
-      aria-controls={`dash-panel-${v}`}
-      onClick={() => choose(v)}
-      className={`flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl px-6 text-[15px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:flex-none ${
-        view === v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-      }`}
-    >
-      <Icon className={`h-5 w-5 ${view === v ? "text-primary" : ""}`} aria-hidden="true" />
-      {label}
-    </button>
-  );
-
   return (
     <>
-      <div role="tablist" aria-label="Dashboard view" className="flex w-full rounded-2xl bg-muted p-1 sm:inline-flex sm:w-auto">
-        {tab("business", "Business", Briefcase)}
-        {tab("personal", "Personal", Wallet)}
-      </div>
+      <Tabs
+        label="Dashboard view"
+        size="lg"
+        value={view}
+        onChange={(v) => choose(v as View)}
+        idPrefix="dash-tab"
+        panelPrefix="dash-panel"
+        options={[{ id: "business", label: "Business", icon: Briefcase }, { id: "personal", label: "Personal", icon: Wallet }]}
+      />
       <div id="dash-panel-business" role="tabpanel" aria-labelledby="dash-tab-business" hidden={view !== "business"} className="space-y-6">
         {children}
       </div>

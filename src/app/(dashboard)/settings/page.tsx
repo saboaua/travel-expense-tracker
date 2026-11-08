@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -143,12 +144,7 @@ export default function SettingsPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-lg mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Profile and Telegram receipt upload
-        </p>
-      </div>
+      <PageHeader title="Settings" description={<>Profile and Telegram receipt upload</>} />
 
       <Card>
         <CardHeader>

@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs } from "@/components/ui/tabs";
 import { useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, FileText, FolderOpen, Image as ImageIcon, MoreVertical, Pencil, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,22 +8,22 @@ import { cn, formatDate } from "@/lib/utils";
 import { documentStatus, expiryMeter, kindLabel, maskNumber, type DocLevel, type TravelDocument } from "@/lib/documents";
 
 const CHIP: Record<DocLevel, string> = {
-  ok: "bg-emerald-100 text-emerald-700",
-  soon: "bg-amber-100 text-amber-800",
-  critical: "bg-red-100 text-red-700",
-  expired: "bg-red-100 text-red-700",
+  ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
+  soon: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  critical: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
+  expired: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
   none: "bg-muted text-muted-foreground",
 };
 const BAR: Record<DocLevel, string> = { ok: "bg-emerald-500", soon: "bg-amber-500", critical: "bg-red-500", expired: "bg-red-500", none: "bg-muted-foreground" };
 const ACCENT = BAR;
 const ICON_TILE: Record<DocLevel, string> = {
-  ok: "bg-blue-100 text-blue-700",
-  none: "bg-blue-100 text-blue-700",
-  soon: "bg-amber-100 text-amber-800",
-  critical: "bg-red-100 text-red-700",
-  expired: "bg-red-100 text-red-700",
+  ok: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+  none: "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+  soon: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300",
+  critical: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
+  expired: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300",
 };
-const CAPTION: Record<DocLevel, string> = { ok: "text-emerald-700", none: "text-muted-foreground", soon: "text-amber-800", critical: "text-red-700", expired: "text-red-700" };
+const CAPTION: Record<DocLevel, string> = { ok: "text-emerald-700 dark:text-emerald-300", none: "text-muted-foreground", soon: "text-amber-800 dark:text-amber-300", critical: "text-red-700 dark:text-red-300", expired: "text-red-700 dark:text-red-300" };
 const NEEDS_ATTENTION: DocLevel[] = ["soon", "critical", "expired"];
 
 type Filter = "all" | "attention" | "valid";
@@ -192,23 +193,14 @@ export function DocumentList({ docs, urls, revealed, toggleReveal, today, compac
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-4">
-        <Tile icon={FolderOpen} label="Total" value={docs.length} hint="Documents stored" tone="bg-blue-100 text-blue-700" />
-        <Tile icon={CheckCircle2} label="Valid" value={valid.length} hint="Not close to expiry" tone="bg-emerald-100 text-emerald-700" />
-        <Tile icon={Clock} label="Expiring soon" value={soon.length} hint={nextSoon && nextMeter ? `Next: ${nextSoon.title}, ${nextMeter.caption.split(" · ")[0]}` : "Nothing to renew"} tone="bg-amber-100 text-amber-800" />
-        <Tile icon={AlertTriangle} label="Expired" value={expiredCount} hint={expiredCount ? "Needs a new document" : "None expired"} tone="bg-red-100 text-red-700" />
+        <Tile icon={FolderOpen} label="Total" value={docs.length} hint="Documents stored" tone="bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300" />
+        <Tile icon={CheckCircle2} label="Valid" value={valid.length} hint="Not close to expiry" tone="bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300" />
+        <Tile icon={Clock} label="Expiring soon" value={soon.length} hint={nextSoon && nextMeter ? `Next: ${nextSoon.title}, ${nextMeter.caption.split(" · ")[0]}` : "Nothing to renew"} tone="bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300" />
+        <Tile icon={AlertTriangle} label="Expired" value={expiredCount} hint={expiredCount ? "Needs a new document" : "None expired"} tone="bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300" />
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label="Document filter" className="flex rounded-xl border bg-muted/50 p-1 sm:inline-flex">
-          {tabs.map((t) => (
-            <button
-              key={t.id} type="button" role="tab" aria-selected={filter === t.id} onClick={() => setFilter(t.id)}
-              className={cn("flex-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none sm:px-3.5", filter === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}
-            >
-              {t.id === "attention" ? <><span className="sm:hidden">Attention</span><span className="hidden sm:inline">Needs attention</span></> : t.label} <span className="ml-1 text-xs opacity-70">{t.count}</span>
-            </button>
-          ))}
-        </div>
+        <Tabs label="Document filter" value={filter} onChange={(id) => setFilter(id as typeof filter)} options={tabs.map((t) => ({ id: t.id, label: t.id === "attention" ? <><span className="sm:hidden">Attention</span><span className="hidden sm:inline">Needs attention</span></> : t.label, count: t.count }))} />
         <div className="relative sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
           <input

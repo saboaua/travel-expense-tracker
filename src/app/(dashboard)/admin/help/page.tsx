@@ -1,8 +1,9 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { CircleHelp, Eye, Pencil, Plus, Trash2, ExternalLink } from "lucide-react";
+import { Eye, Pencil, Plus, Trash2, ExternalLink } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -103,13 +104,11 @@ export default function AdminHelpPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-24 md:p-8">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl"><CircleHelp className="h-7 w-7" aria-hidden="true" /> Help topics</h1>
-          <p className="mt-1 text-muted-foreground">Write the guides every user sees under Help in the menu.</p>
-        </div>
-        {!form && <Button type="button" className="gap-2" onClick={() => { setNotice(null); setError(null); setPreview(false); setForm({ ...EMPTY }); }}><Plus className="h-4 w-4" /> New topic</Button>}
-      </div>
+      <PageHeader
+        title="Help topics"
+        description="Write the guides every user sees under Help in the menu."
+        actions={!form ? <Button type="button" className="gap-2" onClick={() => { setNotice(null); setError(null); setPreview(false); setForm({ ...EMPTY }); }}><Plus className="h-4 w-4" /> New topic</Button> : undefined}
+      />
 
       {error && <Alert>{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}

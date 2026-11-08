@@ -1,10 +1,12 @@
+import { ExportMenu } from "@/components/trips/ExportMenu";
+import { BackLink } from "@/components/ui/page-header";
 import { ShareWith } from "@/components/sharing/ShareWith";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
-import { ArrowLeft, Archive, Camera, CalendarDays, Clock, Download, MapPin, Pencil, Plus, Tag } from "lucide-react";
+import { Camera, CalendarDays, Clock, MapPin, Pencil, Plus, Tag } from "lucide-react";
 import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
@@ -16,9 +18,9 @@ import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, tripPassportCheck } from "@/lib/documents";
 import { EXPENSE_COLS, TRIP_COLS } from "@/lib/columns";
 
-function Tile({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function Tile({ label, value, sub, wide }: { label: string; value: string; sub?: string; wide?: boolean }) {
   return (
-    <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
+    <div className={`rounded-xl border bg-card p-4 shadow-sm sm:p-5 ${wide ? "col-span-2 lg:col-span-1" : ""}`}>
       <p className="text-sm text-muted-foreground">{label}</p>
       <p className="mt-1.5 truncate text-2xl font-bold tracking-tight sm:text-3xl">{value}</p>
       <p className="mt-1 min-h-[1rem] truncate text-xs text-muted-foreground">{sub}</p>
@@ -95,10 +97,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 pb-28 md:p-8">
-      <Link href="/trips" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" />
-        Back to trips
-      </Link>
+      <BackLink href="/trips">Trips</BackLink>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
         <div className="relative h-44 bg-gradient-to-br from-slate-800 to-slate-600 md:h-56">
@@ -132,19 +131,14 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         </div>
 
         <div className="space-y-3 p-3 md:p-4">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-[1.4fr_1fr_1fr]">
             <Link href={`/trips/${id}/add-expense`} className="col-span-2 inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 sm:col-span-1">
               <Camera className="h-4 w-4" /> Add expense
             </Link>
             <Link href={`/trips/${id}/edit`} className={actionBtn}>
               <Pencil className="h-4 w-4" /> Edit
             </Link>
-            <a href={`/api/export/trip/${id}/excel`} className={actionBtn}>
-              <Download className="h-4 w-4" /> Excel
-            </a>
-            <a href={`/api/export/trip/${id}/zip`} className={actionBtn} title="Excel plus all receipt images">
-              <Archive className="h-4 w-4" /> ZIP
-            </a>
+            <ExportMenu tripId={id} className={`${actionBtn} w-full`} />
           </div>
           {trip.notes && <p className="whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">{trip.notes}</p>}
           {info?.summary && (
@@ -159,17 +153,18 @@ export default async function TripDetailPage({ params, searchParams }: { params:
 
       <TripStatusToggle tripId={id} status={trip.status} ended={passed} endLabel={formatDateRange(endDate)} />
 
-      <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-        <Tile label="Total in USD" value={formatCurrency(usdTotal, "USD")} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
+      {/* The second money tile only appears when it says something new: a trip in another currency */}
+      <div className={`grid grid-cols-2 gap-3 md:gap-4 ${primaryOther || (trip.currency && trip.currency !== "USD") ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
+        <Tile wide={!primaryOther && !(trip.currency && trip.currency !== "USD")} label="Total in USD" value={formatCurrency(usdTotal, "USD")} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
         {primaryOther ? (
           <Tile
             label={otherCurrencies.length > 1 ? "Other currencies" : `In ${primaryOther[0]}`}
             value={formatCurrency(primaryOther[1], primaryOther[0])}
             sub={otherCurrencies.length > 1 ? otherCurrencies.map(([c, a]) => `${c} ${formatCurrency(a, c)}`).join(" \u00b7 ") : undefined}
           />
-        ) : (
-          <Tile label={`In ${trip.currency || "USD"}`} value={formatCurrency(list.reduce((s, e) => s + Number(e.amount), 0), trip.currency || "USD")} />
-        )}
+        ) : trip.currency && trip.currency !== "USD" ? (
+          <Tile label={`In ${trip.currency}`} value={formatCurrency(list.reduce((s, e) => s + Number(e.amount), 0), trip.currency)} />
+        ) : null}
         <Tile label="Expenses" value={String(list.length)} sub={list.length ? `${withReceipts} with receipt photo${withReceipts !== 1 ? "s" : ""}` : "None yet"} />
         <Tile label="Average per day" value={perDay != null ? formatCurrency(perDay, "USD") : "\u2014"} sub={upcoming ? "Starts soon" : `${elapsedDays} day${elapsedDays !== 1 ? "s" : ""}`} />
       </div>
@@ -190,12 +185,12 @@ export default async function TripDetailPage({ params, searchParams }: { params:
           <p className="text-xs text-muted-foreground">Tickets, bookings, visa and insurance for this trip, kept private.</p>
         </div>
         {Number(docs_failed) > 0 && (
-          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
             {docs_failed} document{Number(docs_failed) !== 1 ? "s" : ""} could not be uploaded when the trip was created. Add {Number(docs_failed) !== 1 ? "them" : "it"} below.
           </p>
         )}
         {passportCheck && !passportCheck.ok && !completed && (
-          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
             Your passport expires {formatDate(passport!.expiry_date as string)}. Most destinations want it valid until {formatDate(passportCheck.mustBeValidUntil)} for this trip.{" "}
             <Link href="/documents" className="font-medium underline">Check my passport</Link>
           </p>

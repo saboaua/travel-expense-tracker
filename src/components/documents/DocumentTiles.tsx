@@ -86,7 +86,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
         </Link>
       </div>
 
-      {error && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{error}</p>}
+      {error && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">{error}</p>}
 
       {tiles.length === 0 ? (
         <Link href="/documents" className="flex min-h-[8rem] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:max-w-xs">

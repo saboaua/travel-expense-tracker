@@ -100,13 +100,8 @@ export function WeatherCard({ inline = false }: { inline?: boolean } = {}) {
     );
   }
 
-  if (state.status === "error" && inline) {
-    return (
-      <div className={`${panel} text-sm text-muted-foreground`}>
-        <MapPin className="h-4 w-4" aria-hidden="true" /> Weather unavailable right now
-      </div>
-    );
-  }
+  // Nothing to show is nothing taken: no "unavailable" panel on the welcome card
+  if (state.status === "error" && inline) return null;
 
   if (state.status === "loading") {
     return (

@@ -110,7 +110,7 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
       </div>
 
       {notice && (
-        <p role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+        <p role="status" className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
           {notice}
         </p>
       )}

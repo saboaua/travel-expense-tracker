@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
@@ -69,12 +70,7 @@ export default function AdminSettingsPage() {
   const visible = sections.filter((s) => role === "admin" || perms.has(s.feature));
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">Global Settings</h1>
-        <p className="text-muted-foreground mt-1">
-          Configure branding, currencies, receipt and travel categories, Telegram, and users.
-        </p>
-      </div>
+      <PageHeader title="Global Settings" description={<>Configure branding, currencies, receipt and travel categories, Telegram, and users.</>} />
 
       {loaded && visible.length === 0 && <p className="text-sm text-muted-foreground">Nothing here is available for your role.</p>}
 

@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { addDaysISO, dayEndInstant, dayStartInstant, todayISO } from "@/lib/utils";
@@ -7,7 +9,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Shield, AlertTriangle, Activity, Globe, RefreshCw, Filter, X } from "lucide-react";
+import { AlertTriangle, Activity, Globe, RefreshCw, Filter, X } from "lucide-react";
 
 interface SecurityEvent {
   id: string;
@@ -34,8 +36,8 @@ const today = () => todayISO();
 const daysAgo = (n: number) => addDaysISO(todayISO(), -n);
 
 function severityColor(s: string) {
-  if (s === "critical") return "bg-red-100 text-red-800 border-red-200";
-  if (s === "warning") return "bg-amber-100 text-amber-800 border-amber-200";
+  if (s === "critical") return "bg-red-100 text-red-800 border-red-200 dark:bg-red-950/50 dark:text-red-300 dark:border-red-900/60";
+  if (s === "warning") return "bg-amber-100 text-amber-800 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-900/60";
   return "bg-slate-100 text-slate-700 border-slate-200";
 }
 
@@ -150,22 +152,18 @@ export default function AdminSecurityPage() {
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-6xl mx-auto space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-            <Shield className="h-7 w-7" /> Security & Audit
-          </h1>
-          <p className="text-muted-foreground mt-1">Filter logins, threats, and user actions</p>
-        </div>
-        <div className="flex gap-2">
+      <PageHeader
+        title="Security & Audit"
+        description="Filter logins, threats, and user actions"
+        actions={<>
           <Button variant="outline" size="sm" onClick={testWrite} disabled={testing}>
             {testing ? "Writing\u2026" : "Write test event"}
           </Button>
           <Button variant="outline" size="sm" className="gap-2" onClick={load} disabled={loading}>
             <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
           </Button>
-        </div>
-      </div>
+        </>}
+      />
 
       {error && (
         <Alert>
@@ -279,14 +277,13 @@ export default function AdminSecurityPage() {
         </CardContent>
       </Card>
 
-      <div className="flex gap-2 border-b">
-        <button onClick={() => setTab("security")} className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === "security" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
-          <Activity className="h-4 w-4 inline mr-1.5" /> Security events ({events.length})
-        </button>
-        <button onClick={() => setTab("audit")} className={`px-4 py-2 text-sm font-medium border-b-2 ${tab === "audit" ? "border-primary text-primary" : "border-transparent text-muted-foreground"}`}>
-          <Globe className="h-4 w-4 inline mr-1.5" /> Audit trail ({audits.length})
-        </button>
-      </div>
+      <Tabs
+        semantics="group"
+        label="Security views"
+        value={tab}
+        onChange={(id) => setTab(id as typeof tab)}
+        options={[{ id: "security", label: `Security events (${events.length})`, icon: Activity }, { id: "audit", label: `Audit trail (${audits.length})`, icon: Globe }]}
+      />
 
       {tab === "security" && (
         <Card>

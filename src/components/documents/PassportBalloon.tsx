@@ -4,14 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { BellRing, X } from "lucide-react";
 import type { RenewalAlert } from "@/lib/documents";
-import { formatDate } from "@/lib/utils";
+import { daysBetween, formatDate, todayISO } from "@/lib/utils";
 
 const SNOOZE_DAYS = 7;
-const STYLES = {
-  expired: "border-red-200 bg-red-50 text-red-900",
-  critical: "border-red-200 bg-red-50 text-red-900",
-  renew: "border-amber-200 bg-amber-50 text-amber-900",
+// Three tones: red only when it needs action now (expired, or about to be, or it blocks a booked trip), amber while there is time
+const TONES = {
+  urgent: "border-red-200 bg-red-50 text-red-900 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-100",
+  soon: "border-amber-200 bg-amber-50 text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100",
 } as const;
+const URGENT_DAYS = 90;
+
+export function balloonTone(alert: Pick<RenewalAlert, "level" | "expiry" | "tripConflict">, today: string): keyof typeof TONES {
+  if (alert.level === "expired" || alert.tripConflict) return "urgent";
+  return daysBetween(today, alert.expiry) <= URGENT_DAYS ? "urgent" : "soon";
+}
 
 /** Dashboard balloon that tells the user to renew their passport. Dismissing hides it for a week. */
 export function PassportBalloon({ alert }: { alert: RenewalAlert }) {
@@ -35,8 +41,8 @@ export function PassportBalloon({ alert }: { alert: RenewalAlert }) {
   };
 
   return (
-    <div role="status" className={`relative flex items-start gap-3 rounded-xl border p-4 pr-10 shadow-sm ${STYLES[alert.level]}`}>
-      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70">
+    <div role="status" className={`relative flex items-start gap-3 rounded-xl border p-4 pr-10 shadow-sm ${TONES[balloonTone(alert, todayISO())]}`}>
+      <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/70 dark:bg-white/10">
         <BellRing className="h-5 w-5" />
       </span>
       <div className="min-w-0 text-sm">

@@ -8,7 +8,7 @@ import { badgeLabel, isDismissible, topSeverity, visibleNotifications, type AppN
 const STORAGE_KEY = "notifications-dismissed";
 
 const BADGE: Record<Severity, string> = { urgent: "bg-red-600 text-white", warning: "bg-amber-500 text-white", info: "bg-primary text-primary-foreground" };
-const ICON_WRAP: Record<Severity, string> = { urgent: "bg-red-100 text-red-700", warning: "bg-amber-100 text-amber-800", info: "bg-primary/10 text-primary" };
+const ICON_WRAP: Record<Severity, string> = { urgent: "bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300", warning: "bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300", info: "bg-primary/10 text-primary" };
 const ICON: Record<Severity, typeof Info> = { urgent: AlertTriangle, warning: BellRing, info: Info };
 
 function readDismissed(): Record<string, number> {

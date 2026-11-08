@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs } from "@/components/ui/tabs";
 import { useMemo, useState } from "react";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { CalendarDays, Coins, ShoppingBag, Tags } from "lucide-react";
@@ -33,23 +34,7 @@ function shortDate(key: string, grain: Grain) {
 }
 
 function Seg<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: { v: T; label: string }[]; label: string }) {
-  return (
-    <div role="group" aria-label={label} className="inline-flex rounded-lg bg-muted p-0.5">
-      {options.map((o) => (
-        <button
-          key={o.v}
-          type="button"
-          aria-pressed={value === o.v}
-          onClick={() => onChange(o.v)}
-          className={`min-h-8 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-            value === o.v ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-          }`}
-        >
-          {o.label}
-        </button>
-      ))}
-    </div>
-  );
+  return <Tabs semantics="group" size="sm" label={label} value={String(value)} onChange={(id) => onChange(options.find((o) => String(o.v) === id)!.v)} options={options.map((o) => ({ id: String(o.v), label: o.label }))} />;
 }
 
 export default function PersonalDashboard({ rows, projects, today }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string }) {

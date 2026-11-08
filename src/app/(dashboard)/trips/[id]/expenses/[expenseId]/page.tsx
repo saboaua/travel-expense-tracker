@@ -1,16 +1,16 @@
 "use client";
 
+import { BackLink } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Camera, Loader2, ScanText, Trash2, Upload, X } from "lucide-react";
+import { Camera, Loader2, ScanText, Trash2, Upload, X } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { toUsd } from "@/lib/currencies";
@@ -215,9 +215,7 @@ export default function EditExpensePage() {
 
   return (
     <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
-      <Link href={`/trips/${tripId}`} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4" /> Back to trip
-      </Link>
+      <BackLink href={`/trips/${tripId}`} className="mb-6">Trip</BackLink>
       <Card>
         <CardHeader>
           <CardTitle>Edit Expense</CardTitle>

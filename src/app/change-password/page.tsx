@@ -76,7 +76,7 @@ export default function ChangePasswordPage() {
       <div className="w-full max-w-[420px]">
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl shadow-blue-900/5 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 p-8 sm:p-10">
           <div className="flex justify-center mb-6">
-            <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+            <div className="h-14 w-14 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
               <ShieldCheck className="h-7 w-7 text-white" strokeWidth={2} />
             </div>
           </div>
@@ -103,7 +103,7 @@ export default function ChangePasswordPage() {
                 minLength={8}
                 autoComplete="new-password"
                 left={<Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />}
-                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
               />
               <p className="text-xs text-slate-400">{PASSWORD_RULE}</p>
             </div>
@@ -120,7 +120,7 @@ export default function ChangePasswordPage() {
                 minLength={8}
                 autoComplete="new-password"
                 left={<Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />}
-                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                inputClassName="w-full h-11 pl-10 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
               />
               <PasswordHints password={password} confirm={confirm} />
             </div>
@@ -134,7 +134,7 @@ export default function ChangePasswordPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-all disabled:opacity-60"
+              className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium text-sm transition-all disabled:opacity-60"
             >
               {loading ? "Updating..." : "Set new password & continue"}
             </button>

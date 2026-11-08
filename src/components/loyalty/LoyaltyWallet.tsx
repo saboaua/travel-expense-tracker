@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CloudOff, CreditCard, Loader2, MoreVertical, Pencil, Plus, ScanBarcode, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -97,13 +98,7 @@ export function LoyaltyWallet() {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold md:text-3xl">Loyalty cards</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Every store card in one place. Open a card at the till and scan it from your screen.</p>
-        </div>
-        {cards && visible.length > 0 && addButton}
-      </div>
+      <PageHeader title="Loyalty cards" description="Every store card in one place. Open a card at the till and scan it from your screen." actions={cards && visible.length > 0 ? addButton : undefined} />
 
       <OfflineNotice savedAt={savedAt} writable />
 

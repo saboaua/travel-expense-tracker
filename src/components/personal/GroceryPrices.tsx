@@ -47,8 +47,8 @@ export function GroceryPrices() {
   const badge = (t: TrackedItem) => {
     const p = t.stats.changePct;
     if (p == null) return <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">new</span>;
-    if (t.stats.trend === "up") return <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"><ArrowUp className="h-3 w-3" />{p}%</span>;
-    if (t.stats.trend === "down") return <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"><ArrowDown className="h-3 w-3" />{Math.abs(p)}%</span>;
+    if (t.stats.trend === "up") return <span className="inline-flex items-center gap-0.5 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 dark:bg-red-950/50 dark:text-red-300"><ArrowUp className="h-3 w-3" />{p}%</span>;
+    if (t.stats.trend === "down") return <span className="inline-flex items-center gap-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300"><ArrowDown className="h-3 w-3" />{Math.abs(p)}%</span>;
     return <span className="inline-flex items-center gap-0.5 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground"><Minus className="h-3 w-3" />0%</span>;
   };
 
@@ -110,8 +110,8 @@ export function GroceryPrices() {
                 <div className="space-y-4 border-t p-4">
                   <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
                     <div><p className="text-xs text-muted-foreground">Average</p><p className="font-medium">{fmt(t.stats.avg)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Lowest</p><p className="font-medium text-emerald-700">{fmt(t.stats.min)}</p></div>
-                    <div><p className="text-xs text-muted-foreground">Highest</p><p className="font-medium text-red-700">{fmt(t.stats.max)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Lowest</p><p className="font-medium text-emerald-700 dark:text-emerald-300">{fmt(t.stats.min)}</p></div>
+                    <div><p className="text-xs text-muted-foreground">Highest</p><p className="font-medium text-red-700 dark:text-red-300">{fmt(t.stats.max)}</p></div>
                     <div><p className="text-xs text-muted-foreground">Total spent</p><p className="font-medium">{fmt(t.totalSpent)}</p></div>
                   </div>
                   {t.stats.previous != null && (

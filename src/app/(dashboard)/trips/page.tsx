@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -61,18 +62,11 @@ export default async function TripsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-8">
       <BusinessTabs />
-      <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold md:text-3xl">Trips</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Manage your business travels and track expenses</p>
-        </div>
-        <Link href="/trips/new">
-          <Button className="w-full gap-2 sm:w-auto">
-            <Plus className="h-4 w-4" />
-            New Trip
-          </Button>
-        </Link>
-      </div>
+      <PageHeader
+        title="Trips"
+        description="Manage your business travels and track expenses"
+        actions={<Link href="/trips/new"><Button className="w-full gap-2 sm:w-auto"><Plus className="h-4 w-4" />New Trip</Button></Link>}
+      />
 
       {trips.length === 0 ? (
         <Card className="mt-8">

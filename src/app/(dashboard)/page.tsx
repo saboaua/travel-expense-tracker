@@ -219,9 +219,9 @@ export default async function DashboardPage() {
       {passportAlert && passportAlert.level !== "renew" && <PassportBalloon alert={passportAlert} />}
 
       {/* Active Trips */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
+      <Card className="max-md:border-0 max-md:bg-transparent max-md:shadow-none">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 max-md:px-0">
+          <div className="min-w-0 space-y-1">
             <CardTitle>Active Trips</CardTitle>
             <CardDescription>Your ongoing and upcoming travels. Completed trips are in Trips.</CardDescription>
           </div>
@@ -229,7 +229,7 @@ export default async function DashboardPage() {
             <Button variant="outline" size="sm">View all</Button>
           </Link>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 max-md:px-0">
           {activeTripsList.length === 0 ? (
             <div className="text-center py-8">
               <Plane className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
@@ -272,7 +272,7 @@ export default async function DashboardPage() {
                   <Link
                     key={trip.id}
                     href={`/trips/${trip.id}`}
-                    className="flex items-center justify-between gap-3 rounded-xl border p-4 transition-colors hover:bg-accent"
+                    className="flex items-center justify-between gap-3 rounded-xl border bg-card p-4 transition-colors hover:bg-accent"
                   >
                     <div className="min-w-0">
                       <p className="truncate font-semibold">{trip.name}</p>
@@ -285,12 +285,12 @@ export default async function DashboardPage() {
                       <p className="font-semibold">{formatCurrency(tripTotal, "USD")}</p>
                       <div className="flex justify-end gap-1.5">
                         {isPassed(trip) && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-300">
                             <Clock className="h-3 w-3" />
                             Passed
                           </span>
                         )}
-                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/50 dark:text-emerald-300">
                           active
                         </span>
                       </div>

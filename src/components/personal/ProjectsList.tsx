@@ -1,12 +1,13 @@
 "use client";
 
+import { BackLink } from "@/components/ui/page-header";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 import { Alert } from "@/components/ui/alert";
 import { useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft, Plus, Hammer, Plane, ChevronRight, CloudOff } from "lucide-react";
+import { Plus, Hammer, Plane, ChevronRight, CloudOff } from "lucide-react";
 import { KIND_META, type PersonalKind } from "@/lib/personal/constants";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchProjects, projectsKey, type ProjectRow } from "@/lib/offline-personal";
@@ -70,9 +71,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
 
   return (
     <div className="mx-auto max-w-6xl p-4 md:p-8 space-y-8">
-      <Link href="/personal" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> Personal
-      </Link>
+      <BackLink href="/personal">Personal</BackLink>
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">{meta.plural}</h1>

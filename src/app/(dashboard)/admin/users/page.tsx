@@ -1,5 +1,7 @@
 "use client";
 
+import { Tabs } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/ui/page-header";
 import { scrollAreaOrWindow } from "@/components/layout/ScrollArea";
 import { formatDateTime } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
@@ -168,7 +170,7 @@ export default function AdminUsersPage() {
 
   const roleBadge = (r: string) => {
     if (r === "admin") return "bg-indigo-100 text-indigo-700";
-    if (r === "assistant") return "bg-violet-100 text-violet-700";
+    if (r === "assistant") return "bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300";
     return "bg-slate-100 text-slate-600";
   };
 
@@ -182,25 +184,10 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold">User Roles &amp; Users</h1>
-        <p className="text-muted-foreground mt-1">Create accounts, choose each person&apos;s role, and decide what each role can use. Public signup is disabled.</p>
-      </div>
+      <PageHeader title="User Roles & Users" description="Create accounts, choose each person's role, and decide what each role can use. Public signup is disabled." />
 
       {canAssignRole(myRole) && (
-        <div role="tablist" className="inline-flex rounded-xl border bg-muted p-1">
-          {([["users", "Users"], ["roles", "Roles & access"]] as const).map(([id, label]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={tab === id}
-              onClick={() => setTab(id)}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <Tabs label="Users and roles" value={tab} onChange={(id) => setTab(id as typeof tab)} options={[{ id: "users", label: "Users" }, { id: "roles", label: "Roles & access" }]} />
       )}
 
       {tab === "roles" && canAssignRole(myRole) ? (
@@ -223,7 +210,7 @@ export default function AdminUsersPage() {
             A one-time temporary password is generated and expires after {TEMP_PASSWORD_TTL_HOURS} hours. The user must
             change it on first login. If it expires, generate a new one from the list below.
             {!canAssignRole(myRole) && (
-              <span className="block mt-1 text-amber-700">
+              <span className="block mt-1 text-amber-700 dark:text-amber-300">
                 As Assistant you can only create regular Users (not Admin or Assistant).
               </span>
             )}

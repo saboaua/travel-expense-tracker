@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { getBrand, iconHref, manifestHref } from "@/lib/brand-icon";
+import { brandCss } from "@/lib/brand-color";
 import { headers } from "next/headers";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -54,7 +55,7 @@ const themeScript = `
   // The one top-bar colour tag, for the screen's real theme (the page's own switch can differ from the phone's setting)
   var m = document.createElement('meta');
   m.setAttribute('name', 'theme-color');
-  m.setAttribute('content', dark ? '#020817' : '#4f46e5');
+  m.setAttribute('content', dark ? '#0b1020' : '#4f46e5');
   document.head.appendChild(m);
 })();
 `;
@@ -66,10 +67,13 @@ export default async function RootLayout({
 }>) {
   // Per-request nonce set by the middleware (Content-Security-Policy). This also makes every page dynamic.
   const nonce = (await headers()).get("x-nonce") ?? undefined;
+  const brand = await getBrand();
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <style dangerouslySetInnerHTML={{ __html: SPLASH_CSS }} />
+        {/* The one brand colour: buttons, links, the active menu item and charts all read these tokens */}
+        <style id="brand-vars" dangerouslySetInnerHTML={{ __html: brandCss(brand.primaryColor) }} />
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.className} antialiased`}>

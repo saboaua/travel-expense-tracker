@@ -41,7 +41,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-[420px]">
         <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl shadow-blue-900/5 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 p-8 sm:p-10">
           <div className="flex justify-center mb-6">
-            <div className="h-14 w-14 rounded-xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-600/30">
+            <div className="h-14 w-14 rounded-xl bg-primary flex items-center justify-center shadow-lg shadow-primary/30">
               <Plane className="h-7 w-7 text-white" strokeWidth={2} />
             </div>
           </div>
@@ -57,7 +57,7 @@ export default function ForgotPasswordPage() {
               </p>
               <Link
                 href="/login"
-                className="inline-flex items-center gap-2 text-sm font-medium text-indigo-600 hover:text-indigo-700 mt-4"
+                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 mt-4"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to sign in
@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                       autoComplete="email"
-                      className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500 transition-all"
+                      className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/40 focus:border-primary transition-all"
                     />
                   </div>
                 </div>
@@ -103,7 +103,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full h-11 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-medium text-sm transition-all disabled:opacity-60"
+                  className="w-full h-11 rounded-lg bg-primary hover:bg-primary/90 text-white font-medium text-sm transition-all disabled:opacity-60"
                 >
                   {loading ? "Sending..." : "Send reset link"}
                 </button>

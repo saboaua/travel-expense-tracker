@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { formatDateTime } from "@/lib/utils";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
@@ -7,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { LifeBuoy, Mail, Check, Trash2, RotateCcw, RefreshCw } from "lucide-react";
+import { Mail, Check, Trash2, RotateCcw, RefreshCw } from "lucide-react";
 import { SUPPORT_REQUEST_COLS } from "@/lib/columns";
 
 type SupportRequest = {
@@ -72,13 +73,7 @@ export default function AdminSupportPage() {
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-          <LifeBuoy className="h-7 w-7" />
-          Support Requests
-        </h1>
-        <p className="text-muted-foreground mt-1">Messages sent from the Contact Support form on the login screen.</p>
-      </div>
+      <PageHeader title="Support Requests" description={<>Messages sent from the Contact Support form on the login screen.</>} />
 
       {error && <Alert>{error}</Alert>}
 

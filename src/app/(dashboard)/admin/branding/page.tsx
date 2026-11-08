@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { applyBrandColor } from "@/lib/brand-color";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -127,6 +129,7 @@ export default function AdminBrandingPage() {
       if (err) throw err;
 
       document.documentElement.style.setProperty("--brand-primary", primaryColor);
+      applyBrandColor(primaryColor);
 
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -144,15 +147,7 @@ export default function AdminBrandingPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-          <Palette className="h-7 w-7" />
-          Branding
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Logo and colors shown on login and in the app header
-        </p>
-      </div>
+      <PageHeader title="Branding" description={<>Logo and colors shown on login and in the app header</>} />
 
       <form onSubmit={handleSave} className="space-y-6">
       <AccordionGroup>

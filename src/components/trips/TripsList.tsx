@@ -1,5 +1,6 @@
 "use client";
 
+import { Tabs } from "@/components/ui/tabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -224,23 +225,7 @@ export function TripsList({ trips: saved, today }: { trips: ListTrip[]; today: s
       </div>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div role="tablist" aria-label="Trip filter" className="inline-flex rounded-xl border bg-muted/50 p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.id}
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors sm:flex-none",
-                tab === t.id ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              {t.label} <span className="ml-1 text-xs opacity-70">{t.count}</span>
-            </button>
-          ))}
-        </div>
+        <Tabs label="Trip filter" value={tab} onChange={(id) => setTab(id as typeof tab)} options={tabs.map((t) => ({ id: t.id, label: t.label, count: t.count }))} />
 
         <div className="relative sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />

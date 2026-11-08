@@ -332,7 +332,7 @@ try {
         assert(dark ? lum(r.title) > 200 : lum(r.title) < 60, `${path} ${scheme}: heading colour ${r.title}`);
         assert(dark ? lum(r.body) < 60 : lum(r.body) > 240, `${path} ${scheme}: page colour ${r.body}`);
         assert(r.bar.length === 1, `${path} ${scheme}: exactly one theme-color tag (got ${JSON.stringify(r.bar)})`);
-        assert(r.bar[0] === (dark ? "#020817" : "#4f46e5"), `${path} ${scheme}: top bar colour ${r.bar[0]}`);
+        assert(r.bar[0] === (dark ? "#0b1020" : "#4f46e5"), `${path} ${scheme}: top bar colour ${r.bar[0]}`);
       }
       await ctx.close();
     }
@@ -1335,13 +1335,24 @@ try {
     for (const n of ["Bot setup", "How this is set up"]) assert(!(await expanded(admin.page, n)), `Telegram setup: ${n} should start closed`);
   });
 
-  await test("weather lives inside the welcome card on both views", async () => {
+  await test("weather lives inside the welcome card on both views, and takes no room when there is none", async () => {
+    const wait = () => admin.page.waitForResponse((r) => r.url().includes("/api/weather"));
+    const welcome = () => admin.page.locator("div.rounded-xl", { has: admin.page.getByRole("heading", { level: 1 }) }).first();
+    // No weather service in the test setup: nothing is shown, not even an "unavailable" panel
+    const first = wait();
     await admin.page.goto(`${BASE}/`);
-    const card = admin.page.locator("div.rounded-xl", { has: admin.page.getByRole("heading", { level: 1 }) }).first();
-    await card.getByText(/Weather unavailable|°/).first().waitFor(); // no weather service in the test setup, so the fallback text shows
+    await first;
+    await admin.page.waitForTimeout(300);
+    assert((await welcome().getByText(/Weather unavailable|°/).count()) === 0, "an empty weather panel is taking room on the welcome card");
+    // With weather, it sits inside the welcome card on both views
+    await admin.page.route("**/api/weather**", (r) => r.fulfill({ json: { city: "Oranjestad", countryCode: "AW", tempC: 30, code: 1, isDay: true, rainChance: 10 } }));
+    await admin.page.evaluate(() => { try { sessionStorage.clear(); } catch { /* ignore */ } });
+    await admin.page.goto(`${BASE}/`);
+    await welcome().getByText(/°/).first().waitFor();
     await admin.page.getByRole("tab", { name: "Personal" }).click();
-    assert(await card.getByText(/Weather unavailable|°/).first().isVisible(), "weather disappeared on the Personal view");
+    assert(await welcome().getByText(/°/).first().isVisible(), "weather disappeared on the Personal view");
     await admin.page.getByRole("tab", { name: "Business" }).click();
+    await admin.page.unroute("**/api/weather**");
   });
 
   await test("admin: the Personal view of the home page opens", async () => {

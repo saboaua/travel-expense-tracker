@@ -16,7 +16,7 @@ export const startupImages = DEVICES.map(([w, h, r]) => ({
  * nothing, or a black screen, until the stylesheet has downloaded; inline CSS lets the white screen paint with the
  * very first bytes of HTML. The white page colour only applies when launched from the home screen.
  */
-export const SPLASH_CSS = `@media all and (display-mode: standalone), all and (display-mode: fullscreen) { html { background: #ffffff; } html.dark { background: #020817; } }
+export const SPLASH_CSS = `@media all and (display-mode: standalone), all and (display-mode: fullscreen) { html { background: #ffffff; } html.dark { background: #0b1020; } }
 #app-splash {
   display: none;
 }
@@ -63,7 +63,7 @@ export const SPLASH_CSS = `@media all and (display-mode: standalone), all and (d
   to { opacity: 0; visibility: hidden; }
 }
 @media all and (display-mode: standalone), all and (display-mode: fullscreen) {
-  html.dark #app-splash { background: #020817; }
+  html.dark #app-splash { background: #0b1020; }
   html.dark .app-splash-dots i { background: #818cf8; }
 }
 @media (prefers-reduced-motion: reduce) {

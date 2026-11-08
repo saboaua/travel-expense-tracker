@@ -1,12 +1,13 @@
 "use client";
 
+import { BackLink } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, ChevronLeft, ChevronRight, CloudOff, Plus, TrendingUp, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Plus, TrendingUp, ShoppingCart } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
@@ -79,7 +80,7 @@ export function GroceryOverview() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-28 md:p-8">
-      <Link href="/personal" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Personal</Link>
+      <BackLink href="/personal">Personal</BackLink>
 
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>

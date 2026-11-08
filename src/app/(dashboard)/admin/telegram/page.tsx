@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { Send, BookOpen } from "lucide-react";
@@ -67,15 +68,7 @@ export default function AdminTelegramPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-          <Send className="h-7 w-7" />
-          Telegram
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Connect the bot here. Nothing needs to be set in Vercel.
-        </p>
-      </div>
+      <PageHeader title="Telegram" description={<>Connect the bot here. Nothing needs to be set in Vercel.</>} />
 
       <AccordionGroup>
       <AccordionSection

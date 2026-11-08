@@ -1,5 +1,7 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
+import { Tabs } from "@/components/ui/tabs";
 import { useState } from "react";
 import { ShoppingBasket, Tag } from "lucide-react";
 import { CategoryManager } from "@/components/admin/category-manager";
@@ -14,27 +16,9 @@ export default function AdminCategoriesPage() {
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
-      <div>
-        <h1 className="text-2xl md:text-3xl font-bold flex items-center gap-2">
-          <Tag className="h-7 w-7" />
-          Receipt Categories
-        </h1>
-        <p className="text-muted-foreground mt-1">Edit, reorder or create the categories offered on each kind of receipt.</p>
-      </div>
+      <PageHeader title="Receipt Categories" description={<>Edit, reorder or create the categories offered on each kind of receipt.</>} />
 
-      <div role="tablist" className="inline-flex rounded-xl border bg-muted p-1">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            aria-selected={tab === t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition ${tab === t.id ? "bg-background shadow-sm" : "text-muted-foreground"}`}
-          >
-            {t.label}
-          </button>
-        ))}
-      </div>
+      <Tabs label="Category groups" value={tab} onChange={(id) => setTab(id as typeof tab)} options={TABS.map((t) => ({ id: t.id, label: t.label }))} />
 
       {tab === "travel" ? (
         <CategoryManager

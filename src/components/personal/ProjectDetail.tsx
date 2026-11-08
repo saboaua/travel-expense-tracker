@@ -1,5 +1,6 @@
 "use client";
 
+import { BackLink } from "@/components/ui/page-header";
 import { ShareWith } from "@/components/sharing/ShareWith";
 import { useConfirm } from "@/components/ui/confirm";
 import { useMemo, useState } from "react";
@@ -8,7 +9,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw, CloudOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw, CloudOff } from "lucide-react";
 import { KIND_META, type PersonalExpense, type PersonalKind } from "@/lib/personal/constants";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { Bars } from "@/components/personal/Bars";
@@ -97,9 +98,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
 
   return (
     <div className="mx-auto max-w-4xl p-4 md:p-8 pb-28 space-y-6">
-      <Link href={meta.path} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" /> {meta.plural}
-      </Link>
+      <BackLink href={meta.path}>{meta.plural}</BackLink>
       <OfflineNotice savedAt={savedAt} writable />
       {error && <p className="text-sm text-red-600">{error}</p>}
 

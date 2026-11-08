@@ -1,5 +1,6 @@
 "use client";
 
+import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -63,10 +64,7 @@ export default function PersonalHubPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-8">
-      <div className="border-b pb-6">
-        <h1 className="text-2xl font-bold md:text-3xl">Personal</h1>
-        <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" /> Only you can see this. It is kept separate from business trips and reports.</p>
-      </div>
+      <PageHeader title="Personal" description={<span className="inline-flex items-center gap-1.5"><Lock className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> Only you can see this. It is kept separate from business trips and reports.</span>} />
       <div className="grid gap-4 sm:grid-cols-2">
         {tiles.map((t) => (
           <Link key={t.href} href={t.href} className="group block">

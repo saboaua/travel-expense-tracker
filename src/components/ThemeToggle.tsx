@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 const KEY = "theme";
 
 /** Dark page background (matches --background in globals.css) and the brand colour the light theme has always used for the top bar */
-const BAR = { dark: "#020817", light: "#4f46e5" } as const;
+const BAR = { dark: "#0b1020", light: "#4f46e5" } as const;
 
 function apply(theme: "light" | "dark") {
   document.documentElement.classList.toggle("dark", theme === "dark");

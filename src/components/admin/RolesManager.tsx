@@ -157,7 +157,7 @@ export function RolesManager({ onChanged }: { onChanged?: () => void }) {
   if (loading) return <p className="text-sm text-muted-foreground">Loading roles…</p>;
   if (setupNeeded) {
     return (
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/50 dark:text-amber-100">
         <p className="font-semibold">One-time setup needed</p>
         <p className="mt-1">{setupNeeded}</p>
       </div>

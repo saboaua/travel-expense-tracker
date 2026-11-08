@@ -1,17 +1,17 @@
 "use client";
 
+import { BackLink } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryButtons } from "@/components/ui/category-buttons";
-import { ArrowLeft, FileText, Trash2, X } from "lucide-react";
+import { FileText, Trash2, X } from "lucide-react";
 import { DOC_KINDS, type DocKind } from "@/lib/documents";
 import { DOC_ACCEPT, DOC_BUCKET } from "@/lib/document-upload";
 import { makeDocumentApi, saveDocument } from "@/lib/document-outbox";
@@ -165,10 +165,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
 
   return (
     <div className="mx-auto max-w-xl p-4 pb-28 md:p-8">
-      <Link href={tripId ? `/trips/${tripId}` : "/trips"} className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" />
-        {tripId ? "Back to trip" : "Back to trips"}
-      </Link>
+      <BackLink href={tripId ? `/trips/${tripId}` : "/trips"} className="mb-6">{tripId ? "Trip" : "Trips"}</BackLink>
 
       <Card className="rounded-xl">
         <CardHeader>
@@ -274,10 +271,10 @@ export function TripForm({ tripId }: { tripId?: string }) {
               </Button>
 
               {editing && (
-                <div className="mt-2 rounded-xl border border-red-200 bg-red-50/40 p-4">
-                  <p className="text-sm font-medium text-red-700">Danger zone</p>
+                <div className="mt-2 rounded-xl border border-red-200 bg-red-50/40 p-4 dark:border-red-900/60 dark:bg-red-950/50">
+                  <p className="text-sm font-medium text-red-700 dark:text-red-300">Danger zone</p>
                   <p className="mb-3 mt-1 text-xs text-muted-foreground">Deleting removes the trip, all of its expenses, receipt photos and documents.</p>
-                  <Button type="button" variant="outline" className="gap-2 border-red-200 text-red-600 hover:bg-red-50" disabled={saving} onClick={remove}>
+                  <Button type="button" variant="outline" className="gap-2 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/60" disabled={saving} onClick={remove}>
                     <Trash2 className="h-4 w-4" /> Delete trip
                   </Button>
                 </div>

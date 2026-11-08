@@ -13,8 +13,8 @@ export function CredentialsPanel({ credentials }: { credentials: Credentials }) 
   const [copied, setCopied] = useState(false);
 
   return (
-    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3">
-      <p className="text-sm font-medium text-amber-900">
+    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 space-y-3 dark:border-amber-900/60 dark:bg-amber-950/50">
+      <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
         Share these credentials securely. The password is shown only once.
       </p>
       <div className="bg-white rounded-xl border p-3 font-mono text-sm space-y-1 break-all">
@@ -25,7 +25,7 @@ export function CredentialsPanel({ credentials }: { credentials: Credentials }) 
           <span className="text-muted-foreground">Temp password:</span> {credentials.password}
         </p>
       </div>
-      <p className="text-sm text-amber-900 flex items-center gap-1.5">
+      <p className="text-sm text-amber-900 flex items-center gap-1.5 dark:text-amber-100">
         <Clock className="h-4 w-4" />
         Valid until {fmt(credentials.expiresAt)} ({TEMP_PASSWORD_TTL_HOURS} hours). It can be used once to set a new password.
       </p>
