@@ -1378,6 +1378,43 @@ try {
     }
   }
 
+  // Design audit: E2E_AUDIT=<dir> saves screenshots of the main screens with realistic data (desktop and phone, light and dark)
+  if (process.env.E2E_AUDIT) {
+    const dir = process.env.E2E_AUDIT;
+    const now = new Date().toISOString();
+    const cats = ["Meals", "Transport", "Lodging", "Meals", "Other", "Transport"];
+    const merchants = ["Trip Cafe", "Uber", "Marriott Downtown", "Shake Shack", "Staples", "Delta Air Lines"];
+    merchants.forEach((m, i) => fake.table("expenses").push({ id: `aa000000-0000-4000-8000-00000000010${i}`, trip_id: TRIP_ID, user_id: PAT, merchant: m, amount: [18.4, 5.45, 412, 24.9, 36.1, 289][i], currency: "USD", exchange_rate: 1, amount_usd: [18.4, 5.45, 412, 24.9, 36.1, 289][i], category: cats[i], expense_date: addDays(today, -i % 3), notes: null, receipt_path: null, created_at: now }));
+    fake.table("trips").push({ id: "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c4e", user_id: PAT, name: "Bogota Summit", destination: "Bogota", category: "Business", start_date: addDays(today, 12), end_date: addDays(today, 16), currency: "USD", status: "active", notes: null, created_at: now });
+    fake.table("personal_projects").push({ id: "bb000000-0000-4000-8000-000000000001", user_id: PAT, kind: "personal_trip", name: "Beach Week", destination: "Punta Cana", start_date: addDays(today, 30), end_date: addDays(today, 36), status: "active", created_at: now }, { id: "bb000000-0000-4000-8000-000000000002", user_id: PAT, kind: "home_project", name: "Kitchen refresh", destination: null, start_date: addDays(today, -5), end_date: null, status: "active", created_at: now });
+    fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000009aa", user_id: PAT, kind: "passport", title: "Passport", issuing_country: "Aruba", document_number: "P1", expiry_date: addDays(today, 150), trip_id: null, file_path: null, created_at: now });
+    const pages = [["home", "/"], ["trips", "/trips"], ["trip", `/trips/${TRIP_ID}`], ["new-trip", "/trips/new"], ["reports", "/reports"], ["personal", "/personal"], ["documents", "/documents"], ["loyalty", "/personal/loyalty"], ["profile", "/profile"], ["help", "/help"]];
+    const adminPages = [["admin-security", "/admin/security"], ["admin-branding", "/admin/branding"], ["admin-users", "/admin/users"]];
+    const modes = [["desktop-light", { viewport: { width: 1280, height: 860 }, colorScheme: "light" }], ["phone-light", { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, colorScheme: "light" }], ["phone-dark", { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, colorScheme: "dark" }]];
+    for (const [mode, opts] of modes) {
+      for (const [who, email, pw, list] of [["u", "pat@example.com", "Correct-Horse-1", pages], ["a", "admin@example.com", "Admin-Pass-123", adminPages]]) {
+        if (who === "a" && mode === "phone-dark") continue;
+        const ctx = await browser.newContext(opts);
+        ctx.setDefaultTimeout(60_000);
+        const pg = await ctx.newPage();
+        await signIn(pg, email, pw);
+        await pg.waitForURL((u) => u.pathname === "/");
+        for (const [name, path] of list) {
+          await pg.goto(`${BASE}${path}`).catch(() => {});
+          await pg.waitForLoadState("networkidle").catch(() => {});
+          if (process.env.E2E_AUDIT_FONT) {
+            const b64 = (await import("node:fs")).readFileSync(process.env.E2E_AUDIT_FONT).toString("base64");
+            await pg.addStyleTag({ content: `@font-face{font-family:AuditInter;font-weight:100 900;src:url(data:font/woff2;base64,${b64}) format("woff2")} html,body,button,input,select,textarea{font-family:AuditInter,system-ui,sans-serif !important}` });
+            await pg.evaluate(() => document.fonts.ready);
+          }
+          await pg.waitForTimeout(500);
+          await pg.screenshot({ path: `${dir}/${mode}-${name}.png` });
+        }
+        await ctx.close();
+      }
+    }
+  }
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {
