@@ -1171,18 +1171,23 @@ try {
     await d.page.getByRole("link", { name: "Help" }).first().click();
     await d.page.waitForURL((u) => u.pathname === "/help");
     await d.page.getByText("Add the app to your home screen").first().waitFor();
-    await d.page.getByText("Choose a topic").waitFor();
+    assert((await d.page.getByRole("button", { name: /Add the app to your home screen/ }).getAttribute("aria-expanded")) === "false", "topics start closed on desktop");
     await shot(d.page, "help-1-desktop-list");
-    await d.page.getByRole("link", { name: /Add the app to your home screen/ }).click();
+    await d.page.getByRole("button", { name: /Add the app to your home screen/ }).click();
     await d.page.waitForURL((u) => u.pathname === "/help/add-to-home-screen");
+    assert((await d.page.getByRole("button", { name: /Add the app to your home screen/ }).getAttribute("aria-expanded")) === "true", "the clicked topic opens in place");
     await d.page.getByRole("heading", { name: "iPhone and iPad" }).waitFor();
     assert((await d.page.getByText("Add to Home Screen").count()) >= 1, "step text missing");
-    assert(await d.page.getByText("Add the app to your home screen").first().isVisible(), "the list should stay beside the topic on desktop");
+    assert(await d.page.getByRole("button", { name: /Share with a partner/ }).isVisible(), "the other topics stay in the list under the open one");
     assert((await d.page.getByRole("link", { name: "Edit this topic" }).count()) === 0, "a plain user must not see Edit");
     await shot(d.page, "help-2-desktop-topic");
+    await d.page.getByRole("button", { name: /Share with a partner/ }).click();
+    assert((await d.page.getByRole("button", { name: /Add the app to your home screen/ }).getAttribute("aria-expanded")) === "false", "opening another topic closes the first");
+    await d.page.getByRole("button", { name: /Share with a partner/ }).click();
+    await d.page.waitForURL((u) => u.pathname === "/help");
     await d.page.getByLabel("Search help").fill("trip");
-    await d.page.getByText("Share with a partner").first().waitFor();
-    assert((await d.page.getByRole("link", { name: /Add the app to your home screen/ }).count()) === 0, "search should hide other topics");
+    await d.page.getByRole("button", { name: /Share with a partner/ }).waitFor();
+    assert((await d.page.getByRole("button", { name: /Add the app to your home screen/ }).count()) === 0, "search should hide other topics");
     await d.page.getByLabel("Search help").fill("zzzz");
     await d.page.getByText(/Nothing found/).waitFor();
     // a plain user can not open the editor
@@ -1199,8 +1204,8 @@ try {
     await page.getByRole("button", { name: "Menu" }).click();
     await page.getByRole("link", { name: "Help" }).click();
     await page.waitForURL((u) => u.pathname === "/help");
-    await page.getByText("Share with a partner").first().waitFor();
-    assert((await page.getByText("Choose a topic").isVisible()) === false, "the desktop hint must not show on a phone");
+    await page.getByRole("link", { name: /Share with a partner/ }).waitFor();
+    assert((await page.getByRole("button", { name: /Share with a partner/ }).count()) === 0, "the desktop accordion must not show on a phone");
     await shot(page, "help-3-phone-list");
     await page.getByRole("link", { name: /Share with a partner/ }).click();
     await page.getByRole("heading", { name: "Share with a partner", level: 1 }).waitFor();
@@ -1252,9 +1257,10 @@ try {
     assert(fake.table("help_topics").find((r) => r.slug === "reset-your-password").published === false, "draft switch not saved");
     // the page shows the markup as text, never as HTML
     await admin.page.goto(`${BASE}/help/reset-your-password`);
-    await admin.page.getByRole("heading", { name: "Reset your password", level: 1 }).waitFor();
-    assert((await admin.page.locator("article b").count()) === 0, "HTML in a topic must not become real markup");
-    assert((await admin.page.getByText("<b>not html</b>").count()) === 1, "HTML should show as plain text");
+    await admin.page.locator("#help-head-reset-your-password").waitFor();
+    assert((await admin.page.locator("#help-head-reset-your-password").getAttribute("aria-expanded")) === "true", "the topic from the address is open");
+    assert((await admin.page.locator("[role=region] b").count()) === 0, "HTML in a topic must not become real markup");
+    assert((await admin.page.getByText("<b>not html</b>").filter({ visible: true }).count()) === 1, "HTML should show as plain text");
     await admin.page.getByRole("link", { name: "Edit this topic" }).waitFor();
     await admin.page.goto(`${BASE}/admin/help`);
     await admin.page.getByRole("region", { name: "Account" }).getByRole("button", { name: "Delete Reset your password", exact: true }).click();

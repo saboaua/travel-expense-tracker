@@ -2,21 +2,33 @@
 
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
 import { groupByCategory, searchTopics } from "@/lib/help";
 import { HelpProvider, useHelp } from "@/lib/use-help";
+import { HelpAccordion } from "@/components/help/HelpAccordion";
+import { useAccess } from "@/lib/use-access";
 
 function Shell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { topics, loading, error } = useHelp();
   const [query, setQuery] = useState("");
+  const router = useRouter();
+  const { perms } = useAccess();
   const onArticle = pathname !== "/help";
   const active = decodeURIComponent(pathname.split("/")[2] || "");
+  // Desktop: the topic that is open in the list. It follows the address, so a link to a topic opens it.
+  const [open, setOpen] = useState(active);
+  useEffect(() => setOpen(active), [active]);
+  const toggle = (slug: string) => {
+    const next = open === slug ? "" : slug;
+    setOpen(next);
+    router.replace(next ? `/help/${encodeURIComponent(next)}` : "/help", { scroll: false });
+  };
 
   const results = useMemo(() => searchTopics(topics, query), [topics, query]);
   const groups = useMemo(() => groupByCategory(results), [results]);
@@ -44,6 +56,10 @@ function Shell({ children }: { children: React.ReactNode }) {
         )}
       </div>
 
+      {searching && !loading && !error && groups.length > 0 && (
+        <p className="hidden text-sm text-muted-foreground md:block" role="status">{results.length} topic{results.length !== 1 ? "s" : ""} match “{query.trim()}”</p>
+      )}
+
       {loading ? (
         <div className="space-y-2" aria-busy="true">{[0, 1, 2].map((i) => <div key={i} className="h-14 animate-pulse rounded-xl bg-muted" />)}</div>
       ) : error === "missing" ? (
@@ -53,7 +69,12 @@ function Shell({ children }: { children: React.ReactNode }) {
       ) : groups.length === 0 ? (
         <p className="py-8 text-center text-sm text-muted-foreground">{searching ? `Nothing found for “${query.trim()}”.` : "There are no help topics yet."}</p>
       ) : (
-        groups.map((g) => (
+        <>
+        <div className="hidden md:block">
+          <HelpAccordion groups={groups} openSlug={open} onToggle={toggle} query={query} canEdit={perms.has("help.manage")} />
+        </div>
+        <div className="space-y-5 md:hidden">
+        {groups.map((g) => (
           <section key={g.category} aria-label={g.category}>
             <h2 className="mb-2 px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">{g.category}</h2>
             <ul className="overflow-hidden rounded-xl border bg-card">
@@ -77,18 +98,20 @@ function Shell({ children }: { children: React.ReactNode }) {
               })}
             </ul>
           </section>
-        ))
+        ))}
+        </div>
+        </>
       )}
     </div>
   );
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 pb-24 md:p-8">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 pb-24 md:max-w-[54rem] md:p-8">
       <PageHeader className={cn(onArticle && "hidden md:flex")} title="Help" description="Short guides for getting the most out of the app." />
-      <div className="md:grid md:grid-cols-[19rem_minmax(0,1fr)] md:items-start md:gap-8">
-        {/* Phone: the list OR the topic, one at a time. Desktop: both side by side. */}
-        <nav aria-label="Help topics" className={cn("md:sticky md:top-6 md:max-h-[calc(100vh-8rem)] md:overflow-y-auto md:pr-1", onArticle && "hidden md:block")}>{list}</nav>
-        <div className={cn("min-w-0", !onArticle && "hidden md:block")}>{children}</div>
+      <div>
+        {/* Phone: the list OR the topic, one at a time. Desktop: one list whose topics open in place. */}
+        <nav aria-label="Help topics" className={cn(onArticle && "hidden md:block")}>{list}</nav>
+        <div className={cn("min-w-0 md:hidden", !onArticle && "hidden")}>{children}</div>
       </div>
     </div>
   );
