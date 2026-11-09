@@ -8,7 +8,17 @@ import { ClientSubscription } from "@/components/iptv/ClientSubscription";
 
 export const dynamic = "force-dynamic";
 // A private link: keep it out of search engines and do not pass it on in the Referer header
-export const metadata: Metadata = { title: "My subscriptions", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params;
+  const valid = /^[0-9a-f]{32,64}$/i.test(token);
+  return {
+    title: "My subscriptions",
+    robots: { index: false, follow: false },
+    referrer: "no-referrer",
+    // Adding the page to the Home Screen keeps this link, not the sign-in page
+    ...(valid ? { manifest: `/api/manifest?s=${token}`, appleWebApp: { capable: true, title: "My IPTV", statusBarStyle: "default" as const } } : {}),
+  };
+}
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (

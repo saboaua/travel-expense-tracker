@@ -14,13 +14,17 @@ export async function GET(request: Request) {
   // Android crops a maskable icon, so it gets its own copy with room around the logo
   const maskableIcon = iconHref(logoUrl, 512, true);
 
+  // A client's private link installs as its own app: it opens that link, not the sign-in page
+  const token = new URL(request.url).searchParams.get("s") || "";
+  const clientLink = /^[0-9a-f]{32,64}$/i.test(token) ? `/s/${token}` : null;
+
   const manifest = {
-    name,
-    short_name: "Lifolio",
+    name: clientLink ? "My subscriptions" : name,
+    short_name: clientLink ? "My IPTV" : "Lifolio",
     description: "Scan receipts, track business travel expenses, and generate reports",
-    id: "/",
-    start_url: "/",
-    scope: "/",
+    id: clientLink ?? "/",
+    start_url: clientLink ?? "/",
+    scope: clientLink ?? "/",
     display: "standalone",
     display_override: ["standalone"],
     background_color: "#ffffff",
@@ -53,7 +57,7 @@ export async function GET(request: Request) {
   return NextResponse.json(manifest, {
     headers: {
       "Content-Type": "application/manifest+json",
-      "Cache-Control": versioned ? "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800" : "public, max-age=300, s-maxage=300",
+      "Cache-Control": clientLink ? "private, no-store" : versioned ? "public, max-age=86400, s-maxage=86400, stale-while-revalidate=604800" : "public, max-age=300, s-maxage=300",
     },
   });
 }

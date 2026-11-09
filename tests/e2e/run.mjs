@@ -1643,6 +1643,12 @@ try {
     for (const secret of ["00:1A:79", "48213", "A-20418", "J17454B8498X", "Lopez"]) assert(!text.includes(secret), `the public page hides ${secret}`);
     assert(text.includes("Basic") && text.includes("Premium · MAG 524"), "both subscriptions are on the one link");
     assert(text.includes("2 subscriptions"), "the page says how many");
+    // Added to the Home Screen it must open this link, not the sign-in page
+    const href = await visitor.page.locator('link[rel="manifest"]').getAttribute("href");
+    const m = await (await visitor.page.request.get(`${BASE}${href}`)).json();
+    const path = new URL(link).pathname;
+    assert(m.start_url === path && m.scope === path && m.id === path, "the installed app starts on the client link");
+    assert((await (await visitor.page.request.get(`${BASE}/api/manifest?s=nothex`)).json()).start_url === "/", "a made-up value falls back to the normal app");
 
     // Kill switch: every client view stops at once
     await page.goto(`${BASE}/admin/iptv`);
