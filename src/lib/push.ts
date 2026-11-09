@@ -39,7 +39,7 @@ export function validSubscription(s: unknown): s is { endpoint: string; keys: { 
 }
 
 export type PushReason = "ok" | "not_configured" | "no_database" | "no_devices" | "rejected" | "error";
-export type PushResult = { sent: number; reason: PushReason; devices: number; status?: number };
+export type PushResult = { sent: number; reason: PushReason; devices: number; status?: number; detail?: string };
 
 /**
  * Sends one alert to every device a person turned on and says why nothing arrived. Never throws: a failed alert must not fail the action that caused it.
@@ -56,7 +56,7 @@ export async function sendPushDetailed(userId: string | null | undefined, kind: 
       if (!prefs[pref]) return { sent: 0, reason: "ok", devices: 0 };
     }
     const { data: subs, error: subsError } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId).limit(10);
-    if (subsError) { console.error("[push] devices", subsError.message); return { sent: 0, reason: "error", devices: 0 }; }
+    if (subsError) { console.error("[push] devices", subsError.message); return { sent: 0, reason: "error", devices: 0, detail: subsError.message.slice(0, 160) }; }
     if (!subs?.length) return { sent: 0, reason: "no_devices", devices: 0 };
     webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
     const payload = JSON.stringify({ ...PUSH_TEXT[kind], url: PUSH_URL[kind] ?? "/profile", tag: kind });
