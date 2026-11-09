@@ -17,7 +17,7 @@ function testFailure(httpStatus: number | undefined, d: { reason?: string; statu
   if (d.reason === "no_database") return "The server cannot reach its database for alerts (the service key is missing).";
   if (d.reason === "no_devices") return "The server has no saved device for you. Turn alerts off and on again to save this device.";
   if (d.reason === "rejected") return `The phone's alert service refused the message${d.status ? ` (code ${d.status})` : ""}. Turn alerts off and on again; if it repeats, the push keys on the server may not match.`;
-  if (d.reason === "error") return `The server could not send the alert: ${d.detail || "unknown error"}. ${/vapid/i.test(d.detail || "") ? "The push keys in Vercel (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT) are not valid." : ""}`.trim();
+  if (d.reason === "error") return `The server could not send the alert: ${d.detail || "unknown error"}. ${/^vapid /i.test(d.detail || "") ? "The push keys in Vercel (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT) are not valid." : ""}`.trim();
   return "Nothing was sent. Please try again.";
 }
 
