@@ -77,8 +77,9 @@ export async function sendPushDetailed(userId: string | null | undefined, kind: 
     );
     return { sent, reason: sent > 0 ? "ok" : "rejected", devices: subs.length, status };
   } catch (e) {
-    console.error("[push]", e instanceof Error ? e.message : e);
-    return { sent: 0, reason: "error", devices: 0 };
+    const message = e instanceof Error ? e.message : String(e);
+    console.error("[push]", message);
+    return { sent: 0, reason: "error", devices: 0, detail: message.slice(0, 160) };
   }
 }
 
