@@ -1049,6 +1049,19 @@ try {
     assert(JSON.stringify(Object.keys(tripsJson.body.trips[0]).sort()) === JSON.stringify(["destination", "end_date", "kind", "name", "share_id", "shared_by", "start_date", "trip_id"]), "the trip has exactly these fields");
     assert(!/SECRET|987\.65|receipt/.test(JSON.stringify(tripsJson.body)), "no expense, note or receipt in the trip answer");
 
+    // 7b. Alice's history shows that Bob opened the card and the trip (and nobody else can read it)
+    await b.page.waitForTimeout(500);
+    const hist = (await api(a.page, "/api/sharing/activity?filter=views")).body;
+    assert(hist.items.some((i) => i.kind === "view" && /Greenfield/.test(i.item || "")), "Alice's history has Bob opening the card");
+    assert(hist.items.some((i) => i.kind === "view" && /Lisbon Summit/.test(i.item || "")), "Alice's history has Bob viewing the trip");
+    assert((await api(b.page, "/api/sharing/activity?filter=views")).body.items.length === 0, "Bob's own history has none of that");
+    assert((await api(c.page, "/api/sharing/activity")).body.items.length === 0, "a stranger's history is empty");
+    assert((await post(c.page, "/api/sharing/view", { kind: "trip", item_id: ATRIP })).status === 404, "a stranger cannot log a view of someone's trip");
+    await a.page.goto(`${BASE}/profile/sharing-activity`);
+    await a.page.getByTestId("activity-row").first().waitFor();
+    assert(/Bob opened your card|viewed the trip/.test(await a.page.getByTestId("sharing-activity").innerText()), "the history page says who looked at what");
+    await shot(a.page, "share-7b-activity");
+
     // 8. A stranger gets nothing, and a role without the option is refused
     assert((await api(c.page, "/api/sharing/loyalty")).body.cards.length === 0, "Carol sees no cards");
     assert((await api(c.page, "/api/sharing/trips")).body.trips.length === 0, "Carol sees no trips");
@@ -1276,6 +1289,42 @@ try {
     await sam.page.goto(`${BASE}/admin/help`);
     await sam.page.getByRole("heading", { name: "Help topics" }).waitFor();
     await sam.ctx.close();
+  });
+
+  await test("profile: Notifications says when alerts are not set up, and Your data prepares a ZIP and schedules a deletion that can be cancelled", async () => {
+    fake.table("account_deletions"); // this install has run migration_sharing_safety.sql
+    const d = await newPage();
+    await signIn(d.page, "pat@example.com", "Correct-Horse-1");
+    await d.page.waitForURL((u) => u.pathname === "/");
+    await d.page.goto(`${BASE}/profile#notifications`);
+    const card = d.page.getByTestId("notifications-card");
+    await card.waitFor();
+    await card.getByText(/not set up on the server/).waitFor();
+    assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
+    assert((await card.getByRole("switch").count()) === 4, "device switch plus three kinds of alert");
+    const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
+    assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
+    await d.page.goto(`${BASE}/profile#your-data`);
+    const data = d.page.getByTestId("your-data");
+    await data.waitFor();
+    await data.getByRole("button", { name: "Prepare my download" }).click();
+    await data.getByText("Your export is ready.").waitFor();
+    assert((await data.getByRole("link", { name: /Download/ }).getAttribute("download")).endsWith(".zip"), "a ZIP is offered");
+    await data.getByRole("button", { name: "Delete my account…" }).click();
+    const dlg = d.page.getByRole("dialog", { name: "Delete your account?" });
+    await dlg.waitFor();
+    const go = dlg.getByRole("button", { name: "Schedule deletion" });
+    assert(!(await go.isEnabled()), "deletion cannot be scheduled before the email is typed");
+    await dlg.getByTestId("delete-confirm-email").fill("wrong@example.com");
+    assert(!(await go.isEnabled()), "the wrong email does not unlock it");
+    await dlg.getByTestId("delete-confirm-email").fill("pat@example.com");
+    await go.click();
+    await data.getByText(/Deletion on|will be deleted on/).first().waitFor({ timeout: 8000 }).catch(async (e) => { throw new Error(`${e.message.split("\n")[0]} | dialog says: ${await d.page.getByRole("dialog").innerText().catch(() => "(closed)")}`); });
+    assert(fake.table("account_deletions").length === 1 && fake.table("account_deletions")[0].user_id === PAT, "one deletion row, for this person only");
+    await data.getByRole("button", { name: "Cancel deletion" }).click();
+    await data.getByRole("button", { name: "Delete my account…" }).waitFor();
+    assert(fake.table("account_deletions").length === 0, "cancelling removes the row");
+    await d.ctx.close();
   });
 
   await test("profile and setup pages: sections are closed rows that open one at a time, and a link opens its section", async () => {

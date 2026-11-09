@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CreditCard, Loader2, Plane, Share2, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -118,6 +119,12 @@ export function SharingCard() {
     >
         {error && <p className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive" role="alert">{error}</p>}
         {notice && <p className="rounded-lg border border-primary/30 bg-primary/10 p-3 text-sm" role="status">{notice}</p>}
+
+        {o.enabled && (
+          <Link href="/profile/sharing-activity" data-testid="sharing-activity-link" className="flex min-h-[44px] items-center justify-between rounded-xl border px-4 text-sm font-semibold hover:bg-muted">
+            Sharing activity <span className="text-xs font-normal text-muted-foreground">Who looked, and every change</span>
+          </Link>
+        )}
 
         {o.incoming.length > 0 && (
           <div className="space-y-3">

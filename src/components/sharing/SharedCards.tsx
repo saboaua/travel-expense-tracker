@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ScanBarcode, Users } from "lucide-react";
 import { CardFace } from "@/components/loyalty/CardFace";
+import { logShareView } from "@/lib/share-view";
 import { CardDetail } from "@/components/loyalty/CardDetail";
 import type { BarcodeFormat, LoyaltyCard } from "@/lib/loyalty";
 import type { SharedCard } from "@/lib/sharing";
@@ -46,7 +47,7 @@ export function SharedCards() {
       <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
         {cards.map((c) => (
           <li key={c.share_id} data-testid="shared-tile">
-            <button type="button" onClick={() => setOpen(c)} aria-label={`Open ${c.store_name}, shared by ${c.shared_by}`} className="block w-full rounded-xl border-2 border-dashed border-primary/50 text-left shadow-sm transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            <button type="button" onClick={() => { logShareView("loyalty_card", c.card_id); setOpen(c); }} aria-label={`Open ${c.store_name}, shared by ${c.shared_by}`} className="block w-full rounded-xl border-2 border-dashed border-primary/50 text-left shadow-sm transition-transform active:scale-[0.98] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
               <CardFace card={asCard(c)} photoUrl={photoOf(c)} className="h-28 rounded-[10px] sm:h-36">
                 <span className="absolute bottom-2 left-2 flex h-7 w-7 items-center justify-center rounded-md bg-black/30 backdrop-blur-sm" aria-hidden="true"><ScanBarcode className="h-4 w-4" /></span>
               </CardFace>

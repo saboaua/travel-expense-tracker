@@ -10,12 +10,14 @@ const TABLE_FUNCTIONS = new Set(["shared_loyalty_cards", "shared_trips"]);
 export const SHARING_FUNCTIONS = new Set([
   "sharing_overview", "set_sharing", "invite_partner", "respond_to_invite", "end_partnership", "share_item", "unshare_item",
   "shared_loyalty_cards", "shared_trips", "shared_loyalty_photo_path", "sharing_available",
+  "log_share_view", "sharing_activity", "sharing_activity_export",
 ]);
 
 export async function createSharingBackend(fake) {
   const db = new PGlite();
   await db.exec(readFileSync("tests/sharing/stub.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migration_sharing_safety.sql", "utf8"));
   await db.exec("insert into roles (key, permissions) values ('family', array['sharing','loyalty']), ('user', array[]::text[]), ('admin', array[]::text[]) on conflict do nothing");
 
   // Copy what the fake holds into the database before each call (upsert, and remove only what was really deleted)

@@ -120,3 +120,22 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(fetch(req).then(store).catch(() => caches.match(req).then((cached) => cached || Response.error())));
   }
 });
+
+// Alerts from the server. The text is always generic (no card, trip or amount details).
+self.addEventListener("push", (event) => {
+  let data = {};
+  try { data = event.data ? event.data.json() : {}; } catch { data = {}; }
+  const title = typeof data.title === "string" ? data.title : "Lifolio";
+  const body = typeof data.body === "string" ? data.body : "Something needs your attention.";
+  event.waitUntil(self.registration.showNotification(title, { body, tag: typeof data.tag === "string" ? data.tag : "lifolio", icon: "/icon-192.png", badge: "/icon-192.png", data: { url: typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/" } }));
+});
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const c of list) if ("focus" in c) { c.navigate(url).catch(() => {}); return c.focus(); }
+      return self.clients.openWindow(url);
+    }),
+  );
+});

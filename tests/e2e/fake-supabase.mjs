@@ -12,7 +12,7 @@ export const ANON_KEY = "anon-key";
 
 // Tables whose primary key is not "id": an upsert without on_conflict matches on it
 const UNIQUE_KEYS = { telegram_sent_log: ["user_id", "kind", "dedupe_key"], telegram_updates: ["update_id"], help_topics: ["slug"] };
-const PRIMARY_KEYS = { telegram_pending: "telegram_id", telegram_notify_prefs: "user_id" };
+const PRIMARY_KEYS = { telegram_pending: "telegram_id", telegram_notify_prefs: "user_id", account_deletions: "user_id" };
 
 // table -> relation name -> how rows are joined
 const RELATIONS = {

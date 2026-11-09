@@ -40,3 +40,6 @@ $$;
 grant usage on schema public, auth to anon, authenticated, service_role;
 grant all on all tables in schema public to anon, authenticated, service_role;
 grant execute on all functions in schema public to anon, authenticated, service_role;
+-- Supabase also grants every table created later; the migrations must take those away where they should be closed
+alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;

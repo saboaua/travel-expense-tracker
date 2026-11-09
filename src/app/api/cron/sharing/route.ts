@@ -29,6 +29,8 @@ export async function GET(req: Request) {
       if (/does not exist|schema cache/i.test(error.message)) return NextResponse.json({ ok: true, skipped: true });
       throw new Error(error.message);
     }
+    // Sharing history is kept 12 months (best effort: older installs may not have it yet)
+    await supabase.rpc("share_activity_purge");
     const problems = Number(data) || 0;
     if (problems > 0) await notifyJobFailure(supabase, "Sharing integrity check (sharing was switched off)");
     return NextResponse.json({ ok: true, problems });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import type { SharedTrip } from "@/lib/sharing";
+import { logShareView } from "@/lib/share-view";
 import { useSharing } from "@/lib/use-sharing";
 
 const fmt = (d: string | null) => {
@@ -23,7 +24,7 @@ export function SharedTrips({ kind }: { kind: "trip" | "personal_trip" }) {
     let alive = true;
     fetch("/api/sharing/trips", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { trips: [] }))
-      .then((d: { trips?: SharedTrip[] }) => { if (alive) setTrips(Array.isArray(d.trips) ? d.trips.filter((t) => t.kind === kind) : []); })
+      .then((d: { trips?: SharedTrip[] }) => { if (!alive) return; const list = Array.isArray(d.trips) ? d.trips.filter((t) => t.kind === kind) : []; list.forEach((t) => logShareView(t.kind, t.trip_id)); setTrips(list); })
       .catch(() => { if (alive) setTrips([]); });
     return () => { alive = false; };
   }, [live, overview, kind]);

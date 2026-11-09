@@ -1,6 +1,16 @@
 {
   "crons": [
-    { "path": "/api/cron/telegram", "schedule": "0 13 * * *" },
-    { "path": "/api/cron/sharing", "schedule": "30 6 * * *" }
+    {
+      "path": "/api/cron/telegram",
+      "schedule": "0 13 * * *"
+    },
+    {
+      "path": "/api/cron/sharing",
+      "schedule": "30 6 * * *"
+    },
+    {
+      "path": "/api/cron/account-deletions",
+      "schedule": "15 3 * * *"
+    }
   ]
 }

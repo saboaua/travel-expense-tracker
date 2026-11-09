@@ -40,6 +40,7 @@ each file says so when that is the case.
 | 32 | `migration_help_telegram.sql` | Help topic "Connect Telegram" (after 31; never overwrites your edits) |
 | 33 | `migration_help_guides.sql` | Help topics: create a trip, add a trip receipt, import a grocery receipt, export a trip report (after 31) |
 | 34 | `migration_dismissed_notices.sql` | Closed notices (bell, passport banner) are remembered on the account, so reinstalling the app does not bring them back (after 3) |
+| 35 | `migration_sharing_safety.sql` | Sharing history (who opened what you shared, every change; kept 12 months), phone alert devices and switches, scheduled account deletion (7 days, cancellable). Needs migration 30 first |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
