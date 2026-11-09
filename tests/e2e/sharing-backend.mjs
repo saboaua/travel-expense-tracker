@@ -23,6 +23,7 @@ export async function createSharingBackend(fake, serviceKey = "") {
   await db.exec(readFileSync("supabase/migration_sharing_safety.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_subscriptions.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_iptv_customers.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migration_iptv_manage.sql", "utf8"));
   await db.exec("insert into roles (key, permissions) values ('family', array['sharing','loyalty']), ('user', array[]::text[]), ('admin', array[]::text[]) on conflict do nothing");
 
   // Copy what the fake holds into the database before each call (upsert, and remove only what was really deleted)

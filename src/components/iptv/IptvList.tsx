@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useAccess } from "@/lib/use-access";
 import Link from "next/link";
 import { BackLink } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
@@ -23,6 +24,7 @@ const pill: Record<string, string> = {
 const SORTS = ["Soonest first", "Monthly", "Yearly", "Location"] as const;
 
 export function IptvList() {
+  const { role } = useAccess();
   const supabase = useMemo(() => createClient(), []);
   const today = useMemo(() => todayISO(), []);
   const [rows, setRows] = useState<Row[] | null>(null);
@@ -142,6 +144,7 @@ export function IptvList() {
 
       <Link href="/admin/iptv/new" className="flex min-h-12 items-center justify-center rounded-xl bg-primary text-base font-semibold text-primary-foreground">+ Add a client</Link>
 
+      {role === "admin" && (<>
       <h2 className={label}>Client access</h2>
       <Card className="divide-y px-4">
         <div className="flex items-center gap-3 py-2">
@@ -152,6 +155,7 @@ export function IptvList() {
           <Input value={contact} maxLength={40} onChange={(e) => setContact(e.target.value)} onBlur={() => void saveSettings({ iptv_contact: contact.trim() || null })} placeholder="+297 555 0100" />
         </label>
       </Card>
+      </>)}
     </div>
   );
 }

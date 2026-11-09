@@ -42,6 +42,8 @@ async function main() {
   await admin("insert into iptv_clients (id, created_by, client_name, contact, plan, date_subscribed, frequency, expire_date, share_token, share_enabled, client_user_id) values ($1, $2, 'Old Client', '+297 1', 'Basic', '2026-01-01', 'yearly', '2027-01-01', $3, true, $4)", [id(100), ADMIN, "d".repeat(40), id(9)]);
   await db.exec(readFileSync("supabase/migration_iptv_customers.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_iptv_customers.sql", "utf8")); // twice is fine
+  await db.exec(readFileSync("supabase/migration_iptv_manage.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migration_iptv_manage.sql", "utf8")); // twice is fine
   eq("old client became one customer", (await admin("select name, contact, share_enabled, client_user_id from iptv_customers where id = $1", [id(100)]))[0], { name: "Old Client", contact: "+297 1", share_enabled: true, client_user_id: id(9) });
   eq("old client's subscription points at it", (await admin("select customer_id, plan from iptv_clients where id = $1", [id(100)]))[0], { customer_id: id(100), plan: "Basic" });
   ok("old link still opens", ((await call("service", "iptv_public_view", "d".repeat(40))).rows[0].v as Record<string, unknown>)?.first_name === "Old");
@@ -75,6 +77,16 @@ async function main() {
   ok("normal user cannot add a customer", !!(await as(A, custSql, [A])).error);
   ok("client role cannot add a customer", !!(await as(CLIENT, custSql, [CLIENT])).error);
   ok("anonymous cannot add a customer", !!(await as(null, custSql, [A])).error);
+  // a role given the "IPTV clients" option can manage clients; taking it away stops it at once
+  await admin("update roles set permissions = array_append(permissions, 'iptv.manage') where key = 'user'");
+  const delegated = await as<{ id: string }>(A, custSql, [A]);
+  ok("a role given IPTV clients can add a customer", !delegated.error);
+  ok("...and sees it", (await as(A, "select id from iptv_customers")).rows.length === 1);
+  ok("...but another role still cannot", !!(await as(CLIENT, custSql, [CLIENT])).error);
+  await admin("update roles set permissions = array_remove(permissions, 'iptv.manage') where key = 'user'");
+  ok("taken away, it cannot add", !!(await as(A, custSql, [A])).error);
+  eq("taken away, it sees nothing", (await as(A, "select id from iptv_customers")).rows.length, 0);
+  await admin("delete from iptv_customers");
   const cust = await as<{ id: string }>(ADMIN, custSql, [ADMIN]);
   ok("admin can add a customer", !cust.error);
   const cu = cust.rows[0].id;

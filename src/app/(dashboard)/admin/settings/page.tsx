@@ -50,11 +50,10 @@ const sections: { href: string; feature: string; title: string; description: str
     icon: Send,
   },
   {
-    // Not a registered feature, so only an admin sees it and it can never be given to a role
     href: "/admin/iptv",
-    feature: "iptv.admin",
+    feature: "iptv.manage",
     title: "IPTV Clients",
-    description: "Your IPTV customers: expiry dates, renewals and what each client can see. Admin only.",
+    description: "Your IPTV customers: expiry dates, renewals and what each client can see.",
     icon: Tv,
   },
   {

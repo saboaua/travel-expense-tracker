@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/access.test.ts
-import { FEATURE_KEYS, effectivePermissions, legacyPermissions, unreviewedFeatures, clientRedirect, canAccessPath, ruleForPath, slugifyRoleKey, sanitizePermissions, hasAnyAdminFeature, sanitizeLabel } from "../src/lib/access";
+import { FEATURES, FEATURE_KEYS, effectivePermissions, legacyPermissions, unreviewedFeatures, clientRedirect, canAccessPath, ruleForPath, slugifyRoleKey, sanitizePermissions, hasAnyAdminFeature, sanitizeLabel } from "../src/lib/access";
 const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 const sorted = (s:Set<string>) => [...s].sort();
 
@@ -70,12 +70,12 @@ eq(ruleForPath("/personal/subscriptions"), { kind: "feature", key: "subscription
 eq(ruleForPath("/my-subscription"), { kind: "feature", key: "iptv.mine" }, "client page guarded by its option");
 eq(canAccessPath("user", effectivePermissions({key:"user",permissions:[],known_features:[]}), "/my-subscription"), false, "normal user cannot open the client page");
 eq(canAccessPath("user", effectivePermissions({key:"user",permissions:[],known_features:[]}), "/personal/subscriptions"), true, "normal user has subscriptions");
-eq(canAccessPath("assistant", effectivePermissions({key:"assistant",permissions:[],known_features:[]}), "/admin/iptv"), false, "IPTV admin is not delegable (assistant)");
-eq(canAccessPath("ops", new Set(FEATURE_KEYS), "/admin/iptv"), false, "IPTV admin is not delegable (even with every option)");
+eq(canAccessPath("assistant", effectivePermissions({key:"assistant",permissions:[],known_features:[]}), "/admin/iptv"), false, "IPTV clients are not given to assistants by default");
+eq(canAccessPath("ops", effectivePermissions({key:"ops",permissions:["iptv.manage"],known_features:["iptv.manage"]}), "/admin/iptv/abc"), true, "a role given IPTV clients opens the page");
+eq(canAccessPath("ops", effectivePermissions({key:"ops",permissions:["trips"],known_features:FEATURE_KEYS}), "/admin/iptv"), false, "other roles cannot");
 eq(canAccessPath("admin", new Set(), "/admin/iptv/abc"), true, "admin opens IPTV admin");
-eq(ruleForPath("/admin/iptv"), { kind: "adminOnly" }, "IPTV admin path is admin only");
-eq(FEATURE_KEYS.some((k) => k.startsWith("iptv.") && k !== "iptv.mine"), false, "no IPTV admin option exists to hand out");
-// a login that only has the client role is kept on its one page
+eq(ruleForPath("/admin/iptv"), { kind: "feature", key: "iptv.manage" }, "IPTV admin path is guarded by its option");
+eq(FEATURES.find((f) => f.key === "iptv.manage")?.defaultRoles, [], "nobody gets IPTV clients by default");
 eq(clientRedirect("iptv-client", "/"), "/my-subscription", "client sent home from the dashboard");
 eq(clientRedirect("iptv-client", "/personal/subscriptions"), "/my-subscription", "client cannot browse personal");
 eq(clientRedirect("iptv-client", "/admin/iptv"), "/my-subscription", "client cannot reach admin");

@@ -5,13 +5,14 @@ import { createUserAccount } from "@/lib/user-admin";
 import { IPTV_CLIENT_ROLE } from "@/lib/access";
 import { logAudit } from "@/lib/audit";
 
-/** Admin only (not a delegable feature): makes a sign-in for an IPTV client and links it to their record. */
+/** Needs the "IPTV clients" option (admin always has it): makes a sign-in for an IPTV client and links it to their record. */
 export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { data: me } = await supabase.from("profiles").select("role, email").eq("id", user.id).single();
-  if (me?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const { data: allowed } = me?.role === "admin" ? { data: true } : await supabase.rpc("has_permission", { p: "iptv.manage" });
+  if (allowed !== true) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = (await request.json().catch(() => ({}))) as { customerId?: unknown; email?: unknown };
   const customerId = typeof body.customerId === "string" ? body.customerId : "";
@@ -30,6 +31,6 @@ export async function POST(request: Request) {
   const { error } = await db.from("iptv_customers").update({ client_user_id: result.userId }).eq("id", customerId);
   if (error) return NextResponse.json({ error: "The login was made but could not be linked. Link it by email." }, { status: 500 });
 
-  await logAudit({ actorId: user.id, actorEmail: me.email || user.email, action: "user.created", entityType: "user", entityId: result.userId, details: { email, role: IPTV_CLIENT_ROLE, iptv_customer: customerId } }).catch(() => {});
+  await logAudit({ actorId: user.id, actorEmail: me?.email || user.email, action: "user.created", entityType: "user", entityId: result.userId, details: { email, role: IPTV_CLIENT_ROLE, iptv_customer: customerId } }).catch(() => {});
   return NextResponse.json({ success: true, email, tempPassword: result.tempPassword, expiresAt: result.expiresAt, warning: result.warning });
 }

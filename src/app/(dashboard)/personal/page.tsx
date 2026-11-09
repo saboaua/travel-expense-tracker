@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat } from "lucide-react";
+import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Tv } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
@@ -61,6 +61,8 @@ export default function PersonalHubPage() {
   const handy: { href: string; title: string; icon: typeof ShoppingCart; stat: string; right?: string }[] = [
     ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
     ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, stat: "Track what you pay and what is due" }] : []),
+    // Only people who manage IPTV clients (the admin, or a role given "IPTV clients") ever see this tile
+    ...(perms.has("iptv.manage") ? [{ href: "/admin/iptv", title: "IPTV clients", icon: Tv, stat: "Your clients and when they end" }] : []),
     ...(perms.has("iptv.mine") ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, stat: "See your service and when it ends" }] : []),
     ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
   ];

@@ -1594,6 +1594,8 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "admin@example.com", "Admin-Pass-123");
     await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal`);
+    await page.getByRole("link", { name: /IPTV clients/ }).waitFor(); // the admin's Personal page has the tile
     await page.goto(`${BASE}/admin/iptv`);
     await page.getByRole("heading", { name: "IPTV clients", level: 1 }).waitFor();
     await page.getByRole("link", { name: "+ Add a client" }).click();
@@ -1694,6 +1696,9 @@ try {
       await x.page.waitForURL((u) => u.pathname === "/");
       await x.page.goto(`${BASE}/admin/iptv`);
       await x.page.waitForURL((u) => u.pathname === "/");
+      await x.page.goto(`${BASE}/personal`);
+      await x.page.getByRole("heading", { name: "Personal", level: 1 }).waitFor();
+      assert((await x.page.getByRole("link", { name: /IPTV clients/ }).count()) === 0, "no IPTV clients tile for other people");
       await x.page.goto(`${BASE}/my-subscription`);
       await x.page.waitForURL((u) => u.pathname === "/");
       await x.ctx.close();
