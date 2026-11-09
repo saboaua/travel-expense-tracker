@@ -1,9 +1,9 @@
 import webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
-export type PushPref = "invites" | "shared" | "views";
+export type PushPref = "invites" | "shared" | "views" | "reminders";
 export type PushPrefs = Record<PushPref, boolean>;
-export const DEFAULT_PUSH_PREFS: PushPrefs = { invites: true, shared: true, views: false };
+export const DEFAULT_PUSH_PREFS: PushPrefs = { invites: true, shared: true, views: false, reminders: true };
 
 /** Messages only say that something happened. They never carry card numbers, trip details, names of items or amounts. */
 export const PUSH_TEXT = {
@@ -13,9 +13,12 @@ export const PUSH_TEXT = {
   unshared: { title: "Lifolio", body: "A partner changed what they share with you." },
   ended: { title: "Lifolio", body: "A sharing pairing has ended." },
   view: { title: "Lifolio", body: "A partner opened something you shared." },
+  subscription: { title: "Lifolio", body: "A subscription payment is coming up." },
+  iptv: { title: "Lifolio", body: "Some IPTV clients are about to expire." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
 export type PushKind = keyof typeof PUSH_TEXT;
+const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv" };
 
 export function pushConfigured(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
@@ -52,7 +55,7 @@ export async function sendPush(userId: string | null | undefined, kind: PushKind
     const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId).limit(10);
     if (!subs?.length) return 0;
     webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
-    const payload = JSON.stringify({ ...PUSH_TEXT[kind], url: kind === "test" ? "/profile" : "/profile", tag: kind });
+    const payload = JSON.stringify({ ...PUSH_TEXT[kind], url: PUSH_URL[kind] ?? "/profile", tag: kind });
     let sent = 0;
     await Promise.all(
       subs.map(async (s) => {

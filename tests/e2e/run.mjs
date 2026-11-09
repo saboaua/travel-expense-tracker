@@ -44,13 +44,14 @@ fake.seed("roles", [
 ]);
 // A role that has the Partner sharing option (off for every other role until an admin turns it on)
 fake.table("roles").push({ id: "family-role", key: "family", label: "Family", description: "Has partner sharing", permissions: ["trips", "personal", "documents", "loyalty", "sharing"], known_features: [...FEATURES, "sharing"], is_system: false, created_at: new Date().toISOString() });
+fake.table("roles").push({ id: "iptv-client-role", key: "iptv-client", label: "IPTV client", description: "One page", permissions: ["iptv.mine"], known_features: [...FEATURES, "sharing", "subscriptions", "iptv.mine"], is_system: false, created_at: new Date().toISOString() });
 fake.seed("app_settings", [{ id: 1, app_name: "E2E Expense App", logo_url: null, primary_color: "#4f46e5", login_logo_size: 56, privacy_policy: "", support_email: "help@example.com", personal_enabled: true }]);
 fake.seed("currencies", [
   { code: "USD", name: "US Dollar", usd_rate: 1, enabled: true, sort_order: 1 },
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_clients", "iptv_renewals"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -58,6 +59,7 @@ const ADMIN = fake.addUser({ email: "admin@example.com", password: "Admin-Pass-1
 const ALICE = fake.addUser({ email: "alice@example.com", password: "Alice-Pass-123", role: "family", full_name: "Alice Sharer" });
 const BOB = fake.addUser({ email: "bob@example.com", password: "Bob-Pass-12345", role: "family", full_name: "Bob Partner" });
 fake.addUser({ email: "carol@example.com", password: "Carol-Pass-123", role: "family", full_name: "Carol Stranger" });
+fake.addUser({ email: "maria@example.com", password: "Maria-Pass-123", role: "iptv-client", full_name: "Maria Lopez" });
 fake.addUser({ email: "sam@example.com", password: "Sam-Pass-12345", role: "assistant", full_name: "Sam Assistant" });
 const HELP_AT = new Date().toISOString();
 fake.table("help_topics").push(
@@ -73,7 +75,7 @@ fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", crea
 
 /* ---------------- start everything ---------------- */
 // The sharing functions run as the real SQL from supabase/migration_sharing.sql on a real Postgres engine (PGlite)
-const sharingDb = await createSharingBackend(fake);
+const sharingDb = await createSharingBackend(fake, SERVICE_KEY);
 fake.setRpcHook(sharingDb.hook);
 await fake.listen(FAKE_PORT);
 // E2E_PROD=1 runs against a production build (made beforehand with tests/e2e/build-prod.sh), which is how phones get the app
@@ -1301,7 +1303,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 4, "device switch plus three kinds of alert");
+    assert((await card.getByRole("switch").count()) === 5, "device switch plus four kinds of alert");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);
@@ -1559,6 +1561,129 @@ try {
       }
     }
   }
+
+  /* ---------- subscriptions and IPTV clients ---------- */
+  await test("subscriptions: a person adds one and sees the monthly total; a role without the option cannot open the page", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal`);
+    await page.getByRole("link", { name: /Subscriptions/ }).click();
+    await page.getByRole("heading", { name: "Subscriptions", level: 1 }).waitFor();
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByLabel("Name", { exact: true }).fill("Netflix");
+    await page.getByLabel("Price", { exact: true }).fill("120");
+    await page.getByRole("group", { name: "Billed" }).getByRole("button", { name: "Yearly" }).click();
+    await page.getByLabel("Next payment").fill(addDays(today, 3));
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByText("You spend per month").waitFor();
+    await page.getByText("$10.00", { exact: true }).first().waitFor();
+    assert(await page.getByText("In 3 days").count() >= 1, "the payment shows as coming up");
+    assert(fake.table("subscriptions").length === 1 && fake.table("subscriptions")[0].user_id === PAT, "saved for the signed-in person");
+    await ctx.close();
+
+    const other = await newPage();
+    await signIn(other.page, "carol@example.com", "Carol-Pass-123");
+    await other.page.waitForURL((u) => u.pathname === "/");
+    await other.page.goto(`${BASE}/personal/subscriptions`);
+    await other.page.waitForURL((u) => u.pathname === "/");
+    await other.ctx.close();
+  });
+
+  await test("iptv: admin adds a client, sees the countdown, renews, shares a link that shows only safe fields, and the kill switch stops it", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "admin@example.com", "Admin-Pass-123");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/admin/iptv`);
+    await page.getByRole("heading", { name: "IPTV clients", level: 1 }).waitFor();
+    await page.getByRole("link", { name: "+ Add a client" }).click();
+    await page.getByLabel("Client name").fill("Maria Lopez");
+    await page.getByLabel(/Contact/).fill("+297 555 0142");
+    await page.getByLabel("Subscription", { exact: true }).fill("Basic");
+    await page.getByLabel("MAC").fill("00-1a-79-4c-2e-91");
+    await page.getByLabel("ID", { exact: true }).fill("48213");
+    await page.getByLabel("Order #").fill("A-20418");
+    await page.getByLabel("Date subscribed").fill(addDays(today, -25));
+    await page.getByLabel("Expire date").fill(addDays(today, 5));
+    await page.getByRole("button", { name: "Add client" }).click();
+    await page.waitForURL(/\/admin\/iptv\/[0-9a-f-]{36}$/);
+    await page.getByText("5 days left").first().waitFor();
+    assert(fake.table("iptv_clients")[0].mac === "00:1A:79:4C:2E:91", "the MAC is stored in one format");
+    assert(fake.table("iptv_clients")[0].created_by === ADMIN, "the admin is the owner");
+
+    await page.getByRole("button", { name: "Renew", exact: true }).click();
+    await page.getByText("Renewed.").waitFor();
+    assert(fake.table("iptv_renewals").length === 1, "the renewal is in the history");
+    await page.getByText(/^Renewed \d{4}-\d{2}-\d{2}/).first().waitFor();
+
+    await page.getByRole("button", { name: "Make a link" }).click();
+    const link = await page.getByLabel("Client link").inputValue();
+    assert(/\/s\/[0-9a-f]{40}$/.test(link), "a long random address");
+
+    const visitor = await newPage();
+    await visitor.page.goto(link.replace(/^https?:\/\/[^/]+/, BASE));
+    await visitor.page.getByText("Maria, your time left").waitFor();
+    const text = await visitor.page.locator("body").innerText();
+    for (const secret of ["00:1A:79", "48213", "A-20418", "Lopez"]) assert(!text.includes(secret), `the public page hides ${secret}`);
+    assert(text.includes("Basic"), "the plan is shown");
+
+    // Kill switch: every client view stops at once
+    await page.goto(`${BASE}/admin/iptv`);
+    await page.getByRole("switch", { name: "Client links and client logins" }).click();
+    await page.waitForTimeout(500);
+    await visitor.page.reload();
+    await visitor.page.getByText("This link is not available").waitFor();
+    await page.getByRole("switch", { name: "Client links and client logins" }).click();
+    await page.waitForTimeout(500);
+    await visitor.page.reload();
+    await visitor.page.getByText("Maria, your time left").waitFor();
+
+    // Stopping the link kills the old address for good
+    await page.goto(`${BASE}/admin/iptv/${fake.table("iptv_clients")[0].id}`);
+    await page.getByRole("button", { name: "Show the link" }).click();
+    await page.getByRole("button", { name: "Stop", exact: true }).click();
+    await page.getByRole("button", { name: "Stop link" }).click();
+    await page.waitForTimeout(500);
+    await visitor.page.reload();
+    await visitor.page.getByText("This link is not available").waitFor();
+    await visitor.ctx.close();
+    await ctx.close();
+  });
+
+  await test("iptv: a client login lands on one page, sees only their own subscription, and cannot reach anything else; other roles cannot open the admin page", async () => {
+    const id = fake.table("iptv_clients")[0].id;
+    const admin2 = await newPage();
+    await signIn(admin2.page, "admin@example.com", "Admin-Pass-123");
+    await admin2.page.waitForURL((u) => u.pathname === "/");
+    await admin2.page.goto(`${BASE}/admin/iptv/${id}`);
+    await admin2.page.getByLabel("Client email").fill("maria@example.com");
+    await admin2.page.getByRole("button", { name: "Link existing account" }).click();
+    await admin2.page.getByText(/Linked\./).waitFor();
+    await admin2.ctx.close();
+
+    const { ctx, page } = await newPage();
+    await signIn(page, "maria@example.com", "Maria-Pass-123");
+    await page.waitForURL((u) => u.pathname === "/my-subscription");
+    await page.getByText("Maria, your time left").waitFor();
+    const text = await page.locator("body").innerText();
+    for (const secret of ["00:1A:79", "48213", "A-20418"]) assert(!text.includes(secret), `the client page hides ${secret}`);
+    for (const path of ["/", "/trips", "/personal/subscriptions", "/admin/iptv", "/admin/settings"]) {
+      await page.goto(`${BASE}${path}`);
+      await page.waitForURL((u) => u.pathname === "/my-subscription");
+    }
+    await ctx.close();
+
+    for (const [email, pw] of [["sam@example.com", "Sam-Pass-12345"], ["pat@example.com", "Correct-Horse-1"]]) {
+      const x = await newPage();
+      await signIn(x.page, email, pw);
+      await x.page.waitForURL((u) => u.pathname === "/");
+      await x.page.goto(`${BASE}/admin/iptv`);
+      await x.page.waitForURL((u) => u.pathname === "/");
+      await x.page.goto(`${BASE}/my-subscription`);
+      await x.page.waitForURL((u) => u.pathname === "/");
+      await x.ctx.close();
+    }
+  });
 
   await admin.ctx.close();
   await browser.close();

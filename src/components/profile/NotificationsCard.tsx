@@ -7,8 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { currentSubscription, keyToBytes, pushSupport, type PushSupport } from "@/lib/push-client";
 
-type Prefs = { invites: boolean; shared: boolean; views: boolean };
-const DEFAULTS: Prefs = { invites: true, shared: true, views: false };
+type Prefs = { invites: boolean; shared: boolean; views: boolean; reminders: boolean };
+const DEFAULTS: Prefs = { invites: true, shared: true, views: false, reminders: true };
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Profile > Notifications: alerts on this device, and which kinds. The messages never contain card, trip or amount details. */
@@ -83,6 +83,7 @@ export function NotificationsCard() {
   const ROWS: { key: keyof Prefs; title: string; hint: string }[] = [
     { key: "invites", title: "Invites and replies", hint: "Someone invites you, or answers your invite." },
     { key: "shared", title: "Shared with me changed", hint: "A partner shares, updates or stops sharing something with you." },
+    { key: "reminders", title: "Payment and expiry reminders", hint: "A subscription is due soon, or (for admins) IPTV clients are about to expire." },
     { key: "views", title: "When someone opens my shared items", hint: "Off by default. The history always has it." },
   ];
   const status = !support ? "" : support === "ok" ? (on ? "On for this device" : "Off") : support === "needs-install" ? "Add to Home Screen first" : "Not available here";

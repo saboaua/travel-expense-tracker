@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet, CircleHelp } from "lucide-react";
+import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet, CircleHelp, Tv } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { adminNavItems } from "@/lib/access";
+import { adminNavItems, IPTV_CLIENT_ROLE } from "@/lib/access";
 import { resetAccessCache, useAccess } from "@/lib/use-access";
 import { resetSharingCache } from "@/lib/use-sharing";
 import { resetBrandCache, useBrand } from "@/lib/use-brand";
@@ -45,7 +45,7 @@ export function MobileNav() {
   const adminItems = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind] }));
 
   const personalShown = personalEnabled && perms.has("personal");
-  const mainItems: { href: string; label: string; icon: typeof Home }[] = [
+  const mainItems: { href: string; label: string; icon: typeof Home }[] = role === IPTV_CLIENT_ROLE ? [{ href: "/my-subscription", label: "My subscription", icon: Tv }] : [
     ...baseItems.slice(0, 1),
     ...(perms.has("trips") || perms.has("reports") ? [{ href: perms.has("trips") ? "/trips" : "/reports", label: "Business", icon: Briefcase }] : []),
     ...baseItems.slice(1).filter((i) => (i.feature === null || perms.has(i.feature)) && (personalEnabled || i.href !== "/personal")),

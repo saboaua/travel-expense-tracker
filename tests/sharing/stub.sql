@@ -7,7 +7,7 @@ create table auth.users (id uuid primary key default gen_random_uuid(), email te
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 
 create table public.profiles (id uuid primary key references auth.users(id) on delete cascade, first_name text, email text, role text not null default 'user');
-create table public.roles (key text primary key, permissions text[] not null default '{}');
+create table public.roles (key text primary key, label text, description text, permissions text[] not null default '{}', known_features text[] not null default '{}', is_system boolean not null default false);
 create table public.app_settings (id int primary key, sharing_disabled boolean not null default false);
 insert into public.app_settings (id) values (1);
 create table public.security_events (

@@ -2,7 +2,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { resolveSession } from "@/lib/supabase/middleware";
 import { createServerClient } from "@supabase/ssr";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
-import { canAccessPath, ruleForPath } from "@/lib/access";
+import { canAccessPath, clientRedirect, ruleForPath } from "@/lib/access";
 import { loadPermissions } from "@/lib/access-server";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 import { buildCsp, cspHeaderName, makeNonce } from "@/lib/csp";
@@ -19,7 +19,7 @@ async function handle(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public routes that don't need further checks
-  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login", "/api/csp-report", "/api/version"];
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login", "/api/csp-report", "/api/version", "/s/"];
   if (publicPaths.some((p) => path.startsWith(p))) {
     return response;
   }
@@ -93,6 +93,14 @@ async function handle(request: NextRequest) {
 
     // Protect pages with the same role rules as the navigation (admin pages and feature sections)
     const role = (profile?.role as string) || "user";
+    // A person who only has an IPTV client login gets their one page, wherever they try to go
+    const toClientPage = clientRedirect(role, path);
+    if (toClientPage) {
+      const url = request.nextUrl.clone();
+      url.pathname = toClientPage;
+      url.search = "";
+      return NextResponse.redirect(url);
+    }
     if (role !== "admin" && ruleForPath(path).kind !== "open") {
       const perms = await loadPermissions(supabase, role);
       if (!canAccessPath(role, perms, path)) {

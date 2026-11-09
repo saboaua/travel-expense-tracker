@@ -250,8 +250,9 @@ export function createFakeSupabase() {
         if (dropUserUpdates > 0 && req.method === "PUT" && url.pathname === "/auth/v1/user") { dropUserUpdates--; return req.socket.destroy(); }
         if (url.pathname.startsWith("/auth/v1")) return authApi(req, res, url, body);
         if (rpcHook && url.pathname.startsWith("/rest/v1/rpc/")) {
-          const uid = tokens.get(String(req.headers.authorization || "").replace(/^Bearer /, ""));
-          return Promise.resolve(rpcHook(url.pathname.slice("/rest/v1/rpc/".length), body, uid)).then(
+          const bearer = String(req.headers.authorization || "").replace(/^Bearer /, "");
+          const uid = tokens.get(bearer);
+          return Promise.resolve(rpcHook(url.pathname.slice("/rest/v1/rpc/".length), body, uid, bearer)).then(
             (r) => (r ? send(res, r.status, r.body) : rest(req, res, url, body)),
             (e) => send(res, 500, { message: String(e) }),
           );

@@ -13,11 +13,15 @@ export const SHARING_FUNCTIONS = new Set([
   "log_share_view", "sharing_activity", "sharing_activity_export",
 ]);
 
-export async function createSharingBackend(fake) {
+const IPTV_FUNCTIONS = new Set(["iptv_renew", "iptv_create_link", "iptv_stop_link", "iptv_link_user", "iptv_unlink_user", "iptv_public_view", "my_iptv_subscriptions"]);
+const IPTV_CHANGING = new Set(["iptv_renew", "iptv_create_link", "iptv_stop_link", "iptv_link_user", "iptv_unlink_user"]);
+
+export async function createSharingBackend(fake, serviceKey = "") {
   const db = new PGlite();
   await db.exec(readFileSync("tests/sharing/stub.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing_safety.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migration_subscriptions.sql", "utf8"));
   await db.exec("insert into roles (key, permissions) values ('family', array['sharing','loyalty']), ('user', array[]::text[]), ('admin', array[]::text[]) on conflict do nothing");
 
   // Copy what the fake holds into the database before each call (upsert, and remove only what was really deleted)
@@ -35,21 +39,40 @@ export async function createSharingBackend(fake) {
       const ids = rows.map((r) => r.id);
       await db.query(`delete from ${name} where not (id = any($1::uuid[]))`, [ids]);
     };
+    // IPTV: the app writes through the fake; the functions read the same rows from the real database
+    const settings = fake.table("app_settings")[0] || {};
+    await db.query("update app_settings set client_links_disabled = $1, iptv_contact = $2", [!!settings.client_links_disabled, settings.iptv_contact ?? null]);
+    await db.query("delete from iptv_clients");
+    for (const r of fake.table("iptv_clients")) {
+      const cols = ["id", "created_by", "client_name", "contact", "plan", "model", "order_no", "donation", "portal", "mac", "device_id", "location", "date_subscribed", "frequency", "renewal_date", "expire_date", "notes", "share_token", "client_user_id", "reminded_for"];
+      await db.query(`insert into iptv_clients (${cols.join(", ")}, share_enabled) values (${[...cols, "share_enabled"].map((_, i) => `$${i + 1}`).join(", ")})`, [...cols.map((c) => r[c] ?? null), !!r.share_enabled]);
+    }
+    for (const r of fake.table("iptv_renewals")) {
+      await db.query("insert into iptv_renewals (id, client_id, renewed_on, frequency, expires_after) values ($1, $2, $3, $4, $5) on conflict (id) do nothing", [r.id, r.client_id, r.renewed_on, r.frequency, r.expires_after]);
+    }
     await mirror("loyalty_cards", ["id", "user_id", "store_name", "holder_name", "category", "card_number", "barcode_format", "color", "image_path"]);
     await mirror("trips", ["id", "user_id", "name", "destination", "start_date", "end_date"]);
     await mirror("personal_projects", ["id", "user_id", "kind", "name", "destination", "start_date", "end_date"]);
   }
 
-  async function call(fn, args, userId) {
+  /** Copy what the IPTV functions changed back into the fake, so the screens read it through the usual calls */
+  async function pullIptv() {
+    const put = (name, rows) => { const t = fake.table(name); t.length = 0; t.push(...rows); };
+    put("iptv_clients", (await db.query("select row_to_json(t) as r from iptv_clients t")).rows.map((x) => x.r));
+    put("iptv_renewals", (await db.query("select row_to_json(t) as r from iptv_renewals t")).rows.map((x) => x.r));
+  }
+
+  async function call(fn, args, userId, service = false) {
     await sync();
     const names = Object.keys(args || {});
     const list = names.map((n, i) => `${n} := $${i + 1}`).join(", ");
     const sql = TABLE_FUNCTIONS.has(fn) ? `select * from ${fn}(${list})` : `select ${fn}(${list}) as v`;
-    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${userId || ""}', false); set role ${userId ? "authenticated" : "anon"};`);
+    await db.exec(`reset role; select set_config('request.jwt.claim.sub', '${userId || ""}', false); set role ${service ? "service_role" : userId ? "authenticated" : "anon"};`);
     try {
       const r = await db.query(sql, names.map((n) => args[n]));
       if (TABLE_FUNCTIONS.has(fn)) return { status: 200, body: r.rows };
       const v = r.rows[0]?.v;
+      if (IPTV_CHANGING.has(fn)) { await db.exec("reset role"); await pullIptv(); }
       return v === null || v === undefined ? { status: 204, body: undefined } : { status: 200, body: v };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
@@ -63,7 +86,7 @@ export async function createSharingBackend(fake) {
     db,
     call,
     /** Handler to give to the fake: answers sharing functions, leaves everything else alone. */
-    hook: (fn, args, userId) => (SHARING_FUNCTIONS.has(fn) ? call(fn, args, userId) : undefined),
+    hook: (fn, args, userId, bearer) => (SHARING_FUNCTIONS.has(fn) || IPTV_FUNCTIONS.has(fn) ? call(fn, args, userId, !!serviceKey && bearer === serviceKey) : undefined),
     /** The admin kill switch (app_settings.sharing_disabled) */
     setKill: async (on) => { await db.exec(`update app_settings set sharing_disabled = ${on ? "true" : "false"}`); },
     events: async () => (await db.query("select event_type, severity from security_events order by created_at")).rows,

@@ -34,6 +34,7 @@ const PUBLIC_PREFIXES = [
   "/api/manifest",
   "/api/icon",
   "/api/version",
+  "/s/",
 ];
 
 function isPublic(pathname: string) {

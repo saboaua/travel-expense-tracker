@@ -41,6 +41,7 @@ each file says so when that is the case.
 | 33 | `migration_help_guides.sql` | Help topics: create a trip, add a trip receipt, import a grocery receipt, export a trip report (after 31) |
 | 34 | `migration_dismissed_notices.sql` | Closed notices (bell, passport banner) are remembered on the account, so reinstalling the app does not bring them back (after 3) |
 | 35 | `migration_sharing_safety.sql` | Sharing history (who opened what you shared, every change; kept 12 months), phone alert devices and switches, scheduled account deletion (7 days, cancellable). Needs migration 30 first |
+| 36 | `migration_subscriptions.sql` | Personal "Subscriptions" (each person sees only their own) and admin-only IPTV clients: expiry and renewal dates, shareable client link, client logins ("IPTV client" role), and a switch that stops all client views. Needs migrations 3, 14 and the branding/roles one (app_settings, roles) |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.

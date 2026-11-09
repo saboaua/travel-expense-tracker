@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/access.test.ts
-import { FEATURE_KEYS, effectivePermissions, legacyPermissions, unreviewedFeatures, canAccessPath, ruleForPath, slugifyRoleKey, sanitizePermissions, hasAnyAdminFeature, sanitizeLabel } from "../src/lib/access";
+import { FEATURE_KEYS, effectivePermissions, legacyPermissions, unreviewedFeatures, clientRedirect, canAccessPath, ruleForPath, slugifyRoleKey, sanitizePermissions, hasAnyAdminFeature, sanitizeLabel } from "../src/lib/access";
 const eq = (a:unknown,b:unknown,m:string)=>{ const ok=JSON.stringify(a)===JSON.stringify(b); console.log(ok?"PASS":"FAIL", m, ok?"":`got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if(!ok) process.exitCode=1; };
 const sorted = (s:Set<string>) => [...s].sort();
 
@@ -7,9 +7,9 @@ const sorted = (s:Set<string>) => [...s].sort();
 eq(sorted(effectivePermissions({key:"admin",permissions:[],known_features:[]})), [...FEATURE_KEYS].sort(), "admin has all");
 
 // seeded system roles behave like before roles existed
-eq(sorted(legacyPermissions("user")), ["documents","loyalty","personal","personal.dashboard","reports","trips"], "legacy user");
-eq(sorted(legacyPermissions("assistant")), ["documents","help.manage","loyalty","personal","personal.dashboard","reports","trips","users.manage"], "legacy assistant");
-eq(sorted(legacyPermissions("whatever")), ["documents","loyalty","personal","personal.dashboard","reports","trips"], "unknown role -> user baseline");
+eq(sorted(legacyPermissions("user")), ["documents","loyalty","personal","personal.dashboard","reports","subscriptions","trips"], "legacy user");
+eq(sorted(legacyPermissions("assistant")), ["documents","help.manage","loyalty","personal","personal.dashboard","reports","subscriptions","trips","users.manage"], "legacy assistant");
+eq(sorted(legacyPermissions("whatever")), ["documents","loyalty","personal","personal.dashboard","reports","subscriptions","trips"], "unknown role -> user baseline");
 
 // reviewed roles use exactly what the admin ticked
 const reviewedUser = {key:"user",permissions:["trips","reports"],known_features:FEATURE_KEYS};
@@ -64,3 +64,22 @@ eq(adminNavItems("ops", new Set(["currencies.manage","branding.manage","security
 // the wallet sits under /personal but is its own option, so a role can have one without the other
 eq(ruleForPath("/personal/loyalty"), { kind: "feature", key: "loyalty" }, "wallet page is guarded by the loyalty option");
 eq(ruleForPath("/personal/groceries"), { kind: "feature", key: "personal" }, "other personal pages stay on personal");
+
+// subscriptions are personal and per-role; the IPTV client page is its own option nobody has by default
+eq(ruleForPath("/personal/subscriptions"), { kind: "feature", key: "subscriptions" }, "subscriptions page guarded by its option");
+eq(ruleForPath("/my-subscription"), { kind: "feature", key: "iptv.mine" }, "client page guarded by its option");
+eq(canAccessPath("user", effectivePermissions({key:"user",permissions:[],known_features:[]}), "/my-subscription"), false, "normal user cannot open the client page");
+eq(canAccessPath("user", effectivePermissions({key:"user",permissions:[],known_features:[]}), "/personal/subscriptions"), true, "normal user has subscriptions");
+eq(canAccessPath("assistant", effectivePermissions({key:"assistant",permissions:[],known_features:[]}), "/admin/iptv"), false, "IPTV admin is not delegable (assistant)");
+eq(canAccessPath("ops", new Set(FEATURE_KEYS), "/admin/iptv"), false, "IPTV admin is not delegable (even with every option)");
+eq(canAccessPath("admin", new Set(), "/admin/iptv/abc"), true, "admin opens IPTV admin");
+eq(ruleForPath("/admin/iptv"), { kind: "adminOnly" }, "IPTV admin path is admin only");
+eq(FEATURE_KEYS.some((k) => k.startsWith("iptv.") && k !== "iptv.mine"), false, "no IPTV admin option exists to hand out");
+// a login that only has the client role is kept on its one page
+eq(clientRedirect("iptv-client", "/"), "/my-subscription", "client sent home from the dashboard");
+eq(clientRedirect("iptv-client", "/personal/subscriptions"), "/my-subscription", "client cannot browse personal");
+eq(clientRedirect("iptv-client", "/admin/iptv"), "/my-subscription", "client cannot reach admin");
+eq(clientRedirect("iptv-client", "/my-subscription"), null, "client page allowed");
+eq(clientRedirect("iptv-client", "/change-password"), null, "client can change a temporary password");
+eq(clientRedirect("iptv-client", "/my-subscriptionx"), "/my-subscription", "prefix lookalike is not the page");
+eq(clientRedirect("user", "/"), null, "other roles unaffected");

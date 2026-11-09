@@ -25,6 +25,9 @@ export const FEATURES: Feature[] = [
   { key: "reports", label: "Reports", description: "Spending reports and exports.", group: "App", paths: ["/reports"], defaultRoles: ["user", "assistant"] },
   // listed before "personal" so /personal/loyalty is matched by this feature first
   { key: "loyalty", label: "Loyalty cards", description: "Store cards with a scannable barcode, kept in Personal.", group: "App", paths: ["/personal/loyalty"], defaultRoles: ["user", "assistant"] },
+  { key: "subscriptions", label: "Subscriptions", description: "Track your own subscriptions: what you pay, what is due next, free trials and price rises.", group: "App", paths: ["/personal/subscriptions"], defaultRoles: ["user", "assistant"] },
+  // For people who buy IPTV from the admin: one page with their own service and renewal history. Never part of a normal role.
+  { key: "iptv.mine", label: "My IPTV subscription", description: "Sees only their own IPTV service, dates and renewal history.", group: "App", paths: ["/my-subscription"], defaultRoles: [] },
   { key: "personal", label: "Personal", description: "Groceries, home projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
   { key: "personal.dashboard", label: "Personal dashboard", description: "Business / Personal switch on the home page, with spending charts for personal receipts.", group: "App", paths: [], defaultRoles: ["user", "assistant"] },
   { key: "sharing", label: "Partner sharing", description: "Share loyalty cards (view only) and a trip's destination and dates with an approved partner.", group: "App", paths: [], defaultRoles: [] },
@@ -98,6 +101,16 @@ export function ruleForPath(path: string): PathRule {
   for (const f of FEATURES) if (f.paths.some(matches)) return { kind: "feature", key: f.key };
   if (clean === "/admin" || clean.startsWith("/admin/")) return { kind: "adminOnly" }; // unknown admin pages stay admin-only
   return { kind: "open" };
+}
+
+/** The role made for IPTV clients: signed in, they get one page and nothing else. */
+export const IPTV_CLIENT_ROLE = "iptv-client";
+const CLIENT_PATHS = ["/my-subscription", "/change-password", "/api/", "/auth", "/logout"];
+/** Where a client-only login must be sent (null = the page is allowed for them). */
+export function clientRedirect(roleKey: string, path: string): string | null {
+  if (roleKey !== IPTV_CLIENT_ROLE) return null;
+  const clean = path.split("?")[0];
+  return CLIENT_PATHS.some((p) => clean === p || clean.startsWith(p.endsWith("/") ? p : `${p}/`)) ? null : "/my-subscription";
 }
 
 export function canAccessPath(roleKey: string, perms: Set<string>, path: string): boolean {

@@ -3,14 +3,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home, Briefcase, FolderOpen, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet, CircleHelp,
+  Home, Briefcase, FolderOpen, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet, CircleHelp, Tv,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { clearOfflineData } from "@/lib/offline-store";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { adminNavItems } from "@/lib/access";
+import { adminNavItems, IPTV_CLIENT_ROLE } from "@/lib/access";
 import { resetAccessCache, useAccess } from "@/lib/use-access";
 import { resetSharingCache } from "@/lib/use-sharing";
 import { resetBrandCache, useBrand } from "@/lib/use-brand";
@@ -33,7 +33,7 @@ export function Sidebar() {
     router.refresh();
   };
 
-  const userNav = [
+  const userNav = role === IPTV_CLIENT_ROLE ? [{ href: "/my-subscription", label: "My subscription", icon: Tv }] : [
     { href: "/", label: "Dashboard", icon: Home },
     // Trips and Reports share one Business link; the switch between them is at the top of each page
     ...(perms.has("trips") || perms.has("reports") ? [{ href: perms.has("trips") ? "/trips" : "/reports", label: "Business", icon: Briefcase }] : []),

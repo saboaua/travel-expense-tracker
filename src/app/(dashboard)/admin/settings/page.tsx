@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -48,6 +48,14 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Telegram",
     description: "Bot token and notification settings.",
     icon: Send,
+  },
+  {
+    // Not a registered feature, so only an admin sees it and it can never be given to a role
+    href: "/admin/iptv",
+    feature: "iptv.admin",
+    title: "IPTV Clients",
+    description: "Your IPTV customers: expiry dates, renewals and what each client can see. Admin only.",
+    icon: Tv,
   },
   {
     href: "/admin/users",
