@@ -1358,10 +1358,35 @@ try {
   await test("admin: the Personal view of the home page opens", async () => {
     await admin.page.goto(`${BASE}/`);
     await admin.page.getByRole("tab", { name: "Personal" }).click();
-    await admin.page.getByText("Total spent (AWG)").waitFor();
+    await admin.page.getByTestId("personal-total").waitFor();
     await admin.page.getByRole("tab", { name: "Business" }).click();
     await admin.page.getByRole("heading", { name: "Active Trips" }).waitFor();
     assert((await admin.page.getByText("This Month").count()) === 0, "spending tiles should no longer be on the business view");
+  });
+
+  await test("personal dashboard: range chips and a Filters sheet replace the filter card, and the page follows what is tapped", async () => {
+    await admin.page.goto(`${BASE}/`);
+    await admin.page.getByRole("tab", { name: "Personal" }).click();
+    await admin.page.getByTestId("personal-total").waitFor();
+    assert((await admin.page.getByLabel("Date range", { exact: true }).evaluate((el) => el.tagName)) !== "SELECT", "the date range is a row of chips, not a select");
+    assert((await admin.page.getByRole("button", { name: "30 days", exact: true }).getAttribute("aria-pressed")) === "true", "30 days is on by default");
+    await admin.page.getByRole("button", { name: "90 days", exact: true }).click();
+    assert((await admin.page.getByRole("button", { name: "90 days", exact: true }).getAttribute("aria-pressed")) === "true", "tapping 90 days selects it");
+    await admin.page.getByRole("button", { name: "Filters", exact: true }).click();
+    await admin.page.getByRole("dialog", { name: "Filters" }).waitFor();
+    await admin.page.getByRole("button", { name: /^Show \d+ receipts?$/ }).click();
+    await admin.page.getByRole("dialog", { name: "Filters" }).waitFor({ state: "detached" });
+    await admin.page.getByRole("button", { name: "All", exact: true }).click();
+    const cats = admin.page.getByRole("region", { name: "Where it goes" }).getByRole("button");
+    if ((await cats.count()) > 0) {
+      await cats.first().click();
+      await admin.page.getByTestId("active-filters").waitFor();
+      assert((await admin.page.getByTestId("personal-trip-card").count()) === 0, "trips are hidden while a category filter is on");
+      await admin.page.getByRole("button", { name: "Clear filter" }).click();
+      await admin.page.getByTestId("active-filters").waitFor({ state: "detached" });
+    }
+    await admin.page.getByRole("heading", { name: "Active now" }).waitFor();
+    await admin.page.getByRole("tab", { name: "Business" }).click();
   });
 
   await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {

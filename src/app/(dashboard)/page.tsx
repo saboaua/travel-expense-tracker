@@ -21,7 +21,7 @@ import { getCurrentUser } from "@/lib/supabase/session";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
-import { buildRows, tileSummary, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
+import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
@@ -108,7 +108,7 @@ export default async function DashboardPage() {
     // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
     wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
     wantsDash ? supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000) : null,
-    wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, start_date, end_date").eq("user_id", uid) : null,
+    wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, destination, start_date, end_date").eq("user_id", uid) : null,
     wantsDash ? supabase.from("currencies").select("code, usd_rate") : null,
     featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,
     // Partner sharing: invites waiting for an answer show on the bell (only for roles that have the option)
@@ -368,7 +368,6 @@ export default async function DashboardPage() {
           rows={dashRows}
           projects={dashProjects}
           today={today}
-          personalTiles={myPerms.has("personal") ? <PersonalTiles summary={tileSummary(dashRows, dashProjects, today)} currency="AWG" /> : null}
         >
           {businessView}
         </DashboardViews>

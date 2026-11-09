@@ -59,6 +59,30 @@ eq("tiles: groceries this month in AWG", ts.grocery, { total: 200.5, currency: "
 eq("tiles: active home project spend (all time)", ts.projects, { count: 1, spent: 100 + 89.5 + 500 });
 eq("tiles: completed trip not counted", ts.trips, { count: 0, spent: 0 });
 
+// Previous period, change and busiest day
+import { busiestDay, changePercent, previousPeriod } from "../src/lib/personal/dashboard";
+eq("no earlier spending -> no comparison", previousPeriod(rows, DEFAULT_FILTER, today), null);
+const withPrior = buildRows(
+  [
+    { project_id: "p1", merchant: "Ace", amount: 100, currency: "AWG", amount_usd: 55.87, category: "Tools", expense_date: "2026-10-20" },
+    { project_id: "p1", merchant: "Ace", amount: 300, currency: "AWG", amount_usd: 167.6, category: "Tools", expense_date: "2026-09-20" },
+    { project_id: "p1", merchant: "Shop", amount: 50, currency: "AWG", amount_usd: 27.93, category: "Other", expense_date: "2026-09-21" },
+  ],
+  [],
+  {},
+);
+const pp = previousPeriod(withPrior, DEFAULT_FILTER, today);
+eq("previous period is the 30 days before", pp && [pp.from, pp.to, pp.days, pp.total], ["2026-09-06", "2026-10-05", 30, 350]);
+eq("previous period respects the store filter", previousPeriod(withPrior, { ...DEFAULT_FILTER, store: "Shop" }, today)?.total, 50);
+eq("all time has no comparison", previousPeriod(withPrior, { ...DEFAULT_FILTER, range: "all" }, today), null);
+eq("change: less", changePercent(100, 350), -71);
+eq("change: more", changePercent(150, 100), 50);
+eq("change: nothing before", changePercent(100, null), null);
+eq("change: zero before", changePercent(100, 0), null);
+eq("busiest day", busiestDay(f), { date: "2026-11-03", value: 200.5 });
+eq("busiest day, no rows", busiestDay([]), null);
+eq("category filter", filterRows(rows, { ...DEFAULT_FILTER, category: "Groceries" }, today).length, 1);
+
 // Role option
 const feat = FEATURES.find((x) => x.key === "personal.dashboard");
 eq("feature registered in App group", feat?.group, "App");

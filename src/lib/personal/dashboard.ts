@@ -27,7 +27,7 @@ export type DashboardRow = {
   awg: number | null;
 };
 
-export type DashboardProject = { id: string; name: string; kind: string; status?: string; start_date: string | null; end_date: string | null };
+export type DashboardProject = { id: string; name: string; kind: string; status?: string; destination?: string | null; start_date: string | null; end_date: string | null };
 
 const num = (v: unknown) => {
   const n = Number(v);
@@ -86,9 +86,9 @@ export function buildRows(expenses: ExpenseRow[] | null | undefined, groceries: 
 /* ---------------- filters ---------------- */
 
 export type RangePreset = "30d" | "90d" | "year" | "all" | "custom";
-export type DashboardFilter = { range: RangePreset; from: string; to: string; store: string; project: string };
+export type DashboardFilter = { range: RangePreset; from: string; to: string; store: string; project: string; /** Tapping a category on the dashboard filters the page by it */ category: string };
 
-export const DEFAULT_FILTER: DashboardFilter = { range: "30d", from: "", to: "", store: "", project: "" };
+export const DEFAULT_FILTER: DashboardFilter = { range: "30d", from: "", to: "", store: "", project: "", category: "" };
 
 export function resolveRange(f: Pick<DashboardFilter, "range" | "from" | "to">, today: string): { from: string; to: string } {
   switch (f.range) {
@@ -106,7 +106,39 @@ export function resolveRange(f: Pick<DashboardFilter, "range" | "from" | "to">, 
 
 export function filterRows(rows: DashboardRow[], f: DashboardFilter, today: string): DashboardRow[] {
   const { from, to } = resolveRange(f, today);
-  return rows.filter((r) => r.date >= from && r.date <= to && (!f.store || r.merchant === f.store) && (!f.project || r.projectId === f.project));
+  return rows.filter((r) => r.date >= from && r.date <= to && (!f.store || r.merchant === f.store) && (!f.project || r.projectId === f.project) && (!f.category || r.category === f.category));
+}
+
+/**
+ * The stretch of the same length that ends the day before the current range starts, with the same store / project /
+ * category filters. Null for "All time" (nothing to compare with) or when that earlier stretch has no spending.
+ */
+export function previousPeriod(rows: DashboardRow[], f: DashboardFilter, today: string): { from: string; to: string; days: number; total: number } | null {
+  if (f.range === "all") return null;
+  const r = resolveRange(f, today);
+  if (r.from < "0001-01-01") return null;
+  const end = r.to > today ? today : r.to;
+  const days = daysBetween(r.from, end) + 1;
+  if (days < 1) return null;
+  const to = addDaysISO(r.from, -1);
+  const from = addDaysISO(to, -(days - 1));
+  const total = round2(filterRows(rows, { ...f, range: "custom", from, to }, today).reduce((s, x) => s + (x.awg ?? 0), 0));
+  return total > 0 ? { from, to, days, total } : null;
+}
+
+/** Whole-number change against the earlier period; positive means more spending. Null when there is nothing to compare. */
+export function changePercent(current: number, previous: number | null | undefined): number | null {
+  if (previous == null || previous <= 0) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
+
+/** The day with the most spending in the rows, or null when there is none. */
+export function busiestDay(rows: DashboardRow[]): { date: string; value: number } | null {
+  const m = new Map<string, number>();
+  for (const r of rows) if (r.awg != null) m.set(r.date, (m.get(r.date) || 0) + r.awg);
+  let best: { date: string; value: number } | null = null;
+  for (const [date, v] of m) if (!best || v > best.value) best = { date, value: round2(v) };
+  return best;
 }
 
 /* ---------------- analytics ---------------- */
