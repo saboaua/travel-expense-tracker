@@ -12,6 +12,15 @@ const DEFAULTS: Prefs = { invites: true, shared: true, views: false, reminders: 
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Profile > Notifications: alerts on this device, and which kinds. The messages never contain card, trip or amount details. */
+function testFailure(httpStatus: number | undefined, d: { reason?: string; status?: number }): string {
+  if (httpStatus === 503 || d.reason === "not_configured") return "Alerts are not set up on the server yet. An admin needs to add the push keys.";
+  if (d.reason === "no_database") return "The server cannot reach its database for alerts (the service key is missing).";
+  if (d.reason === "no_devices") return "The server has no saved device for you. Turn alerts off and on again to save this device.";
+  if (d.reason === "rejected") return `The phone's alert service refused the message${d.status ? ` (code ${d.status})` : ""}. Turn alerts off and on again; if it repeats, the push keys on the server may not match.`;
+  if (d.reason === "error") return "The server could not look up your devices. The push_subscriptions table may be missing (run the sharing safety migration).";
+  return "Nothing was sent. Please try again.";
+}
+
 export function NotificationsCard() {
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [on, setOn] = useState(false);
@@ -77,7 +86,7 @@ export function NotificationsCard() {
     const r = await post("/api/push/test", {}).catch(() => null);
     const d = r?.ok ? await r.json().catch(() => ({})) : {};
     setBusy(false);
-    setMsg(r?.ok && d.sent > 0 ? { tone: "ok", text: "Sent. It should arrive in a few seconds." } : { tone: "bad", text: "Nothing was sent. Turn alerts on for this device first." });
+    setMsg(r?.ok && d.sent > 0 ? { tone: "ok", text: "Sent. It should arrive in a few seconds." } : { tone: "bad", text: testFailure(r?.status, d) });
   }
 
   const ROWS: { key: keyof Prefs; title: string; hint: string }[] = [

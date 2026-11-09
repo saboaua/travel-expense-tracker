@@ -38,25 +38,30 @@ export function validSubscription(s: unknown): s is { endpoint: string; keys: { 
   return typeof x.keys?.p256dh === "string" && typeof x.keys?.auth === "string" && x.keys.p256dh.length < 200 && x.keys.auth.length < 100;
 }
 
+export type PushReason = "ok" | "not_configured" | "no_database" | "no_devices" | "rejected" | "error";
+export type PushResult = { sent: number; reason: PushReason; devices: number; status?: number };
+
 /**
- * Sends one alert to every device a person turned on. Never throws: a failed alert must not fail the action that caused it.
+ * Sends one alert to every device a person turned on and says why nothing arrived. Never throws: a failed alert must not fail the action that caused it.
  * `pref` is the switch the person has for this kind of alert ("test" ignores the switches).
  */
-export async function sendPush(userId: string | null | undefined, kind: PushKind, pref: PushPref | null): Promise<number> {
+export async function sendPushDetailed(userId: string | null | undefined, kind: PushKind, pref: PushPref | null): Promise<PushResult> {
   try {
-    if (!userId || !pushConfigured()) return 0;
+    if (!userId || !pushConfigured()) return { sent: 0, reason: "not_configured", devices: 0 };
     const db = serviceClient();
-    if (!db) return 0;
+    if (!db) return { sent: 0, reason: "no_database", devices: 0 };
     if (pref) {
       const { data: p } = await db.from("profiles").select("push_prefs").eq("id", userId).maybeSingle();
       const prefs = { ...DEFAULT_PUSH_PREFS, ...((p?.push_prefs as Partial<PushPrefs> | null) ?? {}) };
-      if (!prefs[pref]) return 0;
+      if (!prefs[pref]) return { sent: 0, reason: "ok", devices: 0 };
     }
-    const { data: subs } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId).limit(10);
-    if (!subs?.length) return 0;
+    const { data: subs, error: subsError } = await db.from("push_subscriptions").select("id, endpoint, p256dh, auth").eq("user_id", userId).limit(10);
+    if (subsError) { console.error("[push] devices", subsError.message); return { sent: 0, reason: "error", devices: 0 }; }
+    if (!subs?.length) return { sent: 0, reason: "no_devices", devices: 0 };
     webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
     const payload = JSON.stringify({ ...PUSH_TEXT[kind], url: PUSH_URL[kind] ?? "/profile", tag: kind });
     let sent = 0;
+    let status: number | undefined;
     await Promise.all(
       subs.map(async (s) => {
         try {
@@ -64,15 +69,21 @@ export async function sendPush(userId: string | null | undefined, kind: PushKind
           sent++;
         } catch (e) {
           const code = (e as { statusCode?: number }).statusCode;
+          status = code ?? status;
+          console.error("[push] send failed", code ?? (e instanceof Error ? e.message : e));
           if (code === 404 || code === 410) await db.from("push_subscriptions").delete().eq("id", s.id);
         }
       }),
     );
-    return sent;
+    return { sent, reason: sent > 0 ? "ok" : "rejected", devices: subs.length, status };
   } catch (e) {
     console.error("[push]", e instanceof Error ? e.message : e);
-    return 0;
+    return { sent: 0, reason: "error", devices: 0 };
   }
+}
+
+export async function sendPush(userId: string | null | undefined, kind: PushKind, pref: PushPref | null): Promise<number> {
+  return (await sendPushDetailed(userId, kind, pref)).sent;
 }
 
 /** Looks up one person with a server-only database function (null when there is none or the function is missing). */
