@@ -2,18 +2,18 @@ import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { createClient } from "@supabase/supabase-js";
 import { rateLimit } from "@/lib/rate-limit";
-import { cleanClientView } from "@/lib/iptv";
+import { cleanCustomerView } from "@/lib/iptv";
 import { todayISO } from "@/lib/utils";
 import { ClientSubscription } from "@/components/iptv/ClientSubscription";
 
 export const dynamic = "force-dynamic";
 // A private link: keep it out of search engines and do not pass it on in the Referer header
-export const metadata: Metadata = { title: "My subscription", robots: { index: false, follow: false }, referrer: "no-referrer" };
+export const metadata: Metadata = { title: "My subscriptions", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 function Shell({ children }: { children: React.ReactNode }) {
   return (
     <main className="mx-auto min-h-screen max-w-xl space-y-4 p-4 pt-8 md:p-8">
-      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">My subscription</h1>
+      <h1 className="text-2xl font-bold tracking-tight md:text-3xl">My subscriptions</h1>
       {children}
     </main>
   );
@@ -29,7 +29,7 @@ export default async function ClientLinkPage({ params }: { params: Promise<{ tok
   if (!/^[0-9a-f]{32,64}$/i.test(token) || !process.env.SUPABASE_SERVICE_ROLE_KEY) return unavailable;
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } });
   const { data } = await db.rpc("iptv_public_view", { p_token: token });
-  const view = cleanClientView(data);
+  const view = cleanCustomerView(data);
   if (!view) return unavailable;
   return <Shell><ClientSubscription view={view} today={todayISO()} /></Shell>;
 }

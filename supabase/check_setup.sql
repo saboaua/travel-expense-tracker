@@ -21,7 +21,7 @@ want_tables(name, fix) as (values
   ('loyalty_cards','migration_loyalty.sql'), ('help_topics','migration_help.sql'),
   ('sharing_settings','migration_sharing.sql'), ('partnerships','migration_sharing.sql'), ('shares','migration_sharing.sql'),
   ('share_activity','migration_sharing_safety.sql'), ('push_subscriptions','migration_sharing_safety.sql'), ('account_deletions','migration_sharing_safety.sql'),
-  ('subscriptions','migration_subscriptions.sql'), ('iptv_clients','migration_subscriptions.sql'), ('iptv_renewals','migration_subscriptions.sql')
+  ('subscriptions','migration_subscriptions.sql'), ('iptv_clients','migration_subscriptions.sql'), ('iptv_renewals','migration_subscriptions.sql'), ('iptv_customers','migration_iptv_customers.sql')
 ),
 want_columns(tbl, col, fix) as (values
   ('profiles','role','migration_admin.sql'), ('profiles','must_change_password','migration_admin.sql'),
@@ -40,7 +40,7 @@ want_columns(tbl, col, fix) as (values
   ('telegram_pending','saved_ref','migration_telegram_v2.sql'), ('telegram_pending','saved_path','migration_telegram_v2.sql'),
   ('profiles','dismissed_notices','migration_dismissed_notices.sql'), ('loyalty_cards','back_image_path','migration_loyalty_back.sql'),
   ('app_settings','sharing_disabled','migration_sharing.sql'), ('profiles','push_prefs','migration_sharing_safety.sql'),
-  ('app_settings','client_links_disabled','migration_subscriptions.sql'), ('app_settings','iptv_contact','migration_subscriptions.sql')
+  ('app_settings','client_links_disabled','migration_subscriptions.sql'), ('app_settings','iptv_contact','migration_subscriptions.sql'), ('iptv_clients','customer_id','migration_iptv_customers.sql')
 ),
 want_functions(name, fix) as (values
   ('find_duplicate_expenses','migration_duplicates.sql'), ('handle_new_user','schema.sql'), ('has_permission','migration_roles.sql'),
@@ -60,7 +60,7 @@ want_functions(name, fix) as (values
   ('push_share_partner','migration_sharing_safety.sql'), ('push_view_owner','migration_sharing_safety.sql'), ('account_deletions_due','migration_sharing_safety.sql'),
   ('iptv_is_admin','migration_subscriptions.sql'), ('iptv_renew','migration_subscriptions.sql'), ('iptv_create_link','migration_subscriptions.sql'),
   ('iptv_stop_link','migration_subscriptions.sql'), ('iptv_link_user','migration_subscriptions.sql'), ('iptv_unlink_user','migration_subscriptions.sql'),
-  ('iptv_public_view','migration_subscriptions.sql'), ('my_iptv_subscriptions','migration_subscriptions.sql')
+  ('iptv_public_view','migration_subscriptions.sql'), ('iptv_customer_view','migration_iptv_customers.sql'), ('iptv_subscription_shape','migration_iptv_customers.sql'), ('my_iptv_subscriptions','migration_subscriptions.sql')
 ),
 want_triggers(name, fix) as (values
   ('on_auth_user_created','schema.sql'), ('profiles_protect_privileges','migration_security_hardening.sql'),
@@ -69,7 +69,7 @@ want_triggers(name, fix) as (values
   ('help_topics_touch','migration_help.sql'), ('loyalty_cards_touch','migration_loyalty.sql'),
   ('loyalty_cards_drop_shares','migration_sharing.sql'), ('trips_drop_shares','migration_sharing.sql'), ('personal_projects_drop_shares','migration_sharing.sql'),
   ('partnerships_activity','migration_sharing_safety.sql'), ('shares_activity','migration_sharing_safety.sql'),
-  ('subscriptions_touch','migration_subscriptions.sql'), ('iptv_clients_touch','migration_subscriptions.sql')
+  ('subscriptions_touch','migration_subscriptions.sql'), ('iptv_clients_touch','migration_subscriptions.sql'), ('iptv_customers_touch','migration_iptv_customers.sql')
 ),
 want_buckets(id, fix) as (values
   ('receipts','create it in Storage (private); see schema.sql'), ('documents','migration_documents.sql'),

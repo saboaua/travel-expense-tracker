@@ -22,6 +22,7 @@ export async function createSharingBackend(fake, serviceKey = "") {
   await db.exec(readFileSync("supabase/migration_sharing.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing_safety.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_subscriptions.sql", "utf8"));
+  await db.exec(readFileSync("supabase/migration_iptv_customers.sql", "utf8"));
   await db.exec("insert into roles (key, permissions) values ('family', array['sharing','loyalty']), ('user', array[]::text[]), ('admin', array[]::text[]) on conflict do nothing");
 
   // Copy what the fake holds into the database before each call (upsert, and remove only what was really deleted)
@@ -42,10 +43,14 @@ export async function createSharingBackend(fake, serviceKey = "") {
     // IPTV: the app writes through the fake; the functions read the same rows from the real database
     const settings = fake.table("app_settings")[0] || {};
     await db.query("update app_settings set client_links_disabled = $1, iptv_contact = $2", [!!settings.client_links_disabled, settings.iptv_contact ?? null]);
-    await db.query("delete from iptv_clients");
+    await db.query("delete from iptv_customers");
+    for (const r of fake.table("iptv_customers")) {
+      const cols = ["id", "created_by", "name", "contact", "share_token", "client_user_id"];
+      await db.query(`insert into iptv_customers (${cols.join(", ")}, share_enabled) values (${[...cols, "share_enabled"].map((_, i) => `$${i + 1}`).join(", ")})`, [...cols.map((c) => r[c] ?? null), !!r.share_enabled]);
+    }
     for (const r of fake.table("iptv_clients")) {
-      const cols = ["id", "created_by", "client_name", "contact", "plan", "model", "order_no", "donation", "portal", "mac", "device_id", "location", "date_subscribed", "frequency", "renewal_date", "expire_date", "notes", "share_token", "client_user_id", "reminded_for"];
-      await db.query(`insert into iptv_clients (${cols.join(", ")}, share_enabled) values (${[...cols, "share_enabled"].map((_, i) => `$${i + 1}`).join(", ")})`, [...cols.map((c) => r[c] ?? null), !!r.share_enabled]);
+      const cols = ["id", "created_by", "customer_id", "plan", "model", "order_no", "donation", "portal", "mac", "device_id", "location", "date_subscribed", "frequency", "renewal_date", "expire_date", "notes", "reminded_for"];
+      await db.query(`insert into iptv_clients (${cols.join(", ")}) values (${cols.map((_, i) => `$${i + 1}`).join(", ")})`, cols.map((c) => r[c] ?? null));
     }
     for (const r of fake.table("iptv_renewals")) {
       await db.query("insert into iptv_renewals (id, client_id, renewed_on, frequency, expires_after) values ($1, $2, $3, $4, $5) on conflict (id) do nothing", [r.id, r.client_id, r.renewed_on, r.frequency, r.expires_after]);
@@ -58,6 +63,7 @@ export async function createSharingBackend(fake, serviceKey = "") {
   /** Copy what the IPTV functions changed back into the fake, so the screens read it through the usual calls */
   async function pullIptv() {
     const put = (name, rows) => { const t = fake.table(name); t.length = 0; t.push(...rows); };
+    put("iptv_customers", (await db.query("select row_to_json(t) as r from iptv_customers t")).rows.map((x) => x.r));
     put("iptv_clients", (await db.query("select row_to_json(t) as r from iptv_clients t")).rows.map((x) => x.r));
     put("iptv_renewals", (await db.query("select row_to_json(t) as r from iptv_renewals t")).rows.map((x) => x.r));
   }

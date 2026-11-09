@@ -68,5 +68,6 @@ export async function withColumnFallback<T extends { error: { code?: string; mes
 }
 
 export const SUBSCRIPTION_COLS = "id, name, price, currency, cycle, next_payment, category, status, trial_ends, split_count, remind_days, cancel_url, notes, price_history";
-export const IPTV_CLIENT_COLS = "id, client_name, contact, plan, model, order_no, donation, portal, mac, device_id, location, date_subscribed, frequency, renewal_date, expire_date, notes, share_enabled, client_user_id";
+export const IPTV_CLIENT_COLS = "id, customer_id, plan, model, order_no, donation, portal, mac, device_id, location, date_subscribed, frequency, renewal_date, expire_date, notes";
+export const IPTV_CUSTOMER_COLS = "id, name, contact, share_enabled, client_user_id";
 export const IPTV_RENEWAL_COLS = "id, renewed_on, frequency, expires_after";

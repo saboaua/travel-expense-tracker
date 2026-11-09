@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_clients", "iptv_renewals"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1613,10 +1613,22 @@ try {
     assert(fake.table("iptv_clients")[0].donation === "J17454B8498X", "the donation reference is kept as typed");
     assert(fake.table("iptv_clients")[0].created_by === ADMIN, "the admin is the owner");
 
-    await page.getByRole("button", { name: "Renew", exact: true }).click();
+    assert(fake.table("iptv_customers").length === 1 && fake.table("iptv_clients")[0].customer_id === fake.table("iptv_customers")[0].id, "the subscription belongs to the new client");
+
+    await page.getByRole("button", { name: "Mark renewed" }).click();
     await page.getByText("Renewed.").waitFor();
     assert(fake.table("iptv_renewals").length === 1, "the renewal is in the history");
-    await page.getByText(/^Renewed \d{4}-\d{2}-\d{2}/).first().waitFor();
+
+    // A second subscription for the same client
+    await page.getByRole("link", { name: /Add another subscription for Maria/ }).click();
+    await page.getByLabel("Subscription", { exact: true }).fill("Premium");
+    await page.getByLabel("Model").fill("MAG 524");
+    await page.getByLabel("MAC").fill("00-1a-79-4c-2e-92");
+    await page.getByRole("group", { name: "Frequency" }).getByRole("button", { name: "Yearly" }).click();
+    await page.getByRole("button", { name: "Add subscription" }).click();
+    await page.waitForURL(/\/admin\/iptv\/[0-9a-f-]{36}$/);
+    await page.getByText("Premium · MAG 524").first().waitFor();
+    assert(fake.table("iptv_clients").length === 2 && fake.table("iptv_customers").length === 1, "two subscriptions, still one client");
 
     await page.getByRole("button", { name: "Make a link" }).click();
     const link = await page.getByLabel("Client link").inputValue();
@@ -1624,10 +1636,11 @@ try {
 
     const visitor = await newPage();
     await visitor.page.goto(link.replace(/^https?:\/\/[^/]+/, BASE));
-    await visitor.page.getByText("Maria, your time left").waitFor();
+    await visitor.page.getByText("Hi Maria, you have").waitFor();
     const text = await visitor.page.locator("body").innerText();
     for (const secret of ["00:1A:79", "48213", "A-20418", "J17454B8498X", "Lopez"]) assert(!text.includes(secret), `the public page hides ${secret}`);
-    assert(text.includes("Basic"), "the plan is shown");
+    assert(text.includes("Basic") && text.includes("Premium · MAG 524"), "both subscriptions are on the one link");
+    assert(text.includes("2 subscriptions"), "the page says how many");
 
     // Kill switch: every client view stops at once
     await page.goto(`${BASE}/admin/iptv`);
@@ -1638,10 +1651,10 @@ try {
     await page.getByRole("switch", { name: "Client links and client logins" }).click();
     await page.waitForTimeout(500);
     await visitor.page.reload();
-    await visitor.page.getByText("Maria, your time left").waitFor();
+    await visitor.page.getByText("Hi Maria, you have").waitFor();
 
     // Stopping the link kills the old address for good
-    await page.goto(`${BASE}/admin/iptv/${fake.table("iptv_clients")[0].id}`);
+    await page.goto(`${BASE}/admin/iptv/${fake.table("iptv_customers")[0].id}`);
     await page.getByRole("button", { name: "Show the link" }).click();
     await page.getByRole("button", { name: "Stop", exact: true }).click();
     await page.getByRole("button", { name: "Stop link" }).click();
@@ -1653,7 +1666,7 @@ try {
   });
 
   await test("iptv: a client login lands on one page, sees only their own subscription, and cannot reach anything else; other roles cannot open the admin page", async () => {
-    const id = fake.table("iptv_clients")[0].id;
+    const id = fake.table("iptv_customers")[0].id;
     const admin2 = await newPage();
     await signIn(admin2.page, "admin@example.com", "Admin-Pass-123");
     await admin2.page.waitForURL((u) => u.pathname === "/");
@@ -1666,7 +1679,7 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "maria@example.com", "Maria-Pass-123");
     await page.waitForURL((u) => u.pathname === "/my-subscription");
-    await page.getByText("Maria, your time left").waitFor();
+    await page.getByText("Hi Maria, you have").waitFor();
     const text = await page.locator("body").innerText();
     for (const secret of ["00:1A:79", "48213", "A-20418", "J17454B8498X"]) assert(!text.includes(secret), `the client page hides ${secret}`);
     for (const path of ["/", "/trips", "/personal/subscriptions", "/admin/iptv", "/admin/settings"]) {

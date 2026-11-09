@@ -79,9 +79,9 @@ export function daysLabel(days: number): string {
   return `${plural(days, "day")} left`;
 }
 
-export type ClientLike = { id: string; client_name: string; expire_date: string };
+export type ClientLike = { id: string; client_name?: string; expire_date: string };
 export function sortClients<T extends ClientLike>(list: T[]): T[] {
-  return [...list].sort((a, b) => a.expire_date.localeCompare(b.expire_date) || a.client_name.localeCompare(b.client_name));
+  return [...list].sort((a, b) => a.expire_date.localeCompare(b.expire_date) || (a.client_name ?? "").localeCompare(b.client_name ?? ""));
 }
 export function groupClients<T extends ClientLike>(list: T[], today: string) {
   const g = { contactNow: [] as T[], soon: [] as T[], later: [] as T[] };
@@ -102,11 +102,22 @@ export function dueForReminder<T extends ClientLike & { reminded_for?: string | 
 
 /* ---------------- the message to a client ---------------- */
 
-export function renewalMessage(c: { client_name: string; plan: string; expire_date: string }, today: string, owner = ""): string {
-  const days = daysLeft(c.expire_date, today);
-  const first = c.client_name.trim().split(/\s+/)[0] || "there";
-  const when = days < 0 ? `ended on ${c.expire_date}` : days === 0 ? "ends today" : `ends in ${plural(days, "day")} (${c.expire_date})`;
-  return `Hi ${first}, your ${c.plan} TV service ${when}. Would you like to renew? Reply here and I will take care of it.${owner ? ` ${owner}` : ""}`.trim();
+export type EndingSub = { plan: string; model?: string | null; expire_date: string };
+const subName = (s: EndingSub) => [s.plan, s.model].filter(Boolean).join(" · ");
+/** Mentions only the subscriptions that are ending (or ended); a client with one subscription gets the short form. */
+export function renewalMessage(customerName: string, subs: EndingSub[], today: string, owner = "", all = 1): string {
+  const first = customerName.trim().split(/\s+/)[0] || "there";
+  const when = (s: EndingSub) => {
+    const d = daysLeft(s.expire_date, today);
+    return d < 0 ? `ended on ${s.expire_date}` : d === 0 ? "ends today" : `ends in ${plural(d, "day")} (${s.expire_date})`;
+  };
+  const sorted = [...subs].sort((a, b) => a.expire_date.localeCompare(b.expire_date));
+  const body = sorted.length === 1 && all <= 1
+    ? `your ${sorted[0].plan} TV service ${when(sorted[0])}.`
+    : sorted.length === 1
+      ? `your ${subName(sorted[0])} TV subscription ${when(sorted[0])}.`
+      : `these TV subscriptions are ending: ${sorted.map((s) => `${subName(s)} ${when(s)}`).join("; ")}.`;
+  return `Hi ${first}, ${body} Would you like to renew? Reply here and I will take care of it.${owner ? ` ${owner}` : ""}`.trim();
 }
 
 /** WhatsApp for a phone number, a mail link for an email, nothing for anything else. */
@@ -134,24 +145,31 @@ export function cleanUrl(input: string): string | null {
   return /^https?:\/\/[^\s]+$/i.test(t) && t.length <= 300 ? t : null;
 }
 
-export type ClientInput = {
-  client_name: string; contact: string; plan: string; model: string; order_no: string; donation: string; portal: string; mac: string;
+const tidy = (v: string, max: number) => v.replace(/\s+/g, " ").trim().slice(0, max);
+
+/** The person: a name and one way to reach them. */
+export function validateCustomer(i: { name: string; contact: string }): { ok: true; value: { name: string; contact: string | null } } | { ok: false; error: string } {
+  const name = tidy(i.name, 80);
+  if (!name) return { ok: false, error: "Enter the client's name." };
+  return { ok: true, value: { name, contact: tidy(i.contact, 120) || null } };
+}
+
+/** One subscription (a device with a plan). */
+export type SubscriptionInput = {
+  plan: string; model: string; order_no: string; donation: string; portal: string; mac: string;
   device_id: string; location: string; date_subscribed: string; frequency: string; expire_date: string; notes: string;
 };
-export type ClientRow = {
-  client_name: string; contact: string | null; plan: string; model: string | null; order_no: string | null; donation: string | null; portal: string | null;
+export type SubscriptionRow = {
+  plan: string; model: string | null; order_no: string | null; donation: string | null; portal: string | null;
   mac: string | null; device_id: string | null; location: string | null; date_subscribed: string; frequency: Frequency; expire_date: string; notes: string | null;
 };
-export const blankClient = (today: string): ClientInput => ({
-  client_name: "", contact: "", plan: "", model: "", order_no: "", donation: "", portal: "", mac: "", device_id: "", location: "",
+export const blankSubscription = (today: string): SubscriptionInput => ({
+  plan: "", model: "", order_no: "", donation: "", portal: "", mac: "", device_id: "", location: "",
   date_subscribed: today, frequency: "monthly", expire_date: "", notes: "",
 });
 
-export function validateClient(i: ClientInput): { ok: true; value: ClientRow } | { ok: false; error: string } {
-  const t = (v: string, max: number) => v.replace(/\s+/g, " ").trim().slice(0, max);
-  const name = t(i.client_name, 80);
-  if (!name) return { ok: false, error: "Enter the client's name." };
-  const plan = t(i.plan, 60);
+export function validateSubscription(i: SubscriptionInput): { ok: true; value: SubscriptionRow } | { ok: false; error: string } {
+  const plan = tidy(i.plan, 60);
   if (!plan) return { ok: false, error: "Enter the subscription (the package they bought)." };
   if (!isFrequency(i.frequency)) return { ok: false, error: "Pick how often it renews." };
   if (!isDay(i.date_subscribed)) return { ok: false, error: "Enter the date they subscribed." };
@@ -159,43 +177,54 @@ export function validateClient(i: ClientInput): { ok: true; value: ClientRow } |
   if (mac === null) return { ok: false, error: "That MAC address does not look right. It has 12 letters and numbers, like 00:1A:79:4C:2E:91." };
   const portal = cleanUrl(i.portal);
   if (portal === null) return { ok: false, error: "The portal must be a web address starting with http:// or https://." };
-  // The donation is the payment reference the client gave (like J17454B8498X), kept exactly as typed apart from case-safe trimming
+  // The donation is the payment reference the client gave (like J17454B8498X), kept as typed apart from stray spaces
   const donation = i.donation.replace(/\s+/g, "").slice(0, 40);
   if (donation && !/^[A-Za-z0-9._-]{1,40}$/.test(donation)) return { ok: false, error: "The donation reference can only have letters, numbers, dots, dashes and underscores, like J17454B8498X." };
   const expire = i.expire_date && isDay(i.expire_date) ? i.expire_date : computeExpiry(i.date_subscribed, i.frequency);
   if (expire < i.date_subscribed) return { ok: false, error: "The expire date cannot be before the date they subscribed." };
-  const orNull = (v: string, max: number) => t(v, max) || null;
+  const orNull = (v: string, max: number) => tidy(v, max) || null;
   return {
     ok: true,
     value: {
-      client_name: name, contact: orNull(i.contact, 120), plan, model: orNull(i.model, 60), order_no: orNull(i.order_no, 40), donation: donation || null, portal: portal || null,
-      mac: mac || null, device_id: orNull(i.device_id, 60), location: orNull(i.location, 80), date_subscribed: i.date_subscribed, frequency: i.frequency,
-      expire_date: expire, notes: orNull(i.notes, 500),
+      plan, model: orNull(i.model, 60), order_no: orNull(i.order_no, 40), donation: donation || null, portal: portal || null, mac: mac || null,
+      device_id: orNull(i.device_id, 60), location: orNull(i.location, 80), date_subscribed: i.date_subscribed, frequency: i.frequency, expire_date: expire, notes: orNull(i.notes, 500),
     },
   };
 }
 
-/** The only fields a client may ever be shown (the database returns exactly these). */
-export const CLIENT_VIEW_FIELDS = ["first_name", "plan", "frequency", "date_subscribed", "expire_date", "owner_name", "owner_contact", "history"] as const;
-export type ClientView = {
-  first_name: string; plan: string; frequency: string; date_subscribed: string; expire_date: string;
-  owner_name: string; owner_contact: string | null; history: { renewed_on: string; frequency: string; expires_after: string }[];
+/* ---------------- what a client is shown (the database returns exactly this) ---------------- */
+
+export type SubView = {
+  plan: string; model: string | null; frequency: string; date_subscribed: string; expire_date: string;
+  history: { renewed_on: string; frequency: string; expires_after: string }[];
 };
-export function cleanClientView(raw: unknown): ClientView | null {
+export type CustomerView = { first_name: string; owner_name: string; owner_contact: string | null; subscriptions: SubView[] };
+
+function cleanSub(raw: unknown): SubView | null {
   if (!raw || typeof raw !== "object") return null;
   const r = raw as Record<string, unknown>;
   if (typeof r.plan !== "string" || !isDay(r.expire_date)) return null;
   const hist = Array.isArray(r.history) ? r.history : [];
   return {
-    first_name: typeof r.first_name === "string" ? r.first_name : "",
     plan: r.plan,
+    model: typeof r.model === "string" && r.model ? r.model : null,
     frequency: typeof r.frequency === "string" ? r.frequency : "",
     date_subscribed: isDay(r.date_subscribed) ? r.date_subscribed : "",
     expire_date: r.expire_date,
-    owner_name: typeof r.owner_name === "string" ? r.owner_name : "your provider",
-    owner_contact: typeof r.owner_contact === "string" && r.owner_contact ? r.owner_contact : null,
     history: hist
       .filter((h): h is Record<string, unknown> => !!h && typeof h === "object" && isDay((h as Record<string, unknown>).renewed_on))
       .map((h) => ({ renewed_on: h.renewed_on as string, frequency: String(h.frequency ?? ""), expires_after: isDay(h.expires_after) ? (h.expires_after as string) : "" })),
+  };
+}
+export function cleanCustomerView(raw: unknown): CustomerView | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const subs = (Array.isArray(r.subscriptions) ? r.subscriptions : []).map(cleanSub).filter((x): x is SubView => !!x);
+  if (!subs.length) return null;
+  return {
+    first_name: typeof r.first_name === "string" ? r.first_name : "",
+    owner_name: typeof r.owner_name === "string" ? r.owner_name : "your provider",
+    owner_contact: typeof r.owner_contact === "string" && r.owner_contact ? r.owner_contact : null,
+    subscriptions: subs.sort((a, b) => a.expire_date.localeCompare(b.expire_date)),
   };
 }

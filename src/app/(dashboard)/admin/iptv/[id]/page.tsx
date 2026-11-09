@@ -1,6 +1,6 @@
-import { IptvClientEditor } from "@/components/iptv/IptvClientEditor";
+import { CustomerEditor } from "@/components/iptv/CustomerEditor";
 
-export default async function IptvClientPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function IptvCustomerPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  return <IptvClientEditor id={id} />;
+  return <CustomerEditor id={id} />;
 }

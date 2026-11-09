@@ -47,9 +47,9 @@ export async function GET(req: Request) {
     }
 
     let clients = 0;
-    const iptv = await db.from("iptv_clients").select("id, client_name, expire_date, reminded_for").limit(5000);
+    const iptv = await db.from("iptv_clients").select("id, expire_date, reminded_for").limit(5000);
     if (iptv.error && !/does not exist|schema cache/i.test(iptv.error.message)) throw new Error(iptv.error.message);
-    const dueC = dueClients(((iptv.data ?? []) as { id: string; client_name: string; expire_date: string; reminded_for: string | null }[]), today);
+    const dueC = dueClients(((iptv.data ?? []) as { id: string; expire_date: string; reminded_for: string | null }[]), today);
     if (dueC.length) {
       const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
       for (const a of admins ?? []) await sendPush(a.id as string, "iptv", "reminders");

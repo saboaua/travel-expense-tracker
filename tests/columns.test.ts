@@ -49,6 +49,7 @@ check("GROCERY_ITEM_COLS", "grocery_items", C.GROCERY_ITEM_COLS);
 check("DOCUMENT_COLS", "travel_documents", C.DOCUMENT_COLS);
 check("SUBSCRIPTION_COLS", "subscriptions", C.SUBSCRIPTION_COLS);
 check("IPTV_CLIENT_COLS", "iptv_clients", C.IPTV_CLIENT_COLS);
+check("IPTV_CUSTOMER_COLS", "iptv_customers", C.IPTV_CUSTOMER_COLS);
 check("IPTV_RENEWAL_COLS", "iptv_renewals", C.IPTV_RENEWAL_COLS);
 check("PROFILE_HOME_PLACE_COLS", "profiles", C.PROFILE_HOME_PLACE_COLS);
 check("TELEGRAM_PENDING_COLS_V2", "telegram_pending", C.TELEGRAM_PENDING_COLS_V2);
