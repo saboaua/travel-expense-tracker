@@ -1563,7 +1563,7 @@ try {
   }
 
   /* ---------- subscriptions and IPTV clients ---------- */
-  await test("subscriptions: on a small phone the Add a subscription popup keeps Save on screen, above the bottom bar", async () => {
+  await test("subscriptions: on a small phone the Add a subscription popup keeps Save on screen, at the bottom, with nothing over it", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true });
     const page = await ctx.newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
@@ -1573,8 +1573,9 @@ try {
     const dlg = page.getByRole("dialog", { name: "Add a subscription" });
     await dlg.waitFor();
     const save = await dlg.getByRole("button", { name: "Save", exact: true }).boundingBox();
-    const nav = await page.locator("nav").last().boundingBox();
-    assert(save && nav && save.y + save.height <= nav.y + 1, `Save is hidden behind the bottom bar (${save && save.y + save.height} vs ${nav && nav.y})`);
+    assert(save && save.y + save.height <= 700 + 1 && save.y + save.height >= 700 - 60, `Save sits at the bottom of the screen (${save && save.y + save.height})`);
+    const top = await page.evaluate(([x, y]) => { const el = document.elementFromPoint(x, y); return !!el?.closest('[role="dialog"]'); }, [save.x + save.width / 2, save.y + save.height / 2]);
+    assert(top, "nothing (like the bottom bar) covers Save");
     await ctx.close();
   });
 

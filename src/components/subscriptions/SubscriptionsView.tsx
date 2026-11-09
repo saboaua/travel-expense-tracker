@@ -1,5 +1,6 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CalendarPlus, ExternalLink, Plus, TrendingUp, Upload, X, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -222,8 +223,8 @@ export function SubscriptionsView() {
         </>
       )}
 
-      {editing && form && (
-        <div className="app-frame fixed inset-0 z-[60] flex items-end justify-center bg-black/50 pb-[calc(4rem+env(safe-area-inset-bottom))] md:items-center md:p-4 md:pb-4" role="dialog" aria-modal="true" aria-label={editing.id ? "Edit subscription" : "Add a subscription"}>
+      {editing && form && createPortal(
+        <div className="app-frame fixed inset-0 z-[60] flex items-end justify-center bg-black/50 md:items-center md:p-4" role="dialog" aria-modal="true" aria-label={editing.id ? "Edit subscription" : "Add a subscription"}>
           <div className="flex max-h-full w-full max-w-lg flex-col rounded-t-2xl bg-background md:rounded-2xl">
             <div className="flex shrink-0 items-center justify-between px-5 pt-4">
               <h2 className="text-lg font-bold">{editing.id ? "Edit subscription" : "Add a subscription"}</h2>
@@ -273,12 +274,13 @@ export function SubscriptionsView() {
               </div>
             )}
             </div>
-            <div className="shrink-0 space-y-2 border-t px-5 py-3">
+            <div className="shrink-0 space-y-2 border-t px-5 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
               {formError && <p role="alert" className="text-sm font-medium text-destructive">{formError}</p>}
               <Button onClick={save} disabled={saving} className="h-12 w-full text-base">{saving ? "Saving…" : "Save"}</Button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </>
   );
