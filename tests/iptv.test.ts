@@ -54,8 +54,9 @@ eq("no name", validateClient({ ...base, client_name: " " }).ok, false);
 eq("no plan", validateClient({ ...base, plan: "" }).ok, false);
 eq("bad mac", validateClient({ ...base, mac: "123" }).ok, false);
 eq("bad portal", validateClient({ ...base, portal: "ftp://x" }).ok, false);
-eq("bad donation", validateClient({ ...base, donation: "abc" }).ok, false);
-eq("donation comma", (() => { const r = validateClient({ ...base, donation: "15,5" }); return r.ok && r.value.donation; })(), 15.5);
+eq("bad donation", validateClient({ ...base, donation: "J17 <b>" }).ok, false);
+eq("donation reference kept", (() => { const r = validateClient({ ...base, donation: " J17454B8498X " }); return r.ok && r.value.donation; })(), "J17454B8498X");
+eq("donation empty", (() => { const r = validateClient(base); return r.ok && r.value.donation; })(), null);
 eq("expiry before start", validateClient({ ...base, expire_date: "2025-01-01" }).ok, false);
 eq("custom expiry", (() => { const r = validateClient({ ...base, expire_date: "2026-06-01" }); return r.ok && r.value.expire_date; })(), "2026-06-01");
 

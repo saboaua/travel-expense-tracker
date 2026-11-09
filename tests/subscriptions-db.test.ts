@@ -57,7 +57,7 @@ async function main() {
   eq("alice cannot change bob's", (await as(A, "update subscriptions set name = 'x' where user_id = $1 returning id", [B])).rows.length, 0);
 
   // ---- IPTV is admin only
-  const client = "insert into iptv_clients (created_by, client_name, plan, date_subscribed, frequency, expire_date, mac, order_no, donation, portal, device_id) values ($1, 'Maria Lopez', 'Basic', '2026-01-14', 'monthly', '2026-11-14', '00:1A:79:4C:2E:91', 'A-1', 15, 'https://p.example', '48213') returning id";
+  const client = "insert into iptv_clients (created_by, client_name, plan, date_subscribed, frequency, expire_date, mac, order_no, donation, portal, device_id) values ($1, 'Maria Lopez', 'Basic', '2026-01-14', 'monthly', '2026-11-14', '00:1A:79:4C:2E:91', 'A-1', 'J17454B8498X', 'https://p.example', '48213') returning id";
   ok("normal user cannot add a client", !!(await as(A, client, [A])).error);
   ok("client role cannot add a client", !!(await as(CLIENT, client, [CLIENT])).error);
   ok("anonymous cannot add a client", !!(await as(null, client, [A])).error);
@@ -66,6 +66,7 @@ async function main() {
   const cid = created.rows[0].id;
   eq("normal user sees no clients", (await as(A, "select id from iptv_clients")).rows.length, 0);
   ok("anonymous cannot read clients", !!(await as(null, "select * from iptv_clients")).error);
+  ok("donation reference with odd characters refused", !!(await as(ADMIN, "update iptv_clients set donation = 'x y<' where id = $1", [cid])).error);
   ok("bad MAC refused", !!(await as(ADMIN, "update iptv_clients set mac = 'nonsense' where id = $1", [cid])).error);
   ok("expiry before start refused", !!(await as(ADMIN, "update iptv_clients set expire_date = '2025-01-01' where id = $1", [cid])).error);
   ok("bad frequency refused", !!(await as(ADMIN, "update iptv_clients set frequency = 'weekly' where id = $1", [cid])).error);
@@ -99,7 +100,7 @@ async function main() {
   eq("a client sees only these fields", Object.keys(view).sort(), ["date_subscribed", "expire_date", "first_name", "frequency", "history", "owner_contact", "owner_name", "plan"]);
   eq("first name only", view.first_name, "Maria");
   const text = JSON.stringify(view);
-  for (const secret of ["00:1A", "48213", "A-1", "secret note", "Noord", "p.example", "Lopez"]) ok(`view hides ${secret}`, !text.includes(secret));
+  for (const secret of ["00:1A", "48213", "A-1", "J17454B8498X", "secret note", "Noord", "p.example", "Lopez"]) ok(`view hides ${secret}`, !text.includes(secret));
   ok("history is listed", Array.isArray(view.history) && (view.history as unknown[]).length >= 4);
   eq("unknown token", (await call("service", "iptv_public_view", "x".repeat(40))).rows[0].v, null);
   eq("short token", (await call("service", "iptv_public_view", "abc")).rows[0].v, null);

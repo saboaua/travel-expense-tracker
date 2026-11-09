@@ -1603,12 +1603,14 @@ try {
     await page.getByLabel("MAC").fill("00-1a-79-4c-2e-91");
     await page.getByLabel("ID", { exact: true }).fill("48213");
     await page.getByLabel("Order #").fill("A-20418");
+    await page.getByLabel("Donation").fill("J17454B8498X");
     await page.getByLabel("Date subscribed").fill(addDays(today, -25));
     await page.getByLabel("Expire date").fill(addDays(today, 5));
     await page.getByRole("button", { name: "Add client" }).click();
     await page.waitForURL(/\/admin\/iptv\/[0-9a-f-]{36}$/);
     await page.getByText("5 days left").first().waitFor();
     assert(fake.table("iptv_clients")[0].mac === "00:1A:79:4C:2E:91", "the MAC is stored in one format");
+    assert(fake.table("iptv_clients")[0].donation === "J17454B8498X", "the donation reference is kept as typed");
     assert(fake.table("iptv_clients")[0].created_by === ADMIN, "the admin is the owner");
 
     await page.getByRole("button", { name: "Renew", exact: true }).click();
@@ -1624,7 +1626,7 @@ try {
     await visitor.page.goto(link.replace(/^https?:\/\/[^/]+/, BASE));
     await visitor.page.getByText("Maria, your time left").waitFor();
     const text = await visitor.page.locator("body").innerText();
-    for (const secret of ["00:1A:79", "48213", "A-20418", "Lopez"]) assert(!text.includes(secret), `the public page hides ${secret}`);
+    for (const secret of ["00:1A:79", "48213", "A-20418", "J17454B8498X", "Lopez"]) assert(!text.includes(secret), `the public page hides ${secret}`);
     assert(text.includes("Basic"), "the plan is shown");
 
     // Kill switch: every client view stops at once
@@ -1666,7 +1668,7 @@ try {
     await page.waitForURL((u) => u.pathname === "/my-subscription");
     await page.getByText("Maria, your time left").waitFor();
     const text = await page.locator("body").innerText();
-    for (const secret of ["00:1A:79", "48213", "A-20418"]) assert(!text.includes(secret), `the client page hides ${secret}`);
+    for (const secret of ["00:1A:79", "48213", "A-20418", "J17454B8498X"]) assert(!text.includes(secret), `the client page hides ${secret}`);
     for (const path of ["/", "/trips", "/personal/subscriptions", "/admin/iptv", "/admin/settings"]) {
       await page.goto(`${BASE}${path}`);
       await page.waitForURL((u) => u.pathname === "/my-subscription");

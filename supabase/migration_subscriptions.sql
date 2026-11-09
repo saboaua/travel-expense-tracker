@@ -79,7 +79,7 @@ create table if not exists public.iptv_clients (
   plan text not null check (char_length(plan) between 1 and 60),                 -- SUBSCRIPTION
   model text check (model is null or char_length(model) <= 60),
   order_no text check (order_no is null or char_length(order_no) <= 40),
-  donation numeric(12,2) check (donation is null or (donation >= 0 and donation < 1000000)),
+  donation text,
   portal text check (portal is null or (char_length(portal) <= 300 and portal ~* '^https?://')),
   mac text check (mac is null or mac ~ '^([0-9A-F]{2}:){5}[0-9A-F]{2}$'),
   device_id text check (device_id is null or char_length(device_id) <= 60),      -- ID
@@ -122,6 +122,13 @@ create policy "Admin manages iptv clients" on public.iptv_clients
 drop policy if exists "Admin manages iptv renewals" on public.iptv_renewals;
 create policy "Admin manages iptv renewals" on public.iptv_renewals
   for all to authenticated using (public.iptv_is_admin()) with check (public.iptv_is_admin());
+-- Donation is the payment reference the client gave (for example J17454B8498X), not an amount.
+-- Also fixes databases that already ran the first version of this file, where it was a number.
+alter table public.iptv_clients drop constraint if exists iptv_clients_donation_check;
+alter table public.iptv_clients alter column donation type text using donation::text;
+alter table public.iptv_clients drop constraint if exists iptv_clients_donation_ref;
+alter table public.iptv_clients add constraint iptv_clients_donation_ref check (donation is null or donation ~ '^[A-Za-z0-9._-]{1,40}$');
+
 revoke all on table public.iptv_clients, public.iptv_renewals from anon;
 
 /* ---- admin actions ---- */

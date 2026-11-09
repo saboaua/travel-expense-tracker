@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/confirm";
 import { createClient } from "@/lib/supabase/client";
 import { IPTV_CLIENT_COLS, IPTV_RENEWAL_COLS } from "@/lib/columns";
-import { cn, formatCurrency, todayISO } from "@/lib/utils";
+import { cn, todayISO } from "@/lib/utils";
 import {
   FREQUENCIES, REMINDER_DAYS, blankClient, breakdownText, computeExpiry, contactUrl, daysLabel, daysLeft, frequencyLabel, isDay, renewalMessage, urgencyOf, validateClient, type ClientInput,
 } from "@/lib/iptv";
@@ -164,7 +164,7 @@ export function IptvClientEditor({ id }: { id: string }) {
           <label className={field}>Subscription<Input value={form.plan} onChange={(e) => set("plan", e.target.value)} maxLength={60} /></label>
           <label className={field}>Model<Input value={form.model} onChange={(e) => set("model", e.target.value)} maxLength={60} /></label>
           <label className={field}>Order #<Input value={form.order_no} onChange={(e) => set("order_no", e.target.value)} maxLength={40} /></label>
-          <label className={field}>Donation<Input inputMode="decimal" value={form.donation} onChange={(e) => set("donation", e.target.value)} /></label>
+          <label className={field}>Donation<Input value={form.donation} onChange={(e) => set("donation", e.target.value)} maxLength={40} placeholder="J17454B8498X" autoCapitalize="characters" /></label>
         </div>
         <label className={field}>Portal<Input value={form.portal} onChange={(e) => set("portal", e.target.value)} placeholder="https://" /></label>
         <div className="grid grid-cols-5 gap-3">
@@ -245,7 +245,6 @@ export function IptvClientEditor({ id }: { id: string }) {
               <p key={r.id} className="flex justify-between py-3 text-sm"><span>Renewed {r.renewed_on} · {frequencyLabel(r.frequency)}</span><span className="text-muted-foreground">until {r.expires_after}</span></p>
             ))}
           </Card>
-          {form.donation && <p className="text-sm text-muted-foreground">Donation on record: {formatCurrency(Number(form.donation), "USD")}</p>}
           <Button variant="destructive" className="w-full" onClick={() => void remove()}>Delete client</Button>
         </>
       )}

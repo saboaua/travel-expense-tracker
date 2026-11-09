@@ -139,7 +139,7 @@ export type ClientInput = {
   device_id: string; location: string; date_subscribed: string; frequency: string; expire_date: string; notes: string;
 };
 export type ClientRow = {
-  client_name: string; contact: string | null; plan: string; model: string | null; order_no: string | null; donation: number | null; portal: string | null;
+  client_name: string; contact: string | null; plan: string; model: string | null; order_no: string | null; donation: string | null; portal: string | null;
   mac: string | null; device_id: string | null; location: string | null; date_subscribed: string; frequency: Frequency; expire_date: string; notes: string | null;
 };
 export const blankClient = (today: string): ClientInput => ({
@@ -159,19 +159,16 @@ export function validateClient(i: ClientInput): { ok: true; value: ClientRow } |
   if (mac === null) return { ok: false, error: "That MAC address does not look right. It has 12 letters and numbers, like 00:1A:79:4C:2E:91." };
   const portal = cleanUrl(i.portal);
   if (portal === null) return { ok: false, error: "The portal must be a web address starting with http:// or https://." };
-  let donation: number | null = null;
-  if (i.donation.trim()) {
-    donation = Number(i.donation.replace(",", "."));
-    if (!Number.isFinite(donation) || donation < 0 || donation >= 1_000_000) return { ok: false, error: "Enter the donation as a number, for example 15.00." };
-    donation = Math.round(donation * 100) / 100;
-  }
+  // The donation is the payment reference the client gave (like J17454B8498X), kept exactly as typed apart from case-safe trimming
+  const donation = i.donation.replace(/\s+/g, "").slice(0, 40);
+  if (donation && !/^[A-Za-z0-9._-]{1,40}$/.test(donation)) return { ok: false, error: "The donation reference can only have letters, numbers, dots, dashes and underscores, like J17454B8498X." };
   const expire = i.expire_date && isDay(i.expire_date) ? i.expire_date : computeExpiry(i.date_subscribed, i.frequency);
   if (expire < i.date_subscribed) return { ok: false, error: "The expire date cannot be before the date they subscribed." };
   const orNull = (v: string, max: number) => t(v, max) || null;
   return {
     ok: true,
     value: {
-      client_name: name, contact: orNull(i.contact, 120), plan, model: orNull(i.model, 60), order_no: orNull(i.order_no, 40), donation, portal: portal || null,
+      client_name: name, contact: orNull(i.contact, 120), plan, model: orNull(i.model, 60), order_no: orNull(i.order_no, 40), donation: donation || null, portal: portal || null,
       mac: mac || null, device_id: orNull(i.device_id, 60), location: orNull(i.location, 80), date_subscribed: i.date_subscribed, frequency: i.frequency,
       expire_date: expire, notes: orNull(i.notes, 500),
     },
