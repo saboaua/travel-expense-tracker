@@ -1563,6 +1563,21 @@ try {
   }
 
   /* ---------- subscriptions and IPTV clients ---------- */
+  await test("subscriptions: on a small phone the Add a subscription popup keeps Save on screen, above the bottom bar", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 700 }, hasTouch: true, isMobile: true });
+    const page = await ctx.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/subscriptions`);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
+    const dlg = page.getByRole("dialog", { name: "Add a subscription" });
+    await dlg.waitFor();
+    const save = await dlg.getByRole("button", { name: "Save", exact: true }).boundingBox();
+    const nav = await page.locator("nav").last().boundingBox();
+    assert(save && nav && save.y + save.height <= nav.y + 1, `Save is hidden behind the bottom bar (${save && save.y + save.height} vs ${nav && nav.y})`);
+    await ctx.close();
+  });
+
   await test("subscriptions: a person adds one and sees the monthly total; a role without the option cannot open the page", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

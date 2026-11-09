@@ -223,12 +223,13 @@ export function SubscriptionsView() {
       )}
 
       {editing && form && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 md:items-center" role="dialog" aria-modal="true" aria-label={editing.id ? "Edit subscription" : "Add a subscription"}>
-          <div className="max-h-[92vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-t-2xl bg-background p-5 md:rounded-2xl">
-            <div className="flex items-center justify-between">
+        <div className="app-frame fixed inset-0 z-[60] flex items-end justify-center bg-black/50 pb-[calc(4rem+env(safe-area-inset-bottom))] md:items-center md:p-4 md:pb-4" role="dialog" aria-modal="true" aria-label={editing.id ? "Edit subscription" : "Add a subscription"}>
+          <div className="flex max-h-full w-full max-w-lg flex-col rounded-t-2xl bg-background md:rounded-2xl">
+            <div className="flex shrink-0 items-center justify-between px-5 pt-4">
               <h2 className="text-lg font-bold">{editing.id ? "Edit subscription" : "Add a subscription"}</h2>
               <button type="button" onClick={() => setEditing(null)} aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent"><X className="h-5 w-5" /></button>
             </div>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-3">
             <label className={field}>Name<Input value={form.name} onChange={(e) => set("name", e.target.value)} maxLength={80} /></label>
             <div className="grid grid-cols-2 gap-3">
               <label className={field}>Price<Input inputMode="decimal" value={form.price} onChange={(e) => set("price", e.target.value)} /></label>
@@ -261,8 +262,6 @@ export function SubscriptionsView() {
                 {[...editingSub.price_history].reverse().map((h) => <p key={h.at} className="flex justify-between text-muted-foreground"><span>{h.at}</span><span>{formatCurrency(h.price, editingSub.currency)}</span></p>)}
               </div>
             )}
-            {formError && <p role="alert" className="text-sm font-medium text-destructive">{formError}</p>}
-            <Button onClick={save} disabled={saving} className="h-12 w-full text-base">{saving ? "Saving…" : "Save"}</Button>
             {editingSub && (
               <div className="grid grid-cols-2 gap-2">
                 {editingSub.status === "active"
@@ -273,6 +272,11 @@ export function SubscriptionsView() {
                 <Button variant="destructive" className="col-span-2" onClick={() => void remove(editingSub)}>Delete</Button>
               </div>
             )}
+            </div>
+            <div className="shrink-0 space-y-2 border-t px-5 py-3">
+              {formError && <p role="alert" className="text-sm font-medium text-destructive">{formError}</p>}
+              <Button onClick={save} disabled={saving} className="h-12 w-full text-base">{saving ? "Saving…" : "Save"}</Button>
+            </div>
           </div>
         </div>
       )}
