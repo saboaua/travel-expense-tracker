@@ -1,5 +1,6 @@
 // Run with: npx tsx tests/dismissed.test.ts
 // Closed notices are kept on the account, so removing the app from the home screen does not bring them back.
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { cleanDismissed, mergeDismissed, pruneDismissed, loadDismissed, rememberDismissed, DISMISSED_STORAGE_KEY } from "../src/lib/dismissed";
 
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
@@ -13,16 +14,18 @@ eq(pruneDismissed({ old: now - 8 * DAY, fresh: now - DAY }, now), { fresh: now -
 
 // a tiny browser + database
 const store: Record<string, string> = {};
-(globalThis as any).localStorage = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } };
+(globalThis as unknown as { localStorage: unknown }).localStorage = { getItem: (k: string) => store[k] ?? null, setItem: (k: string, v: string) => { store[k] = v; }, removeItem: (k: string) => { delete store[k]; } };
 let remote: Record<string, number> | null = {};
 let signedIn = true, columnMissing = false;
-const db: any = {
+const fake = {
   auth: { getSession: async () => ({ data: { session: signedIn ? { user: { id: "u1" } } : null } }) },
   from: () => ({
     select: () => ({ eq: () => ({ maybeSingle: async () => columnMissing ? { data: null, error: { message: "column does not exist" } } : { data: { dismissed_notices: remote }, error: null } }) }),
-    update: (v: any) => ({ eq: async () => { remote = v.dismissed_notices; return { error: null }; } }),
+    update: (v: { dismissed_notices: Record<string, number> }) => ({ eq: async () => { remote = v.dismissed_notices; return { error: null }; } }),
   }),
 };
+// Only the few calls the code makes are faked, so the test double is cast once here
+const db = fake as unknown as SupabaseClient;
 
 (async () => {
   const t = Date.now();
