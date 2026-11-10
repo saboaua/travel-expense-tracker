@@ -3,13 +3,13 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, CreditCard, FolderOpen, Hammer, Plus, Repeat } from "lucide-react";
+import { Camera, CreditCard, Hammer, Plus, Repeat } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { approxUsd, cycleLabel, daysUntil, myShare, nextDue, totalsByCurrency, upcoming, type Sub } from "@/lib/subscriptions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import type { DocTile } from "@/components/documents/DocumentTiles";
+import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
 const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDashboard"), {
@@ -17,7 +17,6 @@ const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDa
   loading: () => <p className="py-10 text-center text-sm text-muted-foreground">Loading your personal dashboard…</p>,
 });
 
-const SCOPE_LABEL = { personal: "Personal", business: "Business", both: "Both" } as const;
 const CARD = "rounded-2xl border bg-card p-4 shadow-sm";
 const heading = "text-lg font-bold";
 const seeAll = "inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm font-semibold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -104,47 +103,6 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
   );
 }
 
-/** The documents that are set to show on Personal, soonest to expire first. */
-function DocumentsStrip({ docs, total }: { docs: DocTile[]; total: number }) {
-  return (
-    <section aria-labelledby="personal-docs-h" data-testid="personal-docs" className="space-y-2.5">
-      <div className="flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          <h2 id="personal-docs-h" className={heading}>Documents</h2>
-          <p className="text-sm text-muted-foreground">Passports, IDs and more · soonest to expire first</p>
-        </div>
-        <Link href="/documents" className={seeAll}>{total > docs.length ? `All documents (${total})` : "All documents"}</Link>
-      </div>
-      {docs.length === 0 ? (
-        <Link href="/documents" className="flex min-h-[6rem] flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed p-4 text-center text-muted-foreground hover:border-primary hover:text-foreground">
-          <FolderOpen className="h-5 w-5 text-primary" aria-hidden="true" />
-          <span className="text-sm font-semibold text-foreground">No documents on Personal yet</span>
-          <span className="text-xs">In Documents, set &quot;Show on&quot; to Personal or Both</span>
-        </Link>
-      ) : (
-        <ul className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-2 md:mx-0 md:grid md:grid-cols-2 md:overflow-visible md:px-0 xl:grid-cols-3">
-          {docs.map((d) => (
-            <li key={d.id} className="w-[72%] shrink-0 snap-start sm:w-[45%] md:w-auto">
-              <Link href="/documents" data-testid="personal-doc" className="flex h-full min-h-[116px] flex-col justify-between gap-2 rounded-2xl border bg-card p-3.5 shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <span className="flex items-start justify-between gap-2">
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-bold">{d.title || d.kindLabel}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{d.kindLabel}{d.country ? ` · ${d.country}` : ""}</span>
-                  </span>
-                  <span data-testid="doc-scope" className="shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">{SCOPE_LABEL[d.scope ?? "both"]}</span>
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {d.expiry ? <>Expires <span className="font-semibold text-foreground">{formatDate(d.expiry)}</span>{d.countdown ? ` (${d.countdown})` : ""}</> : "No expiry date"}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 /**
  * The Personal dashboard: on a phone one column (keep handy, spending, trips, subscriptions, documents, then the detail);
  * from 1024px a main column and a side rail (subscriptions and keep handy).
@@ -174,7 +132,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
     () => (
       <>
         <div className="lg:hidden"><SubscriptionsCard subs={subs} today={today} testId="subs-card-mobile" /></div>
-        {canDocuments && <DocumentsStrip docs={docs} total={docTotal} />}
+        {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2" />}
       </>
     ),
     [subs, today, docs, docTotal, canDocuments],

@@ -89,4 +89,29 @@ eq("feature registered in App group", feat?.group, "App");
 eq("user gets it by default", effectivePermissions({ key: "user", permissions: [], known_features: [] }).has("personal.dashboard"), true);
 eq("reviewed and unticked = off", effectivePermissions({ key: "user", permissions: ["trips"], known_features: ["personal.dashboard"] }).has("personal.dashboard"), false);
 eq("admin has it", effectivePermissions({ key: "admin", permissions: [], known_features: [] }).has("personal.dashboard"), true);
+// Grocery money by category: a receipt is shared over its lines' categories and still counts as one receipt
+{
+  const g = buildRows(
+    [],
+    [
+      { id: "r1", store: "Super Food", purchase_date: "2026-11-03", total: "100.00", currency: "AWG" },
+      { id: "r2", store: "Super Food", purchase_date: "2026-11-02", total: "30.00", currency: "AWG" },
+    ],
+    {},
+    [
+      { receipt_id: "r1", category: "Produce", line_total: "30.00" },
+      { receipt_id: "r1", category: "Produce", line_total: "10.00" },
+      { receipt_id: "r1", category: "Dairy", line_total: "20.00" },
+      { receipt_id: "r1", category: null, line_total: "0" },
+    ],
+  );
+  const fg = filterRows(g, DEFAULT_FILTER, today);
+  const ag = analyze(g, fg, [], DEFAULT_FILTER, today);
+  eq("grocery: shared by category, parts add up to the receipts", ag.byCategory, [{ label: "Produce", value: 66.67 }, { label: "Groceries", value: 30 }, { label: "Dairy", value: 33.33 }].sort((x, y) => y.value - x.value));
+  eq("grocery: the total is still the receipts' total", ag.total, 130);
+  eq("grocery: a split receipt counts once", ag.count, 2);
+  eq("grocery: store visits count receipts", ag.topMerchants[0].visits, 2);
+  eq("grocery: a receipt with no lines stays one Groceries row", g.filter((r) => r.receiptId === "r2").map((r) => r.category), ["Groceries"]);
+  eq("grocery: category filter works on the split", filterRows(g, { ...DEFAULT_FILTER, category: "Dairy" }, today).map((r) => r.awg), [33.33]);
+}
 process.exit(fail ? 1 : 0);

@@ -12,12 +12,28 @@ import { useConfirm } from "@/components/ui/confirm";
 import { cn, formatCurrency, todayISO } from "@/lib/utils";
 import { CURRENCIES } from "@/lib/currencies";
 import {
-  CYCLES, alerts, approxUsd, buildIcs, cycleLabel, daysUntil, importCsv, myShare, nextDue, totalsByCurrency, upcoming, validateSub, withPrice,
+  CYCLES, alerts, approxUsd, buildIcs, cycleLabel, daysUntil, importCsv, myShare, nextDue, renewalProgress, totalsByCurrency, upcoming, validateSub, withPrice,
   type Sub, type SubInput,
 } from "@/lib/subscriptions";
 
 const FILTERS = ["All", "Yearly", "Paused"] as const;
 const blank = (today: string): SubInput => ({ name: "", price: "", currency: "USD", cycle: "monthly", next_payment: today, category: "", trial_ends: "", split_count: "1", remind_days: "3", cancel_url: "", notes: "" });
+/** The bar that fills until the renewal: green while far, amber inside a week, red inside three days. */
+function RenewalBar({ s, today }: { s: Sub; today: string }) {
+  const p = renewalProgress(s, today);
+  if (!p) return null;
+  const tone = p.daysLeft <= 3 ? "bg-red-600" : p.daysLeft <= 7 ? "bg-amber-500" : "bg-primary";
+  const text = p.daysLeft === 0 ? "Renews today" : p.daysLeft === 1 ? "Renews tomorrow" : `${p.daysLeft} days to renewal`;
+  return (
+    <span className="mt-1.5 block" data-testid="renewal-bar">
+      <span role="progressbar" aria-label={`${s.name}: ${text}`} aria-valuemin={0} aria-valuemax={100} aria-valuenow={p.pct} className="block h-2 overflow-hidden rounded-full bg-muted">
+        <span className={cn("block h-full rounded-full", tone)} style={{ width: `${Math.max(p.pct, 3)}%` }} />
+      </span>
+      <span className="mt-0.5 block text-xs text-muted-foreground">{text}</span>
+    </span>
+  );
+}
+
 const label = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 const field = "flex flex-col gap-1.5 text-sm font-medium";
 
@@ -183,6 +199,7 @@ export function SubscriptionsView() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}</span>
                     <span className="block text-sm text-muted-foreground">{whenText(daysUntil(s, today))} · {cycleLabel(s.cycle).toLowerCase()}{s.split_count > 1 ? ` · split ${s.split_count} ways` : ""}</span>
+                    <RenewalBar s={s} today={today} />
                   </span>
                   <span className="text-right text-sm font-semibold">{formatCurrency(myShare(s), s.currency)}{s.split_count > 1 && <span className="block text-xs font-normal text-muted-foreground">of {formatCurrency(s.price, s.currency)}</span>}</span>
                 </button>
@@ -209,6 +226,7 @@ export function SubscriptionsView() {
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}{s.status !== "active" && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{s.status}</span>}</span>
                     <span className="block text-sm text-muted-foreground">{cycleLabel(s.cycle)} · next {nextDue(s, today)}</span>
+                    <RenewalBar s={s} today={today} />
                   </span>
                   <span className="text-sm font-semibold">{formatCurrency(myShare(s), s.currency)}</span>
                 </button>

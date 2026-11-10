@@ -25,6 +25,8 @@ export type DashboardRow = {
   original: number;
   /** Same amount in AWG, or null when no rate is known */
   awg: number | null;
+  /** A grocery receipt split over several categories has one row per category; they share this id and count as one receipt */
+  receiptId?: string;
 };
 
 export type DashboardProject = { id: string; name: string; kind: string; status?: string; destination?: string | null; start_date: string | null; end_date: string | null };
@@ -50,9 +52,23 @@ export function toAwg(amount: number, currency: string, amountUsd: number | null
 }
 
 type ExpenseRow = { project_id: string; merchant: string | null; amount: number | string; currency: string; amount_usd: number | string | null; category: string | null; expense_date: string };
-type GroceryRow = { store: string; purchase_date: string; total: number | string; currency: string };
+type GroceryRow = { id?: string; store: string; purchase_date: string; total: number | string; currency: string };
+export type GroceryItemRow = { receipt_id: string; category: string | null; line_total: number | string | null };
 
-export function buildRows(expenses: ExpenseRow[] | null | undefined, groceries: GroceryRow[] | null | undefined, usdRates: Record<string, number>): DashboardRow[] {
+/** Splits an amount over weights, to the cent, so the parts add up to exactly the whole. */
+function allocate(total: number, weights: number[]): number[] {
+  const sum = weights.reduce((s, w) => s + w, 0);
+  const out = weights.map((w) => round2((total * w) / sum));
+  out[out.length - 1] = round2(total - out.slice(0, -1).reduce((s, x) => s + x, 0));
+  return out;
+}
+
+/**
+ * `items` (the lines of the grocery receipts) lets the dashboard show where grocery money goes by category (Produce, Dairy...):
+ * each receipt's total is shared over its categories in proportion to the lines, so the totals still match the receipts.
+ * A receipt with no usable lines stays one "Groceries" row.
+ */
+export function buildRows(expenses: ExpenseRow[] | null | undefined, groceries: GroceryRow[] | null | undefined, usdRates: Record<string, number>, items?: GroceryItemRow[] | null): DashboardRow[] {
   const out: DashboardRow[] = [];
   for (const e of expenses || []) {
     const original = num(e.amount);
@@ -67,18 +83,30 @@ export function buildRows(expenses: ExpenseRow[] | null | undefined, groceries: 
       awg: toAwg(original, e.currency || "USD", e.amount_usd == null ? null : num(e.amount_usd), usdRates),
     });
   }
+  const byReceipt = new Map<string, Map<string, number>>();
+  for (const it of items || []) {
+    const v = num(it.line_total);
+    if (!(v > 0)) continue;
+    const cat = (it.category || "").trim() || "Other";
+    const m = byReceipt.get(it.receipt_id) || new Map<string, number>();
+    m.set(cat, (m.get(cat) || 0) + v);
+    byReceipt.set(it.receipt_id, m);
+  }
   for (const g of groceries || []) {
     const original = num(g.total);
-    out.push({
-      source: "grocery",
-      date: g.purchase_date,
-      merchant: (g.store || "").trim() || "Unknown",
-      category: "Groceries",
-      projectId: null,
-      currency: (g.currency || "AWG").toUpperCase(),
-      original,
-      awg: toAwg(original, g.currency || "AWG", null, usdRates),
-    });
+    const cur = (g.currency || "AWG").toUpperCase();
+    const awg = toAwg(original, g.currency || "AWG", null, usdRates);
+    const base = { source: "grocery" as const, date: g.purchase_date, merchant: (g.store || "").trim() || "Unknown", projectId: null, currency: cur };
+    const cats = g.id ? byReceipt.get(g.id) : undefined;
+    if (cats && cats.size > 0 && original > 0) {
+      const names = [...cats.keys()].sort((a, b) => (cats.get(b) as number) - (cats.get(a) as number));
+      const weights = names.map((n) => cats.get(n) as number);
+      const originals = allocate(original, weights);
+      const awgs = awg == null ? null : allocate(awg, weights);
+      names.forEach((category, k) => out.push({ ...base, category, original: originals[k], awg: awgs ? awgs[k] : null, receiptId: g.id }));
+    } else {
+      out.push({ ...base, category: "Groceries", original, awg, receiptId: g.id });
+    }
   }
   return out;
 }
@@ -201,15 +229,19 @@ export function analyze(allRows: DashboardRow[], filtered: DashboardRow[], proje
   if (f.range === "all" || range.from < "0001-01-01") days = dates.length ? Math.max(1, daysBetween(dates[0], today > dates[dates.length - 1] ? today : dates[dates.length - 1]) + 1) : 1;
   else days = Math.max(1, daysBetween(range.from, range.to > today ? today : range.to) + 1);
 
+  // A receipt split over categories is still one receipt, so visits and counts go by receipt
+  const unit = (r: DashboardRow, i: number) => r.receiptId ?? `row${i}`;
   const group = (keyOf: (r: DashboardRow) => string) => {
-    const m = new Map<string, { value: number; visits: number }>();
-    for (const r of converted) {
+    const m = new Map<string, { value: number; seen: Set<string> }>();
+    converted.forEach((r, i) => {
       const k = keyOf(r);
-      const cur = m.get(k) || { value: 0, visits: 0 };
-      m.set(k, { value: cur.value + (r.awg as number), visits: cur.visits + 1 });
-    }
-    return [...m.entries()].map(([label, v]) => ({ label, value: round2(v.value), visits: v.visits })).sort((a, b) => b.value - a.value);
+      const cur = m.get(k) || { value: 0, seen: new Set<string>() };
+      cur.seen.add(unit(r, i));
+      m.set(k, { value: cur.value + (r.awg as number), seen: cur.seen });
+    });
+    return [...m.entries()].map(([label, v]) => ({ label, value: round2(v.value), visits: v.seen.size })).sort((a, b) => b.value - a.value);
   };
+  const receipts = (rs: DashboardRow[]) => new Set(rs.map(unit)).size;
 
   const byCategory = group((r) => r.category).map(({ label, value }) => ({ label, value }));
   const topMerchants = group((r) => r.merchant).slice(0, 5);
@@ -248,8 +280,8 @@ export function analyze(allRows: DashboardRow[], filtered: DashboardRow[], proje
 
   return {
     total,
-    count: filtered.length,
-    unconverted: filtered.length - converted.length,
+    count: receipts(filtered),
+    unconverted: receipts(filtered.filter((r) => r.awg == null)),
     days,
     avgPerDay: round2(total / days),
     byCategory,

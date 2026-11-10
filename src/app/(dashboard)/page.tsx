@@ -90,7 +90,7 @@ export default async function DashboardPage() {
   const wantsDash = myPerms.has("personal.dashboard") && personalAllowed;
   const wantsSharing = myPerms.has("sharing");
   const monthStart = `${todayISO().slice(0, 7)}-01`;
-  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashPj, dashCu, destinationInfo, sharingRes] = await Promise.all([
+  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashGi, dashPj, dashCu, destinationInfo, sharingRes] = await Promise.all([
     // Security alerts are only for admins (the same people who can open Admin > Security)
     wantsSecurity
       ? supabase
@@ -108,7 +108,9 @@ export default async function DashboardPage() {
     wantsSummary ? supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", uid).eq("status", "active").order("created_at", { ascending: false }) : null,
     // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
     wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
-    wantsDash ? supabase.from("grocery_receipts").select("store, purchase_date, total, currency").eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000) : null,
+    wantsDash ? supabase.from("grocery_receipts").select("id, store, purchase_date, total, currency").eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000) : null,
+    // The lines of those receipts, so the dashboard can show where grocery money goes by category
+    wantsDash ? supabase.from("grocery_items").select("receipt_id, category, line_total").eq("user_id", uid).limit(20000) : null,
     wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, destination, start_date, end_date").eq("user_id", uid) : null,
     wantsDash ? supabase.from("currencies").select("code, usd_rate") : null,
     featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,
@@ -141,7 +143,7 @@ export default async function DashboardPage() {
   if (dashEx && dashGr && dashPj && !dashEx.error && !dashGr.error && !dashPj.error) {
     const rates: Record<string, number> = {};
     for (const c of dashCu?.data || []) if (c.usd_rate && Number(c.usd_rate) > 0) rates[String(c.code).toUpperCase()] = Number(c.usd_rate);
-    dashRows = buildRows(dashEx.data, dashGr.data, rates);
+    dashRows = buildRows(dashEx.data, dashGr.data, rates, dashGi && !dashGi.error ? dashGi.data : null);
     dashProjects = (dashPj.data || []) as DashboardProject[];
   }
 

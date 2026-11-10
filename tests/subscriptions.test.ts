@@ -1,5 +1,5 @@
 import {
-  nextPayment, nextDue, monthlyCost, totalsByCurrency, approxUsd, alerts, upcoming, dueForReminder, withPrice, validateSub, importCsv, buildIcs, myShare, priceChange, type Sub,
+  nextPayment, nextDue, monthlyCost, totalsByCurrency, approxUsd, alerts, upcoming, dueForReminder, withPrice, validateSub, importCsv, buildIcs, myShare, priceChange, renewalProgress, type Sub,
 } from "../src/lib/subscriptions";
 
 let fail = 0;
@@ -53,5 +53,15 @@ const ics = buildIcs([sub({ name: "Net, flix" }), sub({ id: "2", status: "cancel
 eq("ics events", (ics.match(/BEGIN:VEVENT/g) ?? []).length, 1);
 eq("ics escapes", ics.includes("SUMMARY:Net\\, flix"), true);
 eq("ics rule", ics.includes("RRULE:FREQ=MONTHLY") && ics.includes("DTSTART;VALUE=DATE:20261120"), true);
+// renewal progress bar
+{
+  const p = renewalProgress(sub({ next_payment: "2026-11-20" }), T)!;
+  eq("progress: monthly, 11 days left of a 31-day period", [p.from, p.to, p.daysLeft, p.periodDays, p.pct], ["2026-10-20", "2026-11-20", 11, 31, 65]);
+  eq("progress: pays today means a full bar and no days left", [renewalProgress(sub({ next_payment: "2026-11-09" }), T)!.daysLeft, renewalProgress(sub({ next_payment: "2026-11-09" }), T)!.pct], [0, 100]);
+  eq("progress: weekly", renewalProgress(sub({ cycle: "weekly", next_payment: "2026-11-12" }), T)!.pct, Math.round((4 / 7) * 100));
+  eq("progress: yearly rolls to this year's date", renewalProgress(sub({ cycle: "yearly", next_payment: "2025-12-09" }), T)!.daysLeft, 30);
+  eq("progress: none while in a free trial", renewalProgress(sub({ trial_ends: "2026-11-12" }), T), null);
+  eq("progress: none when paused", renewalProgress(sub({ status: "paused" }), T), null);
+}
 console.log(fail ? `${fail} FAILED` : "subscriptions: all checks passed");
 process.exit(fail ? 1 : 0);

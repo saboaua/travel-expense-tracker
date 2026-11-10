@@ -108,7 +108,7 @@ function DocumentTile({ doc, today, url, revealed, toggleReveal, onView, onEdit,
             <p className="flex min-w-0 items-center gap-2">
               <span className="truncate font-semibold">{doc.title}</span>
               {meter && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", CHIP[st.level])}>{meter.label}</span>}
-              {!doc.trip_id && <span data-testid="doc-scope" className="shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">{DOC_SCOPES.find((o) => o.value === docScope(doc))?.label}</span>}
+              {!doc.trip_id && docScope(doc) !== "both" && <span data-testid="doc-scope" className="shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">{DOC_SCOPES.find((o) => o.value === docScope(doc))?.label}</span>}
             </p>
             <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
               <span className="truncate">{kindLabel(doc.kind)}{doc.issuing_country ? ` · ${doc.issuing_country}` : ""}</span>

@@ -43,6 +43,18 @@ export const inTrial = (s: Sub, today: string) => !!s.trial_ends && s.trial_ends
 export const nextDue = (s: Sub, today: string) => (inTrial(s, today) ? (s.trial_ends as string) : nextPayment(s.next_payment, s.cycle, today));
 export const daysUntil = (s: Sub, today: string) => daysBetween(today, nextDue(s, today));
 
+/** How far through the current billing period it is: the bar that fills until the renewal. Null in a free trial or when not active. */
+export function renewalProgress(s: Sub, today: string): { pct: number; daysLeft: number; periodDays: number; from: string; to: string } | null {
+  if (s.status !== "active" || inTrial(s, today)) return null;
+  const to = nextPayment(s.next_payment, s.cycle, today);
+  const step = CYCLES.find((c) => c.key === s.cycle)!.step;
+  const from = "weeks" in step ? addDays(to, -7) : addMonths(to, -step.months);
+  const periodDays = Math.max(1, daysBetween(from, to));
+  const daysLeft = Math.max(0, daysBetween(today, to));
+  const done = Math.min(periodDays, Math.max(0, daysBetween(from, today)));
+  return { pct: Math.round((done / periodDays) * 100), daysLeft, periodDays, from, to };
+}
+
 /** My share of the price (a family plan split three ways). */
 export const myShare = (s: Pick<Sub, "price" | "split_count">) => Math.round((s.price / Math.max(1, s.split_count)) * 100) / 100;
 /** Cost per month: yearly plans count 1/12, weekly 52/12. Paused, cancelled and trial subscriptions cost nothing yet. */

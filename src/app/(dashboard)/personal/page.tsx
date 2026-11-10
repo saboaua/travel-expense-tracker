@@ -20,6 +20,17 @@ export default function PersonalHubPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const { perms, loaded } = useAccess();
   const [comingUp, setComingUp] = useState<ComingUpItem[] | null>(null);
+  // How many IPTV subscriptions an admin has assigned to this account. The tile is only shown when there is one.
+  const [myIptv, setMyIptv] = useState(0);
+  const wantsMyIptv = loaded && perms.has("iptv.mine") && !perms.has("iptv.manage");
+  useEffect(() => {
+    if (!wantsMyIptv) return setMyIptv(0);
+    let alive = true;
+    createClient().rpc("my_iptv_subscriptions").then(({ data, error }) => {
+      if (alive) setMyIptv(!error && Array.isArray(data) ? data.length : 0);
+    });
+    return () => { alive = false; };
+  }, [wantsMyIptv]);
   // Cards partners share with me, shown on the right of the Loyalty cards tile (the left side is my own cards)
   const { overview } = useSharing();
   const [sharedCards, setSharedCards] = useState<number | null>(null);
@@ -93,7 +104,7 @@ export default function PersonalHubPage() {
     ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, stat: "Track what you pay and what is due" }] : []),
     // Only people who manage IPTV clients (the admin, or a role given "IPTV clients") see this tile, and they do not also get the client tile below
     ...(perms.has("iptv.manage") ? [{ href: "/admin/iptv", title: "IPTV clients", icon: Tv, stat: "Your clients and when they end" }] : []),
-    ...(perms.has("iptv.mine") && !perms.has("iptv.manage") ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, stat: "See your service and when it ends" }] : []),
+    ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, stat: "See your service and when it ends" }] : []),
     ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
   ];
 

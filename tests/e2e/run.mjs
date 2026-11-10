@@ -427,10 +427,10 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
     await page.getByRole("heading", { name: "Documents", exact: true }).waitFor();
-    const titles = await page.locator("section[aria-labelledby=doc-tiles-heading] p.truncate.font-bold").allInnerTexts();
+    const titles = await page.getByTestId("doc-tiles").locator("p.truncate.font-bold").allInnerTexts();
     assert(titles.join("|") === "Visa / e-visa|Travel insurance", `tile order/content was: ${titles.join("|")}`);
     await page.getByText("Expires soon").first().waitFor();
-    const text = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
+    const text = await page.getByTestId("doc-tiles").innerText();
     assert(!text.includes("V12345678") && !text.includes("POL99887766"), "full document number leaked into a tile");
     assert(!text.includes("Trip-only Booking"), "trip document shown on the dashboard tiles");
     assert(text.includes("(20 days)") && /application id/i.test(text) && /policy no/i.test(text), "tile countdown or number labels missing");
@@ -1516,11 +1516,10 @@ try {
       assert((await page.getByRole("tab", { name: "Personal" }).getAttribute("aria-selected")) === "true", "Personal is the tab that is open first");
       await page.getByTestId("personal-total").waitFor();
       const strip = page.getByTestId("personal-docs");
-      await strip.getByText("Both Passport").waitFor();
-      await strip.getByText("Personal Licence").waitFor();
-      assert((await strip.getByText("Work Visa").count()) === 0, "a Business-only document is not listed on Personal");
-      const scopes = await strip.getByTestId("doc-scope").allInnerTexts();
-      assert(scopes.includes("Both") && scopes.includes("Personal"), `scope badges were: ${scopes.join("|")}`);
+      await strip.getByText("Passport", { exact: true }).waitFor();
+      await strip.getByText("Driver's license", { exact: true }).waitFor();
+      assert((await strip.getByText("Visa / e-visa", { exact: true }).count()) === 0, "a Business-only document is not listed on Personal");
+      assert((await strip.getByTestId("doc-scope").count()) === 0 && !(await strip.innerText()).includes("Both"), "the document tiles do not show a Both badge");
       const rail = page.getByTestId("subs-card-desktop");
       await rail.getByText("Rail Streaming").waitFor();
       assert(await page.getByTestId("keep-handy-desktop").isVisible(), "Keep handy is in the side rail on a desktop");
@@ -1531,11 +1530,11 @@ try {
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a desktop");
       // Business lists what is set to Business or Both
       await page.getByRole("tab", { name: "Business" }).click();
-      const biz = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
-      assert(biz.includes("Passport") && biz.includes("Visa") && !biz.includes("Licence"), `business tiles were: ${biz.replace(/\s+/g, " ").slice(0, 200)}`);
+      const biz = await page.getByTestId("doc-tiles").innerText();
+      assert(biz.includes("Passport") && biz.includes("Visa") && !biz.includes("license"), `business tiles were: ${biz.replace(/\s+/g, " ").slice(0, 200)}`);
       // The choice sticks
       await page.goto(`${BASE}/`);
-      assert((await page.getByRole("tab", { name: "Business" }).getAttribute("aria-selected")) === "true", "the last chosen tab is remembered");
+      await page.getByRole("tab", { name: "Business", selected: true }).waitFor({ timeout: 10_000 }).catch(() => { throw new Error("the last chosen tab is remembered"); });
       await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
     } finally {
       await ctx.close();
@@ -1564,7 +1563,7 @@ try {
       assert(handy > 0 && handy < spend && spend < subs && subs < pdocs, `order was handy ${handy}, spending ${spend}, subscriptions ${subs}, documents ${pdocs}`);
       assert(!(await page.getByTestId("subs-card-desktop").isVisible()), "the desktop rail is hidden on a phone");
       await page.getByTestId("subs-card-mobile").getByText("Phone Music").waitFor();
-      await page.getByTestId("personal-docs").getByText("Phone ID").waitFor();
+      await page.getByTestId("personal-docs").getByText("ID card", { exact: true }).waitFor();
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a phone");
       for (const el of await page.getByTestId("keep-handy-mobile").getByRole("link").all()) {
         const b = await el.boundingBox();
@@ -1603,7 +1602,7 @@ try {
       assert(row && row.show_on === "personal", `saved show_on was ${row && row.show_on}`);
       await page.getByText("Scope Test Doc").first().waitFor();
       // Editing keeps the choice and can change it
-      await page.getByText("Scope Test Doc").first().locator("xpath=ancestor::li").getByTestId("doc-scope").waitFor();
+      await page.getByText("Scope Test Doc").first().locator("xpath=ancestor::li").getByTestId("doc-scope").getByText("Personal").waitFor();
     } finally {
       await ctx.close();
       const i = docs.findIndex((d) => d.title === "Scope Test Doc");
@@ -1889,6 +1888,55 @@ try {
       await x.page.goto(`${BASE}/my-subscription`);
       await x.page.waitForURL((u) => u.pathname === "/");
       await x.ctx.close();
+    }
+  });
+
+  await test("personal: My IPTV subscription only shows for a person an admin has assigned a subscription to", async () => {
+    // Maria was linked to an IPTV client in the test above; Sam has an account but no subscription. Both get a role that has the option.
+    fake.table("roles").push({ id: "member-iptv-role", key: "member-iptv", label: "Member", description: "Has My IPTV", permissions: ["personal", "iptv.mine"], known_features: [...FEATURES, "iptv.mine"], is_system: false, created_at: new Date().toISOString() });
+    const profile = (name) => fake.table("profiles").find((p) => p.full_name === name);
+    const before = { maria: profile("Maria Lopez").role, sam: profile("Sam Assistant").role };
+    profile("Maria Lopez").role = "member-iptv";
+    profile("Sam Assistant").role = "member-iptv";
+    try {
+      for (const [email, pw, shown] of [["maria@example.com", "Maria-Pass-123", true], ["sam@example.com", "Sam-Pass-12345", false]]) {
+        const x = await newPage();
+        await signIn(x.page, email, pw);
+        await x.page.waitForURL((u) => u.pathname === "/");
+        await x.page.goto(`${BASE}/personal`);
+        await x.page.getByRole("heading", { name: "Personal", level: 1 }).waitFor();
+        await x.page.getByRole("link", { name: /Groceries|Home Projects/ }).first().waitFor();
+        if (shown) await x.page.getByRole("link", { name: /My IPTV subscription/ }).waitFor();
+        else {
+          await x.page.waitForTimeout(1500);
+          assert((await x.page.getByRole("link", { name: /My IPTV subscription/ }).count()) === 0, `${email} has no IPTV subscription, so the tile stays hidden`);
+        }
+        await x.ctx.close();
+      }
+    } finally {
+      profile("Maria Lopez").role = before.maria;
+      profile("Sam Assistant").role = before.sam;
+      const roles = fake.table("roles");
+      roles.splice(roles.findIndex((r) => r.key === "member-iptv"), 1);
+    }
+  });
+
+  await test("subscriptions: every active subscription shows a bar that fills until its renewal", async () => {
+    const subs = fake.table("subscriptions");
+    subs.push({ id: "5b000000-0000-4000-8000-0000000008f1", user_id: PAT, name: "Bar Streaming", price: 10, currency: "USD", cycle: "monthly", next_payment: addDays(today, 10), category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: new Date().toISOString() });
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/subscriptions`);
+      const bar = page.getByRole("progressbar", { name: /Bar Streaming/ }).first();
+      await bar.waitFor();
+      const now = Number(await bar.getAttribute("aria-valuenow"));
+      assert(now > 0 && now < 100, `the bar shows how far along the period is (${now}%)`);
+      assert((await bar.getAttribute("aria-label")).includes("10 days to renewal"), "the bar says how many days are left");
+    } finally {
+      await ctx.close();
+      subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000008f1"), 1);
     }
   });
 

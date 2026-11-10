@@ -50,7 +50,7 @@ const CHIP: Record<DocLevel, string> = {
 };
 
 /** Documents on the business page: one tile per saved document, soonest to expire first. */
-export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: number }) {
+export function DocumentTiles({ tiles, total, idPrefix = "doc-tiles", gridClass = "sm:grid-cols-2 xl:grid-cols-3" }: { tiles: DocTile[]; total: number; /** Two lists on one page (Personal and Business) need their own heading ids */ idPrefix?: string; gridClass?: string }) {
   const [viewing, setViewing] = useState<{ title: string; url: string; path: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -77,10 +77,10 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
   };
 
   return (
-    <section aria-labelledby="doc-tiles-heading" className="space-y-3">
+    <section aria-labelledby={`${idPrefix}-heading`} data-testid={idPrefix} className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <h2 id="doc-tiles-heading" className="text-lg font-bold">Documents</h2>
+          <h2 id={`${idPrefix}-heading`} className="text-lg font-bold">Documents</h2>
           <p className="text-sm text-muted-foreground">Soonest to expire first</p>
         </div>
         <Link href="/documents" className="inline-flex h-10 shrink-0 items-center rounded-lg border bg-card px-4 text-sm font-semibold text-primary hover:bg-muted">
@@ -97,7 +97,7 @@ export function DocumentTiles({ tiles, total }: { tiles: DocTile[]; total: numbe
           <span className="text-xs">Passport, ID, driver&apos;s license…</span>
         </Link>
       ) : (
-        <div className="grid grid-cols-1 gap-3 md:gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        <div className={`grid grid-cols-1 gap-3 md:gap-4 ${gridClass}`}>
           {tiles.map((t) => {
             const Icon = ICONS[t.kind] ?? FileText;
             const iconBtn = "inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60";
