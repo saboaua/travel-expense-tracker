@@ -48,6 +48,7 @@ each file says so when that is the case.
 | 40 | `migration_documents_show_on.sql` | Each document gets a "Show on" choice (Personal, Business or Both) that decides which home dashboard lists it. Existing documents stay on both. Needs migration_documents.sql |
 | 41 | `migration_help_documents.sql` | Help topic "Add your documents" (scanning, Show on Personal / Business / Both, expiry badges). Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
 | 42 | `migration_help_profile_photo.sql` | Help topic "Add your photo to your profile". Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
+| 43 | `migration_help_dark_mode.sql` | Help topic "Switch to dark mode". Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
