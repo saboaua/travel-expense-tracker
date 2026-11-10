@@ -9,7 +9,7 @@ import type { ListTrip } from "@/lib/trips-list";
 import { Button } from "@/components/ui/button";
 import { Plus, Plane } from "lucide-react";
 import { todayISO } from "@/lib/utils";
-import { BusinessTabs } from "@/components/layout/BusinessTabs";
+import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
@@ -61,8 +61,10 @@ export default async function TripsPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-8">
+      <BusinessHeader />
       <BusinessTabs />
       <PageHeader
+        as="h2"
         title="Trips"
         description="Manage your business travels and track expenses"
         actions={<Link href="/trips/new"><Button className="w-full gap-2 sm:w-auto"><Plus className="h-4 w-4" />New Trip</Button></Link>}

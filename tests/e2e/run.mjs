@@ -1610,6 +1610,19 @@ try {
     }
   });
 
+  await test("business: Trips and Reports open under a Business title with a line of help, like the Personal page", async () => {
+    for (const [path, section] of [["/trips", "Trips"], ["/reports", "Reports"]]) {
+      await admin.page.goto(`${BASE}${path}`);
+      await admin.page.getByRole("heading", { name: "Business", level: 1 }).waitFor();
+      await admin.page.getByText("Plan business trips, track their expenses and export your travel reports.").waitFor();
+      await admin.page.getByRole("heading", { name: section, level: 2, exact: true }).waitFor();
+      assert((await admin.page.getByRole("heading", { level: 1 }).count()) === 1, `${path} has one main title`);
+      const title = await admin.page.getByRole("heading", { name: "Business", level: 1 }).boundingBox();
+      const tabs = await admin.page.getByRole("navigation", { name: "Business sections" }).boundingBox();
+      assert(title && tabs && title.y < tabs.y, "the title sits above the Trips / Reports switch");
+    }
+  });
+
   await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {
     await admin.page.goto(`${BASE}/personal`);
     await admin.page.getByRole("heading", { name: "Groceries" }).waitFor();

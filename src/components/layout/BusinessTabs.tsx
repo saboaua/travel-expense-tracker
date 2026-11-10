@@ -3,7 +3,13 @@
 import { usePathname } from "next/navigation";
 import { FileText, Plane } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
+import { PageHeader } from "@/components/ui/page-header";
 import { useAccess } from "@/lib/use-access";
+
+/** The title of the Business area, like the Personal page has: shown above the Trips / Reports switch. */
+export function BusinessHeader() {
+  return <PageHeader title="Business" description="Plan business trips, track their expenses and export your travel reports." />;
+}
 
 /** Switch between the two business sections. Shown at the top of the Trips and Reports lists. */
 export function BusinessTabs() {

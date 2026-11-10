@@ -1,6 +1,6 @@
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
-import { BusinessTabs } from "@/components/layout/BusinessTabs";
+import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
@@ -100,8 +100,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-8">
+      <BusinessHeader />
       <BusinessTabs />
       <PageHeader
+        as="h2"
         title="Reports"
         description="Business travel spending in USD, using the rate saved with each expense"
         actions={<>
