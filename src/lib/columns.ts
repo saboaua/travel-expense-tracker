@@ -10,6 +10,10 @@ export const TRIP_COLS = "id, name, destination, category, start_date, end_date,
 /** What the export workbooks need from a trip. */
 export const TRIP_EXPORT_COLS = "id, name, destination, start_date, end_date, currency, status";
 
+/** A flight on a trip. Not selected: user_id and last_alert_key (the alert job's own memory). */
+export const FLIGHT_COLS =
+  "id, trip_id, leg, flight_number, airline, aircraft, flight_date, dep_iata, dep_city, dep_name, dep_local, dep_est_local, dep_offset, dep_terminal, dep_gate, arr_iata, arr_city, arr_name, arr_local, arr_est_local, arr_offset, arr_terminal, arr_gate, status, pnr, seat, cabin, source, alerts, last_synced_at";
+
 export const EXPENSE_COLS = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
 export const PERSONAL_PROJECT_COLS = "id, user_id, kind, name, destination, description, start_date, end_date, budget, currency, status, created_at";

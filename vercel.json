@@ -15,6 +15,10 @@
     {
       "path": "/api/cron/reminders",
       "schedule": "45 12 * * *"
+    },
+    {
+      "path": "/api/cron/flights",
+      "schedule": "20 11 * * *"
     }
   ]
 }

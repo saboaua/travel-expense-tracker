@@ -1,4 +1,5 @@
 import { daysBetween } from "@/lib/utils";
+import type { FlightLineInfo } from "@/components/flights/FlightLine";
 
 export type ListTrip = {
   id: string;
@@ -11,6 +12,8 @@ export type ListTrip = {
   count: number;
   /** For the calendar event's notes */
   notes?: string | null;
+  /** The next flight, when one has been added */
+  flight?: FlightLineInfo | null;
 };
 
 export type Phase = "ongoing" | "upcoming" | "ended" | "completed";

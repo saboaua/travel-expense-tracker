@@ -21,7 +21,7 @@ want_tables(name, fix) as (values
   ('loyalty_cards','migration_loyalty.sql'), ('help_topics','migration_help.sql'),
   ('sharing_settings','migration_sharing.sql'), ('partnerships','migration_sharing.sql'), ('shares','migration_sharing.sql'),
   ('share_activity','migration_sharing_safety.sql'), ('push_subscriptions','migration_sharing_safety.sql'), ('account_deletions','migration_sharing_safety.sql'),
-  ('subscriptions','migration_subscriptions.sql'), ('iptv_clients','migration_subscriptions.sql'), ('iptv_renewals','migration_subscriptions.sql'), ('iptv_customers','migration_iptv_customers.sql')
+  ('subscriptions','migration_subscriptions.sql'), ('iptv_clients','migration_subscriptions.sql'), ('iptv_renewals','migration_subscriptions.sql'), ('iptv_customers','migration_iptv_customers.sql'), ('trip_flights','migration_trip_flights.sql')
 ),
 want_columns(tbl, col, fix) as (values
   ('profiles','role','migration_admin.sql'), ('profiles','must_change_password','migration_admin.sql'),

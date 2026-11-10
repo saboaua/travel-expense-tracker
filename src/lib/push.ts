@@ -16,11 +16,12 @@ export const PUSH_TEXT = {
   subscription: { title: "Lifolio", body: "A subscription payment is coming up." },
   iptv: { title: "Lifolio", body: "Some IPTV clients are about to expire." },
   trip: { title: "Lifolio", body: "A trip is coming up. Open the app to check your plans." },
+  flight: { title: "Lifolio", body: "A flight on your trip changed. Open the app to check it." },
   support: { title: "Lifolio", body: "A new support request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
 export type PushKind = keyof typeof PUSH_TEXT;
-const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", support: "/admin/support" };
+const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", flight: "/trips", support: "/admin/support" };
 
 export function pushConfigured(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);

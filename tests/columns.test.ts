@@ -40,6 +40,7 @@ const check = (label: string, table: string, spec: string) => {
 };
 
 check("TRIP_COLS", "trips", C.TRIP_COLS);
+check("FLIGHT_COLS", "trip_flights", C.FLIGHT_COLS);
 check("TRIP_EXPORT_COLS", "trips", C.TRIP_EXPORT_COLS);
 check("EXPENSE_COLS", "expenses", C.EXPENSE_COLS);
 check("PERSONAL_PROJECT_COLS", "personal_projects", C.PERSONAL_PROJECT_COLS);

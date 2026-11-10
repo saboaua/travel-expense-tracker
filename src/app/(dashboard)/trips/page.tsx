@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Plus, Plane } from "lucide-react";
 import { todayISO } from "@/lib/utils";
 import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
+import { FLIGHT_COLS } from "@/lib/columns";
+import { clock, nextFlight, shownDeparture, statusView, type TripFlight } from "@/lib/flights";
+import type { FlightLineInfo } from "@/components/flights/FlightLine";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
@@ -46,6 +49,20 @@ export default async function TripsPage() {
     .order("start_date", { ascending: false });
 
   const trips = (data || []) as Trip[];
+
+  // The next flight per trip, for the line on each card (none when the table does not exist yet)
+  const { data: flightRows } = await supabase.from("trip_flights").select(FLIGHT_COLS).eq("user_id", user.id);
+  const byTrip = new Map<string, TripFlight[]>();
+  for (const f of (flightRows ?? []) as unknown as TripFlight[]) byTrip.set(f.trip_id, [...(byTrip.get(f.trip_id) ?? []), f]);
+  const now = Date.now();
+  const lineFor = (tripId: string): FlightLineInfo | null => {
+    const all = byTrip.get(tripId) ?? [];
+    const f = nextFlight(all, now);
+    if (!f) return null;
+    const c = clock(shownDeparture(f));
+    const v = statusView(f);
+    return { number: f.flight_number, from: f.dep_iata ?? "?", to: f.arr_iata ?? "?", time: c ? `${c.time} ${c.period}` : "", status: v.label, tone: v.tone, more: all.length - 1 };
+  };
   const listTrips: ListTrip[] = trips.map((t) => ({
     id: t.id,
     name: t.name,
@@ -56,6 +73,7 @@ export default async function TripsPage() {
     notes: t.notes ?? null,
     total: tripTotal(t),
     count: t.expenses?.length || 0,
+    flight: lineFor(t.id),
   }));
 
   return (

@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { SYNCED_EVENT } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
+import { FlightLine } from "@/components/flights/FlightLine";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { CalendarSheet } from "@/components/trips/CalendarSheet";
 import { MARK_EVENT, markState, readMark, type CalendarMark, type MarkState } from "@/lib/trip-calendar";
@@ -92,6 +93,7 @@ function TripCard({
             <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
             {formatDateRange(trip.start_date, trip.end_date)}
           </p>
+          {trip.flight && <FlightLine flight={trip.flight} />}
         </div>
 
         <div className="mt-4 flex items-end justify-between gap-3 border-t pt-4">

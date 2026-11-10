@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -2006,6 +2006,51 @@ try {
     } finally {
       await ctx.close();
       subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000008f1"), 1);
+    }
+  });
+
+  await test("flights: a flight added by hand shows on the trip page and trip card, the confirmation code stays hidden until revealed, and it can be removed", async () => {
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.route("**/api/flights/lookup**", (r) => r.fulfill({ status: 503, json: { reason: "not_configured" } }));
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByTestId("flight-add").first().click();
+      const dlg = page.getByRole("dialog", { name: "Add flight" });
+      await dlg.waitFor();
+      await dlg.getByTestId("flight-number").fill("CM 312");
+      await dlg.getByTestId("flight-find").click();
+      await dlg.getByTestId("flight-manual").waitFor();
+      assert((await dlg.getByTestId("flight-notice").innerText()).includes("not set up"), "says lookup is not set up and offers manual entry");
+      await dlg.getByTestId("flight-airline").fill("Copa Airlines");
+      await dlg.getByTestId("flight-from").fill("aua");
+      await dlg.getByTestId("flight-to").fill("pty");
+      await dlg.getByTestId("flight-dep-time").fill("09:45");
+      await dlg.getByTestId("flight-arr-time").fill("11:10");
+      await dlg.getByTestId("flight-pnr-input").fill("wk89l2");
+      await dlg.getByTestId("flight-seat").fill("4a");
+      await dlg.getByTestId("flight-save").click();
+      await page.getByTestId("flight-panel").waitFor({ timeout: 60000 }).catch(async () => { throw new Error("no panel; rows=" + JSON.stringify(fake.table("trip_flights").map((f) => f.flight_number)) + " page=" + (await page.locator("body").innerText()).slice(0, 700)); });
+      const panel = await page.getByTestId("flight-panel").innerText();
+      assert(/CM 312/.test(panel) && /AUA/.test(panel) && /PTY/.test(panel), "panel shows the flight and route: " + panel);
+      assert(!panel.includes("WK89L2"), "confirmation code is masked");
+      await page.getByRole("button", { name: "Show confirmation code" }).click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="flight-panel"]')?.textContent?.includes("WK89L2"));
+      const row = fake.table("trip_flights").find((f) => f.flight_number === "CM 312");
+      assert(row && row.source === "manual" && row.user_id === PAT && row.trip_id === TRIP_ID, "saved as a manual flight for this trip");
+      await page.goto(`${BASE}/trips`);
+      await page.getByTestId("trip-flight-line").first().waitFor({ timeout: 60000 });
+      assert((await page.getByTestId("trip-flight-line").first().innerText()).includes("AUA to PTY"), "trip card shows the next flight");
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByTestId("flight-remove").click();
+      await page.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
+      await page.getByText("No flight added yet").waitFor({ timeout: 60000 });
+      assert(!fake.table("trip_flights").some((f) => f.flight_number === "CM 312"), "removed from the database");
+    } finally {
+      await ctx.close();
+      const t = fake.table("trip_flights");
+      t.splice(0, t.length);
     }
   });
 

@@ -16,7 +16,9 @@ import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
 import { CategoryDonut } from "@/components/reports/CategoryDonut";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, tripPassportCheck } from "@/lib/documents";
-import { EXPENSE_COLS, TRIP_COLS } from "@/lib/columns";
+import { EXPENSE_COLS, FLIGHT_COLS, TRIP_COLS } from "@/lib/columns";
+import { TripFlights } from "@/components/flights/TripFlights";
+import type { TripFlight } from "@/lib/flights";
 
 function Tile({ label, value, sub, wide }: { label: string; value: string; sub?: string; wide?: boolean }) {
   return (
@@ -47,6 +49,10 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   const { data: passportDocs } = await supabase.from("travel_documents").select("kind, expiry_date").eq("user_id", user?.id).eq("kind", "passport");
   const passport = currentPassport(passportDocs || []);
   const passportCheck = passport?.expiry_date ? tripPassportCheck(passport.expiry_date, trip.end_date || trip.start_date) : null;
+
+  // Flights are optional: an older database without the table simply shows none
+  const { data: flightRows } = await supabase.from("trip_flights").select(FLIGHT_COLS).eq("trip_id", id).eq("user_id", user.id);
+  const flights = (flightRows ?? []) as unknown as TripFlight[];
 
   const today = todayISO();
   const endDate: string = trip.end_date || trip.start_date;
@@ -148,6 +154,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
           )}
         </div>
       </div>
+
+      <TripFlights tripId={id} tripName={trip.name} tripStart={trip.start_date} tripEnd={endDate} userId={user.id} flights={flights} />
 
       <ShareWith kind="trip" itemId={id} />
 
