@@ -1,5 +1,5 @@
 /**
- * Flights on a trip: reading what a flight-data service (AeroDataBox) or a scanned ticket says, and showing it.
+ * Flights on a trip: reading what a flight-data service (aviationstack) or a scanned ticket says, and showing it.
  *
  * Times are kept as the local wall-clock time at each airport, exactly what a boarding pass shows ("2026-11-17T09:45"),
  * plus the airport's UTC offset in minutes when it is known. That keeps the screen simple (no time-zone maths to show a
@@ -72,7 +72,7 @@ export function parseFlightNumber(input: string): { code: string; number: string
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
 export const isIsoDay = (s: unknown): s is string => typeof s === "string" && ISO_DAY.test(s) && !Number.isNaN(Date.parse(`${s}T00:00:00Z`));
 
-/* ---------------- reading AeroDataBox ---------------- */
+/* ---------------- reading aviationstack ---------------- */
 
 /** "2026-11-17 09:45-04:00" -> { local: "2026-11-17T09:45", offset: -240 }. */
 export function parseStamp(raw: unknown): { local: string; offset: number | null } | null {
@@ -109,8 +109,8 @@ export function statusFromService(raw: unknown, delay: number): FlightStatus {
   const s = String(raw ?? "").toLowerCase().replace(/[^a-z]/g, "");
   if (s === "canceled" || s === "cancelled" || s === "canceleduncertain") return "cancelled";
   if (s === "diverted") return "diverted";
-  if (s === "arrived") return "landed";
-  if (s === "departed" || s === "enroute" || s === "approaching") return "departed";
+  if (s === "arrived" || s === "landed") return "landed";
+  if (s === "departed" || s === "enroute" || s === "approaching" || s === "active") return "departed";
   if (s === "boarding" || s === "gateclosed") return "boarding";
   if (s === "delayed") return "delayed";
   if (s === "expected" || s === "checkin" || s === "scheduled") return delay >= 15 ? "delayed" : "scheduled";
@@ -122,45 +122,70 @@ const minutesBetween = (a: string | null, b: string | null): number => {
   return Math.round((Date.parse(`${b}:00Z`) - Date.parse(`${a}:00Z`)) / 60000);
 };
 
-/** One flight from AeroDataBox's "flights by number and date" answer (a list; the one leaving on `date` is used). */
-export function fromAeroDataBox(json: unknown, date: string): FlightFields | null {
-  const list = (Array.isArray(json) ? json : json ? [json] : []) as Obj[];
-  const pick =
-    list.find((f) => parseStamp(obj(obj(f.departure).scheduledTime).local ?? obj(obj(f.departure).scheduledTime).utc)?.local.startsWith(date)) ?? list[0];
+/** The airport's UTC offset (minutes) at a local wall-clock time, from its IANA zone name. */
+export function zoneOffsetMinutes(timeZone: unknown, local: string): number | null {
+  if (typeof timeZone !== "string" || !timeZone) return null;
+  try {
+    const fmt = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" });
+    const at = (ms: number) => {
+      const part = fmt.formatToParts(new Date(ms)).find((p) => p.type === "timeZoneName")?.value ?? "";
+      const m = part.match(/GMT([+-])(\d{2}):?(\d{2})?/);
+      return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) : part === "GMT" ? 0 : null;
+    };
+    const guess = Date.parse(`${local}:00Z`);
+    const first = at(guess);
+    if (first == null) return null;
+    return at(guess - first * 60000) ?? first;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One flight from aviationstack's flights answer ({ data: [...] }). Its time stamps carry a +00:00 ending even though the
+ * clock part is the airport's local time, so the clock part is read as local and the offset comes from the zone name.
+ * The entry leaving on `date` is used (the first one when no date matches and none is asked for).
+ */
+export function fromAviationstack(json: unknown, date: string | null): FlightFields | null {
+  const data = obj(json).data;
+  const list = (Array.isArray(data) ? data : []) as Obj[];
+  const day = (f: Obj) => parseStamp(obj(f.departure).scheduled)?.local.slice(0, 10) ?? (typeof f.flight_date === "string" ? f.flight_date : "");
+  const pick = date ? list.find((f) => day(f) === date) : list[0];
   if (!pick) return null;
   const dep = obj(pick.departure);
   const arr = obj(pick.arrival);
-  const depPlace = obj(dep.airport);
-  const arrPlace = obj(arr.airport);
-  const depSched = parseStamp(obj(dep.scheduledTime).local);
-  const arrSched = parseStamp(obj(arr.scheduledTime).local);
-  const depRev = parseStamp(obj(dep.revisedTime).local) ?? parseStamp(obj(dep.predictedTime).local);
-  const arrRev = parseStamp(obj(arr.revisedTime).local) ?? parseStamp(obj(arr.predictedTime).local);
-  const number = parseFlightNumber(String(pick.number ?? ""));
+  const depSched = parseStamp(dep.scheduled);
+  const arrSched = parseStamp(arr.scheduled);
+  const depEst = parseStamp(dep.estimated);
+  const arrEst = parseStamp(arr.estimated);
+  const number = parseFlightNumber(String(obj(pick.flight).iata ?? ""));
   if (!number || !depSched) return null;
-  const delay = minutesBetween(depSched.local, depRev?.local ?? null);
+  const given = typeof dep.delay === "number" && Number.isFinite(dep.delay) ? dep.delay : null;
+  const delay = given ?? minutesBetween(depSched.local, depEst?.local ?? null);
+  const estimatedDiffers = (est: { local: string } | null, sched: { local: string } | null) => !!est && est.local !== sched?.local;
+  const state = String(pick.flight_status ?? "").toLowerCase();
   return {
     flight_number: number.display,
     airline: str(obj(pick.airline).name),
-    aircraft: str(obj(pick.aircraft).model),
+    aircraft: str(obj(pick.aircraft).iata) ?? str(obj(pick.aircraft).icao),
     flight_date: depSched.local.slice(0, 10),
-    dep_iata: iata(depPlace.iata),
-    dep_city: str(depPlace.municipalityName),
-    dep_name: str(depPlace.shortName) ?? str(depPlace.name),
+    dep_iata: iata(dep.iata),
+    dep_city: null,
+    dep_name: str(dep.airport),
     dep_local: depSched.local,
-    dep_est_local: depRev && depRev.local !== depSched.local ? depRev.local : null,
-    dep_offset: depSched.offset,
+    dep_est_local: estimatedDiffers(depEst, depSched) && delay >= 1 ? depEst!.local : null,
+    dep_offset: zoneOffsetMinutes(dep.timezone, depSched.local),
     dep_terminal: str(dep.terminal, 12),
     dep_gate: str(dep.gate, 12),
-    arr_iata: iata(arrPlace.iata),
-    arr_city: str(arrPlace.municipalityName),
-    arr_name: str(arrPlace.shortName) ?? str(arrPlace.name),
+    arr_iata: iata(arr.iata),
+    arr_city: null,
+    arr_name: str(arr.airport),
     arr_local: arrSched?.local ?? null,
-    arr_est_local: arrRev && arrRev.local !== arrSched?.local ? arrRev.local : null,
-    arr_offset: arrSched?.offset ?? null,
+    arr_est_local: estimatedDiffers(arrEst, arrSched) && delay >= 1 ? arrEst!.local : null,
+    arr_offset: arrSched ? zoneOffsetMinutes(arr.timezone, arrSched.local) : null,
     arr_terminal: str(arr.terminal, 12),
     arr_gate: str(arr.gate, 12),
-    status: statusFromService(pick.status, delay),
+    status: statusFromService(state, delay),
   };
 }
 

@@ -44,8 +44,8 @@ function FoundCard({ f }: { f: FlightFields }) {
       <p className="mt-2 text-[15px] font-semibold">{[f.airline, f.flight_number].filter(Boolean).join(" · ")}</p>
       {f.aircraft && <p className="text-[13px] text-muted-foreground">{f.aircraft}</p>}
       <div className="mt-3 flex justify-between gap-3 text-[15px]">
-        <span><b>{f.dep_iata}</b> {d && `${d.time} ${d.period}`}<br /><span className="text-[13px] text-muted-foreground">{[f.dep_city, day(f.dep_local)].filter(Boolean).join(" · ")}</span></span>
-        <span className="text-right"><b>{f.arr_iata}</b> {a && `${a.time} ${a.period}`}<br /><span className="text-[13px] text-muted-foreground">{[f.arr_city, day(f.arr_local)].filter(Boolean).join(" · ")}</span></span>
+        <span><b>{f.dep_iata}</b> {d && `${d.time} ${d.period}`}<br /><span className="text-[13px] text-muted-foreground">{[f.dep_city ?? f.dep_name, day(f.dep_local)].filter(Boolean).join(" · ")}</span></span>
+        <span className="text-right"><b>{f.arr_iata}</b> {a && `${a.time} ${a.period}`}<br /><span className="text-[13px] text-muted-foreground">{[f.arr_city ?? f.arr_name, day(f.arr_local)].filter(Boolean).join(" · ")}</span></span>
       </div>
     </div>
   );
@@ -124,7 +124,7 @@ export function AddFlightSheet({
       setFound(null);
       const pretty = parseFlightNumber(n)?.display ?? n;
       if (body.reason === "not_configured") setNotice({ tone: "info", text: "Flight lookup is not set up yet. Enter the details yourself." });
-      else if (body.reason === "not_found") setNotice({ tone: "warn", text: `We couldn't find ${pretty} on that date. Check the number and date, or enter the details yourself. Flights added by hand don't update automatically.` });
+      else if (body.reason === "not_found") setNotice({ tone: "warn", text: `We couldn't find ${pretty} on that date. Check the number and date, or enter the details yourself. Flights far in the future may not be available yet. Flights added by hand don't update automatically.` });
       else if (body.reason === "limit") setNotice({ tone: "warn", text: "Too many lookups this hour. Enter the details yourself, or try again later." });
       else if (res.status === 400) setError(body.error || "Check the flight number and date.");
       else setNotice({ tone: "warn", text: "The flight service did not answer. Try again, or enter the details yourself." });

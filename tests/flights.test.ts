@@ -1,5 +1,5 @@
 import {
-  parseFlightNumber, parseStamp, fromAeroDataBox, statusFromService, statusView, clock, delayMinutes, durationMinutes, durationText,
+  parseFlightNumber, parseStamp, fromAviationstack, zoneOffsetMinutes, statusFromService, statusView, clock, delayMinutes, durationMinutes, durationText,
   arrivalDayOffset, zoneNote, manualFlight, sanitizeFlightScan, maskPnr, needsRefresh, changeKey, nextFlight, sortFlights, flightSummary, type TripFlight,
 } from "../src/lib/flights";
 
@@ -21,30 +21,32 @@ eq("stamp: utc", parseStamp("2026-11-17T13:45Z"), { local: "2026-11-17T13:45", o
 eq("stamp: positive", parseStamp("2026-11-17 18:05+05:30"), { local: "2026-11-17T18:05", offset: 330 });
 eq("stamp: none", parseStamp("nope"), null);
 
-// AeroDataBox answer
-const adb = [{
-  number: "CM 312", status: "Expected",
-  airline: { name: "Copa Airlines", iata: "CM" }, aircraft: { model: "Boeing 737 MAX 9" },
-  departure: { airport: { iata: "AUA", municipalityName: "Oranjestad", shortName: "Queen Beatrix" }, scheduledTime: { utc: "2026-11-17 13:45Z", local: "2026-11-17 09:45-04:00" }, terminal: "1", gate: "3" },
-  arrival: { airport: { iata: "PTY", municipalityName: "Panama City", shortName: "Tocumen" }, scheduledTime: { utc: "2026-11-17 15:40Z", local: "2026-11-17 10:40-05:00" }, terminal: "2", gate: "204" },
-}];
-const f = fromAeroDataBox(adb, "2026-11-17")!;
-eq("adb: number", f.flight_number, "CM 312");
-eq("adb: airline", f.airline, "Copa Airlines");
-eq("adb: route", [f.dep_iata, f.arr_iata, f.dep_city, f.arr_city], ["AUA", "PTY", "Oranjestad", "Panama City"]);
-eq("adb: times", [f.dep_local, f.arr_local], ["2026-11-17T09:45", "2026-11-17T10:40"]);
-eq("adb: offsets", [f.dep_offset, f.arr_offset], [-240, -300]);
-eq("adb: gate and terminal", [f.arr_terminal, f.arr_gate, f.dep_terminal], ["2", "204", "1"]);
-eq("adb: on time", f.status, "scheduled");
-eq("adb: nothing", fromAeroDataBox([], "2026-11-17"), null);
-eq("adb: no times", fromAeroDataBox([{ number: "CM 312" }], "2026-11-17"), null);
-// a delayed flight
-const late = fromAeroDataBox([{ ...adb[0], departure: { ...adb[0].departure, revisedTime: { local: "2026-11-17 10:10-04:00" } } }], "2026-11-17")!;
-eq("adb: delay shows as delayed", late.status, "delayed");
-eq("adb: revised departure", late.dep_est_local, "2026-11-17T10:10");
-// the right day among several
-const two = fromAeroDataBox([{ ...adb[0], departure: { ...adb[0].departure, scheduledTime: { local: "2026-11-16 09:45-04:00" } } }, adb[0]], "2026-11-17")!;
-eq("adb: picks the requested day", two.dep_local, "2026-11-17T09:45");
+// aviationstack answer (stamps end in +00:00 but the clock is local)
+const adb = { data: [{
+  flight_date: "2026-11-17", flight_status: "scheduled",
+  departure: { airport: "Queen Beatrix", timezone: "America/Aruba", iata: "AUA", terminal: "1", gate: "3", delay: null, scheduled: "2026-11-17T09:45:00+00:00", estimated: "2026-11-17T09:45:00+00:00", actual: null },
+  arrival: { airport: "Tocumen", timezone: "America/Panama", iata: "PTY", terminal: "2", gate: "204", delay: null, scheduled: "2026-11-17T10:40:00+00:00", estimated: "2026-11-17T10:40:00+00:00", actual: null },
+  airline: { name: "Copa Airlines", iata: "CM" }, flight: { number: "312", iata: "CM312" }, aircraft: { iata: "B739" },
+}] };
+const f = fromAviationstack(adb, "2026-11-17")!;
+eq("avs: number", f.flight_number, "CM 312");
+eq("avs: airline", f.airline, "Copa Airlines");
+eq("avs: route", [f.dep_iata, f.arr_iata], ["AUA", "PTY"]);
+eq("avs: times read as local", [f.dep_local, f.arr_local], ["2026-11-17T09:45", "2026-11-17T10:40"]);
+eq("avs: offsets from zone names", [f.dep_offset, f.arr_offset], [-240, -300]);
+eq("avs: gate and terminal", [f.arr_terminal, f.arr_gate, f.dep_terminal], ["2", "204", "1"]);
+eq("avs: on time", [f.status, f.dep_est_local], ["scheduled", null]);
+eq("avs: nothing", fromAviationstack({ data: [] }, "2026-11-17"), null);
+eq("avs: garbage", fromAviationstack(null, "2026-11-17"), null);
+eq("avs: no times", fromAviationstack({ data: [{ flight: { iata: "CM312" } }] }, "2026-11-17"), null);
+eq("avs: other day is not it", fromAviationstack(adb, "2026-11-18"), null);
+eq("avs: no date wanted takes the first", fromAviationstack(adb, null)!.flight_number, "CM 312");
+const dep = (o: object) => ({ data: [{ ...adb.data[0], departure: { ...adb.data[0].departure, ...o } }] });
+const late = fromAviationstack(dep({ delay: 25, estimated: "2026-11-17T10:10:00+00:00" }), "2026-11-17")!;
+eq("avs: delay shows as delayed", [late.status, late.dep_est_local], ["delayed", "2026-11-17T10:10"]);
+eq("avs: active is in the air", fromAviationstack({ data: [{ ...adb.data[0], flight_status: "active" }] }, "2026-11-17")!.status, "departed");
+eq("avs: landed", fromAviationstack({ data: [{ ...adb.data[0], flight_status: "landed" }] }, "2026-11-17")!.status, "landed");
+eq("zone offset: winter and summer", [zoneOffsetMinutes("America/New_York", "2026-01-15T10:00"), zoneOffsetMinutes("America/New_York", "2026-07-15T10:00"), zoneOffsetMinutes("Asia/Kolkata", "2026-07-15T10:00"), zoneOffsetMinutes("Nowhere/Land", "2026-07-15T10:00"), zoneOffsetMinutes(null, "2026-07-15T10:00")], [-300, -240, 330, null, null]);
 
 eq("status words", ["Canceled", "Arrived", "EnRoute", "Boarding", "Unknown"].map((s) => statusFromService(s, 0)), ["cancelled", "landed", "departed", "boarding", "unknown"]);
 
@@ -63,7 +65,7 @@ eq("delay: none", delayMinutes(fl()), 0);
 eq("delay: 25", delayMinutes(fl({ dep_est_local: "2026-11-17T10:10" })), 25);
 eq("day offset: same day", arrivalDayOffset(fl()), 0);
 eq("day offset: overnight", arrivalDayOffset(fl({ arr_local: "2026-11-18T06:00" })), 1);
-eq("zone note: behind", zoneNote(fl()), "Local times at each airport. Panama City is 1 hour behind Oranjestad.");
+eq("zone note: behind", zoneNote(fl()), "Local times at each airport. PTY is 1 hour behind AUA.");
 eq("zone note: unknown", zoneNote(fl({ dep_offset: null })), "Local times at each airport.");
 eq("status: on time", statusView(fl()), { label: "On time", tone: "ok" });
 eq("status: manual is just scheduled", statusView(fl({ source: "manual" })), { label: "Scheduled", tone: "muted" });
