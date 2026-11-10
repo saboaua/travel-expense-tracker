@@ -70,7 +70,7 @@ function Donut({ parts, total, caption }: { parts: { label: string; value: numbe
   let offset = 0;
   const label = `Share of spending: ${parts.map((x) => `${x.label} ${Math.round((x.value / sum) * 100)}%`).join(", ")}`;
   return (
-    <div className="relative h-[176px] w-[176px] shrink-0" data-testid="where-donut">
+    <div className="relative h-[210px] w-[210px] shrink-0 md:h-[240px] md:w-[240px]" data-testid="where-donut">
       <svg viewBox="0 0 160 160" className="h-full w-full" role="img" aria-label={label}>
         <circle cx="80" cy="80" r={R} fill="none" stroke="currentColor" strokeWidth={STROKE} className="text-muted/60" />
         {parts.map((x) => {
@@ -84,7 +84,7 @@ function Donut({ parts, total, caption }: { parts: { label: string; value: numbe
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
         <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{caption}</span>
-        <span className="mt-0.5 text-2xl font-semibold leading-none tabular-nums tracking-tight">{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <span className="mt-0.5 text-[28px] font-semibold leading-none tabular-nums tracking-tight">{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
   );
@@ -335,7 +335,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                 total={forList.total}
                 caption={`${filter.range === "custom" ? "Custom" : RANGES.find((r) => r.id === filter.range)!.label} \u00b7 ${BASE_CURRENCY}`}
               />
-              <div className="w-full min-w-0 flex-1">
+              <div className="w-full min-w-0 md:max-w-[22rem] md:flex-1">
             <ul>
               {heads.map((c, i) => {
                 const on = filter.category === c.label;
