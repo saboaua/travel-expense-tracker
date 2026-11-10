@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm";
-import { cn, formatCurrency, todayISO } from "@/lib/utils";
+import { cn, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { CURRENCIES } from "@/lib/currencies";
 import {
   CYCLES, alerts, approxUsd, buildIcs, cycleLabel, daysUntil, importCsv, myShare, nextDue, renewalProgress, totalsByCurrency, upcoming, validateSub, withPrice,
@@ -225,7 +225,7 @@ export function SubscriptionsView() {
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted font-bold">{s.name.slice(0, 1).toUpperCase()}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}{s.status !== "active" && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{s.status}</span>}</span>
-                    <span className="block text-sm text-muted-foreground">{cycleLabel(s.cycle)} · next {nextDue(s, today)}</span>
+                    <span className="block text-sm text-muted-foreground">{cycleLabel(s.cycle)} · next {formatDate(nextDue(s, today))}</span>
                     <RenewalBar s={s} today={today} />
                   </span>
                   <span className="text-sm font-semibold">{formatCurrency(myShare(s), s.currency)}</span>

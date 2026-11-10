@@ -128,7 +128,7 @@ function DocumentTile({ doc, today, url, revealed, toggleReveal, onView, onEdit,
           {meter && doc.expiry_date ? (
             <>
               <div className="flex justify-between gap-3 text-xs sm:text-[13px]">
-                <span className="text-muted-foreground">{meter.daysLeft < 0 ? "Expired" : "Expires"} {formatDate(doc.expiry_date)}</span>
+                <span className="whitespace-nowrap text-muted-foreground">{meter.daysLeft < 0 ? "Expired" : "Expires"} {formatDate(doc.expiry_date)}</span>
                 <span className={cn("shrink-0 font-semibold", CAPTION[st.level])}>{meter.caption}</span>
               </div>
               <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="Time left before this document expires" aria-valuemin={0} aria-valuemax={100} aria-valuenow={meter.pct}>

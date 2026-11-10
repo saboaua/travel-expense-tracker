@@ -369,6 +369,7 @@ export default async function DashboardPage() {
         notifications={notifications}
         canUseTrips={myPerms.has("trips")}
         weather={<WeatherCard inline />}
+        hasPersonalView={!!dashRows}
       />
 
       {dashRows ? (

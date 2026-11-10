@@ -1,4 +1,3 @@
-import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -62,9 +61,7 @@ export default async function TripsPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-8">
       <BusinessHeader />
-      <BusinessTabs />
-      <PageHeader
-        as="h2"
+      <BusinessTabs
         title="Trips"
         description="Manage your business travels and track expenses"
         actions={<Link href="/trips/new"><Button className="w-full gap-2 sm:w-auto"><Plus className="h-4 w-4" />New Trip</Button></Link>}

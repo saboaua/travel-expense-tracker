@@ -47,7 +47,7 @@ function KeepHandy({ testId }: { testId: string }) {
         {items.map((i) => (
           <Link key={i.href + i.label} href={i.href} className={cn(tile, i.primary && "border-primary bg-primary text-primary-foreground hover:bg-primary/90")}>
             <i.icon className={cn("h-5 w-5 shrink-0", !i.primary && "text-primary")} aria-hidden="true" />
-            <span className="min-w-0 truncate">{i.label}</span>
+            <span className="min-w-0 leading-tight">{i.label}</span>
           </Link>
         ))}
       </div>

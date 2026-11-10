@@ -9,6 +9,7 @@ import type { DocTile } from "@/components/documents/DocumentTiles";
 
 type View = "business" | "personal";
 const KEY = "dashboard-view";
+export const VIEW_EVENT = "dashboard-view-change";
 
 /**
  * Sits right under the welcome section. The business dashboard (children) is left exactly as it is; this only decides
@@ -32,6 +33,8 @@ export function DashboardViews({ rows, projects, today, docs, docTotal, canDocum
     } catch {
       /* ignore */
     }
+    // The welcome card above follows the tab
+    window.dispatchEvent(new CustomEvent(VIEW_EVENT, { detail: v }));
   };
 
   return (

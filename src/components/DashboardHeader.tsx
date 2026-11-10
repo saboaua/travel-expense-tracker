@@ -7,6 +7,7 @@ import { ScanLauncher } from "@/components/scan/ScanLauncher";
 import type { HomePlace, ScanOption } from "@/lib/scan-destination";
 import { NotificationBell } from "@/components/NotificationBell";
 import type { AppNotification } from "@/lib/notifications";
+import { VIEW_EVENT } from "@/components/DashboardViews";
 
 type Props = {
   firstName: string | null;
@@ -22,6 +23,8 @@ type Props = {
   canUseTrips?: boolean;
   /** Weather panel, shown beside the greeting */
   weather?: ReactNode;
+  /** True when the Personal | Business tabs are shown below: the card then follows the selected tab */
+  hasPersonalView?: boolean;
 };
 
 function greetingFor(hour: number) {
@@ -30,22 +33,33 @@ function greetingFor(hour: number) {
   return "Good evening";
 }
 
-export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, scanOptions, home = null, notifications = [], canUseTrips = true, weather }: Props) {
+export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, scanOptions, home = null, notifications = [], canUseTrips = true, weather, hasPersonalView = false }: Props) {
   const [greeting, setGreeting] = useState("Welcome back");
   const [online, setOnline] = useState(true);
+  // Follows the Personal / Business tab below; Personal is the default, like the tabs
+  const [view, setView] = useState<"personal" | "business">("personal");
 
   useEffect(() => {
     setGreeting(greetingFor(new Date().getHours()));
     const sync = () => setOnline(navigator.onLine);
     sync();
+    try {
+      if (localStorage.getItem("dashboard-view") === "business") setView("business");
+    } catch {
+      /* storage blocked: stay on personal */
+    }
+    const onView = (e: Event) => setView((e as CustomEvent).detail === "business" ? "business" : "personal");
+    window.addEventListener(VIEW_EVENT, onView);
     window.addEventListener("online", sync);
     window.addEventListener("offline", sync);
     return () => {
+      window.removeEventListener(VIEW_EVENT, onView);
       window.removeEventListener("online", sync);
       window.removeEventListener("offline", sync);
     };
   }, []);
 
+  const personal = hasPersonalView && view === "personal";
   const name = firstName || "";
   const tripCount = `${activeCount} active trip${activeCount !== 1 ? "s" : ""}`;
 
@@ -70,9 +84,15 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, s
               {greeting}
               {name ? `, ${name}` : ""}
             </h1>
-            <p className="truncate text-sm text-muted-foreground">
-              <span className="hidden md:inline">Track corporate expenses &amp; itineraries {"\u2022"} </span>
-              {tripCount}
+            <p className="truncate text-sm text-muted-foreground" data-testid="greeting-sub">
+              {personal ? (
+                "Your spending, subscriptions and documents"
+              ) : (
+                <>
+                  <span className="hidden md:inline">Track corporate expenses &amp; itineraries {"\u2022"} </span>
+                  {tripCount}
+                </>
+              )}
             </p>
           </div>
           <div className="flex shrink-0 items-center gap-2 md:order-3 md:gap-3">
@@ -86,7 +106,7 @@ export function DashboardHeader({ firstName, initials, avatarUrl, activeCount, s
           <div className="basis-full empty:hidden md:order-2 md:basis-auto">{weather}</div>
         </div>
 
-        <ScanLauncher options={scanOptions} home={home} showNewTrip={canUseTrips} />
+        <ScanLauncher options={scanOptions} home={home} showNewTrip={canUseTrips && !personal} />
       </div>
     </>
   );

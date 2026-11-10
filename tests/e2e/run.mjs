@@ -1615,12 +1615,31 @@ try {
       await admin.page.goto(`${BASE}${path}`);
       await admin.page.getByRole("heading", { name: "Business", level: 1 }).waitFor();
       await admin.page.getByText("Plan business trips, track their expenses and export your travel reports.").waitFor();
-      await admin.page.getByRole("heading", { name: section, level: 2, exact: true }).waitFor();
+      await admin.page.getByRole("heading", { name: new RegExp(`^${section}:`), level: 2 }).waitFor({ state: "attached" });
       assert((await admin.page.getByRole("heading", { level: 1 }).count()) === 1, `${path} has one main title`);
       const title = await admin.page.getByRole("heading", { name: "Business", level: 1 }).boundingBox();
       const tabs = await admin.page.getByRole("navigation", { name: "Business sections" }).boundingBox();
       assert(title && tabs && title.y < tabs.y, "the title sits above the Trips / Reports switch");
     }
+    // the page action sits in the tabs row on a desktop
+    await admin.page.goto(`${BASE}/trips`);
+    const tabsBox = await admin.page.getByRole("navigation", { name: "Business sections" }).boundingBox();
+    const newTrip = await admin.page.getByRole("link", { name: "New Trip" }).first().boundingBox();
+    assert(tabsBox && newTrip && Math.abs(tabsBox.y + tabsBox.height / 2 - (newTrip.y + newTrip.height / 2)) < 40, "New Trip sits beside the tabs");
+  });
+
+  await test("home: the welcome card follows the Personal / Business tab", async () => {
+    await admin.page.goto(`${BASE}/`);
+    await admin.page.evaluate(() => localStorage.removeItem("dashboard-view"));
+    await admin.page.reload();
+    const sub = admin.page.getByTestId("greeting-sub");
+    await sub.getByText("Your spending, subscriptions and documents").waitFor();
+    assert((await admin.page.getByRole("link", { name: "New Trip" }).count()) === 0, "no New Trip on the Personal tab");
+    await admin.page.getByRole("tab", { name: /Business/ }).first().click();
+    await sub.getByText(/active trip/).waitFor();
+    await admin.page.getByRole("link", { name: "New Trip" }).first().waitFor();
+    await admin.page.getByRole("tab", { name: /Personal/ }).first().click();
+    await sub.getByText("Your spending, subscriptions and documents").waitFor();
   });
 
   await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {
@@ -1712,7 +1731,17 @@ try {
     fake.table("trips").push({ id: "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c4e", user_id: PAT, name: "Bogota Summit", destination: "Bogota", category: "Business", start_date: addDays(today, 12), end_date: addDays(today, 16), currency: "USD", status: "active", notes: null, created_at: now });
     fake.table("personal_projects").push({ id: "bb000000-0000-4000-8000-000000000001", user_id: PAT, kind: "personal_trip", name: "Beach Week", destination: "Punta Cana", start_date: addDays(today, 30), end_date: addDays(today, 36), status: "active", created_at: now }, { id: "bb000000-0000-4000-8000-000000000002", user_id: PAT, kind: "home_project", name: "Kitchen refresh", destination: null, start_date: addDays(today, -5), end_date: null, status: "active", created_at: now });
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000009aa", user_id: PAT, kind: "passport", title: "Passport", issuing_country: "Aruba", document_number: "P1", expiry_date: addDays(today, 150), trip_id: null, file_path: null, created_at: now });
-    const pages = [["home", "/"], ["trips", "/trips"], ["trip", `/trips/${TRIP_ID}`], ["new-trip", "/trips/new"], ["reports", "/reports"], ["personal", "/personal"], ["documents", "/documents"], ["loyalty", "/personal/loyalty"], ["profile", "/profile"], ["help", "/help"]];
+    fake.table("subscriptions").push(
+      { id: "5b000000-0000-4000-8000-00000000a001", user_id: PAT, name: "Netflix", price: 15.5, currency: "USD", cycle: "monthly", next_payment: addDays(today, 3), category: "Streaming", status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: now },
+      { id: "5b000000-0000-4000-8000-00000000a002", user_id: PAT, name: "Gym membership", price: 30, currency: "USD", cycle: "monthly", next_payment: addDays(today, 18), category: "Health", status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: now },
+      { id: "5b000000-0000-4000-8000-00000000a003", user_id: PAT, name: "iCloud 200 GB", price: 35, currency: "USD", cycle: "yearly", next_payment: addDays(today, 120), category: "Software", status: "active", trial_ends: null, split_count: 1, remind_days: 7, cancel_url: null, notes: null, price_history: [], created_at: now },
+    );
+    fake.table("grocery_receipts").push({ id: "9a000000-0000-4000-8000-00000000a001", user_id: PAT, store: "Super Food", purchase_date: addDays(today, -2), total: 148.2, currency: "AWG", receipt_path: null, notes: null, created_at: now }, { id: "9a000000-0000-4000-8000-00000000a002", user_id: PAT, store: "Ling & Sons", purchase_date: addDays(today, -9), total: 96.4, currency: "AWG", receipt_path: null, notes: null, created_at: now });
+    fake.table("grocery_items").push(
+      ...[["Produce", 52.1], ["Dairy", 38.6], ["Meat", 41.5], ["Snacks", 16.0]].map(([category, line_total], i) => ({ id: `9b000000-0000-4000-8000-00000000a10${i}`, receipt_id: "9a000000-0000-4000-8000-00000000a001", user_id: PAT, name: `Item ${i}`, normalized_name: `item ${i}`, category, quantity: 1, unit_price: line_total, line_total, created_at: now })),
+      ...[["Produce", 30.2], ["Household", 40.2], ["Dairy", 26.0]].map(([category, line_total], i) => ({ id: `9b000000-0000-4000-8000-00000000a20${i}`, receipt_id: "9a000000-0000-4000-8000-00000000a002", user_id: PAT, name: `Thing ${i}`, normalized_name: `thing ${i}`, category, quantity: 1, unit_price: line_total, line_total, created_at: now })),
+    );
+    const pages = [["home-business", "/", "business"], ["subscriptions", "/personal/subscriptions"], ["home", "/"], ["trips", "/trips"], ["trip", `/trips/${TRIP_ID}`], ["new-trip", "/trips/new"], ["reports", "/reports"], ["personal", "/personal"], ["documents", "/documents"], ["loyalty", "/personal/loyalty"], ["profile", "/profile"], ["help", "/help"]];
     const adminPages = [["admin-security", "/admin/security"], ["admin-branding", "/admin/branding"], ["admin-users", "/admin/users"]];
     const modes = [["desktop-light", { viewport: { width: 1280, height: 860 }, colorScheme: "light" }], ["phone-light", { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, colorScheme: "light" }], ["phone-dark", { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, hasTouch: true, isMobile: true, colorScheme: "dark" }]];
     for (const [mode, opts] of modes) {
@@ -1723,7 +1752,8 @@ try {
         const pg = await ctx.newPage();
         await signIn(pg, email, pw);
         await pg.waitForURL((u) => u.pathname === "/");
-        for (const [name, path] of list) {
+        for (const [name, path, view] of list) {
+          await pg.evaluate((v) => { try { if (v) localStorage.setItem("dashboard-view", v); else localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } }, view || null);
           await pg.goto(`${BASE}${path}`).catch(() => {});
           await pg.waitForLoadState("networkidle").catch(() => {});
           if (process.env.E2E_AUDIT_FONT) {
