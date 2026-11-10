@@ -2054,6 +2054,62 @@ try {
     }
   });
 
+  await test("flights: an outbound and a return added by hand stay separate", async () => {
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.route("**/api/flights/lookup**", (r) => r.fulfill({ status: 404, json: { reason: "not_found" } }));
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      const add = async (leg, number, from, to, dep, arr) => {
+        await page.getByTestId("flight-add").first().click();
+        const dlg = page.getByRole("dialog", { name: "Add flight" });
+        await dlg.waitFor();
+        await dlg.getByRole("button", { name: leg, exact: true }).click();
+        await dlg.getByTestId("flight-number").fill(number);
+        await dlg.getByTestId("flight-find").click();
+        await dlg.getByTestId("flight-manual").waitFor();
+        const pre = [await dlg.getByTestId("flight-from").inputValue(), await dlg.getByTestId("flight-to").inputValue()];
+        await dlg.getByTestId("flight-from").fill(from);
+        await dlg.getByTestId("flight-to").fill(to);
+        await dlg.getByTestId("flight-dep-time").fill(dep);
+        await dlg.getByTestId("flight-arr-time").fill(arr);
+        await dlg.getByTestId("flight-save").click();
+        await dlg.waitFor({ state: "detached", timeout: 30000 });
+        return pre;
+      };
+      // Switching legs inside one open sheet must not carry the details over
+      await page.getByTestId("flight-add").first().click();
+      const first = page.getByRole("dialog", { name: "Add flight" });
+      await first.waitFor();
+      await first.getByTestId("flight-number").fill("CM 312");
+      await first.getByTestId("flight-find").click();
+      await first.getByTestId("flight-manual").waitFor();
+      await first.getByTestId("flight-from").fill("AUA");
+      await first.getByRole("button", { name: "Return", exact: true }).click();
+      assert((await first.getByTestId("flight-number").inputValue()) === "", "number is cleared when the leg changes");
+      assert((await first.getByTestId("flight-manual").count()) === 0, "back to finding by number");
+      await first.getByRole("button", { name: "Close" }).click();
+      await add("Outbound", "CM 312", "AUA", "PTY", "09:45", "11:10");
+      await page.getByTestId("flight-panel").waitFor({ timeout: 60000 });
+      const pre = await add("Return", "CM 313", "PTY", "AUA", "14:00", "17:30");
+      assert(pre.every((v) => v === "") || (pre[0] === "" && pre[1] === ""), "the return form does not start with the outbound details: " + JSON.stringify(pre));
+      await page.getByRole("tab").nth(1).waitFor({ timeout: 60000 });
+      const rows = fake.table("trip_flights").map((f) => [f.leg, f.flight_number, f.dep_iata, f.arr_iata, f.flight_date]);
+      assert(rows.length === 2 && rows.some((r) => r[0] === "outbound" && r[1] === "CM 312" && r[2] === "AUA") && rows.some((r) => r[0] === "return" && r[1] === "CM 313" && r[2] === "PTY"), "two separate flights saved: " + JSON.stringify(rows));
+      const tabs = await page.getByRole("tab").allInnerTexts();
+      assert(tabs.length === 2 && tabs[0] !== tabs[1], "two different tabs: " + JSON.stringify(tabs));
+      await page.getByRole("tab").nth(1).click();
+      assert((await page.getByTestId("flight-panel").innerText()).includes("CM 313"), "the return tab shows the return flight");
+      await page.getByRole("tab").nth(0).click();
+      assert((await page.getByTestId("flight-panel").innerText()).includes("CM 312"), "the outbound tab shows the outbound flight");
+    } finally {
+      await ctx.close();
+      const t = fake.table("trip_flights");
+      t.splice(0, t.length);
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {

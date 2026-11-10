@@ -101,9 +101,17 @@ export function AddFlightSheet({
   }, [onClose]);
 
   // A return flight starts from the trip's last day
+  // Each leg is its own flight: choosing another one in a new flight starts the form again, so nothing typed or found for
+  // the outbound carries over to the return
   const pickLeg = (l: FlightLeg) => {
+    if (l === leg) return;
     setLeg(l);
-    if (!editing && !found) setDate(l === "return" ? tripEnd : tripStart);
+    if (editing) return;
+    setMode("find");
+    setNumber(""); setFound(null); setNotice(null); setError("");
+    setPnr(""); setSeat(""); setCabin(""); setAlerts(true);
+    setAirline(""); setFrom(""); setTo(""); setDepTime(""); setArrTime(""); setArrDate("");
+    setDate(l === "return" ? tripEnd : tripStart);
   };
 
   async function find(n = number, d = date): Promise<boolean> {
