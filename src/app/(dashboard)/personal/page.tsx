@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Tv } from "lucide-react";
+import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
@@ -22,7 +22,7 @@ export default function PersonalHubPage() {
   const [comingUp, setComingUp] = useState<ComingUpItem[] | null>(null);
   // How many IPTV subscriptions an admin has assigned to this account. The tile is only shown when there is one.
   const [myIptv, setMyIptv] = useState(0);
-  const wantsMyIptv = loaded && perms.has("iptv.mine") && !perms.has("iptv.manage");
+  const wantsMyIptv = loaded && perms.has("iptv.mine"); // admins too: an admin can be a client of someone else's provider account
   useEffect(() => {
     if (!wantsMyIptv) return setMyIptv(0);
     let alive = true;
@@ -103,7 +103,6 @@ export default function PersonalHubPage() {
     ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
     ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, stat: "Track what you pay and what is due" }] : []),
     // Only people who manage IPTV clients (the admin, or a role given "IPTV clients") see this tile, and they do not also get the client tile below
-    ...(perms.has("iptv.manage") ? [{ href: "/admin/iptv", title: "IPTV clients", icon: Tv, stat: "Your clients and when they end" }] : []),
     ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, stat: "See your service and when it ends" }] : []),
     ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
   ];

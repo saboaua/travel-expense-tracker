@@ -1623,7 +1623,7 @@ try {
     assert((await admin.page.getByText("0 active").count()) === 0, "empty tiles no longer read '0 active'");
     await admin.page.getByText("Keep handy").waitFor();
     assert((await admin.page.getByRole("link", { name: /Documents/ }).count()) > 0 && (await admin.page.getByRole("link", { name: /Loyalty cards/ }).count()) > 0, "Documents and Loyalty cards are listed");
-    // on a phone the items (seven for an admin, with Subscriptions and IPTV clients) are within about one and a half screens: the last one starts above 1100px
+    // on a phone the items (six for an admin, with Subscriptions) are within about one and a half screens: the last one starts above 1100px
     await admin.page.setViewportSize({ width: 390, height: 844 });
     const top = await admin.page.getByRole("link", { name: /Loyalty cards/ }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
     assert(top < 1100, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
@@ -1774,9 +1774,13 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "admin@example.com", "Admin-Pass-123");
     await page.waitForURL((u) => u.pathname === "/");
+    // The IPTV clients page is reached from Settings, not from the Personal page
     await page.goto(`${BASE}/personal`);
-    await page.getByRole("link", { name: /IPTV clients/ }).waitFor(); // the admin's Personal page has the tile
-    await page.goto(`${BASE}/admin/iptv`);
+    await page.getByRole("heading", { name: "Personal", level: 1 }).waitFor();
+    assert((await page.getByRole("link", { name: /IPTV clients/ }).count()) === 0, "the Personal page has no IPTV clients tile");
+    await page.goto(`${BASE}/admin/settings`);
+    await page.getByRole("link", { name: /IPTV clients/i }).click();
+    await page.waitForURL((u) => u.pathname === "/admin/iptv");
     await page.getByRole("heading", { name: "IPTV clients", level: 1 }).waitFor();
     await page.getByRole("link", { name: "+ Add a client" }).click();
     await page.getByLabel("Client name").fill("Maria Lopez");
@@ -1913,6 +1917,19 @@ try {
         }
         await x.ctx.close();
       }
+      // An admin who is assigned a subscription on their own email sees the tile too
+      const id = fake.table("iptv_customers")[0].id;
+      const a2 = await newPage();
+      await signIn(a2.page, "admin@example.com", "Admin-Pass-123");
+      await a2.page.waitForURL((u) => u.pathname === "/");
+      await a2.page.goto(`${BASE}/admin/iptv/${id}`);
+      await a2.page.getByRole("button", { name: "Unlink", exact: true }).click(); // Maria is linked to this client from the test above
+      await a2.page.getByLabel("Client email").fill("admin@example.com");
+      await a2.page.getByRole("button", { name: "Link existing account" }).click();
+      await a2.page.getByText(/Linked\./).waitFor();
+      await a2.page.goto(`${BASE}/personal`);
+      await a2.page.getByRole("link", { name: /My IPTV subscription/ }).waitFor();
+      await a2.ctx.close();
     } finally {
       profile("Maria Lopez").role = before.maria;
       profile("Sam Assistant").role = before.sam;
