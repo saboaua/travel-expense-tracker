@@ -49,6 +49,7 @@ each file says so when that is the case.
 | 41 | `migration_help_documents.sql` | Help topic "Add your documents" (scanning, Show on Personal / Business / Both, expiry badges). Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
 | 42 | `migration_help_profile_photo.sql` | Help topic "Add your photo to your profile". Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
 | 43 | `migration_help_dark_mode.sql` | Help topic "Switch to dark mode". Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
+| 44 | `migration_help_account.sql` | Help topics for the Profile page: change your password, set your personal information, set your home place, download or delete your data. Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.
