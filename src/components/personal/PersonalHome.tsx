@@ -7,6 +7,7 @@ import { Camera, CreditCard, Hammer, Plus, Repeat } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
+import { RenewalBar } from "@/components/subscriptions/RenewalBar";
 import { approxUsd, cycleLabel, daysUntil, myShare, nextDue, totalsByCurrency, upcoming, type Sub } from "@/lib/subscriptions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
@@ -77,7 +78,7 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
         <>
           <div>
             {usd != null ? (
-              <p className="text-2xl font-bold tabular-nums">{formatCurrency(usd, "USD")}<span className="text-sm font-medium text-muted-foreground"> / month</span></p>
+              <p className="text-2xl font-bold tabular-nums">{formatCurrency(usd, "USD")}<span className="text-sm font-medium text-muted-foreground"> / month (USD)</span></p>
             ) : (
               totals.map((t) => <p key={t.currency} className="text-xl font-bold tabular-nums">{formatCurrency(t.monthly, t.currency)}<span className="text-sm font-medium text-muted-foreground"> / month</span></p>)
             )}
@@ -90,7 +91,9 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
                 <li key={s.id} className="flex min-h-[52px] items-center gap-2.5 py-1.5">
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[15px] font-semibold">{s.name}</span>
-                    <span className="block text-xs text-muted-foreground">{formatCurrency(myShare(s), s.currency)} {cycleLabel(s.cycle).toLowerCase()} · {formatDate(nextDue(s, today))}</span>
+                    <span className="block text-xs text-muted-foreground">{formatCurrency(myShare(s), s.currency)} {cycleLabel(s.cycle).toLowerCase()}</span>
+                    <RenewalBar s={s} today={today} />
+                    <span className="mt-0.5 block text-xs text-muted-foreground">Renews {formatDate(nextDue(s, today))}</span>
                   </span>
                   <span className={cn("shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold", pill.cls)}>{pill.text}</span>
                 </li>
@@ -132,7 +135,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
     () => (
       <>
         <div className="lg:hidden"><SubscriptionsCard subs={subs} today={today} testId="subs-card-mobile" /></div>
-        {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2" />}
+        {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2 lg:grid-cols-3" />}
       </>
     ),
     [subs, today, docs, docTotal, canDocuments],

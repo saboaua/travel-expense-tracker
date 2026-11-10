@@ -60,6 +60,33 @@ function tripBadge(p: DashboardProject, today: string): { text: string; tone: "g
   return { text: "In progress", tone: "blue" };
 }
 
+/** Ring chart of the category shares, with the total in the middle. The legend beside it is what filters the page. */
+function Donut({ parts, total, caption }: { parts: { label: string; value: number; color: string }[]; total: number; caption: string }) {
+  const R = 60;
+  const C = 2 * Math.PI * R;
+  const sum = parts.reduce((t, x) => t + x.value, 0) || 1;
+  let offset = 0;
+  const label = `Share of spending: ${parts.map((x) => `${x.label} ${Math.round((x.value / sum) * 100)}%`).join(", ")}`;
+  return (
+    <div className="relative h-[170px] w-[170px] shrink-0" data-testid="where-donut">
+      <svg viewBox="0 0 160 160" className="h-full w-full" role="img" aria-label={label}>
+        {parts.map((x) => {
+          const len = (x.value / sum) * C;
+          const seg = (
+            <circle key={x.label} cx="80" cy="80" r={R} fill="none" stroke={x.color} strokeWidth="22" strokeDasharray={`${Math.max(len - (parts.length > 1 ? 2 : 0), 0)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 80 80)" />
+          );
+          offset += len;
+          return seg;
+        })}
+      </svg>
+      <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
+        <span className="text-xs text-muted-foreground">{caption}</span>
+        <span className="text-[22px] font-bold leading-tight tabular-nums tracking-tight">{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+      </div>
+    </div>
+  );
+}
+
 const sectionLabel = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 const chipBase = "inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const chipOn = "border-primary bg-primary font-semibold text-primary-foreground";
@@ -68,6 +95,7 @@ const chipOff = "border-input bg-card hover:bg-accent";
 export default function PersonalDashboard({ rows, projects, today, afterTrips }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; /** Cards shown right after the trips (subscriptions, documents) */ afterTrips?: ReactNode }) {
   const [filter, setFilter] = useState<DashboardFilter>(DEFAULT_FILTER);
   const [sheet, setSheet] = useState(false);
+  const [heroView, setHeroView] = useState<"trend" | "breakdown">("trend");
 
   const set = (patch: Partial<DashboardFilter>) => setFilter((f) => ({ ...f, ...patch }));
   const filtered = useMemo(() => filterRows(rows, filter, today), [rows, filter, today]);
@@ -86,6 +114,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
   const grain: Grain = a.days > 800 ? "month" : a.days > 120 ? "week" : "day";
   const trend = useMemo(() => trendSeries(filtered, grain, range, today), [filtered, grain, range.from, range.to, today]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const peak = trend.length > 1 ? trend.reduce((m, x) => (x.value > m.value ? x : m), trend[0]) : null;
   const heads = forList.byCategory.slice(0, 5);
   const restTotal = forList.byCategory.slice(5).reduce((s, x) => s + x.value, 0);
   const listTotal = forList.total || 1;
@@ -164,9 +193,16 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
 
       {/* Hero: how much, versus before, how it is moving */}
       <section aria-label="Spending summary" className="space-y-2.5 rounded-2xl border bg-card p-4 shadow-sm">
-        <p className="text-sm text-muted-foreground">
-          {filter.category || "Spent"} · {rangeText}
-        </p>
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-sm text-muted-foreground">
+            {filter.category || "Spent"} · {rangeText}
+          </p>
+          <div role="group" aria-label="Spending view" className="inline-flex gap-1 rounded-xl bg-muted p-1">
+            {(["trend", "breakdown"] as const).map((v) => (
+              <button key={v} type="button" aria-pressed={heroView === v} onClick={() => setHeroView(v)} className={cn("min-h-[36px] rounded-lg px-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", heroView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{v}</button>
+            ))}
+          </div>
+        </div>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-3xl font-bold tabular-nums tracking-tight" data-testid="personal-total">{money(a.total)}</p>
           {change != null && (
@@ -184,14 +220,32 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
         </div>
         {prev && change != null && <p className="text-sm text-muted-foreground">than the {plural(prev.days, "day")} before ({money(prev.total)})</p>}
 
-        {trend.length > 1 && (
-          <div className="h-[72px] w-full text-primary" role="img" aria-label={`Spending over time in ${BASE_CURRENCY}`}>
+        {heroView === "breakdown" && (
+          <ul className="space-y-1.5 py-1" data-testid="hero-breakdown">
+            {heads.slice(0, 4).map((c, i) => (
+              <li key={c.label} className="text-sm">
+                <div className="flex justify-between"><span className="font-medium">{c.label}</span><span className="tabular-nums text-muted-foreground">{Math.round((c.value / listTotal) * 100)}%</span></div>
+                <div className="mt-1 h-2 rounded-full bg-muted"><div className="h-2 rounded-full" style={{ width: `${(c.value / listTotal) * 100}%`, background: PALETTE[i % PALETTE.length] }} /></div>
+              </li>
+            ))}
+          </ul>
+        )}
+        {heroView === "trend" && trend.length > 1 && (
+          <div className="h-[72px] w-full text-primary md:h-[120px]" role="img" aria-label={`Spending over time in ${BASE_CURRENCY}${peak ? `, peak on ${longDate(peak.key, false)}` : ""}`}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trend} margin={{ left: 0, right: 0, top: 6, bottom: 0 }}>
                 <Tooltip formatter={(v) => money(Number(v))} labelFormatter={(k) => longDate(String(k), false)} />
                 <Area type="monotone" dataKey="value" stroke="currentColor" strokeWidth={2.5} fill="currentColor" fillOpacity={0.12} isAnimationActive={false} />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+        )}
+
+        {heroView === "trend" && trend.length > 1 && (
+          <div className="flex justify-between text-xs text-muted-foreground" aria-hidden="true">
+            <span>{longDate(trend[0].key, false)}</span>
+            {peak && <span className="font-semibold text-primary">{longDate(peak.key, false)} (peak)</span>}
+            <span>{longDate(trend[trend.length - 1].key, false)}</span>
           </div>
         )}
 
@@ -276,12 +330,13 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
           {/* Where it goes: every row filters the page */}
           <h2 className={cn(sectionLabel, "pt-1")}>Where it goes</h2>
           <section aria-label="Where it goes" className="rounded-2xl border bg-card p-2">
-            <div className="mx-2 mb-1.5 mt-2 flex h-3 overflow-hidden rounded-md" role="img" aria-label={`Share of spending: ${heads.map((c) => `${c.label} ${Math.round((c.value / listTotal) * 100)}%`).join(", ")}`}>
-              {heads.map((c, i) => (
-                <span key={c.label} style={{ width: `${(c.value / listTotal) * 100}%`, background: PALETTE[i % PALETTE.length] }} />
-              ))}
-              {restTotal > 0 && <span style={{ width: `${(restTotal / listTotal) * 100}%`, background: PALETTE[5] }} />}
-            </div>
+            <div className="flex flex-col items-center gap-2 p-2 md:flex-row md:gap-6">
+              <Donut
+                parts={[...heads.map((c, i) => ({ label: c.label, value: c.value, color: PALETTE[i % PALETTE.length] })), ...(restTotal > 0 ? [{ label: "Everything else", value: restTotal, color: PALETTE[5] }] : [])]}
+                total={forList.total}
+                caption={`${filter.range === "custom" ? "Custom" : RANGES.find((r) => r.id === filter.range)!.label} \u00b7 ${BASE_CURRENCY}`}
+              />
+              <div className="w-full min-w-0 flex-1">
             <ul>
               {heads.map((c, i) => {
                 const on = filter.category === c.label;
@@ -307,6 +362,8 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                 </li>
               )}
             </ul>
+              </div>
+            </div>
           </section>
 
           <h2 className={cn(sectionLabel, "pt-1")}>Top stores</h2>
@@ -318,8 +375,12 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-medium">{m.label}</span>
                       <span className="block text-xs text-muted-foreground">{plural(m.visits, "visit")}</span>
+                      <span className="mt-1.5 block h-1.5 rounded-full bg-muted" aria-hidden="true"><span className="block h-1.5 rounded-full bg-primary" style={{ width: `${Math.min(100, (m.value / (a.total || 1)) * 100)}%` }} /></span>
                     </span>
-                    <span className="text-[15px] font-semibold tabular-nums">{money(m.value)}</span>
+                    <span className="text-right">
+                      <span className="block text-[15px] font-semibold tabular-nums">{money(m.value)}</span>
+                      <span className="block text-xs text-muted-foreground tabular-nums">{Math.round((m.value / (a.total || 1)) * 1000) / 10}% of spend</span>
+                    </span>
                   </button>
                 </li>
               ))}

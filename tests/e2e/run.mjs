@@ -1466,6 +1466,17 @@ try {
       await admin.page.getByTestId("active-filters").waitFor({ state: "detached" });
     }
     await admin.page.getByRole("heading", { name: "Active now" }).waitFor();
+    // the new ring chart and the Trend | Breakdown switch
+    if ((await admin.page.getByRole("region", { name: "Where it goes" }).count()) > 0) {
+      await admin.page.getByTestId("where-donut").waitFor();
+      const legend = await admin.page.getByRole("region", { name: "Where it goes" }).getByRole("button").count();
+      const ring = await admin.page.getByTestId("where-donut").getByRole("img").getAttribute("aria-label");
+      assert(ring && ring.split("%").length - 1 >= Math.min(legend, 2), "the ring names the same shares as the legend");
+      await admin.page.getByRole("button", { name: "Breakdown", exact: true }).click();
+      await admin.page.getByTestId("hero-breakdown").waitFor();
+      await admin.page.getByRole("button", { name: "Trend", exact: true }).click();
+      await admin.page.getByTestId("hero-breakdown").waitFor({ state: "detached" });
+    }
     await admin.page.getByRole("tab", { name: "Business" }).click();
   });
 
