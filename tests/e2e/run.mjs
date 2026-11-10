@@ -1479,10 +1479,10 @@ try {
     assert((await admin.page.getByText("0 active").count()) === 0, "empty tiles no longer read '0 active'");
     await admin.page.getByText("Keep handy").waitFor();
     assert((await admin.page.getByRole("link", { name: /Documents/ }).count()) > 0 && (await admin.page.getByRole("link", { name: /Loyalty cards/ }).count()) > 0, "Documents and Loyalty cards are listed");
-    // on a phone all five items are within about one and a half screens: the last one starts above 1000px
+    // on a phone the items (seven for an admin, with Subscriptions and IPTV clients) are within about one and a half screens: the last one starts above 1100px
     await admin.page.setViewportSize({ width: 390, height: 844 });
     const top = await admin.page.getByRole("link", { name: /Loyalty cards/ }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
-    assert(top < 900, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
+    assert(top < 1100, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
     await admin.page.setViewportSize({ width: 1280, height: 720 });
   });
 
