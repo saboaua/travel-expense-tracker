@@ -1,6 +1,6 @@
 import { todayISO } from "@/lib/utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, TRIP_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, EXPENSE_COLS, TRIP_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import type { TravelDocument } from "@/lib/documents";
 import type { LoyaltyCard } from "@/lib/loyalty";
@@ -23,12 +23,13 @@ export function fetchLoyaltyCards(supabase: SupabaseClient, userId: string) {
 }
 
 export function fetchDocuments(supabase: SupabaseClient, tripId: string | null) {
-  return withColumnFallback(
+  return withColumnFallback3(
     (cols) => {
       const q = supabase.from("travel_documents").select(cols).order("created_at", { ascending: false });
       return tripId ? q.eq("trip_id", tripId) : q.is("trip_id", null);
     },
     DOCUMENT_COLS,
+    DOCUMENT_COLS_NUMBER,
     DOCUMENT_COLS_BASE
   ) as unknown as PromiseLike<{ data: TravelDocument[] | null; error: { message: string } | null }>;
 }

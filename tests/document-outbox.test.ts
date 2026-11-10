@@ -26,12 +26,30 @@ const fields = { kind: "visa" as const, title: "Visa", document_number: "", issu
 const doc = (o: Partial<TravelDocument> = {}): TravelDocument => ({ id: "d1", user_id: "u", trip_id: null, kind: "passport", title: "Passport", issuing_country: null, expiry_date: null, notes: null, file_path: "u/general/old-p.pdf", created_at: "", ...o });
 const missingCol = { code: "42703", message: "column travel_documents.document_number does not exist" };
 
+async function assertFails(p: Promise<unknown>, re: RegExp, m: string) {
+  try { await p; eq("saved", "failed", m); } catch (e) { eq(re.test((e as Error).message), true, m); }
+}
+
 (async () => {
   // online
   let f = fakeApi(), st = memStore();
   let r = await saveDocument({ api: f.api, store: st, userId: "u", doc: null, fields, file: pdf(), online: true });
   eq([f.calls.uploads.length, r.queued, st.items.length, f.calls.upserts[0].id === r.doc.id, f.calls.upserts[0].user_id, f.calls.upserts[0].trip_id, "document_number" in f.calls.upserts[0]], [1, false, 0, true, "u", null, false], "online: a new document uploads and saves with its own id; no number column is sent without a number");
   eq(String(f.calls.uploads[0]).startsWith("u/general/"), true, "the file goes under the user's general folder");
+
+  // show on: the default is not sent, so older databases keep working; a choice is sent
+  f = fakeApi(); st = memStore();
+  await saveDocument({ api: f.api, store: st, userId: "u", doc: null, fields: { ...fields, show_on: "both" }, online: true });
+  eq("show_on" in f.calls.upserts[0], false, "show on: the default (both) is not sent to a database that may lack the column");
+  f = fakeApi(); st = memStore();
+  await saveDocument({ api: f.api, store: st, userId: "u", doc: null, fields: { ...fields, show_on: "personal" }, online: true });
+  eq(f.calls.upserts[0].show_on, "personal", "show on: a choice is sent");
+  f = fakeApi({ upsertErrors: [{ code: "42703", message: "column travel_documents.show_on does not exist" }] }); st = memStore();
+  await assertFails(saveDocument({ api: f.api, store: st, userId: "u", doc: null, fields: { ...fields, show_on: "business" }, online: true }), /migration_documents_show_on/, "show on: a choice on an older database says which migration to run");
+  f = fakeApi({ upsertErrors: [{ code: "42703", message: "column travel_documents.show_on does not exist" }] }); st = memStore();
+  const keepDoc = doc({ show_on: "both" });
+  await saveDocument({ api: f.api, store: st, userId: "u", doc: keepDoc, fields: { ...fields, show_on: "both" }, online: true });
+  eq([f.calls.upserts.length, "show_on" in f.calls.upserts[1]], [2, false], "show on: both on an older database retries without the column and saves");
 
   // in a trip
   f = fakeApi(); st = memStore();

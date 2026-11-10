@@ -11,7 +11,7 @@ import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
-import { currentPassport, documentStatus, kindLabel, maskNumber, numberLabel, renewalAlert, sortForTiles, tileCountdown } from "@/lib/documents";
+import { currentPassport, docScope, documentStatus, kindLabel, maskNumber, numberLabel, renewalAlert, showsOn, sortForTiles, tileCountdown } from "@/lib/documents";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import { buildAccessNotification, buildNotifications, buildSecurityNotifications } from "@/lib/notifications";
 import { buildSharingNotifications, type SharingOverview } from "@/lib/sharing";
@@ -22,7 +22,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
-import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -52,9 +52,10 @@ export default async function DashboardPage() {
       .eq("user_id", uid)
       .order("start_date", { ascending: true }),
     // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
-    withColumnFallback(
+    withColumnFallback3(
       (cols) => supabase.from("travel_documents").select(cols).eq("user_id", uid),
       DOCUMENT_TILE_COLS,
+      DOCUMENT_TILE_COLS_NUMBER,
       DOCUMENT_TILE_COLS_BASE
     ),
     supabase.from("app_settings").select("personal_enabled").eq("id", 1).single(),
@@ -62,7 +63,7 @@ export default async function DashboardPage() {
   ]);
   const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
   const trips = tripsRes.data;
-  type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null };
+  type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null; show_on?: string | null };
   const docRows = (docRes.data || []) as unknown as DocRow[];
   const role = (profile?.role as string) || "user";
   const roleRows = rolesRes.error ? null : ((rolesRes.data || []) as RoleRecord[]);
@@ -195,9 +196,8 @@ export default async function DashboardPage() {
     canDocuments: myPerms.has("documents"),
   });
 
-  // Tiles for the person's own documents (not tied to a trip), soonest to expire first
-  const accountDocs = sortForTiles(docRows.filter((d) => !d.trip_id));
-  const docTiles: DocTile[] = accountDocs.slice(0, 4).map((d) => {
+  // Tiles for the person's own documents (not tied to a trip), soonest to expire first. "Show on" decides which dashboard lists each one.
+  const toTile = (d: DocRow): DocTile => {
     const st = documentStatus(d.kind, d.expiry_date, todayISO());
     return {
       id: d.id,
@@ -212,8 +212,14 @@ export default async function DashboardPage() {
       filePath: d.file_path,
       numberLabel: numberLabel(d.kind),
       countdown: tileCountdown(d.kind, d.expiry_date, todayISO()),
+      scope: docScope(d),
     };
-  });
+  };
+  const ownDocs = sortForTiles(docRows.filter((d) => !d.trip_id));
+  const accountDocs = ownDocs.filter((d) => showsOn(d, "business"));
+  const docTiles: DocTile[] = accountDocs.slice(0, 4).map(toTile);
+  const personalDocsAll = ownDocs.filter((d) => showsOn(d, "personal"));
+  const personalDocTiles: DocTile[] = personalDocsAll.slice(0, 6).map(toTile);
 
   const businessView = (
     <>
@@ -368,6 +374,9 @@ export default async function DashboardPage() {
           rows={dashRows}
           projects={dashProjects}
           today={today}
+          docs={personalDocTiles}
+          docTotal={personalDocsAll.length}
+          canDocuments={myPerms.has("documents")}
         >
           {businessView}
         </DashboardViews>

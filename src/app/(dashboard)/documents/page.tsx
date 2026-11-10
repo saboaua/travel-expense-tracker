@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { kindLabel, type TravelDocument } from "@/lib/documents";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, withColumnFallback3 } from "@/lib/columns";
 
 export default async function DocumentsPage() {
   const supabase = await createClient();
@@ -15,9 +15,10 @@ export default async function DocumentsPage() {
   if (!user) redirect("/login");
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user?.id).single();
   const canSeePersonal = (await loadPermissions(supabase, (profile?.role as string) || "user")).has("personal");
-  const { data } = await withColumnFallback(
+  const { data } = await withColumnFallback3(
     (cols) => supabase.from("travel_documents").select(cols).eq("user_id", user?.id).order("created_at", { ascending: false }),
     DOCUMENT_COLS,
+    DOCUMENT_COLS_NUMBER,
     DOCUMENT_COLS_BASE
   );
   const all = (data || []) as unknown as TravelDocument[];

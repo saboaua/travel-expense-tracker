@@ -20,11 +20,14 @@ export const GROCERY_ITEM_COLS = "id, name, category, quantity, unit_price, unit
 
 export const DOCUMENT_COLS_BASE = "id, user_id, trip_id, kind, title, issuing_country, expiry_date, notes, file_path, created_at";
 /** document_number comes from migration_documents_number.sql, which an older database may not have yet. */
-export const DOCUMENT_COLS = `${DOCUMENT_COLS_BASE}, document_number`;
+export const DOCUMENT_COLS_NUMBER = `${DOCUMENT_COLS_BASE}, document_number`;
+/** show_on comes from migration_documents_show_on.sql. */
+export const DOCUMENT_COLS = `${DOCUMENT_COLS_NUMBER}, show_on`;
 
 /** What the document tiles on the home page need. document_number (masked on the tile) needs its own migration. */
 export const DOCUMENT_TILE_COLS_BASE = "id, kind, title, issuing_country, expiry_date, trip_id, file_path, created_at";
-export const DOCUMENT_TILE_COLS = `${DOCUMENT_TILE_COLS_BASE}, document_number`;
+export const DOCUMENT_TILE_COLS_NUMBER = `${DOCUMENT_TILE_COLS_BASE}, document_number`;
+export const DOCUMENT_TILE_COLS = `${DOCUMENT_TILE_COLS_NUMBER}, show_on`;
 
 /** Without the back photo: used when migration_loyalty_back.sql has not been run yet. */
 export const LOYALTY_CARD_COLS_BASE = "id, user_id, store_name, holder_name, category, card_number, barcode_format, color, image_path, created_at";
@@ -65,6 +68,15 @@ export async function withColumnFallback<T extends { error: { code?: string; mes
   const first = await run(full);
   if (isMissingColumn(first.error)) return run(base);
   return first;
+}
+
+/** Like withColumnFallback, but with a middle step: the newest column is dropped first, then the older optional ones. */
+export async function withColumnFallback3<T extends { error: { code?: string; message?: string } | null }>(run: (columns: string) => PromiseLike<T>, full: string, mid: string, base: string): Promise<T> {
+  const first = await run(full);
+  if (!isMissingColumn(first.error)) return first;
+  const second = await run(mid);
+  if (!isMissingColumn(second.error)) return second;
+  return run(base);
 }
 
 export const SUBSCRIPTION_COLS = "id, name, price, currency, cycle, next_payment, category, status, trial_ends, split_count, remind_days, cancel_url, notes, price_history";

@@ -425,6 +425,7 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
     await page.getByRole("heading", { name: "Documents", exact: true }).waitFor();
     const titles = await page.locator("section[aria-labelledby=doc-tiles-heading] p.truncate.font-bold").allInnerTexts();
     assert(titles.join("|") === "Visa / e-visa|Travel insurance", `tile order/content was: ${titles.join("|")}`);
@@ -1490,6 +1491,124 @@ try {
     // the stand-in database does not filter by owner, so take the row out for the tests that count subscriptions
     const subs = fake.table("subscriptions");
     subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000000e1"), 1);
+  });
+
+  await test("home: opens on Personal first, documents follow their Show on choice, and subscriptions sit in a side rail on a desktop", async () => {
+    const now = new Date().toISOString();
+    const docs = fake.table("travel_documents");
+    docs.push(
+      { id: "d0c00000-0000-4000-8000-0000000007a1", user_id: ADMIN, kind: "passport", title: "Both Passport", issuing_country: "Aruba", document_number: null, expiry_date: addDays(today, 900), trip_id: null, file_path: null, show_on: "both", created_at: now },
+      { id: "d0c00000-0000-4000-8000-0000000007a2", user_id: ADMIN, kind: "license", title: "Personal Licence", issuing_country: "Aruba", document_number: null, expiry_date: addDays(today, 500), trip_id: null, file_path: null, show_on: "personal", created_at: now },
+      { id: "d0c00000-0000-4000-8000-0000000007a3", user_id: ADMIN, kind: "visa", title: "Work Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 300), trip_id: null, file_path: null, show_on: "business", created_at: now },
+    );
+    fake.table("subscriptions").push({ id: "5b000000-0000-4000-8000-0000000007b1", user_id: ADMIN, name: "Rail Streaming", price: 12, currency: "USD", cycle: "monthly", next_payment: addDays(today, 5), category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: now });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
+      await page.goto(`${BASE}/`);
+      await page.getByRole("tab", { name: "Personal" }).waitFor();
+      const tabs = await page.getByRole("tab").allInnerTexts();
+      assert(tabs.slice(0, 2).join("|") === "Personal|Business", `tabs were: ${tabs.join("|")}`);
+      assert((await page.getByRole("tab", { name: "Personal" }).getAttribute("aria-selected")) === "true", "Personal is the tab that is open first");
+      await page.getByTestId("personal-total").waitFor();
+      const strip = page.getByTestId("personal-docs");
+      await strip.getByText("Both Passport").waitFor();
+      await strip.getByText("Personal Licence").waitFor();
+      assert((await strip.getByText("Work Visa").count()) === 0, "a Business-only document is not listed on Personal");
+      const scopes = await strip.getByTestId("doc-scope").allInnerTexts();
+      assert(scopes.includes("Both") && scopes.includes("Personal"), `scope badges were: ${scopes.join("|")}`);
+      const rail = page.getByTestId("subs-card-desktop");
+      await rail.getByText("Rail Streaming").waitFor();
+      assert(await page.getByTestId("keep-handy-desktop").isVisible(), "Keep handy is in the side rail on a desktop");
+      assert(!(await page.getByTestId("keep-handy-mobile").isVisible()), "the phone's Keep handy row is hidden on a desktop");
+      const total = await page.getByTestId("personal-total").boundingBox();
+      const railBox = await rail.boundingBox();
+      assert(total && railBox && railBox.x > total.x + total.width, "the side rail sits to the right of the spending");
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a desktop");
+      // Business lists what is set to Business or Both
+      await page.getByRole("tab", { name: "Business" }).click();
+      const biz = await page.locator("section[aria-labelledby=doc-tiles-heading]").innerText();
+      assert(biz.includes("Passport") && biz.includes("Visa") && !biz.includes("Licence"), `business tiles were: ${biz.replace(/\s+/g, " ").slice(0, 200)}`);
+      // The choice sticks
+      await page.goto(`${BASE}/`);
+      assert((await page.getByRole("tab", { name: "Business" }).getAttribute("aria-selected")) === "true", "the last chosen tab is remembered");
+      await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
+    } finally {
+      await ctx.close();
+      for (const id of ["d0c00000-0000-4000-8000-0000000007a1", "d0c00000-0000-4000-8000-0000000007a2", "d0c00000-0000-4000-8000-0000000007a3"]) docs.splice(docs.findIndex((r) => r.id === id), 1);
+      const subs = fake.table("subscriptions");
+      subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000007b1"), 1);
+    }
+  });
+
+  await test("home on a phone: Keep handy comes first, then spending, subscriptions and documents in one column", async () => {
+    const now = new Date().toISOString();
+    const docs = fake.table("travel_documents");
+    docs.push({ id: "d0c00000-0000-4000-8000-0000000007c1", user_id: ADMIN, kind: "id", title: "Phone ID", issuing_country: "Aruba", document_number: null, expiry_date: addDays(today, 800), trip_id: null, file_path: null, show_on: "personal", created_at: now });
+    fake.table("subscriptions").push({ id: "5b000000-0000-4000-8000-0000000007d1", user_id: ADMIN, name: "Phone Music", price: 9, currency: "USD", cycle: "monthly", next_payment: addDays(today, 9), category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: now });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 1, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("personal-total").waitFor();
+      const y = async (id) => (await page.getByTestId(id).boundingBox())?.y ?? -1;
+      const handy = await y("keep-handy-mobile"), spend = await y("personal-total"), subs = await y("subs-card-mobile"), pdocs = await y("personal-docs");
+      assert(handy > 0 && handy < spend && spend < subs && subs < pdocs, `order was handy ${handy}, spending ${spend}, subscriptions ${subs}, documents ${pdocs}`);
+      assert(!(await page.getByTestId("subs-card-desktop").isVisible()), "the desktop rail is hidden on a phone");
+      await page.getByTestId("subs-card-mobile").getByText("Phone Music").waitFor();
+      await page.getByTestId("personal-docs").getByText("Phone ID").waitFor();
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a phone");
+      for (const el of await page.getByTestId("keep-handy-mobile").getByRole("link").all()) {
+        const b = await el.boundingBox();
+        assert(b && b.height >= 44, "Keep handy buttons are at least 44px tall");
+      }
+    } finally {
+      await ctx.close();
+      docs.splice(docs.findIndex((r) => r.id === "d0c00000-0000-4000-8000-0000000007c1"), 1);
+      const subs = fake.table("subscriptions");
+      subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000007d1"), 1);
+    }
+  });
+
+  await test("documents: the form has a Show on choice (Personal, Business or Both) that is saved with the document", async () => {
+    const docs = fake.table("travel_documents");
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/documents`);
+      await page.getByRole("button", { name: "Add document" }).first().click();
+      const dlg = page.getByRole("dialog", { name: "Add document" });
+      await dlg.waitFor();
+      const group = dlg.getByTestId("doc-show-on");
+      assert((await group.getByRole("button", { name: "Both" }).getAttribute("aria-pressed")) === "true", "Both is chosen by default");
+      await dlg.locator('input[maxlength="120"]').fill("Scope Test Doc");
+      await dlg.locator('input[type="date"]').fill(addDays(today, 900));
+      await group.getByRole("button", { name: "Personal", exact: true }).click();
+      assert((await group.getByRole("button", { name: "Personal", exact: true }).getAttribute("aria-pressed")) === "true", "tapping Personal selects it");
+      await dlg.getByText("Listed on the Personal dashboard only.").waitFor();
+      await dlg.getByRole("button", { name: "Save document" }).click();
+      await dlg.waitFor({ state: "detached", timeout: 15_000 }).catch(async () => { throw new Error("the form stayed open: " + (await dlg.innerText()).replace(/\s+/g, " ").slice(0, 300)); });
+      const row = docs.find((d) => d.title === "Scope Test Doc");
+      assert(row && row.show_on === "personal", `saved show_on was ${row && row.show_on}`);
+      await page.getByText("Scope Test Doc").first().waitFor();
+      // Editing keeps the choice and can change it
+      await page.getByText("Scope Test Doc").first().locator("xpath=ancestor::li").getByTestId("doc-scope").waitFor();
+    } finally {
+      await ctx.close();
+      const i = docs.findIndex((d) => d.title === "Scope Test Doc");
+      if (i >= 0) docs.splice(i, 1);
+    }
   });
 
   await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {

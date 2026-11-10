@@ -108,3 +108,10 @@ import { sanitizeDocumentFields } from "../src/lib/mrz";
   const f = sanitizeDocumentFields({ kind: "license", document_number: "A1234567", expiry_date: "2031-05-02", issuing_country: "Aruba", holder_name: "Patrick Fortin" }, "2026-11-06");
   eq([f.kind, f.document_number, f.expiry_date], ["license", "A1234567", "2031-05-02"], "license: the reader's answer is accepted");
 }
+import { docScope, showsOn } from "../src/lib/documents";
+{
+  eq([docScope({}), docScope({ show_on: null }), docScope({ show_on: "bogus" }), docScope({ show_on: "personal" })], ["both", "both", "both", "personal"], "show on: no value (older database) or junk means both");
+  eq([showsOn({ show_on: "personal" }, "personal"), showsOn({ show_on: "personal" }, "business")], [true, false], "show on: personal only lists on Personal");
+  eq([showsOn({ show_on: "business" }, "personal"), showsOn({ show_on: "business" }, "business")], [false, true], "show on: business only lists on Business");
+  eq([showsOn({ show_on: "both" }, "personal"), showsOn({ show_on: "both" }, "business"), showsOn({}, "business")], [true, true, true], "show on: both lists everywhere, and so does an unmarked document");
+}

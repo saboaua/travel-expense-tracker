@@ -45,6 +45,7 @@ each file says so when that is the case.
 | 37 | `migration_iptv_customers.sql` | One IPTV client can have several subscriptions: adds the client record (name, contact, the one shareable link and the client login) and moves each existing subscription under its own client. Needs migration 36 |
 | 38 | `migration_iptv_manage.sql` | The IPTV clients page can be given to a role (Admin > Roles > "IPTV clients") instead of being admin only. Needs 36 and 37 |
 | 39 | `migration_help_notifications.sql` | Help topics "Turn on phone alerts" and "Track your subscriptions". Needs migration_help.sql. Added once; edit afterwards in Admin > Help |
+| 40 | `migration_documents_show_on.sql` | Each document gets a "Show on" choice (Personal, Business or Both) that decides which home dashboard lists it. Existing documents stay on both. Needs migration_documents.sql |
 
 Keep a note of which files you have already run in your own project; the repository
 cannot tell which ones are applied. A new project should run all of them.

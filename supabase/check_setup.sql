@@ -31,7 +31,7 @@ want_columns(tbl, col, fix) as (values
   ('profiles','temp_password_issued_at','migration_temp_password.sql'), ('profiles','temp_password_expires_at','migration_temp_password.sql'),
   ('expenses','exchange_rate','migration_currency.sql'), ('expenses','amount_usd','migration_currency.sql'), ('expenses','image_hash','migration_duplicates.sql'),
   ('trips','destination','migration_trip_fields.sql'), ('trips','category','migration_trip_fields.sql'),
-  ('travel_documents','document_number','migration_documents_number.sql'),
+  ('travel_documents','document_number','migration_documents_number.sql'), ('travel_documents','show_on','migration_documents_show_on.sql'),
   ('categories','icon','migration_travel_categories.sql'),
   ('grocery_items','unit','migration_personal.sql'),
   ('app_settings','login_logo_size','migration_login_support.sql'), ('app_settings','privacy_policy','migration_login_support.sql'), ('app_settings','support_email','migration_login_support.sql'),

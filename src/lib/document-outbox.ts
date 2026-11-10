@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isMissingColumn } from "@/lib/columns";
-import type { DocKind, TravelDocument } from "@/lib/documents";
+import type { DocKind, DocScope, TravelDocument } from "@/lib/documents";
 import { DOC_BUCKET, dbMessage, prepareDocFile, safeName } from "@/lib/document-upload";
 import { classifyError } from "@/lib/offline-queue";
 import { newId, type OutboxItem, type OutboxStore, type PushOutcome } from "@/lib/outbox";
@@ -20,6 +20,8 @@ export interface DocumentFields {
   issuing_country?: string | null;
   expiry_date?: string | null;
   notes?: string | null;
+  /** Which dashboard lists it. Left out (or "both" on a database without the column) keeps older databases working. */
+  show_on?: DocScope;
 }
 
 export interface DocumentSaveItem extends OutboxItem {
@@ -71,6 +73,7 @@ export function makeDocumentApi(supabase: SupabaseClient): DocumentApi {
 }
 
 const BUCKET_MESSAGE = "Documents storage is not set up yet. Run supabase/migration_documents.sql.";
+const SHOW_ON_MESSAGE = "The \"Show on\" column is missing. Run supabase/migration_documents_show_on.sql in Supabase.";
 const NUMBER_MESSAGE = "The document number column is missing. Run supabase/migration_documents_number.sql in Supabase.";
 
 const fail = (error: unknown): PushOutcome => {
@@ -96,6 +99,12 @@ export async function pushDocumentSave(api: DocumentApi, item: DocumentSaveItem)
   else if (item.isNew) row.file_path = null;
 
   let res = await api.upsert(row);
+  if (isMissingColumn(res.error as { code?: string; message?: string } | null) && "show_on" in row) {
+    // An older database without migration_documents_show_on.sql: "both" is what it does anyway, any other choice needs the column
+    if (row.show_on && row.show_on !== "both") return { kind: "failed", message: SHOW_ON_MESSAGE };
+    delete row.show_on;
+    res = await api.upsert(row);
+  }
   if (isMissingColumn(res.error as { code?: string; message?: string } | null) && "document_number" in row) {
     // An older database without the number column: a document with no number still saves
     if (row.document_number) return { kind: "failed", message: NUMBER_MESSAGE };
@@ -200,6 +209,8 @@ export async function saveDocument(a: SaveDocumentArgs): Promise<SaveDocumentRes
     expiry_date: a.fields.expiry_date || null,
     notes: a.fields.notes?.trim() || null,
     // Only send the number when there is one or the column is known to exist, so older databases keep working
+    // Only send the choice when it is not the default or the column is known to exist
+    ...(a.fields.show_on && (a.fields.show_on !== "both" || (a.doc && a.doc.show_on !== undefined) || (prev && "show_on" in prev.row)) ? { show_on: a.fields.show_on } : {}),
     ...(number || (a.doc && a.doc.document_number !== undefined) || (prev && "document_number" in prev.row) ? { document_number: number ? number.slice(0, 40) : null } : {}),
   };
   const item: DocumentSaveItem = {

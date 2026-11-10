@@ -26,6 +26,8 @@ export type DocTile = {
   numberLabel: string;
   /** "20 days" when the end is near, else null */
   countdown: string | null;
+  /** Which dashboard lists it ("Show on" in Documents) */
+  scope?: "personal" | "business" | "both";
 };
 
 const ICONS: Record<string, typeof FileText> = {

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ArrowDown, ArrowUp, Camera, ChevronRight, Hammer, MapPin, Plane, Plus, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -65,7 +65,7 @@ const chipBase = "inline-flex min-h-[44px] items-center justify-center whitespac
 const chipOn = "border-primary bg-primary font-semibold text-primary-foreground";
 const chipOff = "border-input bg-card hover:bg-accent";
 
-export default function PersonalDashboard({ rows, projects, today }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string }) {
+export default function PersonalDashboard({ rows, projects, today, afterTrips }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; /** Cards shown right after the trips (subscriptions, documents) */ afterTrips?: ReactNode }) {
   const [filter, setFilter] = useState<DashboardFilter>(DEFAULT_FILTER);
   const [sheet, setSheet] = useState(false);
 
@@ -264,6 +264,8 @@ export default function PersonalDashboard({ rows, projects, today }: { rows: Das
           )}
         </>
       )}
+
+      {afterTrips}
 
       {a.count === 0 ? (
         <div className="rounded-2xl border bg-card px-4 py-10 text-center text-sm text-muted-foreground">

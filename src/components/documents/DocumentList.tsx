@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Eye, EyeOff, FileText, FolderOpen, Image as ImageIcon, MoreVertical, Pencil, Search, ShieldCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn, formatDate } from "@/lib/utils";
-import { documentStatus, expiryMeter, kindLabel, maskNumber, type DocLevel, type TravelDocument } from "@/lib/documents";
+import { DOC_SCOPES, docScope, documentStatus, expiryMeter, kindLabel, maskNumber, type DocLevel, type TravelDocument } from "@/lib/documents";
 
 const CHIP: Record<DocLevel, string> = {
   ok: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
@@ -108,6 +108,7 @@ function DocumentTile({ doc, today, url, revealed, toggleReveal, onView, onEdit,
             <p className="flex min-w-0 items-center gap-2">
               <span className="truncate font-semibold">{doc.title}</span>
               {meter && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-xs font-medium", CHIP[st.level])}>{meter.label}</span>}
+              {!doc.trip_id && <span data-testid="doc-scope" className="shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground">{DOC_SCOPES.find((o) => o.value === docScope(doc))?.label}</span>}
             </p>
             <p className="mt-0.5 flex min-w-0 flex-wrap items-center gap-x-1 text-xs text-muted-foreground">
               <span className="truncate">{kindLabel(doc.kind)}{doc.issuing_country ? ` · ${doc.issuing_country}` : ""}</span>

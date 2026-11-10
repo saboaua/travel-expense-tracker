@@ -23,6 +23,20 @@ export const DOC_KINDS: { value: DocKind; label: string; hasExpiry: boolean }[] 
 export const kindLabel = (k: string) => DOC_KINDS.find((d) => d.value === k)?.label ?? "Document";
 export const kindHasExpiry = (k: string) => DOC_KINDS.find((d) => d.value === k)?.hasExpiry ?? false;
 
+/** Which home dashboard lists a document. Older databases have no column, which means both. */
+export type DocScope = "personal" | "business" | "both";
+export const DOC_SCOPES: { value: DocScope; label: string }[] = [
+  { value: "personal", label: "Personal" },
+  { value: "business", label: "Business" },
+  { value: "both", label: "Both" },
+];
+export const docScope = (d: { show_on?: string | null }): DocScope => (d.show_on === "personal" || d.show_on === "business" ? d.show_on : "both");
+/** True when the document belongs on that dashboard. */
+export const showsOn = (d: { show_on?: string | null }, view: "personal" | "business"): boolean => {
+  const s = docScope(d);
+  return s === "both" || s === view;
+};
+
 export type TravelDocument = {
   id: string;
   user_id: string;
@@ -30,6 +44,7 @@ export type TravelDocument = {
   kind: DocKind;
   title: string;
   document_number?: string | null;
+  show_on?: DocScope | null;
   issuing_country: string | null;
   expiry_date: string | null;
   notes: string | null;

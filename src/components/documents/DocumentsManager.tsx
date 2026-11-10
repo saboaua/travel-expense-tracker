@@ -10,7 +10,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { todayISO } from "@/lib/utils";
-import { DOC_KINDS, kindHasExpiry, type DocKind, type TravelDocument } from "@/lib/documents";
+import { DOC_KINDS, DOC_SCOPES, docScope, kindHasExpiry, type DocKind, type DocScope, type TravelDocument } from "@/lib/documents";
 import { DocumentList } from "@/components/documents/DocumentList";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { compressDocImage, DOC_ACCEPT, DOC_BUCKET, DOC_QUALITY, formatBytes, isCroppable, type DocQuality } from "@/lib/document-upload";
@@ -48,6 +48,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const formRef = useRef<HTMLFormElement>(null);
   const [expiry, setExpiry] = useState("");
   const [notes, setNotes] = useState("");
+  const [showOn, setShowOn] = useState<DocScope>("both");
   const [file, setFile] = useState<File | null>(null);
   // Photo pipeline: original pick -> crop -> compress. `prepared` files are uploaded as is.
   const [original, setOriginal] = useState<File | null>(null);
@@ -145,7 +146,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the page opens
   }, []);
 
-  const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
+  const reset = () => { setEditing(null); setNumber(""); setTitle(""); setCountry(""); setExpiry(""); setNotes(""); setShowOn("both"); setFile(null); setOriginal(null); setCropped(null); setCropping(null); setSizes(null); setQuality("standard"); setKind(defaultKind); setAdding(false); setScanNote(null); };
 
   const startEdit = (d: TravelDocument) => {
     setError(null);
@@ -157,6 +158,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setCountry(d.issuing_country || "");
     setExpiry(d.expiry_date || "");
     setNotes(d.notes || "");
+    setShowOn(docScope(d));
     setFile(null);
     setOriginal(null);
     setCropped(null);
@@ -185,7 +187,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user.id;
       if (!uid) throw new Error("Sign in again to save the document.");
-      const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, file, prepared: !!cropped && file === preparedFile.current };
+      const fields = { kind, title: label, document_number: number, issuing_country: country, expiry_date: kindHasExpiry(kind) ? expiry || null : null, notes, show_on: showOn, file, prepared: !!cropped && file === preparedFile.current };
       const { file: picked, prepared, ...rest } = fields;
       await saveDocument({
         api: makeDocumentApi(supabase), store: browserOutbox, userId: uid, doc: editing, tripId, fields: rest, file: picked, prepared,
@@ -297,7 +299,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   /** Closes the popup; asks first when something was typed or a file was chosen that would be lost. */
   const requestClose = async () => {
     if (saving) return;
-    const dirty = editing ? !!file : !!(title.trim() || number.trim() || country.trim() || expiry || notes.trim() || file);
+    const dirty = editing ? !!file || showOn !== docScope(editing) : !!(title.trim() || number.trim() || country.trim() || expiry || notes.trim() || file);
     if (dirty && !(await confirm({ title: "Discard this document?", message: "What you entered will be lost.", confirmLabel: "Discard", cancelLabel: "Keep editing", destructive: true }))) return;
     reset();
   };
@@ -434,6 +436,22 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
               </div>
             )}
           </div>
+          {!tripId && (
+            <div role="group" aria-labelledby="doc-show-on" data-testid="doc-show-on">
+              <span id="doc-show-on" className="text-xs text-muted-foreground">Show on</span>
+              <div className="mt-1 flex gap-1 rounded-2xl bg-muted p-1">
+                {DOC_SCOPES.map((o) => (
+                  <button key={o.value} type="button" aria-pressed={showOn === o.value} onClick={() => setShowOn(o.value)}
+                    className={`min-h-11 flex-1 rounded-xl px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${showOn === o.value ? "bg-raised font-semibold text-foreground shadow-sm" : "font-medium text-muted-foreground hover:text-foreground"}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {showOn === "both" ? "Listed on the Personal and the Business dashboard." : showOn === "personal" ? "Listed on the Personal dashboard only." : "Listed on the Business dashboard only."} It is never copied, so edits show everywhere it is listed.
+              </p>
+            </div>
+          )}
           <div>
             <label className="text-xs text-muted-foreground">Notes</label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional" maxLength={1000} />

@@ -1,15 +1,11 @@
 "use client";
 
 import { Tabs } from "@/components/ui/tabs";
-import dynamic from "next/dynamic";
+import PersonalHome from "@/components/personal/PersonalHome";
 import { useEffect, useState, type ReactNode } from "react";
 import { Briefcase, Wallet } from "lucide-react";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
-
-const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDashboard"), {
-  ssr: false,
-  loading: () => <p className="py-10 text-center text-sm text-muted-foreground">Loading your personal dashboard…</p>,
-});
+import type { DocTile } from "@/components/documents/DocumentTiles";
 
 type View = "business" | "personal";
 const KEY = "dashboard-view";
@@ -18,14 +14,14 @@ const KEY = "dashboard-view";
  * Sits right under the welcome section. The business dashboard (children) is left exactly as it is; this only decides
  * whether it or the personal analytics is shown. The page renders it only for roles that have "Personal dashboard".
  */
-export function DashboardViews({ rows, projects, today, children }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; children: ReactNode }) {
-  const [view, setView] = useState<View>("business");
+export function DashboardViews({ rows, projects, today, docs, docTotal, canDocuments, children }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; docs: DocTile[]; docTotal: number; canDocuments: boolean; children: ReactNode }) {
+  const [view, setView] = useState<View>("personal");
 
   useEffect(() => {
     try {
-      if (localStorage.getItem(KEY) === "personal") setView("personal");
+      if (localStorage.getItem(KEY) === "business") setView("business");
     } catch {
-      /* storage blocked: stay on business */
+      /* storage blocked: stay on personal */
     }
   }, []);
 
@@ -47,14 +43,14 @@ export function DashboardViews({ rows, projects, today, children }: { rows: Dash
         onChange={(v) => choose(v as View)}
         idPrefix="dash-tab"
         panelPrefix="dash-panel"
-        options={[{ id: "business", label: "Business", icon: Briefcase }, { id: "personal", label: "Personal", icon: Wallet }]}
+        options={[{ id: "personal", label: "Personal", icon: Wallet }, { id: "business", label: "Business", icon: Briefcase }]}
       />
       <div id="dash-panel-business" role="tabpanel" aria-labelledby="dash-tab-business" hidden={view !== "business"} className="space-y-6">
         {children}
       </div>
       {view === "personal" && (
         <div id="dash-panel-personal" role="tabpanel" aria-labelledby="dash-tab-personal" className="space-y-6">
-          <PersonalDashboard rows={rows} projects={projects} today={today} />
+          <PersonalHome rows={rows} projects={projects} today={today} docs={docs} docTotal={docTotal} canDocuments={canDocuments} />
         </div>
       )}
     </>
