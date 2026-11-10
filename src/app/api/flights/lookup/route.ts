@@ -23,5 +23,5 @@ export async function GET(request: Request) {
   const result = await lookupFlight(number, date);
   if (result.ok) return NextResponse.json({ flight: result.flight });
   const status = result.reason === "not_configured" ? 503 : result.reason === "not_found" ? 404 : 502;
-  return NextResponse.json({ error: result.reason, reason: result.reason, upstream: result.upstream ?? null }, { status });
+  return NextResponse.json({ error: result.reason, reason: result.reason, upstream: result.upstream ?? null, code: result.code ?? null }, { status });
 }

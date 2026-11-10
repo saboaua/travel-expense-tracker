@@ -11,10 +11,12 @@ export function flightLookupConfigured(): boolean {
 
 export type LookupResult =
   | { ok: true; flight: FlightFields }
-  | { ok: false; reason: "not_configured" | "bad_number" | "not_found" | "upstream"; upstream?: number };
+  | { ok: false; reason: "not_configured" | "bad_number" | "not_found" | "upstream"; upstream?: number; code?: string };
 
-async function ask(key: string, compact: string, date: string | null): Promise<{ status: number; json: unknown } | null> {
-  const q = new URLSearchParams({ access_key: key, flight_iata: compact, limit: "10" });
+type Answer = { status: number; json: unknown };
+
+async function ask(key: string, compact: string, date: string | null): Promise<Answer | null> {
+  const q = new URLSearchParams({ access_key: key, flight_iata: compact, limit: "100" });
   if (date) q.set("flight_date", date);
   try {
     const res = await fetch(`https://api.aviationstack.com/v1/flights?${q}`, {
@@ -28,6 +30,7 @@ async function ask(key: string, compact: string, date: string | null): Promise<{
   }
 }
 
+/** aviationstack reports problems as { error: { code, message } }, sometimes with a 200 status. */
 const errorCode = (json: unknown): string => {
   const e = (json as { error?: { code?: unknown; type?: unknown } } | null)?.error;
   return e ? String(e.code ?? e.type ?? "error") : "";
@@ -38,14 +41,25 @@ export async function lookupFlight(numberInput: string, date: string): Promise<L
   if (!key) return { ok: false, reason: "not_configured" };
   const num = parseFlightNumber(numberInput);
   if (!num) return { ok: false, reason: "bad_number" };
+
+  // With the date first (paid plans find flights ahead of time). The free plan either refuses the date filter or answers
+  // with nothing for it, so when that gives no flight, ask for the live flight and keep it only if it is the day wanted.
   let r = await ask(key, num.compact, date);
-  // The free plan refuses the date filter: ask for the live flight and keep it only when it is the day wanted
-  if (r && errorCode(r.json) === "function_access_restricted") r = await ask(key, num.compact, null);
+  let flight = r && !errorCode(r.json) ? fromAviationstack(r.json, date) : null;
+  if (!flight && r && (!errorCode(r.json) || errorCode(r.json) === "function_access_restricted")) {
+    const live = await ask(key, num.compact, null);
+    if (live) {
+      r = live;
+      flight = !errorCode(live.json) ? fromAviationstack(live.json, date) : null;
+    }
+  }
+  if (flight) return { ok: true, flight };
   if (!r) return { ok: false, reason: "upstream" };
   const code = errorCode(r.json);
-  if (code) return { ok: false, reason: "upstream", upstream: r.status };
-  if (r.status === 404) return { ok: false, reason: "not_found" };
+  if (code) {
+    console.warn(`[flights] aviationstack answered ${r.status} ${code} for ${num.compact} ${date}`);
+    return { ok: false, reason: "upstream", upstream: r.status, code };
+  }
   if (r.status < 200 || r.status >= 300) return { ok: false, reason: "upstream", upstream: r.status };
-  const flight = fromAviationstack(r.json, date);
-  return flight ? { ok: true, flight } : { ok: false, reason: "not_found" };
+  return { ok: false, reason: "not_found" };
 }

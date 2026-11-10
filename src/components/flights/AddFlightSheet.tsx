@@ -127,7 +127,7 @@ export function AddFlightSheet({
     setBusy("find");
     try {
       const res = await fetch(`/api/flights/lookup?number=${encodeURIComponent(n)}&date=${encodeURIComponent(d)}`);
-      const body = (await res.json().catch(() => ({}))) as { flight?: FlightFields; reason?: string; error?: string };
+      const body = (await res.json().catch(() => ({}))) as { flight?: FlightFields; reason?: string; error?: string; code?: string };
       if (res.ok && body.flight) { setFound(body.flight); setNumber(body.flight.flight_number); return true; }
       setFound(null);
       const pretty = parseFlightNumber(n)?.display ?? n;
@@ -135,6 +135,8 @@ export function AddFlightSheet({
       else if (body.reason === "not_found") setNotice({ tone: "warn", text: `We couldn't find ${pretty} on that date. Check the number and date, or enter the details yourself. Flights far in the future may not be available yet. Flights added by hand don't update automatically.` });
       else if (body.reason === "limit") setNotice({ tone: "warn", text: "Too many lookups this hour. Enter the details yourself, or try again later." });
       else if (res.status === 400) setError(body.error || "Check the flight number and date.");
+      else if (body.code === "invalid_access_key" || body.code === "missing_access_key") setNotice({ tone: "warn", text: "The flight service key is not valid, so lookups are off. Enter the details yourself." });
+      else if (body.code === "usage_limit_reached" || body.code === "rate_limit_reached") setNotice({ tone: "warn", text: "The flight service has reached its limit for now. Enter the details yourself, or try again later." });
       else setNotice({ tone: "warn", text: "The flight service did not answer. Try again, or enter the details yourself." });
       if (res.status !== 400 && res.status !== 429 && body.reason !== "upstream") setMode("manual");
       return false;

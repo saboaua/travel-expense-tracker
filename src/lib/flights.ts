@@ -148,7 +148,8 @@ export function zoneOffsetMinutes(timeZone: unknown, local: string): number | nu
  */
 export function fromAviationstack(json: unknown, date: string | null): FlightFields | null {
   const data = obj(json).data;
-  const list = (Array.isArray(data) ? data : []) as Obj[];
+  // The same flight is listed again under each partner airline's number (codeshare): the operating one comes first
+  const list = ((Array.isArray(data) ? data : []) as Obj[]).filter((f) => f && typeof f === "object").sort((a, b) => Number(!!obj(a.flight).codeshared) - Number(!!obj(b.flight).codeshared));
   const day = (f: Obj) => parseStamp(obj(f.departure).scheduled)?.local.slice(0, 10) ?? (typeof f.flight_date === "string" ? f.flight_date : "");
   const pick = date ? list.find((f) => day(f) === date) : list[0];
   if (!pick) return null;
