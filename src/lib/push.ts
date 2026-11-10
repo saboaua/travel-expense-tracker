@@ -1,9 +1,9 @@
 import * as webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
-export type PushPref = "invites" | "shared" | "views" | "reminders";
+export type PushPref = "invites" | "shared" | "views" | "reminders" | "trips" | "support";
 export type PushPrefs = Record<PushPref, boolean>;
-export const DEFAULT_PUSH_PREFS: PushPrefs = { invites: true, shared: true, views: false, reminders: true };
+export const DEFAULT_PUSH_PREFS: PushPrefs = { invites: true, shared: true, views: false, reminders: true, trips: true, support: true };
 
 /** Messages only say that something happened. They never carry card numbers, trip details, names of items or amounts. */
 export const PUSH_TEXT = {
@@ -15,10 +15,12 @@ export const PUSH_TEXT = {
   view: { title: "Lifolio", body: "A partner opened something you shared." },
   subscription: { title: "Lifolio", body: "A subscription payment is coming up." },
   iptv: { title: "Lifolio", body: "Some IPTV clients are about to expire." },
+  trip: { title: "Lifolio", body: "A trip is coming up. Open the app to check your plans." },
+  support: { title: "Lifolio", body: "A new support request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
 export type PushKind = keyof typeof PUSH_TEXT;
-const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv" };
+const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", support: "/admin/support" };
 
 export function pushConfigured(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);

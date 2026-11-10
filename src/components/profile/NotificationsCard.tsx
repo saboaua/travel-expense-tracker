@@ -5,10 +5,11 @@ import { Bell } from "lucide-react";
 import { AccordionSection } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { useAccess } from "@/lib/use-access";
 import { currentSubscription, keyToBytes, pushSupport, type PushSupport } from "@/lib/push-client";
 
-type Prefs = { invites: boolean; shared: boolean; views: boolean; reminders: boolean };
-const DEFAULTS: Prefs = { invites: true, shared: true, views: false, reminders: true };
+type Prefs = { invites: boolean; shared: boolean; views: boolean; reminders: boolean; trips: boolean; support: boolean };
+const DEFAULTS: Prefs = { invites: true, shared: true, views: false, reminders: true, trips: true, support: true };
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 
 /** Profile > Notifications: alerts on this device, and which kinds. The messages never contain card, trip or amount details. */
@@ -22,6 +23,7 @@ function testFailure(httpStatus: number | undefined, d: { reason?: string; statu
 }
 
 export function NotificationsCard() {
+  const { role } = useAccess();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [on, setOn] = useState(false);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
@@ -93,6 +95,8 @@ export function NotificationsCard() {
     { key: "invites", title: "Invites and replies", hint: "Someone invites you, or answers your invite." },
     { key: "shared", title: "Shared with me changed", hint: "A partner shares, updates or stops sharing something with you." },
     { key: "reminders", title: "Payment and expiry reminders", hint: "A subscription is due soon, or (for admins) IPTV clients are about to expire." },
+    { key: "trips", title: "Trips coming up", hint: "A reminder three days and one day before a trip starts." },
+    ...(role === "admin" ? [{ key: "support" as const, title: "Support requests", hint: "Someone sends a message from the contact form. Only admins see this." }] : []),
     { key: "views", title: "When someone opens my shared items", hint: "Off by default. The history always has it." },
   ];
   const status = !support ? "" : support === "ok" ? (on ? "On for this device" : "Off") : support === "needs-install" ? "Add to Home Screen first" : "Not available here";

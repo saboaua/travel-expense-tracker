@@ -1293,6 +1293,26 @@ try {
     await sam.ctx.close();
   });
 
+  await test("profile: only an admin is offered Support requests alerts; everyone is offered Trips coming up", async () => {
+    const admin = await newPage();
+    await signIn(admin.page, "admin@example.com", "Admin-Pass-123");
+    await admin.page.waitForURL((u) => u.pathname === "/");
+    await admin.page.goto(`${BASE}/profile#notifications`);
+    const card = admin.page.getByTestId("notifications-card");
+    await card.waitFor();
+    await card.getByRole("switch", { name: "Support requests" }).waitFor();
+    await card.getByRole("switch", { name: "Trips coming up" }).waitFor();
+    await admin.ctx.close();
+    const user = await newPage();
+    await signIn(user.page, "pat@example.com", "Correct-Horse-1");
+    await user.page.waitForURL((u) => u.pathname === "/");
+    await user.page.goto(`${BASE}/profile#notifications`);
+    const c2 = user.page.getByTestId("notifications-card");
+    await c2.getByRole("switch", { name: "Trips coming up" }).waitFor();
+    assert((await c2.getByRole("switch", { name: "Support requests" }).count()) === 0, "a normal person is not offered Support requests");
+    await user.ctx.close();
+  });
+
   await test("profile: Notifications says when alerts are not set up, and Your data prepares a ZIP and schedules a deletion that can be cancelled", async () => {
     fake.table("account_deletions"); // this install has run migration_sharing_safety.sql
     const d = await newPage();
@@ -1303,7 +1323,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 5, "device switch plus four kinds of alert");
+    assert((await card.getByRole("switch").count()) === 6, "device switch plus five kinds of alert (no Support requests for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);

@@ -216,7 +216,7 @@ report as (
               else 'REVIEW' end,
          w.fix
   from (values
-    ('add-to-home-screen','migration_help.sql'), ('share-with-partner','migration_help.sql'), ('connect-telegram','migration_help_telegram.sql'),
+    ('add-to-home-screen','migration_help.sql'), ('share-with-partner','migration_help.sql'), ('connect-telegram','migration_help_telegram.sql'), ('turn-on-notifications','migration_help_notifications.sql'), ('track-subscriptions','migration_help_notifications.sql'),
     ('create-a-trip','migration_help_guides.sql'), ('add-a-trip-receipt','migration_help_guides.sql'),
     ('import-grocery-receipt','migration_help_guides.sql'), ('export-trip-report','migration_help_guides.sql')
   ) w(slug, fix)

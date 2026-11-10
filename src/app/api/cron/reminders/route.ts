@@ -6,7 +6,7 @@ import { sendPush } from "@/lib/push";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { dueForReminder as dueSubs, nextDue, type Sub } from "@/lib/subscriptions";
 import { dueForReminder as dueClients } from "@/lib/iptv";
-import { todayISO } from "@/lib/utils";
+import { addDaysISO, todayISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,7 +21,7 @@ function authorized(req: Request) {
 
 /**
  * Daily: one phone alert per person who has a subscription payment coming up inside the days they chose, and one to each
- * admin when IPTV clients are within 15 days of expiring. Each date is reminded once (reminded_for). The alert text never
+ * admin when IPTV clients are within 15 days of expiring. Each date is reminded once (reminded_for). Travellers get one alert 3 days and 1 day before a trip starts. The alert text never
  * says which subscription or client; the person opens the app for that. Email is not sent: the app has no email service.
  */
 export async function GET(req: Request) {
@@ -56,7 +56,15 @@ export async function GET(req: Request) {
       for (const c of dueC) await db.from("iptv_clients").update({ reminded_for: c.expire_date }).eq("id", c.id);
       clients = dueC.length;
     }
-    return NextResponse.json({ ok: true, people, clients });
+    // Trips: everyone with an active trip starting in 3 days or tomorrow gets one alert (a day-exact match, so nothing is stored)
+    let travellers = 0;
+    const trips = await db.from("trips").select("user_id").eq("status", "active").in("start_date", [addDaysISO(today, 1), addDaysISO(today, 3)]).limit(5000);
+    if (trips.error) throw new Error(trips.error.message);
+    for (const userId of new Set(((trips.data ?? []) as { user_id: string }[]).map((t) => t.user_id))) {
+      await sendPush(userId, "trip", "trips");
+      travellers++;
+    }
+    return NextResponse.json({ ok: true, people, clients, travellers });
   } catch (e) {
     console.error("[cron] reminders", e instanceof Error ? e.message : e);
     await notifyJobFailure(db, "Subscription and IPTV reminders");

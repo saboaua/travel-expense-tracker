@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 import { notifySupportRequest } from "@/lib/telegram-alerts";
+import { sendPush } from "@/lib/push";
 import { scanFields } from "@/lib/suspicious-input";
 
 export const dynamic = "force-dynamic";
@@ -92,6 +93,14 @@ export async function POST(request: Request) {
 
   // Tell the admins on Telegram (never blocks or fails the request)
   if (created?.id) await notifySupportRequest(db, name, subject || null, String(created.id));
+
+  // Phone alert to each admin who has "Support requests" switched on (never blocks or fails the request)
+  try {
+    const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
+    await Promise.allSettled((admins ?? []).map((a) => sendPush(a.id as string, "support", "support")));
+  } catch (e) {
+    console.error("support phone alert failed:", e);
+  }
 
   // Optional email notification (needs RESEND_API_KEY and a support email in Branding)
   try {
