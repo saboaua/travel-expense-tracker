@@ -62,26 +62,29 @@ function tripBadge(p: DashboardProject, today: string): { text: string; tone: "g
 
 /** Ring chart of the category shares, with the total in the middle. The legend beside it is what filters the page. */
 function Donut({ parts, total, caption }: { parts: { label: string; value: number; color: string }[]; total: number; caption: string }) {
-  const R = 60;
+  const R = 62;
+  const STROKE = 14;
+  const GAP = STROKE + 5; // round caps reach half a stroke past each end, so this leaves a clean 5-unit gap between slices
   const C = 2 * Math.PI * R;
   const sum = parts.reduce((t, x) => t + x.value, 0) || 1;
   let offset = 0;
   const label = `Share of spending: ${parts.map((x) => `${x.label} ${Math.round((x.value / sum) * 100)}%`).join(", ")}`;
   return (
-    <div className="relative h-[170px] w-[170px] shrink-0" data-testid="where-donut">
+    <div className="relative h-[176px] w-[176px] shrink-0" data-testid="where-donut">
       <svg viewBox="0 0 160 160" className="h-full w-full" role="img" aria-label={label}>
+        <circle cx="80" cy="80" r={R} fill="none" stroke="currentColor" strokeWidth={STROKE} className="text-muted/60" />
         {parts.map((x) => {
           const len = (x.value / sum) * C;
           const seg = (
-            <circle key={x.label} cx="80" cy="80" r={R} fill="none" stroke={x.color} strokeWidth="22" strokeDasharray={`${Math.max(len - (parts.length > 1 ? 2 : 0), 0)} ${C}`} strokeDashoffset={-offset} transform="rotate(-90 80 80)" />
+            <circle key={x.label} cx="80" cy="80" r={R} fill="none" stroke={x.color} strokeWidth={STROKE} strokeLinecap="round" strokeDasharray={`${Math.max(len - GAP, 0.01)} ${C}`} strokeDashoffset={-(offset + GAP / 2)} transform="rotate(-90 80 80)" />
           );
           offset += len;
           return seg;
         })}
       </svg>
       <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-        <span className="text-xs text-muted-foreground">{caption}</span>
-        <span className="text-[22px] font-bold leading-tight tabular-nums tracking-tight">{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{caption}</span>
+        <span className="mt-0.5 text-2xl font-semibold leading-none tabular-nums tracking-tight">{total.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
       </div>
     </div>
   );
@@ -109,7 +112,6 @@ const chipOff = "border-input bg-card hover:bg-accent";
 export default function PersonalDashboard({ rows, projects, today, afterTrips }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; /** Cards shown right after the trips (subscriptions, documents) */ afterTrips?: ReactNode }) {
   const [filter, setFilter] = useState<DashboardFilter>(DEFAULT_FILTER);
   const [sheet, setSheet] = useState(false);
-  const [heroView, setHeroView] = useState<"trend" | "breakdown">("trend");
 
   const set = (patch: Partial<DashboardFilter>) => setFilter((f) => ({ ...f, ...patch }));
   const filtered = useMemo(() => filterRows(rows, filter, today), [rows, filter, today]);
@@ -207,16 +209,9 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
 
       {/* Hero: how much, versus before, how it is moving */}
       <section aria-label="Spending summary" className="space-y-2.5 rounded-2xl border bg-card p-4 shadow-sm">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-sm text-muted-foreground">
-            {filter.category || "Spent"} · {rangeText}
-          </p>
-          <div role="group" aria-label="Spending view" className="inline-flex gap-1 rounded-xl bg-muted p-1">
-            {(["trend", "breakdown"] as const).map((v) => (
-              <button key={v} type="button" aria-pressed={heroView === v} onClick={() => setHeroView(v)} className={cn("min-h-[36px] rounded-lg px-3 text-sm font-semibold capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", heroView === v ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>{v}</button>
-            ))}
-          </div>
-        </div>
+        <p className="text-sm text-muted-foreground">
+          {filter.category || "Spent"} · {rangeText}
+        </p>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <p className="text-3xl font-bold tabular-nums tracking-tight" data-testid="personal-total">{money(a.total)}</p>
           {change != null && (
@@ -234,17 +229,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
         </div>
         {prev && change != null && <p className="text-sm text-muted-foreground">than the {plural(prev.days, "day")} before ({money(prev.total)})</p>}
 
-        {heroView === "breakdown" && (
-          <ul className="space-y-1.5 py-1" data-testid="hero-breakdown">
-            {heads.slice(0, 4).map((c, i) => (
-              <li key={c.label} className="text-sm">
-                <div className="flex justify-between"><span className="font-medium">{c.label}</span><span className="tabular-nums text-muted-foreground">{Math.round((c.value / listTotal) * 100)}%</span></div>
-                <div className="mt-1 h-2 rounded-full bg-muted"><div className="h-2 rounded-full" style={{ width: `${(c.value / listTotal) * 100}%`, background: PALETTE[i % PALETTE.length] }} /></div>
-              </li>
-            ))}
-          </ul>
-        )}
-        {heroView === "trend" && trend.length > 1 && (
+        {trend.length > 1 && (
           <div className="h-[72px] w-full text-primary md:h-[120px]" role="img" aria-label={`Spending over time in ${BASE_CURRENCY}${peak ? `, peak on ${longDate(peak.key, false)}` : ""}`}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trend} margin={{ left: 0, right: 0, top: 6, bottom: 0 }}>
@@ -255,7 +240,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
           </div>
         )}
 
-        {heroView === "trend" && trend.length > 1 && (
+        {trend.length > 1 && (
           <div className="flex justify-between text-xs text-muted-foreground" aria-hidden="true">
             <span>{longDate(trend[0].key, false)}</span>
             {peak && <span className="font-semibold text-primary">{longDate(peak.key, false)} (peak)</span>}
@@ -357,10 +342,9 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                 return (
                   <li key={c.label}>
                     <button type="button" aria-pressed={on} onClick={() => toggleCategory(c.label)} className={cn("flex min-h-[52px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", on && "bg-primary/10")}>
-                      <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: PALETTE[i % PALETTE.length] }} aria-hidden="true" />
+                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} aria-hidden="true" />
                       <span className={cn("min-w-0 flex-1 truncate text-[15px]", on ? "font-semibold" : "font-medium")}>{c.label}</span>
-                      <span className="text-[15px] font-semibold tabular-nums">{money(c.value)}</span>
-                      <span className="w-9 text-right text-[13px] text-muted-foreground tabular-nums">{Math.round((c.value / listTotal) * 100)}%</span>
+                      <span className="text-[15px] font-semibold tabular-nums text-muted-foreground">{Math.round((c.value / listTotal) * 100)}%</span>
                       <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
                     </button>
                   </li>
@@ -368,10 +352,9 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
               })}
               {restTotal > 0 && (
                 <li className="flex min-h-[44px] items-center gap-2.5 px-2.5 py-1.5 text-muted-foreground">
-                  <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: PALETTE[5] }} aria-hidden="true" />
+                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[5] }} aria-hidden="true" />
                   <span className="flex-1 text-[15px]">Everything else</span>
-                  <span className="text-[15px] tabular-nums">{money(Math.round(restTotal * 100) / 100)}</span>
-                  <span className="w-9 text-right text-[13px] tabular-nums">{Math.round((restTotal / listTotal) * 100)}%</span>
+                  <span className="text-[15px] font-semibold tabular-nums">{Math.round((restTotal / listTotal) * 100)}%</span>
                   <span className="w-4" />
                 </li>
               )}

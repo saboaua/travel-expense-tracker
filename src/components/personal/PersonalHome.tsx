@@ -33,7 +33,7 @@ function duePill(days: number): { text: string; cls: string } {
 /** Quick doors, only the ones this role has. Shown at the top on a phone and in the side rail on a desktop. */
 function KeepHandy({ testId }: { testId: string }) {
   const { perms } = useAccess();
-  const tile = "flex min-h-[52px] items-center gap-2.5 rounded-xl border bg-card px-3.5 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+  const tile = "flex min-h-[56px] items-center justify-start gap-2.5 rounded-xl border text-left bg-card px-3.5 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
   const items = [
     { href: "/personal/groceries/new", label: "Scan receipt", icon: Camera, primary: true, show: perms.has("personal") },
     { href: "/personal/subscriptions", label: "Add subscription", icon: Repeat, primary: false, show: perms.has("subscriptions") },
@@ -48,7 +48,7 @@ function KeepHandy({ testId }: { testId: string }) {
         {items.map((i) => (
           <Link key={i.href + i.label} href={i.href} className={cn(tile, i.primary && "border-primary bg-primary text-primary-foreground hover:bg-primary/90")}>
             <i.icon className={cn("h-5 w-5 shrink-0", !i.primary && "text-primary")} aria-hidden="true" />
-            <span className="min-w-0 leading-tight">{i.label}</span>
+            <span className="min-w-0 flex-1 text-left leading-tight">{i.label}</span>
           </Link>
         ))}
       </div>
