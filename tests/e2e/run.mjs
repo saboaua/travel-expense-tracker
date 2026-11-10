@@ -1466,6 +1466,30 @@ try {
     await admin.page.getByRole("tab", { name: "Business" }).click();
   });
 
+  await test("personal on a desktop: a Coming up side panel lists what is due soonest; phones do not get it", async () => {
+    fake.table("subscriptions").push({ id: "5b000000-0000-4000-8000-0000000000e1", user_id: ADMIN, name: "Gym membership", price: 30, currency: "USD", cycle: "monthly", next_payment: addDays(today, 2), category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], created_at: new Date().toISOString() });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    const page = await ctx.newPage();
+    await signIn(page, "admin@example.com", "Admin-Pass-123");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal`);
+    const panel = page.getByTestId("coming-up");
+    await panel.getByText("Gym membership").waitFor();
+    await panel.getByText("In 2 days").waitFor();
+    assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scrolling on a desktop");
+    const groc = await page.getByRole("link", { name: "Scan receipt" }).boundingBox();
+    const side = await panel.boundingBox();
+    assert(groc && side && groc.x + groc.width < side.x, "the side panel sits to the right of the main column");
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert(!(await panel.isVisible()), "phones do not show the side panel");
+    await page.setViewportSize({ width: 820, height: 1000 });
+    assert(!(await panel.isVisible()), "tablets keep the current layout");
+    await ctx.close();
+    // the stand-in database does not filter by owner, so take the row out for the tests that count subscriptions
+    const subs = fake.table("subscriptions");
+    subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000000e1"), 1);
+  });
+
   await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {
     await admin.page.goto(`${BASE}/personal`);
     await admin.page.getByRole("heading", { name: "Groceries" }).waitFor();
