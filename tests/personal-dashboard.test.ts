@@ -31,6 +31,7 @@ eq("unconverted counted", a.unconverted, 1);
 eq("avg per day", a.avgPerDay, Math.round(((100 + 89.5 + 200.5) / 30) * 100) / 100);
 eq("top category", a.byCategory[0], { label: "Groceries", value: 200.5 });
 eq("top merchant", a.topMerchants[0].label, "Super Food");
+eq("top merchant lists what is bought there", typeof a.topMerchants[0].kinds, "string");
 eq("per project days from start to today", a.perProject.find((p) => p.id === "p1")?.days, 6);
 eq("project without dates not listed when all rows unconverted", a.perProject.find((p) => p.id === "p2"), undefined);
 eq("stores list", a.stores, ["Ace", "Hotel", "Old", "Super Food"]);

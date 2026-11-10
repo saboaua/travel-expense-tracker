@@ -87,6 +87,20 @@ function Donut({ parts, total, caption }: { parts: { label: string; value: numbe
   );
 }
 
+/** One colour per rank in Top stores: a light badge, a bar, and a darker text shade that keeps 4.5:1 on white and on the dark card. */
+const STORE_TONES = [
+  { badge: "bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-300", bar: "bg-blue-600", text: "text-blue-700 dark:text-blue-300" },
+  { badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300", bar: "bg-emerald-600", text: "text-emerald-700 dark:text-emerald-300" },
+  { badge: "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300", bar: "bg-amber-500", text: "text-amber-800 dark:text-amber-300" },
+  { badge: "bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300", bar: "bg-violet-600", text: "text-violet-700 dark:text-violet-300" },
+  { badge: "bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300", bar: "bg-rose-600", text: "text-rose-700 dark:text-rose-300" },
+];
+/** "Ling & Sons" -> "LS", "Folira Supermarket" -> "FS", "Costco" -> "CO" */
+function initials(name: string) {
+  const w = name.replace(/[^\p{L}\p{N} ]/gu, " ").split(/\s+/).filter(Boolean);
+  return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] || "?").slice(0, 2)).toUpperCase();
+}
+
 const sectionLabel = "text-xs font-semibold uppercase tracking-wide text-muted-foreground";
 const chipBase = "inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 const chipOn = "border-primary bg-primary font-semibold text-primary-foreground";
@@ -369,21 +383,31 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
           <h2 className={cn(sectionLabel, "pt-1")}>Top stores</h2>
           <section aria-label="Top stores" className="rounded-2xl border bg-card p-2">
             <ul>
-              {a.topMerchants.map((m) => (
-                <li key={m.label}>
-                  <button type="button" aria-pressed={filter.store === m.label} onClick={() => set({ store: filter.store === m.label ? "" : m.label })} className={cn("flex min-h-[56px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", filter.store === m.label && "bg-primary/10")}>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-medium">{m.label}</span>
-                      <span className="block text-xs text-muted-foreground">{plural(m.visits, "visit")}</span>
-                      <span className="mt-1.5 block h-1.5 rounded-full bg-muted" aria-hidden="true"><span className="block h-1.5 rounded-full bg-primary" style={{ width: `${Math.min(100, (m.value / (a.total || 1)) * 100)}%` }} /></span>
-                    </span>
-                    <span className="text-right">
-                      <span className="block text-[15px] font-semibold tabular-nums">{money(m.value)}</span>
-                      <span className="block text-xs text-muted-foreground tabular-nums">{Math.round((m.value / (a.total || 1)) * 1000) / 10}% of spend</span>
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {a.topMerchants.map((m, i) => {
+                const tone = STORE_TONES[i % STORE_TONES.length];
+                const share = (m.value / (a.total || 1)) * 100;
+                return (
+                  <li key={m.label}>
+                    <button type="button" aria-pressed={filter.store === m.label} onClick={() => set({ store: filter.store === m.label ? "" : m.label })} className={cn("w-full rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", filter.store === m.label && "bg-primary/10")}>
+                      <span className="flex min-h-[44px] items-center gap-3">
+                        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold", tone.badge)} aria-hidden="true">{initials(m.label)}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="flex items-center gap-2">
+                            <span className="truncate text-[15px] font-semibold">{m.label}</span>
+                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{plural(m.visits, "visit")}</span>
+                          </span>
+                          {m.kinds && <span className="block truncate text-[13px] text-muted-foreground">{m.kinds}</span>}
+                        </span>
+                        <span className="text-right">
+                          <span className="block text-[15px] font-bold tabular-nums">{money(m.value)}</span>
+                          <span className={cn("block text-[13px] font-semibold tabular-nums", tone.text)}>{Math.round(share * 10) / 10}% of spend</span>
+                        </span>
+                      </span>
+                      <span className="mt-2 block h-1.5 rounded-full bg-muted" aria-hidden="true"><span className={cn("block h-1.5 rounded-full", tone.bar)} style={{ width: `${Math.min(100, share)}%` }} /></span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </section>
 

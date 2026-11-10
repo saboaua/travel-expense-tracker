@@ -182,7 +182,7 @@ export type Analytics = {
   days: number;
   avgPerDay: number;
   byCategory: Slice[];
-  topMerchants: (Slice & { visits: number })[];
+  topMerchants: (Slice & { visits: number; /** What is bought there, biggest first: "Produce & Dairy" */ kinds: string })[];
   byCurrency: { currency: string; original: number; awg: number | null }[];
   perProject: { id: string; name: string; days: number; total: number; perDay: number }[];
   stores: string[];
@@ -244,7 +244,12 @@ export function analyze(allRows: DashboardRow[], filtered: DashboardRow[], proje
   const receipts = (rs: DashboardRow[]) => new Set(rs.map(unit)).size;
 
   const byCategory = group((r) => r.category).map(({ label, value }) => ({ label, value }));
-  const topMerchants = group((r) => r.merchant).slice(0, 5);
+  const kindsOf = (merchant: string) => {
+    const m = new Map<string, number>();
+    for (const r of converted) if (r.merchant === merchant) m.set(r.category, (m.get(r.category) || 0) + (r.awg as number));
+    return [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 2).map(([c]) => c).join(" & ");
+  };
+  const topMerchants = group((r) => r.merchant).slice(0, 5).map((x) => ({ ...x, kinds: kindsOf(x.label) }));
 
   const cur = new Map<string, { original: number; awg: number | null }>();
   for (const r of filtered) {
