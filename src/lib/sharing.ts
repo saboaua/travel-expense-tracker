@@ -37,6 +37,8 @@ export type SharedCard = {
   has_image: boolean;
   shared_by: string;
 };
+import type { FlightFields } from "@/lib/flights";
+
 export type SharedTrip = {
   share_id: string;
   kind: "trip" | "personal_trip";
@@ -47,6 +49,17 @@ export type SharedTrip = {
   end_date: string | null;
   shared_by: string;
 };
+
+/** A flight on a shared trip: details only. Confirmation code, seat, cabin and alert settings are never part of it. */
+export type SharedFlight = Pick<FlightFields, "flight_number" | "airline" | "aircraft" | "flight_date" | "dep_iata" | "dep_city" | "dep_name" | "dep_local" | "dep_est_local" | "dep_offset" | "dep_terminal" | "dep_gate" | "arr_iata" | "arr_city" | "arr_name" | "arr_local" | "arr_est_local" | "arr_offset" | "arr_terminal" | "arr_gate" | "status"> & {
+  share_id: string;
+  trip_id: string;
+  flight_id: string;
+  leg: "outbound" | "return" | "connection";
+  source: "auto" | "manual";
+  shared_by: string;
+};
+export const SHARED_FLIGHT_FIELDS = ["share_id", "trip_id", "flight_id", "leg", "flight_number", "airline", "aircraft", "flight_date", "dep_iata", "dep_city", "dep_name", "dep_local", "dep_est_local", "dep_offset", "dep_terminal", "dep_gate", "arr_iata", "arr_city", "arr_name", "arr_local", "arr_est_local", "arr_offset", "arr_terminal", "arr_gate", "status", "source", "shared_by"] as const;
 
 /** The only fields a shared trip may have. The server drops everything else before sending (and the database never returns it). */
 export const SHARED_TRIP_FIELDS = ["share_id", "kind", "trip_id", "name", "destination", "start_date", "end_date", "shared_by"] as const;
@@ -66,6 +79,15 @@ export const cleanSharedTrips = (rows: unknown): SharedTrip[] =>
     .map((r) => pick<SharedTrip>(r as Record<string, unknown>, SHARED_TRIP_FIELDS))
     // dates are plain days (YYYY-MM-DD), whatever form the database driver used
     .map((t) => ({ ...t, start_date: dayOnly(t.start_date), end_date: dayOnly(t.end_date) }));
+/** Same belt and braces for flights: only the listed fields leave the server, and times are plain local clock text. */
+export const cleanSharedFlights = (rows: unknown): SharedFlight[] =>
+  (Array.isArray(rows) ? rows : [])
+    .filter((r) => r && typeof r === "object")
+    .map((r) => pick<SharedFlight>(r as Record<string, unknown>, SHARED_FLIGHT_FIELDS))
+    .map((f) => {
+      const local = (v: unknown) => (typeof v === "string" && /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}/.test(v) ? `${v.slice(0, 10)}T${v.slice(11, 16)}` : null);
+      return { ...f, flight_date: dayOnly(f.flight_date) ?? "", dep_local: local(f.dep_local), dep_est_local: local(f.dep_est_local), arr_local: local(f.arr_local), arr_est_local: local(f.arr_est_local) };
+    });
 export const cleanSharedCards = (rows: unknown): SharedCard[] =>
   (Array.isArray(rows) ? rows : []).filter((r) => r && typeof r === "object").map((r) => pick<SharedCard>(r as Record<string, unknown>, SHARED_CARD_FIELDS));
 

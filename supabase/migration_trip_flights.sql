@@ -2,7 +2,7 @@
 -- Run in the Supabase SQL Editor (safe to run more than once). Needs the trips table (schema.sql).
 -- Times are kept as the local wall-clock time at each airport (what a boarding pass shows), plus the airport's UTC offset
 -- so the flight length can be worked out. A flight you enter by hand has no offset and is marked source = 'manual'.
--- Flights are private to their owner: sharing a trip with a partner does not share its flights.
+-- Flights are private to their owner. A partner you shared the trip with sees the flight details (not confirmation code, seat or cabin) through migration 46.
 
 create table if not exists public.trip_flights (
   id uuid primary key default gen_random_uuid(),

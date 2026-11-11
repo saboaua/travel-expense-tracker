@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, MapPin, Users } from "lucide-react";
-import type { SharedTrip } from "@/lib/sharing";
+import { CalendarDays, CalendarPlus, MapPin, Plane, Users } from "lucide-react";
+import type { SharedFlight, SharedTrip } from "@/lib/sharing";
+import { FlightCalendarSheet } from "@/components/flights/FlightCalendarSheet";
+import { clock, flightSummary, sortFlights, statusView } from "@/lib/flights";
 import { logShareView } from "@/lib/share-view";
 import { useSharing } from "@/lib/use-sharing";
 
@@ -17,11 +19,20 @@ export const rangeLabel = (a: string | null, b: string | null) => (a && b && a !
 export function SharedTrips({ kind }: { kind: "trip" | "personal_trip" }) {
   const { overview } = useSharing();
   const [trips, setTrips] = useState<SharedTrip[]>([]);
+  const [flights, setFlights] = useState<SharedFlight[]>([]);
+  const [cal, setCal] = useState<SharedFlight | null>(null);
+  const [added, setAdded] = useState("");
   const live = !!overview && overview.available && overview.enabled;
 
   useEffect(() => {
-    if (!live) return setTrips([]);
+    if (!live) { setTrips([]); setFlights([]); return; }
     let alive = true;
+    if (kind === "trip") {
+      fetch("/api/sharing/flights", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : { flights: [] }))
+        .then((d: { flights?: SharedFlight[] }) => { if (alive) setFlights(Array.isArray(d.flights) ? d.flights : []); })
+        .catch(() => { if (alive) setFlights([]); });
+    }
     fetch("/api/sharing/trips", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : { trips: [] }))
       .then((d: { trips?: SharedTrip[] }) => { if (!alive) return; const list = Array.isArray(d.trips) ? d.trips.filter((t) => t.kind === kind) : []; list.forEach((t) => logShareView(t.kind, t.trip_id)); setTrips(list); })
@@ -40,10 +51,31 @@ export function SharedTrips({ kind }: { kind: "trip" | "personal_trip" }) {
             <p className="mt-1 text-base font-semibold">{t.name}</p>
             {t.destination && <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {t.destination}</p>}
             {(t.start_date || t.end_date) && <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"><CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" /> {rangeLabel(t.start_date, t.end_date)}</p>}
+            {flights.filter((f) => f.trip_id === t.trip_id).length > 0 && (
+              <ul className="mt-3 space-y-1 border-t pt-2" aria-label="Flights" data-testid="shared-flights">
+                {sortFlights(flights.filter((f) => f.trip_id === t.trip_id)).map((f) => {
+                  const v = statusView(f);
+                  return (
+                    <li key={f.flight_id} className="flex items-center gap-2" data-testid="shared-flight">
+                      <Plane className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 text-sm">
+                        <span className="block truncate">{flightSummary(f)}</span>
+                        <span className="block text-xs text-muted-foreground">{clock(f.dep_local) ? new Date(`${f.dep_local!.slice(0, 10)}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : ""} · {v.label}</span>
+                      </span>
+                      <button type="button" data-testid="shared-flight-calendar" onClick={() => setCal(f)} aria-label={`Add ${f.flight_number} to calendar`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                        <CalendarPlus className="h-5 w-5" aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
             <p className="mt-2 text-xs text-muted-foreground">View only</p>
           </li>
         ))}
       </ul>
+      {added && <p role="status" className="text-sm font-medium text-emerald-800 dark:text-emerald-300">{added}</p>}
+      {cal && <FlightCalendarSheet flight={{ ...cal, id: cal.flight_id }} onClose={() => setCal(null)} onAdded={setAdded} />}
     </section>
   );
 }

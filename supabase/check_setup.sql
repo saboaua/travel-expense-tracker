@@ -48,7 +48,7 @@ want_functions(name, fix) as (values
   ('purge_old_logs','migration_throttle_retention.sql'), ('throttle_hit','migration_security_hardening.sql'),
   ('throttle_reset','migration_security_hardening.sql'), ('throttle_status','migration_security_hardening.sql'), ('write_audit','migration_audit.sql'),
   ('end_partnership','migration_sharing.sql'), ('invite_partner','migration_sharing.sql'), ('respond_to_invite','migration_sharing.sql'), ('set_sharing','migration_sharing.sql'),
-  ('share_item','migration_sharing.sql'), ('unshare_item','migration_sharing.sql'), ('shared_loyalty_cards','migration_sharing.sql'), ('shared_trips','migration_sharing.sql'),
+  ('share_item','migration_sharing.sql'), ('unshare_item','migration_sharing.sql'), ('shared_loyalty_cards','migration_sharing.sql'), ('shared_trips','migration_sharing.sql'), ('shared_trip_flights','migration_sharing_flights.sql'),
   ('shared_loyalty_photo_path','migration_sharing.sql'), ('sharing_active_count','migration_sharing.sql'), ('sharing_available','migration_sharing.sql'),
   ('sharing_drop_item_shares','migration_sharing.sql'), ('sharing_email_of','migration_sharing.sql'), ('sharing_gate','migration_sharing.sql'),
   ('sharing_integrity_check','migration_sharing.sql'), ('sharing_is_on','migration_sharing.sql'), ('sharing_log','migration_sharing.sql'),

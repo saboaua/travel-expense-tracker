@@ -2110,6 +2110,34 @@ try {
     }
   });
 
+  await test("flights: Add to calendar gives a timed event for the flight, and a flight that is not yours is not found", async () => {
+    const { ctx, page } = await newPage();
+    const FID = "f1000000-0000-4000-8000-000000000001";
+    fake.table("trip_flights").push({ id: FID, trip_id: TRIP_ID, user_id: PAT, leg: "outbound", flight_number: "CM 312", airline: "Copa Airlines", aircraft: null, flight_date: today, dep_iata: "AUA", dep_city: null, dep_name: "Queen Beatrix", dep_local: `${today}T09:45`, dep_est_local: null, dep_offset: -240, dep_terminal: "1", dep_gate: "3", arr_iata: "PTY", arr_city: null, arr_name: "Tocumen", arr_local: `${today}T10:40`, arr_est_local: null, arr_offset: -300, arr_terminal: null, arr_gate: null, status: "scheduled", pnr: "WK89L2", seat: "04A", cabin: "Business", source: "auto", alerts: true, last_synced_at: new Date().toISOString(), created_at: new Date().toISOString() });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByTestId("flight-calendar").click();
+      const dlg = page.getByRole("dialog", { name: "Add flight to calendar" });
+      await dlg.waitFor();
+      assert((await dlg.getByTestId("flight-cal-preview").innerText()).includes("CM 312 AUA to PTY"), "the sheet shows the flight");
+      await dlg.getByRole("button", { name: "Close" }).click();
+      const res = await page.request.get(`${BASE}/api/flights/${FID}/calendar?reminder=3h&download=1`);
+      const text = await res.text();
+      const d = today.replace(/-/g, "");
+      assert(res.status() === 200 && (res.headers()["content-type"] || "").includes("text/calendar"), "a calendar file comes back");
+      assert(text.includes(`DTSTART:${d}T134500Z`) && text.includes("SUMMARY:CM 312 AUA to PTY") && text.includes("TRIGGER:-PT3H"), "timed event with a reminder: " + text.slice(0, 400));
+      assert(!/WK89L2|04A|Business/.test(text), "no booking details in the file");
+      const other = await page.request.get(`${BASE}/api/flights/f1000000-0000-4000-8000-0000000000ff/calendar`);
+      assert(other.status() === 404, "an unknown flight is not found");
+    } finally {
+      await ctx.close();
+      const t = fake.table("trip_flights");
+      t.splice(0, t.length);
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {

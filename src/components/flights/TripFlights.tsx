@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Pencil, Plane, Plus, Trash2 } from "lucide-react";
+import { CalendarPlus, Pencil, Plane, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { useConfirm } from "@/components/ui/confirm";
@@ -12,6 +12,7 @@ import { useOutbox } from "@/lib/use-outbox";
 import { needsRefresh, nextFlight, sortFlights, type TripFlight } from "@/lib/flights";
 import { FlightPanel } from "./FlightPanel";
 import { AddFlightSheet } from "./AddFlightSheet";
+import { FlightCalendarSheet } from "./FlightCalendarSheet";
 
 const LEG_LABEL = { outbound: "Outbound", return: "Return", connection: "Connection" } as const;
 const ghost = "inline-flex min-h-11 items-center gap-2 rounded-xl px-3 text-sm font-semibold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -34,6 +35,8 @@ export function TripFlights({
   const [sheet, setSheet] = useState<{ existing?: TripFlight; leg?: TripFlight["leg"] } | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
   const [err, setErr] = useState("");
+  const [cal, setCal] = useState<TripFlight | null>(null);
+  const [added, setAdded] = useState("");
   const asked = useRef(false);
 
   // Waiting changes that reach the server later bring the page up to date
@@ -129,6 +132,7 @@ export function TripFlights({
             <div role={merged.length > 1 ? "tabpanel" : undefined}>
               <FlightPanel flight={current} />
               <div className="mt-2 flex flex-wrap items-center gap-1">
+                <button type="button" data-testid="flight-calendar" disabled={waiting.has(current.id)} title={waiting.has(current.id) ? "Available once the flight has synced" : undefined} onClick={() => setCal(current)} className={cn(ghost, "disabled:opacity-50")}><CalendarPlus className="h-4 w-4" aria-hidden="true" />Add to calendar</button>
                 <button type="button" data-testid="flight-edit" onClick={() => setSheet({ existing: current })} className={ghost}><Pencil className="h-4 w-4" aria-hidden="true" />Edit</button>
                 <button type="button" data-testid="flight-remove" onClick={() => remove(current)} className={cn(ghost, "text-red-700 dark:text-red-300")}><Trash2 className="h-4 w-4" aria-hidden="true" />Remove</button>
                 {waiting.has(current.id) && <span className="ml-auto text-xs font-medium text-amber-800 dark:text-amber-200" data-testid="flight-waiting">Waiting to sync</span>}
@@ -137,8 +141,10 @@ export function TripFlights({
           )}
         </div>
       )}
+      {added && <p role="status" data-testid="flight-cal-done" className="mt-2 text-sm font-medium text-emerald-800 dark:text-emerald-300">{added}</p>}
       {err && <p role="alert" className="mt-2 text-sm font-medium text-red-700 dark:text-red-300">{err}</p>}
 
+      {cal && <FlightCalendarSheet flight={cal} onClose={() => setCal(null)} onAdded={setAdded} />}
       {sheet && (
         <AddFlightSheet
           key={sheet.existing?.id ?? "new"}
