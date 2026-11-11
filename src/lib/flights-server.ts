@@ -9,6 +9,9 @@ export function flightLookupConfigured(): boolean {
   return Boolean(process.env.AVIATIONSTACK_API_KEY);
 }
 
+/** Set once the plan has refused the date filter, so later lookups skip the call that would only use up the monthly allowance. */
+let dateFilterRefused = false;
+
 export type LookupResult =
   | { ok: true; flight: FlightFields }
   | { ok: false; reason: "not_configured" | "bad_number" | "not_found" | "upstream"; upstream?: number; code?: string };
@@ -44,13 +47,14 @@ export async function lookupFlight(numberInput: string, date: string): Promise<L
 
   // With the date first (paid plans find flights ahead of time). The free plan either refuses the date filter or answers
   // with nothing for it, so when that gives no flight, ask for the live flight and keep it only if it is the day wanted.
-  let r = await ask(key, num.compact, date);
-  let flight = r && !errorCode(r.json) ? fromAviationstack(r.json, date) : null;
-  if (!flight && r && (!errorCode(r.json) || errorCode(r.json) === "function_access_restricted")) {
+  let r = dateFilterRefused ? null : await ask(key, num.compact, date);
+  if (r && errorCode(r.json) === "function_access_restricted") dateFilterRefused = true;
+  let flight = r && !errorCode(r.json) ? fromAviationstack(r.json, date, num.compact) : null;
+  if (!flight && (!r || !errorCode(r.json) || errorCode(r.json) === "function_access_restricted")) {
     const live = await ask(key, num.compact, null);
     if (live) {
       r = live;
-      flight = !errorCode(live.json) ? fromAviationstack(live.json, date) : null;
+      flight = !errorCode(live.json) ? fromAviationstack(live.json, date, num.compact) : null;
     }
   }
   if (flight) return { ok: true, flight };

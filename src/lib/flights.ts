@@ -146,10 +146,14 @@ export function zoneOffsetMinutes(timeZone: unknown, local: string): number | nu
  * clock part is the airport's local time, so the clock part is read as local and the offset comes from the zone name.
  * The entry leaving on `date` is used (the first one when no date matches and none is asked for).
  */
-export function fromAviationstack(json: unknown, date: string | null): FlightFields | null {
+export function fromAviationstack(json: unknown, date: string | null, wanted?: string): FlightFields | null {
   const data = obj(json).data;
   // The same flight is listed again under each partner airline's number (codeshare): the operating one comes first
-  const list = ((Array.isArray(data) ? data : []) as Obj[]).filter((f) => f && typeof f === "object").sort((a, b) => Number(!!obj(a.flight).codeshared) - Number(!!obj(b.flight).codeshared));
+  // When asked for a number, only entries with that number count (a search can also bring back partner numbers)
+  const want = wanted ? parseFlightNumber(wanted)?.compact : null;
+  const all = ((Array.isArray(data) ? data : []) as Obj[]).filter((f) => f && typeof f === "object");
+  const exact = want ? all.filter((f) => parseFlightNumber(String(obj(f.flight).iata ?? ""))?.compact === want) : all;
+  const list = (exact.length ? exact : all).sort((a, b) => Number(!!obj(a.flight).codeshared) - Number(!!obj(b.flight).codeshared));
   const day = (f: Obj) => parseStamp(obj(f.departure).scheduled)?.local.slice(0, 10) ?? (typeof f.flight_date === "string" ? f.flight_date : "");
   const pick = date ? list.find((f) => day(f) === date) : list[0];
   if (!pick) return null;
@@ -157,8 +161,17 @@ export function fromAviationstack(json: unknown, date: string | null): FlightFie
   const arr = obj(pick.arrival);
   const depSched = parseStamp(dep.scheduled);
   const arrSched = parseStamp(arr.scheduled);
-  const depEst = parseStamp(dep.estimated);
-  const arrEst = parseStamp(arr.estimated);
+  // The service keeps "estimated" equal to "scheduled" even for a late flight; what really happened is in "actual", and
+  // "delay" says how late. So the revised time is the actual one, else scheduled plus delay, else the estimate.
+  const revised = (side: Obj, sched: { local: string } | null): { local: string } | null => {
+    const actual = parseStamp(side.actual);
+    if (actual) return actual;
+    const late = typeof side.delay === "number" && Number.isFinite(side.delay) ? side.delay : 0;
+    if (sched && late > 0) return { local: new Date(Date.parse(`${sched.local}:00Z`) + late * 60000).toISOString().slice(0, 16) };
+    return parseStamp(side.estimated);
+  };
+  const depEst = revised(dep, depSched);
+  const arrEst = revised(arr, arrSched);
   const number = parseFlightNumber(String(obj(pick.flight).iata ?? ""));
   if (!number || !depSched) return null;
   const given = typeof dep.delay === "number" && Number.isFinite(dep.delay) ? dep.delay : null;
@@ -174,7 +187,7 @@ export function fromAviationstack(json: unknown, date: string | null): FlightFie
     dep_city: null,
     dep_name: str(dep.airport),
     dep_local: depSched.local,
-    dep_est_local: estimatedDiffers(depEst, depSched) && delay >= 1 ? depEst!.local : null,
+    dep_est_local: estimatedDiffers(depEst, depSched) ? depEst!.local : null,
     dep_offset: zoneOffsetMinutes(dep.timezone, depSched.local),
     dep_terminal: str(dep.terminal, 12),
     dep_gate: str(dep.gate, 12),
@@ -182,7 +195,7 @@ export function fromAviationstack(json: unknown, date: string | null): FlightFie
     arr_city: null,
     arr_name: str(arr.airport),
     arr_local: arrSched?.local ?? null,
-    arr_est_local: estimatedDiffers(arrEst, arrSched) && delay >= 1 ? arrEst!.local : null,
+    arr_est_local: estimatedDiffers(arrEst, arrSched) ? arrEst!.local : null,
     arr_offset: arrSched ? zoneOffsetMinutes(arr.timezone, arrSched.local) : null,
     arr_terminal: str(arr.terminal, 12),
     arr_gate: str(arr.gate, 12),

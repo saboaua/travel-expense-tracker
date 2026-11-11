@@ -44,7 +44,7 @@ async function main() {
   calls.length = 0;
   serve((u) => ({ data: u.searchParams.get("flight_date") ? [] : [entry("CM312", "2026-11-10")] }));
   r = await lookupFlight("CM312", "2026-11-10");
-  eq("free plan (empty): live flight used", [r.ok, calls.length], [true, 2]);
+  eq("free plan (empty): live flight used, and the refused date filter is not asked again", [r.ok, calls.length], [true, 1]);
 
   // Live flight is another day: not found
   serve((u) => ({ data: u.searchParams.get("flight_date") ? [] : [entry("CM312", "2026-11-10")] }));
@@ -55,6 +55,25 @@ async function main() {
   serve(() => ({ data: [entry("AV9999", "2026-11-17", { flight: { number: "9999", iata: "AV9999", codeshared: { airline_iata: "cm" } } }), entry("CM312", "2026-11-17")] }));
   r = await lookupFlight("CM312", "2026-11-17");
   eq("codeshare duplicates are skipped", r.ok && r.flight.flight_number, "CM 312");
+
+
+  // A real answer from the free plan (CM767, landed 19 minutes late; the other entry is its Turkish Airlines codeshare)
+  const side = (iata: string, tz: string, name: string, sched: string, est: string, actual: string, delay: number, extra: object) => ({ airport: name, timezone: tz, iata, terminal: null, gate: "2", delay, scheduled: sched, estimated: est, actual, ...extra });
+  const dep = side("AUA", "America/Aruba", "Reina Beatrix", "2026-11-10T15:46:00+00:00", "2026-11-10T15:46:00+00:00", "2026-11-10T16:05:00+00:00", 19, {});
+  const arr = side("PTY", "America/Panama", "Tocumen International", "2026-11-10T16:54:00+00:00", "2026-11-10T16:50:00+00:00", "2026-11-10T17:04:00+00:00", 10, { terminal: "2", gate: "208" });
+  const copa = { flight_date: "2026-11-10", flight_status: "landed", departure: dep, arrival: arr, airline: { name: "Copa Airlines", iata: "CM" }, flight: { number: "767", iata: "CM767", codeshared: null }, aircraft: { iata: "B38M" } };
+  const tk = { ...copa, airline: { name: "Turkish Airlines", iata: "TK" }, flight: { number: "9156", iata: "TK9156", codeshared: { flight_iata: "cm767" } } };
+  serve(() => ({ data: [tk, copa] }));
+  r = await lookupFlight("CM 767", "2026-11-10");
+  if (r.ok) {
+    eq("real: operating flight, not the codeshare", [r.flight.flight_number, r.flight.airline], ["CM 767", "Copa Airlines"]);
+    eq("real: scheduled local times", [r.flight.dep_local, r.flight.arr_local], ["2026-11-10T15:46", "2026-11-10T16:54"]);
+    eq("real: late departure shows the actual time", [r.flight.dep_est_local, r.flight.arr_est_local], ["2026-11-10T16:05", "2026-11-10T17:04"]);
+    eq("real: landed, offsets, gate", [r.flight.status, r.flight.dep_offset, r.flight.arr_offset, r.flight.arr_gate, r.flight.arr_terminal], ["landed", -240, -300, "208", "2"]);
+  } else eq("real: found", r, "a flight");
+  // asked for the codeshare number: that entry is used
+  r = await lookupFlight("TK 9156", "2026-11-10");
+  eq("real: the partner number finds its own entry", r.ok && r.flight.flight_number, "TK 9156");
 
   // Real errors are passed on, not hidden as "not found"
   serve(() => ({ error: { code: "invalid_access_key", message: "bad" } }));
