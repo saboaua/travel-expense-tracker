@@ -45,7 +45,7 @@ export function ShareWith({ kind, itemId, className = "" }: { kind: ShareKind; i
   }
 
   return (
-    <div className={`rounded-xl border p-3 ${className}`} data-testid="share-with">
+    <div className={`rounded-xl border bg-card p-3 ${className}`} data-testid="share-with">
       <p className="flex items-center gap-1.5 text-sm font-semibold"><Users className="h-4 w-4" aria-hidden="true" /> Share with</p>
       <p className="mt-0.5 text-xs text-muted-foreground">
         {kind === "loyalty_card" ? "They can see and scan this card. They cannot change or delete it." : "They see the trip name, destination and dates only. No expenses, receipts or notes."}
