@@ -61,7 +61,7 @@ export const pairOf = (a: string, b: string): [string, string] => (a < b ? [a, b
 const pairId = (a: string, b: string) => pairOf(a, b).join("\u0001");
 
 /** "Same product" suggestion between two groups that look alike but are not certain. */
-export type Suggestion = { keyA: string; keyB: string; a: { name: string; stores: string[] }; b: { name: string; stores: string[] } };
+export type Suggestion = { keyA: string; keyB: string; a: { name: string; stores: string[] }; b: { name: string; stores: string[] }; /** How far apart the latest prices are, in percent of the higher one */ priceGapPct?: number };
 
 /* ---------------- products ---------------- */
 
@@ -234,27 +234,43 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
     };
   });
 
-  // Pairs that look alike but are not certain. Same size on both sides, so a 330 ml and a 1.5 L are never offered.
+  // Pairs that look alike but are not certain. Two sizes that differ are never offered (a 330 ml and a 1.5 L), but a name with
+  // no size can still match one with a size ("Frito Lays Sour Cream" and "Lays Sour Cream 170 g"). Both must be in the same currency and unit.
   const suggestions: Suggestion[] = [];
   const bucket = new Map<string, Product[]>();
   for (const p of products) {
     const a = atoms.get(p.atomKeys[0])!.atom;
-    if (!a.size || !a.words.length) continue;
-    const k = `${a.currency}|${sizeKey(a.size)}|${a.unit ?? ""}`;
+    if (!a.words.length) continue;
+    const k = `${a.currency}|${a.unit ?? ""}`;
     bucket.set(k, [...(bucket.get(k) ?? []), p]);
   }
+  const sizeOf = (p: Product) => atoms.get(p.atomKeys[0])!.atom.size;
+  const ranked: { s: Suggestion; score: number }[] = [];
   for (const list of bucket.values()) {
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
       const A = list[i], B = list[j];
+      const sa = sizeOf(A), sb = sizeOf(B);
+      if (sa && sb && sizeKey(sa) !== sizeKey(sb)) continue;
       if (A.atomKeys.some((x) => B.atomKeys.some((y) => decided.has(pairId(x, y))))) continue;
-      if (!looksAlike(wordsOf(A, atoms), wordsOf(B, atoms))) continue;
-      suggestions.push({
-        keyA: A.atomKeys[0], keyB: B.atomKeys[0],
-        a: { name: A.names[0].name, stores: [...new Set(A.history.map((h) => h.store))] },
-        b: { name: B.names[0].name, stores: [...new Set(B.history.map((h) => h.store))] },
+      const wa = wordsOf(A, atoms), wb = wordsOf(B, atoms);
+      if (!looksAlike(wa, wb)) continue;
+      // Price is only a hint: a very different price means a different pack, a close one puts the pair first
+      const pa = A.stats.last, pb = B.stats.last;
+      const gap = pa > 0 && pb > 0 ? Math.abs(pa - pb) / Math.max(pa, pb) : 0;
+      if (gap > 0.6) continue;
+      ranked.push({
+        score: gap + (sa && sb ? 0 : 0.05),
+        s: {
+          keyA: A.atomKeys[0], keyB: B.atomKeys[0],
+          a: { name: A.names[0].name, stores: [...new Set(A.history.map((h) => h.store))] },
+          b: { name: B.names[0].name, stores: [...new Set(B.history.map((h) => h.store))] },
+          priceGapPct: Math.round(gap * 1000) / 10,
+        },
       });
     }
   }
+  ranked.sort((x, y) => x.score - y.score);
+  for (const r of ranked) suggestions.push(r.s);
   return { products, suggestions: suggestions.slice(0, 5) };
 }
 
@@ -265,14 +281,39 @@ export function cleanName(name: string): string {
   return out || name;
 }
 
-/** Not equal, yet close: one wording is inside the other (two words at least), or most words are shared. */
+/** Same word, or one letter off ("onion" / "union", a typical misread). Words under five letters must match exactly. */
+export function wordsClose(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (a.length < 5 || b.length < 5 || Math.abs(a.length - b.length) > 1) return false;
+  if (a.length === b.length) {
+    let diff = 0;
+    for (let i = 0; i < a.length; i++) if (a[i] !== b[i] && ++diff > 1) return false;
+    return true;
+  }
+  const [long, short] = a.length > b.length ? [a, b] : [b, a];
+  let i = 0, skipped = 0;
+  for (let j = 0; j < long.length; j++) {
+    if (long[j] === short[i]) i++;
+    else if (++skipped > 1) return false;
+  }
+  return true;
+}
+
+/** Not equal, yet close: one wording is inside the other (two words at least), or most words are shared. Words one letter apart count as shared. */
 export function looksAlike(a: string[], b: string[]): boolean {
-  const A = new Set(a), B = new Set(b);
-  const shared = [...A].filter((w) => B.has(w)).length;
-  if (!shared || (shared === A.size && shared === B.size)) return false;
-  const small = Math.min(A.size, B.size);
+  const A = [...new Set(a)], B = [...new Set(b)];
+  const taken = new Set<number>();
+  let shared = 0;
+  for (const w of A) {
+    const at = B.findIndex((x, i) => !taken.has(i) && wordsClose(w, x));
+    if (at >= 0) { taken.add(at); shared++; }
+  }
+  if (!shared) return false;
+  const exact = A.length === B.length && A.every((w) => B.includes(w));
+  if (exact) return false;
+  const small = Math.min(A.length, B.length);
   if (shared === small && small >= 2) return true;
-  return shared / (A.size + B.size - shared) >= 0.6;
+  return shared / (A.length + B.length - shared) >= 0.6;
 }
 
 /* ---------------- list helpers ---------------- */

@@ -1,4 +1,4 @@
-import { parseSize, atomOf, buildProducts, looksAlike, cleanName, summarizeStores, historyWithChange, matchesFilter, priceSummary } from "../src/lib/personal/price-compare";
+import { parseSize, atomOf, buildProducts, looksAlike, wordsClose, cleanName, summarizeStores, historyWithChange, matchesFilter, priceSummary } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 
 let fail = 0;
@@ -76,6 +76,26 @@ eq("no keeps them apart and stops asking", [no.products.length, no.suggestions.l
 const [c1, c2] = [atomOf("Corona Extra Bot 33CL", "AWG", null).key, atomOf("Corona Extra 330ML Cold", "AWG", null).key];
 eq("not the same product splits them", buildProducts(corona, [{ key_a: c1, key_b: c2, same: false }]).products.length, 2);
 eq("other currency never matches", buildProducts([row("Corona Extra 330ML", 5, "A", "2026-11-01"), row("Corona Extra 330ML", 3, "B", "2026-11-02", { receipt: { store: "B", purchase_date: "2026-11-02", currency: "USD" } })]).products.length, 2);
+
+
+// the real chips: a brand word in front, a misread letter, and a size on one side only
+const lays = buildProducts([row("Lays Sour Cream & Onion 170 g", 8.5, "AMAZING MARKET", "2026-11-11", { category: "Snacks" }), row("Frito Lays Sour Cream & Union", 9.2, "Ling & Sons", "2026-11-06", { category: "Snacks" })]);
+eq("lays: still two products until you say so", lays.products.length, 2);
+eq("lays: one suggestion", lays.suggestions.length, 1);
+eq("lays: price gap shown as a hint", lays.suggestions[0]?.priceGapPct, 7.6);
+eq("lays: yes combines them", buildProducts([row("Lays Sour Cream & Onion 170 g", 8.5, "AMAZING MARKET", "2026-11-11"), row("Frito Lays Sour Cream & Union", 9.2, "Ling & Sons", "2026-11-06")], [{ key_a: lays.suggestions[0].keyA, key_b: lays.suggestions[0].keyB, same: true }]).products.length, 1);
+// no size on either side
+const mm = buildProducts([row("M&M Peanut Share", 5.89, "NEW HUA RUN", "2026-11-11"), row("M&M Peanut", 5.5, "AMAZING MARKET", "2026-11-11")]);
+eq("m&m: peanut share and peanut are offered", mm.suggestions.length, 1);
+eq("m&m: king size is a different product", buildProducts([row("M&M Peanut Share", 5.89, "A", "2026-11-11"), row("M&M King Size", 5.9, "B", "2026-11-11")]).suggestions.length, 0);
+eq("a different size is never offered", buildProducts([row("Lays Sour Cream 170 g", 8.5, "A", "2026-11-11"), row("Lays Sour Cream 50 g", 3, "B", "2026-11-11")]).suggestions.length, 0);
+eq("a price far apart is not offered", buildProducts([row("Lays Sour Cream", 8.5, "A", "2026-11-11"), row("Frito Lays Sour Cream", 2, "B", "2026-11-11")]).suggestions.length, 0);
+const asked = buildProducts([row("Lays Sour Cream", 8, "A", "2026-11-11"), row("Frito Lays Sour Cream", 12, "B", "2026-11-11"), row("Lays Sour Cream Chips", 8.2, "C", "2026-11-11")]).suggestions[0];
+eq("closest price is asked first", [asked.a.name, asked.b.name].sort(), ["Lays Sour Cream", "Lays Sour Cream Chips"]);
+eq("onion and union are one letter apart", wordsClose("onion", "union"), true);
+eq("short words must match exactly", wordsClose("cola", "coca"), false);
+eq("different words stay different", wordsClose("peanut", "peach"), false);
+eq("a missing letter in a long word is close", wordsClose("cheddar", "chedar"), true);
 
 // looksAlike
 eq("subset of two words", looksAlike(["heinz", "ketchup"], ["heinz", "ketchup", "tomato"]), true);
