@@ -92,7 +92,7 @@ export function TripFlights({
   const missingLeg = merged.length === 1 ? (merged[0].leg === "outbound" ? "return" : "outbound") : undefined;
 
   return (
-    <section aria-labelledby="flights-h" className="rounded-xl border bg-card p-3 shadow-sm md:p-4" data-testid="trip-flights">
+    <section id="flights" aria-labelledby="flights-h" className="scroll-mt-20 rounded-xl border bg-card p-3 shadow-sm md:p-4" data-testid="trip-flights">
       <div className="mb-3 flex items-center justify-between gap-2">
         <h2 id="flights-h" className="flex items-center gap-2 text-lg font-bold"><Plane className="h-5 w-5 text-primary" aria-hidden="true" />Flights</h2>
         {merged.length > 0 && (

@@ -1048,6 +1048,13 @@ try {
     await shot(b.page, "share-7-shared-trip");
     const stText = await st.innerText();
     assert(/Lisbon Summit/.test(stText) && /Lisbon/.test(stText) && /Shared by alice/.test(stText), "name, destination and who shared it");
+    assert(/View only/.test(stText) && /Upcoming|In progress|Passed/.test(stText), "shared card: view only and a date badge: " + stText);
+    assert(!/Add expense|Flight details|\$\s?\d|expense/i.test(stText), "shared card has no amount, expense count or buttons: " + stText);
+    const photosJson = await api(b.page, "/api/sharing/trip-photos");
+    assert(Object.keys(photosJson.body).join() === "photos" && Object.keys(photosJson.body.photos).every((k) => /^[0-9a-f-]{36}$/i.test(k)), "photos answer: only trip ids and image addresses");
+    await b.page.goto(`${BASE}/`);
+    await b.page.getByRole("tab", { name: "Business" }).click().catch(() => {});
+    await b.page.getByTestId("shared-trip").waitFor({ timeout: 30000 });
     const bobPage = await b.page.content();
     for (const secret of ["SECRET-NOTES", "SECRET-HOTEL", "987.65", "secret-receipt"]) assert(!bobPage.includes(secret), `Bob's page must not contain ${secret}`);
     const tripsJson = await api(b.page, "/api/sharing/trips");
@@ -2164,7 +2171,13 @@ try {
       await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
       const hero = page.getByTestId("featured-trip");
       await hero.waitFor({ timeout: 30000 });
-      assert((await hero.innerText()).includes("AUA to PTY"), "the business dashboard shows the flight: " + (await hero.innerText()).slice(0, 300));
+      const heroText = await hero.innerText();
+      assert(/CM 312/.test(heroText) && /AUA/.test(heroText) && /PTY/.test(heroText), "the business dashboard shows the flight: " + heroText.slice(0, 300));
+      assert(/Added by hand/.test(heroText) && !/Flight sync active/.test(heroText), "a hand-entered flight says so, not 'sync active'");
+      assert(!/Confirmed/.test(heroText), "the status never claims 'Confirmed'");
+      assert(/Flight details/.test(heroText) && /Add expense/.test(heroText), "flight details and add expense buttons");
+      await page.getByTestId("featured-flight-details").click();
+      await page.waitForURL(new RegExp(`/trips/${TRIP_ID}#flights`), { timeout: 30000 });
     } finally {
       await ctx.close();
       const t = fake.table("trip_flights");

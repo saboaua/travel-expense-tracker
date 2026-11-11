@@ -1,15 +1,17 @@
 import { FlightLine } from "@/components/flights/FlightLine";
-import { flightLine, type TripFlight } from "@/lib/flights";
+import { flightLine, nextFlight, type TripFlight } from "@/lib/flights";
+import { FeaturedTripCard } from "@/components/dashboard/FeaturedTripCard";
+import { SharedTrips } from "@/components/sharing/SharedTrips";
+import { tripBadge } from "@/lib/trip-card";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plane, MapPin, Clock, Camera, ChevronRight } from "lucide-react";
+import { Plane, ChevronRight } from "lucide-react";
 import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { buildScanOptions } from "@/lib/scan-destination";
 import { getDestinationInfo } from "@/lib/destination";
-import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { WeatherCard } from "@/components/WeatherCard";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { PassportBalloon } from "@/components/documents/PassportBalloon";
@@ -175,16 +177,6 @@ export default async function DashboardPage() {
 
   const isPassed = (t: { start_date: string; end_date: string | null }) => endOf(t) < today;
 
-  // Badge on the hero photo
-  const heroBadge = (t: { start_date: string; end_date: string | null }) => {
-    if (t.start_date > today) {
-      const d = daysBetween(today, t.start_date);
-      return { label: `Upcoming \u00b7 ${d} day${d !== 1 ? "s" : ""} left`, cls: "bg-emerald-500 text-white" };
-    }
-    if (!isPassed(t)) return { label: "In progress", cls: "bg-blue-500 text-white" };
-    return { label: "Passed", cls: "bg-amber-500 text-white" };
-  };
-
   // Greeting identity: profile first name, else first word of the full name, else the email prefix
   const firstName =
     profile?.first_name || (profile?.full_name ? String(profile.full_name).split(" ")[0] : null) || user?.email?.split("@")[0] || null;
@@ -256,68 +248,18 @@ export default async function DashboardPage() {
             <>
               {featured && (() => {
                 const fTotal = featured.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
-                const fCount = featured.expenses?.length || 0;
-                const badge = heroBadge(featured);
+                const fFlights = flightsByTrip.get(featured.id) ?? [];
+                const fNext = nextFlight(fFlights, Date.now());
                 return (
-                  <div
-                    data-testid="featured-trip"
-                    className="overflow-hidden rounded-2xl border bg-card shadow-sm md:flex"
-                  >
-                    <Link href={`/trips/${featured.id}`} className="relative block h-44 bg-gradient-to-br from-slate-800 to-slate-600 md:h-auto md:min-h-[13rem] md:w-2/5 md:shrink-0">
-                      {destinationInfo?.imageUrl && <DestinationPhoto src={destinationInfo.imageUrl} />}
-                      <div className="absolute inset-0 bg-gradient-to-b from-black/10 via-transparent to-black/75" />
-                      <span
-                        className={`absolute right-3 top-3 inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold shadow ${badge.cls}`}
-                      >
-                        <Clock className="h-3 w-3" />
-                        {badge.label}
-                      </span>
-                      <div className="absolute inset-x-0 bottom-0 p-4 text-white md:hidden">
-                        {featured.destination && (
-                          <p className="flex items-center gap-1 text-xs opacity-90">
-                            <MapPin className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{featured.destination}</span>
-                          </p>
-                        )}
-                        <h3 className="mt-0.5 truncate text-xl font-semibold">{featured.name}</h3>
-                        <p className="text-sm opacity-90">
-                          {formatDate(featured.start_date)}
-                          {featured.end_date && ` - ${formatDate(featured.end_date)}`}
-                        </p>
-                      </div>
-                      {featured.destination && (
-                        <p className="absolute bottom-3 left-4 hidden items-center gap-1 text-sm text-white md:flex">
-                          <MapPin className="h-3.5 w-3.5 shrink-0" />
-                          <span className="truncate">{featured.destination}</span>
-                        </p>
-                      )}
-                    </Link>
-                    <div className="flex flex-1 flex-col justify-between gap-4 p-4 md:p-6">
-                      <Link href={`/trips/${featured.id}`} className="hidden min-w-0 md:block">
-                        <h3 className="truncate text-xl font-semibold">{featured.name}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(featured.start_date)}
-                          {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
-                        </p>
-                      </Link>
-                      {lineFor(featured.id) && <FlightLine flight={lineFor(featured.id)!} />}
-                      <div className="flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-xl font-bold tabular-nums">{formatCurrency(fTotal, "USD")}</p>
-                          <p className="text-sm text-muted-foreground">
-                            spent &middot; {fCount} expense{fCount !== 1 ? "s" : ""}
-                          </p>
-                        </div>
-                        <Link
-                          href={`/trips/${featured.id}/add-expense`}
-                          className="inline-flex h-11 shrink-0 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-                        >
-                          <Camera className="h-4 w-4" />
-                          Add expense
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
+                  <FeaturedTripCard
+                    trip={featured}
+                    imageUrl={destinationInfo?.imageUrl ?? null}
+                    badge={tripBadge(featured.start_date, featured.end_date, today)!}
+                    flight={fNext}
+                    moreFlights={fNext ? fFlights.length - 1 : 0}
+                    total={fTotal}
+                    count={featured.expenses?.length || 0}
+                  />
                 );
               })()}
 
@@ -354,6 +296,9 @@ export default async function DashboardPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Trips partners shared with me: photo, dates and flights, no amounts */}
+      <SharedTrips kind="trip" />
 
       {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
       {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
