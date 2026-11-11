@@ -86,6 +86,8 @@ export type CrossCheck = {
   alts: Record<number, number>;
   /** How many AI prices the on-device reader found too. */
   agreed: number;
+  /** Which rows those are (indexes into the AI items). */
+  agreedRows: number[];
   /** False when the on-device reading was too poor to judge anything from (then nothing is flagged). */
   trusted: boolean;
   /** Prices the on-device reader found on item lines that the AI did not list. */
@@ -108,7 +110,7 @@ export function crossCheck(aiItems: GroceryLine[], ocr: { text: string; items: G
   const found = aiItems.map((it) => take(it.line_total));
   const agreed = found.filter(Boolean).length;
   const share = aiItems.length ? agreed / aiItems.length : 0;
-  if (aiItems.length === 0 || share < 0.5) return { flagged: {}, alts: {}, agreed, trusted: false, extra: [] };
+  if (aiItems.length === 0 || share < 0.5) return { flagged: {}, alts: {}, agreed, agreedRows: [], trusted: false, extra: [] };
 
   const flagged: Record<number, string> = {};
   const alts: Record<number, number> = {};
@@ -135,7 +137,7 @@ export function crossCheck(aiItems: GroceryLine[], ocr: { text: string; items: G
       else extra.push(it.line_total);
     }
   }
-  return { flagged, alts, agreed, trusted: true, extra };
+  return { flagged, alts, agreed, agreedRows: found.map((f, i) => (f ? i : -1)).filter((i) => i >= 0), trusted: true, extra };
 }
 
 /** Folds several flag sets into the items and returns the combined plain-language issues. */

@@ -97,6 +97,8 @@ export type LateUpdate = {
   flags: Record<number, string>;
   /** Another reader's price for a row, offered as a suggestion. */
   alts: Record<number, number>;
+  /** Rows whose price both readers printed the same: confirmed. */
+  agree: number[];
   /** Plain sentences about the receipt as a whole. */
   issues: string[];
   /** "ocr": the on-device reader compared prices; "ai": the AI took a second look. */
@@ -135,7 +137,7 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, on
         const cross = crossCheck(snapshot, { text: ocr.rawText, items: bestItems(ocr.rawText, ocr.layout, ocr.amount) });
         const issues: string[] = [];
         if (cross.trusted && cross.extra.length > 0) issues.push(`The second reader also saw ${cross.extra.length === 1 ? `a price of ${cross.extra[0].toFixed(2)}` : `${cross.extra.length} prices`} that the AI did not list.`);
-        if (Object.keys(cross.flagged).length > 0 || issues.length > 0) onLater({ flags: cross.flagged, alts: cross.alts, issues, from: "ocr" });
+        if (cross.trusted) onLater({ flags: cross.flagged, alts: cross.alts, agree: cross.agreedRows, issues, from: "ocr" });
       });
       // Second look, only when the numbers do not add up
       if (!check.ok && (typeof navigator === "undefined" || navigator.onLine !== false)) {
@@ -152,7 +154,7 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, on
             if (!better || better.items.length === 0) return;
             const d = diffReadings(snapshot, better.items);
             const issues = d.added > 0 ? [`The AI's second look found ${d.added} more ${d.added === 1 ? "line" : "lines"} on the receipt.`] : [];
-            if (Object.keys(d.flagged).length > 0 || issues.length > 0) onLater({ flags: d.flagged, alts: d.alts, issues, from: "ai" });
+            if (Object.keys(d.flagged).length > 0 || issues.length > 0) onLater({ flags: d.flagged, alts: d.alts, agree: [], issues, from: "ai" });
           })
           .catch(() => {});
       }

@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Check, Eye, Plus, Sparkles, Trash2 } from "lucide-react";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
@@ -26,7 +26,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
 
-type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number };
+type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean };
 const uid = () => Math.random().toString(36).slice(2);
 const money = (s: string) => {
   const n = parseFloat(s);
@@ -119,6 +119,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const blankRow = (): Row => ({ key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: allowed("Other"), unit: "" });
   // Keys of the rows made by the latest scan, so a late suggestion lands on the right row even after edits or deletes
   const scanKeys = useRef<string[]>([]);
+  const [onlyCheck, setOnlyCheck] = useState(false);
+  const [witness, setWitness] = useState(false); // the on-device reader compared its prices with the AI's
+  const [secondLook, setSecondLook] = useState(0); // rows where the AI's second look read another price
   const scanId = useRef(0);
 
   /** Suggestions that arrive after the rows are on screen: they are attached to rows, never applied. */
@@ -126,9 +129,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     if (id !== scanId.current) return; // a newer scan replaced these rows
     setRows((rs) => rs.map((r) => {
       const i = scanKeys.current.indexOf(r.key);
-      if (i < 0 || (!u.flags[i] && u.alts[i] == null)) return r;
-      return { ...r, flag: r.flag ?? u.flags[i], alt: r.alt ?? u.alts[i] };
+      if (i < 0) return r;
+      if (u.agree.includes(i) && !u.flags[i]) return { ...r, confirmed: true };
+      if (!u.flags[i] && u.alts[i] == null) return r;
+      return { ...r, flag: r.flag ?? u.flags[i], alt: r.alt ?? u.alts[i], confirmed: false };
     }));
+    if (u.from === "ocr") setWitness(true);
+    if (u.from === "ai") setSecondLook(Object.keys(u.alts).length);
     const n = Object.keys(u.flags).length;
     const extra = [n > 0 ? `${n} ${n === 1 ? "price looks" : "prices look"} uncertain.` : "", ...u.issues].filter(Boolean).join(" ");
     if (extra) setNote((cur) => (cur ? `${cur} ${extra}` : extra));
@@ -138,6 +145,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     setScanning(true);
     setNote(null);
     const id = ++scanId.current;
+    setWitness(false);
+    setSecondLook(0);
+    setOnlyCheck(false);
     try {
       const r = await extractGroceryReceipt(f, { currency, categories: categoryNames }, (u) => applyLate(id, u));
       if (r.store && !store) setStore(r.store);
@@ -173,6 +183,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   };
 
   const update = (key: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+
+  const settle = (key: string) => update(key, { flag: undefined, alt: undefined, confirmed: true });
+  const takeAlt = (r: Row) => {
+    if (r.alt == null) return;
+    const q = money(r.quantity) > 0 ? money(r.quantity) : 1;
+    update(r.key, { line_total: r.alt.toFixed(2), unit_price: r2(r.alt / q).toFixed(2), flag: undefined, alt: undefined, confirmed: true });
+  };
 
   // Keep qty x unit = line total in sync while editing
   const setQty = (r: Row, v: string) => update(r.key, { quantity: v, line_total: String(r2(money(v) * money(r.unit_price))) });
@@ -294,10 +311,55 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 </Button>
               </div>
 
-              {rows.map((r) => (
-                <div key={r.key} className="space-y-2 rounded-xl border p-3">
+              {rows.some((r) => r.flag || r.confirmed) && (
+                <div className="space-y-3 rounded-2xl border bg-card p-4" data-testid="scan-summary">
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700"><Eye className="h-5 w-5" /></span>
+                    <div>
+                      <p className="font-semibold">Read {rows.length} {rows.length === 1 ? "item" : "items"}</p>
+                      <p className="text-xs text-muted-foreground">{witness ? "Two readers looked at the same photo" : "Checked against the receipt's own numbers"}</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {rows.some((r) => r.confirmed) && <span className="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-green-100 px-3 text-sm font-semibold text-green-800"><Check className="h-3.5 w-3.5" />{rows.filter((r) => r.confirmed).length} confirmed by both</span>}
+                    {rows.some((r) => r.flag) && <span className="inline-flex min-h-[30px] items-center gap-1 rounded-full bg-amber-100 px-3 text-sm font-semibold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />{rows.filter((r) => r.flag).length} to check</span>}
+                  </div>
+                  {rows.some((r) => r.flag) && (
+                    <label className="flex min-h-[44px] cursor-pointer items-center gap-3 text-sm font-medium">
+                      <input type="checkbox" className="h-5 w-5" checked={onlyCheck} onChange={(e) => setOnlyCheck(e.target.checked)} />
+                      Show only items to check
+                    </label>
+                  )}
+                </div>
+              )}
+              {secondLook > 0 && (
+                <div className="flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900" data-testid="second-look">
+                  <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
+                  <p><b>The AI took a second look.</b> The first reading did not add up to the receipt total, so it looked at the photo again. It read another price on {secondLook} {secondLook === 1 ? "row" : "rows"}: use it if it is right.</p>
+                </div>
+              )}
+
+              {rows.filter((r) => !onlyCheck || r.flag).map((r) => (
+                <div key={r.key} className={`space-y-2 rounded-xl border p-3 ${r.flag ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/40" : ""}`} data-flagged={r.flag ? "true" : undefined}>
+                  {r.flag && (
+                    <div className="space-y-2" data-testid="row-check">
+                      <div className="flex items-center gap-2"><span className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-amber-100 px-2.5 text-xs font-semibold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Check</span></div>
+                      <p className="rounded-lg border border-amber-200 bg-amber-50 p-2 text-sm text-amber-900">{r.flag}.</p>
+                      <div className="flex flex-wrap gap-2">
+                        {r.alt != null ? (
+                          <>
+                            <Button type="button" variant="outline" className="min-h-[44px] flex-1" onClick={() => settle(r.key)}>Keep {formatCurrency(money(r.line_total), currency)}</Button>
+                            <Button type="button" variant="outline" className="min-h-[44px] flex-1" onClick={() => takeAlt(r)}>Use {formatCurrency(r.alt, currency)}</Button>
+                          </>
+                        ) : (
+                          <Button type="button" variant="outline" className="min-h-[44px] w-full" onClick={() => settle(r.key)}>It is right</Button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                   <div className="flex gap-2">
                     <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder="Item name" maxLength={160} />
+                    {r.confirmed && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800" title="Both readers agree" aria-label="Both readers agree"><Check className="h-4 w-4" /></span>}
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
                       <Trash2 className="h-4 w-4" />
                     </Button>
@@ -314,12 +376,21 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 </div>
               ))}
 
-              {rows.length > 0 && (
-                <p className={`rounded-lg p-2 text-xs ${total && Math.abs(diff) > 0.05 ? "bg-amber-50 text-amber-800" : "bg-muted text-muted-foreground"}`}>
-                  Items add up to {formatCurrency(itemsSum, currency)}
-                  {total && Math.abs(diff) > 0.05 ? `. Receipt total is ${formatCurrency(money(total), currency)} (${diff > 0 ? "+" : ""}${formatCurrency(diff, currency)}). That can be tax, bags or discounts, or a missed item.` : "."}
-                </p>
-              )}
+              {rows.length > 0 && (() => {
+                const off = !!total && Math.abs(diff) > 0.05;
+                return (
+                  <div className={`flex items-start gap-3 rounded-2xl border p-3 text-sm ${off ? "border-amber-300 bg-amber-50 text-amber-900" : "border-green-200 bg-green-50 text-green-900"}`} data-testid="items-total">
+                    <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${off ? "bg-amber-100" : "bg-green-100"}`}>{off ? <AlertTriangle className="h-4 w-4" /> : <Check className="h-4 w-4" />}</span>
+                    <p>
+                      <b>Items add up to {formatCurrency(itemsSum, currency)}</b>
+                      <br />
+                      {off
+                        ? `${formatCurrency(Math.abs(diff), currency)} ${diff > 0 ? "less" : "more"} than the receipt total, ${formatCurrency(money(total), currency)}. That can be tax, bags or discounts, or a missed or misread item.`
+                        : total ? `Same as the receipt total, ${formatCurrency(money(total), currency)}` : "Enter the receipt total above to compare."}
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="space-y-2">

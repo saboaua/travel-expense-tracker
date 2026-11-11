@@ -776,6 +776,50 @@ try {
     await ctx.close();
   });
 
+  await test("scan: rows the second look disagrees with get a Check mark and a Use button, and the total bar turns green once the items add up", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    const first = { store: "Test Shop", date: null, total: 5.59, currency: "USD", source: "ai", items: [item("Milk", 2.49), item("Bread", 8.1)] };
+    const fixed = { ...first, items: [item("Milk", 2.49), item("Bread", 3.1)] };
+    await page.route("**/api/ocr", async (route) => {
+      const body = route.request().postData() || "";
+      if (body.includes("grocery-recheck")) { await new Promise((r) => setTimeout(r, 800)); return route.fulfill({ json: { result: fixed } }); }
+      return route.fulfill({ json: { result: first } });
+    });
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?quick=1`);
+    await page.getByRole("button", { name: "Use full image" }).click();
+    // The first reading is on screen straight away, with the problem shown
+    await page.getByTestId("items-total").waitFor();
+    assert(/10\.59/.test(await page.getByTestId("items-total").innerText()), "the sum of the items is shown");
+    assert((await page.getByTestId("items-total").innerText()).includes("less than") === false, "items are above the total, not below it");
+    // The AI's second look arrives later and marks the row
+    await page.getByTestId("row-check").waitFor({ timeout: 15_000 });
+    assert((await page.getByTestId("second-look").innerText()).includes("second look"), "the second look is announced");
+    const useBtn = page.getByRole("button", { name: /^Use .*3\.10/ });
+    assert(await useBtn.isVisible(), "the other price is offered as a button");
+    assert((await page.locator("input[type=number]").evaluateAll((els) => els.map((e) => e.value))).includes("8.10"), "nothing was changed by itself");
+    await useBtn.click();
+    await page.waitForFunction(() => document.querySelector('[data-testid="items-total"]')?.textContent?.includes("Same as the receipt total"));
+    assert((await page.locator('[data-flagged="true"]').count()) === 0, "the row is no longer marked");
+    await ctx.close();
+  });
+
+  await test("scan: when nothing can be read a blank row is ready to type into", async () => {
+    const { ctx, page } = await newPage();
+    await page.route("**/api/ocr", (route) => route.fulfill({ status: 502, json: { error: "AI OCR failed", reason: "ai_failed" } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?quick=1`);
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByPlaceholder("Item name").first().waitFor({ timeout: 60_000 });
+    assert(/Type them in below|Type the items in below/.test(await page.locator("body").innerText()), "the note offers typing the items in");
+    await ctx.close();
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
