@@ -847,6 +847,36 @@ try {
     await ctx.close();
   });
 
+  await test("prices: on a phone the green saving line and the store name never overlap the price", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const R = ["9c000000-0000-4000-8000-00000000e001", "9c000000-0000-4000-8000-00000000e002"];
+    const mk = (id, store, days) => ({ id, user_id: PAT, store, purchase_date: addDays(today, days), total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    const item = (n, rid, name, price) => ({ id: `9d000000-0000-4000-8000-00000000e10${n}`, receipt_id: rid, user_id: PAT, name, normalized_name: name.toLowerCase(), category: "Other", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() });
+    fake.table("grocery_receipts").push(mk(R[0], "Folira Supermarket", -6), mk(R[1], "TUR DIA", -2));
+    fake.table("grocery_items").push(item(1, R[0], "Oreo", 1.5), item(2, R[1], "Oreo", 4.99));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const card = page.getByTestId("price-product").filter({ hasText: "Oreo" }).first();
+      await card.waitFor({ timeout: 60000 });
+      const chip = await card.locator("span.bg-emerald-100").first().boundingBox();
+      const price = await card.locator("p.text-lg").first().boundingBox();
+      const store = await card.getByTestId("price-best-store").boundingBox();
+      assert(chip && price && store, "chip, price and store are all visible");
+      const overlap = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+      assert(!overlap(chip, price), "the green line does not touch the price");
+      assert(store.y >= chip.y + chip.height - 1, "the store name is below the green line");
+      assert(!overlap(store, price), "the store name does not touch the price");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("00000000e")) a.splice(i, 1); }
+    }
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

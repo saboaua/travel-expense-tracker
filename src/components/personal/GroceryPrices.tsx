@@ -206,7 +206,7 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online }: { p: Prod
           <p className="text-[13px] text-muted-foreground">{p.category} · {multi ? `${p.stores.length} stores · ` : `${p.stores[0].store} · `}bought {p.count}x · last {formatDate(p.lastDate)}</p>
           <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
             {p.saving ? (
-              <><span className={`${chipBase} ${GREEN}`}>{p.saving.to} saves {fmt(p.saving.amount)} ({Math.round(p.saving.pct * 10) / 10}%)</span><span className="text-[13px] text-muted-foreground">vs {p.saving.from}</span></>
+              <><span className={`${chipBase} ${GREEN} max-w-full !whitespace-normal`}>{p.saving.to} saves {fmt(p.saving.amount)} ({Math.round(p.saving.pct * 10) / 10}%)</span><span className="text-[13px] text-muted-foreground">vs {p.saving.from}</span></>
             ) : multi ? (
               <span className="text-[13px] text-muted-foreground">Cheapest at {best.store}, where you bought last</span>
             ) : p.stats.previous != null ? (
@@ -215,12 +215,14 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online }: { p: Prod
               <span className="text-[13px] text-muted-foreground">Only seen at one store</span>
             )}
           </div>
+          {/* On a phone the store sits under the green line, so it can never run into the price on the right */}
+          {multi && <p className="mt-1.5 text-[13px] text-muted-foreground sm:hidden" data-testid="price-best-store">Best price at {best.store}</p>}
         </div>
         <div className="hidden shrink-0 sm:block"><Sparkline values={[...p.history].reverse().map((h) => h.price)} width={96} /></div>
         <div className="shrink-0 text-right">
           {multi && <p className="text-xs text-muted-foreground">Best price</p>}
           <p className={`text-lg font-bold tabular-nums ${multi ? "text-emerald-800 dark:text-emerald-300" : ""}`}>{fmt(shownPrice)}{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</p>
-          <div className="mt-1">{multi ? <span className="text-xs text-muted-foreground">{best.store}</span> : <Change pct={p.changePct} />}</div>
+          <div className="mt-1">{multi ? <span className="hidden text-xs text-muted-foreground sm:inline">{best.store}</span> : <Change pct={p.changePct} />}</div>
         </div>
         {isOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />}
       </button>
