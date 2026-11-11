@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { pushLookup, sendPush } from "@/lib/push";
+import { pushItemTitle, pushLookup, pushName, sendPush } from "@/lib/push";
 import { SHARE_KINDS, isUuid, type ShareKind } from "@/lib/sharing";
 import { callSharing, jsonError, noStore, withSharingUser } from "@/lib/sharing-server";
 
@@ -13,7 +13,12 @@ export async function POST(request: Request) {
     const r = await callSharing(supabase, "share_item", { p_partnership: body.partnership_id, p_kind: body.kind, p_item: body.item_id });
     if (r.error) return jsonError(r.error);
     const pid = body.partnership_id as string;
-    after(async () => { await sendPush(await pushLookup("push_other_party", { p_partnership: pid, p_me: userId }), "shared", "shared"); });
+    const kind = body.kind as string;
+    const itemId = body.item_id as string;
+    after(async () => {
+      const to = await pushLookup("push_other_party", { p_partnership: pid, p_me: userId });
+      if (to) await sendPush(to, "shared", "shared", { by: await pushName(userId), item: await pushItemTitle(kind, itemId), itemKind: kind });
+    });
     return NextResponse.json({ ok: true, share_id: r.data }, { headers: noStore });
   });
 }

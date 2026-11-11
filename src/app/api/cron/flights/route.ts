@@ -51,7 +51,7 @@ export async function GET(req: Request) {
       await db.from("trip_flights").update({ ...patch, last_alert_key: key }).eq("id", f.id);
       if (!first && key !== f.last_alert_key) people.add(f.user_id);
     }
-    for (const userId of people) await sendPush(userId, "flight", "trips");
+    for (const userId of people) await sendPush(userId, "flight", "flights");
     return NextResponse.json({ ok: true, checked, alerted: people.size });
   } catch (e) {
     console.error("[cron flights]", e instanceof Error ? e.message : e);

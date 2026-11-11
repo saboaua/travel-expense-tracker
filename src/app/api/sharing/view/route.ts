@@ -1,6 +1,6 @@
 import { NextResponse, after } from "next/server";
 import { SHARE_KINDS, isUuid, type ShareKind } from "@/lib/sharing";
-import { pushLookup, sendPush } from "@/lib/push";
+import { pushItemTitle, pushLookup, pushName, sendPush } from "@/lib/push";
 import { callSharing, jsonError, noStore, withSharingUser } from "@/lib/sharing-server";
 
 export const dynamic = "force-dynamic";
@@ -14,7 +14,10 @@ export async function POST(request: Request) {
     if (r.error) return jsonError(r.error);
     if (r.data === true) {
       const { kind, item_id } = body as { kind: string; item_id: string };
-      after(async () => { await sendPush(await pushLookup("push_view_owner", { p_viewer: userId, p_kind: kind, p_item: item_id }), "view", "views"); });
+      after(async () => {
+        const owner = await pushLookup("push_view_owner", { p_viewer: userId, p_kind: kind, p_item: item_id });
+        if (owner) await sendPush(owner, "view", "views", { by: await pushName(userId), item: await pushItemTitle(kind, item_id), itemKind: kind });
+      });
     }
     return NextResponse.json({ ok: true }, { headers: noStore });
   });

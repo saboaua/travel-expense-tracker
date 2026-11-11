@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { pushLookup, sendPush } from "@/lib/push";
+import { pushLookup, pushName, sendPush } from "@/lib/push";
 import { isUuid } from "@/lib/sharing";
 import { callSharing, jsonError, noStore, withSharingUser } from "@/lib/sharing-server";
 
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const partner = await pushLookup("push_other_party", { p_partnership: body.id, p_me: userId });
     const r = await callSharing(supabase, "end_partnership", { p_id: body.id });
     if (r.error) return jsonError(r.error);
-    after(async () => { await sendPush(partner, "ended", "shared"); });
+    after(async () => { if (partner) await sendPush(partner, "ended", "shared", { by: await pushName(userId) }); });
     return NextResponse.json({ ok: true }, { headers: noStore });
   });
 }

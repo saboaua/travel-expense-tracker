@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   // Phone alert to each admin who has "Support requests" switched on (never blocks or fails the request)
   try {
     const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
-    await Promise.allSettled((admins ?? []).map((a) => sendPush(a.id as string, "support", "support")));
+    await Promise.allSettled((admins ?? []).map((a) => sendPush(a.id as string, "support", "support", { by: String(name || "").trim().split(/\s+/)[0], subject: subject || undefined })));
   } catch (e) {
     console.error("support phone alert failed:", e);
   }

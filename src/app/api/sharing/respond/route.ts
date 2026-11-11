@@ -1,5 +1,5 @@
 import { NextResponse, after } from "next/server";
-import { pushLookup, sendPush } from "@/lib/push";
+import { pushLookup, pushName, sendPush } from "@/lib/push";
 import { isUuid } from "@/lib/sharing";
 import { callSharing, jsonError, noStore, withSharingUser } from "@/lib/sharing-server";
 
@@ -12,7 +12,9 @@ export async function POST(request: Request) {
     const r = await callSharing(supabase, "respond_to_invite", { p_id: body.id, p_action: body.action });
     if (r.error) return jsonError(r.error);
     const pid = body.id as string;
-    after(async () => { await sendPush(await pushLookup("push_other_party", { p_partnership: pid, p_me: userId }), "accepted", "invites"); });
+    const accepted = body.action === "accept";
+    // a decline or a block never says who did it: the wording stays generic
+    after(async () => { const to = await pushLookup("push_other_party", { p_partnership: pid, p_me: userId }); if (to) await sendPush(to, "accepted", "invites", accepted ? { by: await pushName(userId) } : undefined); });
     return NextResponse.json({ ok: true }, { headers: noStore });
   });
 }

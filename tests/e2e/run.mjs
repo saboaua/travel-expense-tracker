@@ -1303,7 +1303,7 @@ try {
     await sam.ctx.close();
   });
 
-  await test("profile: only an admin is offered Support requests alerts; everyone is offered Trips coming up", async () => {
+  await test("profile: only an admin is offered Support requests alerts; everyone is offered Trip coming up", async () => {
     const admin = await newPage();
     await signIn(admin.page, "admin@example.com", "Admin-Pass-123");
     await admin.page.waitForURL((u) => u.pathname === "/");
@@ -1311,16 +1311,51 @@ try {
     const card = admin.page.getByTestId("notifications-card");
     await card.waitFor();
     await card.getByRole("switch", { name: "Support requests" }).waitFor();
-    await card.getByRole("switch", { name: "Trips coming up" }).waitFor();
+    await card.getByRole("switch", { name: "Trip coming up" }).waitFor();
     await admin.ctx.close();
     const user = await newPage();
     await signIn(user.page, "pat@example.com", "Correct-Horse-1");
     await user.page.waitForURL((u) => u.pathname === "/");
     await user.page.goto(`${BASE}/profile#notifications`);
     const c2 = user.page.getByTestId("notifications-card");
-    await c2.getByRole("switch", { name: "Trips coming up" }).waitFor();
+    await c2.getByRole("switch", { name: "Trip coming up" }).waitFor();
     assert((await c2.getByRole("switch", { name: "Support requests" }).count()) === 0, "a normal person is not offered Support requests");
     await user.ctx.close();
+  });
+
+  await test("profile: Notifications are grouped, new kinds are offered, the message style and quiet hours are saved", async () => {
+    const user = await newPage();
+    try {
+      await signIn(user.page, "pat@example.com", "Correct-Horse-1");
+      await user.page.waitForURL((u) => u.pathname === "/");
+      await user.page.goto(`${BASE}/profile#notifications`);
+      const card = user.page.getByTestId("notifications-card");
+      await card.waitFor();
+      for (const g of ["trips-and-travel", "money-and-papers", "sharing"]) await card.getByTestId(`push-group-${g}`).waitFor();
+      assert((await card.getByTestId("push-group-admin-only").count()) === 0, "a normal person has no admin group");
+      for (const name of ["Trip coming up", "Flight changes", "Flight tomorrow", "After the trip", "Subscription payments", "Document expiry", "Invites and replies", "Shared with me changed"]) await card.getByRole("switch", { name }).waitFor();
+      assert((await card.getByRole("switch", { name: "Flight tomorrow" }).getAttribute("aria-checked")) === "true", "new kinds start on");
+      assert((await card.getByRole("radio", { name: /Show details/ }).getAttribute("aria-checked")) === "true", "details is the default style");
+      await card.getByRole("radio", { name: /Keep it private/ }).click();
+      await card.getByRole("switch", { name: "Document expiry" }).click();
+      await card.getByRole("switch", { name: "Pause alerts at night" }).click();
+      await card.getByLabel("Quiet hours from").selectOption("21");
+      await user.page.waitForFunction(() => document.querySelector('[data-testid="push-quiet"] select') !== null);
+      await user.page.waitForTimeout(800);
+      const saved = fake.table("profiles").find((p) => p.id === PAT)?.push_prefs;
+      assert(saved && saved.detail === "private" && saved.documents === false && saved.quiet?.on === true && saved.quiet?.start === 21, "saved: " + JSON.stringify(saved));
+      assert(saved.flightTomorrow === true || saved.flightTomorrow === undefined, "other switches keep their value");
+      await user.page.reload();
+      await card.waitFor();
+      await user.page.waitForFunction(() => document.querySelector('[data-testid="push-style-private"]')?.getAttribute("aria-checked") === "true", null, { timeout: 30000 });
+      assert((await card.getByRole("radio", { name: /Keep it private/ }).getAttribute("aria-checked")) === "true", "the style is still private after a reload");
+      assert((await card.getByRole("switch", { name: "Document expiry" }).getAttribute("aria-checked")) === "false", "the switch is still off after a reload");
+      assert((await card.getByRole("switch", { name: "Pause alerts at night" }).getAttribute("aria-checked")) === "true" && (await card.getByLabel("Quiet hours from").inputValue()) === "21", "quiet hours are still set after a reload");
+    } finally {
+      await user.ctx.close();
+      const me = fake.table("profiles").find((p) => p.id === PAT);
+      if (me) delete me.push_prefs;
+    }
   });
 
   await test("profile: Notifications says when alerts are not set up, and Your data prepares a ZIP and schedules a deletion that can be cancelled", async () => {
@@ -1333,7 +1368,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 6, "device switch plus five kinds of alert (no Support requests for a normal person)");
+    assert((await card.getByRole("switch").count()) === 11, "device switch, nine kinds of alert and quiet hours (no Support or IPTV for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);

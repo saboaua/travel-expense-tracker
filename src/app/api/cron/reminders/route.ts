@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
-import { sendPush } from "@/lib/push";
+import { flushHeldPushes, sendPush } from "@/lib/push";
+import { documentsExpiring, flightsTomorrow, tripStartingSoon, tripsEnded } from "@/lib/push-reminders";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { dueForReminder as dueSubs, nextDue, type Sub } from "@/lib/subscriptions";
 import { dueForReminder as dueClients } from "@/lib/iptv";
-import { addDaysISO, todayISO } from "@/lib/utils";
+import { daysBetween, todayISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -21,8 +22,8 @@ function authorized(req: Request) {
 
 /**
  * Daily: one phone alert per person who has a subscription payment coming up inside the days they chose, and one to each
- * admin when IPTV clients are within 15 days of expiring. Each date is reminded once (reminded_for). Travellers get one alert 3 days and 1 day before a trip starts. The alert text never
- * says which subscription or client; the person opens the app for that. Email is not sent: the app has no email service.
+ * admin when IPTV clients are within 15 days of expiring. Each date is reminded once (reminded_for). Travellers get one alert 3 days and 1 day before a trip starts, one the day before a flight, and one after a trip ends.
+ * Documents about to expire are reminded once per step. With the person's "details" style the alert names the trip, flight or subscription (never an amount, number or code); with "private" it only says something is coming up. Email is not sent: the app has no email service.
  */
 export async function GET(req: Request) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
     for (const [userId, list] of byUser) {
       const due = dueSubs(list, today);
       if (!due.length) continue;
-      await sendPush(userId, "subscription", "reminders");
+      await sendPush(userId, "subscription", "reminders", { subscriptions: due.map((s) => ({ name: s.name, due: nextDue(s, today) })), days: Math.max(0, daysBetween(today, nextDue(due[0], today))) }, { today });
       people++;
       for (const s of due) await db.from("subscriptions").update({ reminded_for: nextDue(s, today) }).eq("id", s.id);
     }
@@ -52,19 +53,21 @@ export async function GET(req: Request) {
     const dueC = dueClients(((iptv.data ?? []) as { id: string; expire_date: string; reminded_for: string | null }[]), today);
     if (dueC.length) {
       const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
-      for (const a of admins ?? []) await sendPush(a.id as string, "iptv", "reminders");
+      const first = [...dueC].sort((a, b) => a.expire_date.localeCompare(b.expire_date))[0].expire_date;
+      for (const a of admins ?? []) await sendPush(a.id as string, "iptv", "iptv", { count: dueC.length, date: first }, { today });
       for (const c of dueC) await db.from("iptv_clients").update({ reminded_for: c.expire_date }).eq("id", c.id);
       clients = dueC.length;
     }
-    // Trips: everyone with an active trip starting in 3 days or tomorrow gets one alert (a day-exact match, so nothing is stored)
-    let travellers = 0;
-    const trips = await db.from("trips").select("user_id").eq("status", "active").in("start_date", [addDaysISO(today, 1), addDaysISO(today, 3)]).limit(5000);
-    if (trips.error) throw new Error(trips.error.message);
-    for (const userId of new Set(((trips.data ?? []) as { user_id: string }[]).map((t) => t.user_id))) {
-      await sendPush(userId, "trip", "trips");
-      travellers++;
-    }
-    return NextResponse.json({ ok: true, people, clients, travellers });
+    // Alerts held in quiet hours go out now, once the quiet time is over
+    const held = await flushHeldPushes(new Date(), today);
+    // Trips starting in 3 days or tomorrow, flights tomorrow, trips that just ended, documents about to expire
+    const travellers = await tripStartingSoon(db, today);
+    const flights = await flightsTomorrow(db, today);
+    const ended = await tripsEnded(db, today);
+    const documents = await documentsExpiring(db, today);
+    // Reminder keys older than half a year are not needed any more
+    await db.from("push_sent_log").delete().lt("sent_at", new Date(Date.now() - 180 * 86400_000).toISOString());
+    return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, documents, held });
   } catch (e) {
     console.error("[cron] reminders", e instanceof Error ? e.message : e);
     await notifyJobFailure(db, "Subscription and IPTV reminders");
