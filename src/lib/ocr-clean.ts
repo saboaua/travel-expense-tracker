@@ -12,7 +12,7 @@ export function fixDigits(line: string): string {
   return line.replace(PRICE_TOKEN, (t) => (/\d/.test(t) ? t.replace(/[Oo]/g, "0").replace(/[lI]/g, "1").replace(/S/g, "5") : t));
 }
 
-const CURRENCY_BEFORE_FIGURE = /(?:(?<![\p{L}\d])(?:US|CA|AU|EC)?\$|\b(?:AWG|USD|EUR|ANG|XCD|CAD|GBP|Afl)\.?|[€£])\s*(?=-?\d)/giu;
+const CURRENCY_BEFORE_FIGURE = /(?:(?<![\p{L}\d])(?:US|CA|AU|EC)?\$|\b(?:AWG|USD|EUR|ANG|XCD|CAD|GBP|Afl)\.?|[€£]|\bF(?=\s+\d+[.,]\d{2}))\s*(?=-?\d)/giu;
 
 export function cleanOcrText(text: string): string {
   return text
@@ -29,6 +29,8 @@ export function cleanOcrText(text: string): string {
       l = l.replace(CURRENCY_BEFORE_FIGURE, "");
       // minus after the figure: "1.00-" -> "-1.00"
       l = l.replace(/(?<![\d.,])(\d{1,4}(?:[.,]\d{3})*[.,]\d{2})\s*(?:-|CR\b)(?=\s*[A-Z]?\s*$)/, "-$1");
+      // stray marks the scanner leaves at the end of a line ("5.83  =", "8.30 |")
+      l = l.replace(/\s+[=|~_:;]+\s*$/, "");
       return l.replace(/[ ]{3,}/g, "  ").trim();
     })
     .join("\n");

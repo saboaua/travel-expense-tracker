@@ -158,7 +158,62 @@ function num(s: string): number {
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
 /** Product code printed before the name ("0012345 MILK WHOLE") is not part of the name. */
-const stripCode = (name: string) => name.replace(/^#?\d{4,}\s+/, "").replace(/^[*#]+\s*/, "");
+const stripCode = (name: string) => name.replace(/^#?\d{4,}\s+/, "").replace(/^[A-Z]{1,3}-\d{3,}\s+/, "").replace(/^[*#]+\s*/, "");
+
+const tidyName = (n: string) => stripCode(n.replace(/[^\p{L}\p{N}&'.\-/ ]/gu, " ").replace(/\s{2,}/g, " ").trim());
+const MONEY_G = /-?\d{1,4}(?:[.,]\d{3})*[.,]\d{2}/g;
+const prices = (l: string) => (l.match(MONEY_G) || []).map(num);
+
+/**
+ * Two-line layouts where the name sits above a line of figures (supermarket POS printers):
+ *   "2 - Peanut butter"  /  "040000004325  @  1.50  3.00"       (barcode, unit price, total)
+ *   "AN-4271 Vitamin B"  /  "1  EACH  43.10  10%  38.79"        (unit, unit price, discount, total)
+ * Returns the item and how many lines it used, or null when the lines do not look like this.
+ */
+function twoLineItem(line: string, next: string | undefined): { item: GroceryLine; used: number } | null {
+  if (!next || PRICE.test(line)) return null;
+  const nameOnly = (raw: string) => tidyName(raw.replace(/^\W*\d{0,3}\s*[-–]\s+/, ""));
+
+  // name line "N - NAME" (the dash is what marks it) followed by a barcode line
+  const dash = line.match(/^(?:\S{1,3}\s+)?(\d{1,3})?\s*[-–]\s+(\p{L}.*)$/u);
+  if (dash && (/\b\d{8,14}\b/.test(next) || /\s@\s/.test(next))) {
+    const p = prices(next);
+    if (p.length >= 2) {
+      const unit = p[p.length - 2], total = p[p.length - 1];
+      const byPrice = unit > 0 ? Math.round(total / unit) : 0;
+      const printed = dash[1] ? parseInt(dash[1], 10) : 0;
+      const qty = byPrice >= 1 && Math.abs(r2(byPrice * unit) - total) < 0.02 ? byPrice : printed || 1;
+      const name = nameOnly(dash[2]);
+      if (name && total > 0) return { item: { name, quantity: qty, unit_price: unit, line_total: total, category: guessGroceryCategory(name), unit: null }, used: 1 };
+    }
+  }
+
+  // coded description line followed by "qty EACH unit [disc%] [total]"
+  const code = line.match(/^[A-Z]{1,3}-\d{3,}\s+(\p{L}.*)$/u);
+  const each = next.match(/^(?:(\S{1,2})\s+)?(?:EACH|EA|PC|PCS|UNIT)\s+(.*)$/i);
+  if (code && each) {
+    const p = prices(each[2].replace(/\d+\s*%/g, " "));
+    const disc = each[2].match(/(\d{1,2})\s*%/);
+    if (p.length >= 1) {
+      const qtyTok = each[1] && /^\d+$/.test(each[1]) ? parseInt(each[1], 10) : 1; // a lone letter is a misread "1"
+      const unit = p[0];
+      let total = p.length >= 2 ? p[p.length - 1] : null;
+      let flag: string | undefined;
+      if (total == null) {
+        // the total was lost: work it out from the discount, and say so
+        total = Math.floor(unit * qtyTok * (1 - (disc ? parseInt(disc[1], 10) / 100 : 0)) * 100 + 1e-6) / 100;
+        flag = "Price worked out from the discount, check it against the receipt";
+      }
+      const name = tidyName(code[1]);
+      if (name && total > 0) {
+        const item: GroceryLine = { name, quantity: qtyTok, unit_price: r2(total / qtyTok), line_total: total, category: guessGroceryCategory(name), unit: null };
+        if (flag) item.flag = flag;
+        return { item, used: 1 };
+      }
+    }
+  }
+  return null;
+}
 
 export function parseLineItems(text: string): GroceryLine[] {
   const lines = cleanOcrText(text).split(/\r?\n/).map((l) => l.replace(/\s{2,}/g, "  ").trim()).filter(Boolean);
@@ -168,6 +223,13 @@ export function parseLineItems(text: string): GroceryLine[] {
     const line = lines[i];
     if (STOP_SECTION.test(line) && items.length > 0) break; // everything after the subtotal is payment info
     if (SKIP_LINE.test(line)) continue;
+
+    const two = twoLineItem(line, lines[i + 1]);
+    if (two) {
+      items.push(two.item);
+      i += two.used;
+      continue;
+    }
 
     // Weighed item split over three lines: "TOMATOES" / "0.750 kg @ 3.99/kg" / "2.99"
     if (!PRICE.test(line) && /\p{L}{2}/u.test(line)) {

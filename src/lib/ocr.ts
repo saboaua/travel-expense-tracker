@@ -76,6 +76,8 @@ function lineScore(line: string): number {
   if (STRONG_TOTAL.test(l)) score += 10;
   else if (PLAIN_TOTAL.test(l)) score += 6;
   else if (/\b(card|visa|mastercard|amex|debit|credit)\b/.test(l) && /\b(charged|payment|paid|amount|sale)\b/.test(l)) score += 3;
+  // "TOTAL US $ 8.08" printed under the real total is the same bill in dollars, not the amount charged
+  if (/\bu\.?s\.?\s*\$|\bus\s+\d|\busd\b/.test(l) && (STRONG_TOTAL.test(l) || PLAIN_TOTAL.test(l))) score -= 4;
   const incl = /\bincl|\binc\.|including/.test(l);
   if (PENALTY.test(l) && !(incl && /\btax|vat\b/.test(l))) score -= 8;
   return score;
@@ -96,6 +98,15 @@ function parseAmount(text: string): number | null {
     if (!best || score > best.score || (score === best.score && i >= best.idx)) best = { score, idx: i, value };
   }
   if (best) return best.value;
+
+  // Cash receipts without a total line: what was handed over, less any change given back
+  const tendered = lines.find((l) => /\btender(ed)?\b/i.test(l) && amountsIn(l).length > 0);
+  if (tendered) {
+    const t = amountsIn(tendered).pop()!;
+    const chg = lines.find((l) => /\bchange\b/i.test(l));
+    const c = chg ? (amountsIn(chg).pop() ?? 0) : 0;
+    if (t - c > 0) return Math.round((t - c) * 100) / 100;
+  }
 
   // No labelled total: biggest figure among the lower part of the receipt, ignoring penalised lines
   const tail = lines.slice(Math.floor(lines.length * 0.5));
@@ -166,7 +177,7 @@ function plausible(date: string, now = new Date()): boolean {
   return t <= max && t >= min;
 }
 
-function dateCandidates(line: string, monthFirst: boolean): string[] {
+function dateCandidates(line: string, monthFirst: boolean, now = new Date()): string[] {
   const out: string[] = [];
   const push = (v: string | null) => v && out.push(v);
 
@@ -176,7 +187,13 @@ function dateCandidates(line: string, monthFirst: boolean): string[] {
     const a = +m[1], b = +m[2], y = +m[3];
     if (a > 12) push(iso(y, b, a));
     else if (b > 12) push(iso(y, a, b));
-    else push(monthFirst ? iso(y, a, b) : iso(y, b, a));
+    else {
+      // 04/11 can be 4 November or 11 April; stores in the same town print both. Take the reading closest to today that is not in the future.
+      const pair = (monthFirst ? [iso(y, a, b), iso(y, b, a)] : [iso(y, b, a), iso(y, a, b)]).filter((v): v is string => !!v);
+      const ok = pair.filter((v) => plausible(v, now));
+      ok.sort((p, q) => Math.abs(now.getTime() - Date.parse(p)) - Math.abs(now.getTime() - Date.parse(q)));
+      for (const v of ok.length ? ok : pair) push(v);
+    }
   }
 
   const mon = "(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|ene|abr|ago|dic|mrt|mei|okt)[a-z]*";
@@ -194,7 +211,7 @@ function parseDate(text: string, hints: OcrHints = {}, now = new Date()): string
   // Lines that say "date" first, then everything else
   const ordered = [...lines.filter((l) => /\bdate|fecha|datum\b/i.test(l)), ...lines];
   for (const line of ordered) {
-    for (const c of dateCandidates(line, monthFirst)) if (plausible(c, now)) return c;
+    for (const c of dateCandidates(line, monthFirst, now)) if (plausible(c, now)) return c;
   }
   return null;
 }
@@ -204,7 +221,7 @@ function parseDate(text: string, hints: OcrHints = {}, now = new Date()): string
 /* ------------------------------------------------------------------ */
 
 const NOT_MERCHANT =
-  /^(tel|phone|fax|www\.|http|invoice|receipt|tax\s*id|vat|order|table|cashier|server|date|time|welcome|thank|customer|copy|duplicate)|@|\b(street|st\.|avenue|ave\.?|road|rd\.?|blvd|calle|straat|weg)\b/i;
+  /^(cash\s+(purchase|invoice|sale|receipt)|tax\s+invoice|customer\s+copy|tel|phone|fax|www\.|http|invoice|receipt|tax\s*id|vat|order|table|cashier|server|date|time|welcome|thank|customer|copy|duplicate)|@|\b(street|st\.|avenue|ave\.?|road|rd\.?|blvd|calle|straat|weg)\b/i;
 
 function parseMerchant(text: string): string | null {
   const lines = text
@@ -217,6 +234,7 @@ function parseMerchant(text: string): string | null {
     if (NOT_MERCHANT.test(line)) continue;
     const letters = (line.match(/\p{L}/gu) || []).length;
     if (letters < 3 || letters / line.length < 0.6) continue; // mostly digits/symbols
+    if (!/\p{L}{4,}/u.test(line)) continue; // no real word in it: scanner noise
     return line.slice(0, 80);
   }
   return null;
@@ -243,12 +261,12 @@ function guessCategory(text: string, allowed?: string[]): string | null {
 }
 
 /** Parse plain OCR text into fields. Exported so it can be tested without an image. */
-export function parseReceiptText(text: string, hints: OcrHints = {}): Omit<OcrResult, "source"> {
+export function parseReceiptText(text: string, hints: OcrHints = {}, now = new Date()): Omit<OcrResult, "source"> {
   return {
     merchant: parseMerchant(text),
     amount: parseAmount(cleanOcrText(text)),
     currency: parseCurrency(text),
-    date: parseDate(text, hints),
+    date: parseDate(text, hints, now),
     category: guessCategory(text, hints.categories),
     rawText: text,
   };
