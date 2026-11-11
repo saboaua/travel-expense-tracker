@@ -3,6 +3,7 @@ import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS } from "@/lib/columns";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import type { ItemLite, ReceiptLite } from "@/lib/personal/grocery";
 import type { TrackerRow } from "@/lib/personal/grocery";
+import type { MatchDecision } from "@/lib/personal/price-compare";
 import { isRowDelete, isRowSave } from "@/lib/row-outbox";
 import type { OutboxItem } from "@/lib/outbox";
 
@@ -18,6 +19,7 @@ export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[] };
 
 export const overviewKey = (userId: string) => `${userId}:groceries:overview`;
 export const pricesKey = (userId: string) => `${userId}:groceries:prices`;
+export const priceMatchesKey = (userId: string) => `${userId}:groceries:price-matches`;
 export const receiptKey = (userId: string, id: string) => `${userId}:groceries:receipt:${id}`;
 
 const shift = (m: string, delta: number) => {
@@ -63,6 +65,17 @@ export async function fetchPrices(supabase: SupabaseClient): Result<TrackerRow[]
     };
   } catch (error) {
     return { data: null, error };
+  }
+}
+
+/** Your Yes / No answers on "same product?". Before the migration is run there is no table: that simply means no answers yet. */
+export async function fetchPriceMatches(supabase: SupabaseClient): Result<MatchDecision[]> {
+  try {
+    const { data, error } = await supabase.from("grocery_price_matches").select("key_a, key_b, same").limit(2000);
+    if (error) return { data: [], error: null };
+    return { data: (data ?? []).map((d) => ({ key_a: String(d.key_a), key_b: String(d.key_b), same: d.same === true })), error: null };
+  } catch {
+    return { data: [], error: null };
   }
 }
 

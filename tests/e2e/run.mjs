@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -2013,6 +2013,38 @@ try {
     } finally {
       await ctx.close();
       subs.splice(subs.findIndex((r) => r.id === "5b000000-0000-4000-8000-0000000008f1"), 1);
+    }
+  });
+
+  await test("prices: the same beer from two supermarkets is one product that says which store is cheaper, and a wrong match can be undone", async () => {
+    const { ctx, page } = await newPage();
+    const R = ["9c000000-0000-4000-8000-00000000c001", "9c000000-0000-4000-8000-00000000c002", "9c000000-0000-4000-8000-00000000c003"];
+    const mk = (id, store, days) => ({ id, user_id: PAT, store, purchase_date: addDays(today, days), total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    const item = (n, rid, name, price) => ({ id: `9d000000-0000-4000-8000-00000000d00${n}`, receipt_id: rid, user_id: PAT, name, normalized_name: name.toLowerCase(), category: "Beverages", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() });
+    fake.table("grocery_receipts").push(mk(R[0], "Plaza Market", -10), mk(R[1], "Plaza Market", -5), mk(R[2], "Corner Mart", -4));
+    fake.table("grocery_items").push(item(1, R[0], "Corona Extra Bot 33CL", 5.25), item(2, R[1], "Corona Extra Bot 33CL", 5.49), item(3, R[2], "Corona Extra 330ML Cold", 5.75));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const card = page.getByTestId("price-product").filter({ hasText: "Corona Extra" });
+      await card.first().waitFor({ timeout: 60000 });
+      assert((await card.count()) === 1, "two wordings, two stores: one product, not " + (await card.count()));
+      const text = await card.first().innerText();
+      assert(/330 ml/.test(text) && /Plaza Market saves/.test(text), "size and the cheaper store show on the card: " + text);
+      await card.first().getByRole("button").first().click();
+      const detail = card.first().getByTestId("price-detail");
+      await detail.waitFor();
+      const stores = await detail.getByTestId("price-store").allInnerTexts();
+      assert(stores.length === 2 && /Plaza Market/.test(stores[0]) && /Cheapest/.test(stores[0]) && /Corner Mart/.test(stores[1]) && /more/.test(stores[1]), "cheapest store first: " + JSON.stringify(stores));
+      assert(/4\.6%/.test(stores[0]) && /was .*5\.25/.test(stores[0]), "the same store's own change is shown: " + stores[0]);
+      assert(/Plaza Market is cheaper/.test(await detail.getByTestId("price-saving").innerText()), "the saving line names the cheaper store");
+      await detail.getByRole("button", { name: "Not the same product" }).first().click();
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="price-product"]').length === 2, null, { timeout: 30000 });
+      assert(fake.table("grocery_price_matches").some((m) => m.same === false && m.user_id === PAT), "the answer is saved");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items", "grocery_price_matches"]) { const rows = fake.table(t); for (let i = rows.length - 1; i >= 0; i--) if (/^9[cd]0000/.test(String(rows[i].id ?? rows[i].key_a ?? "")) || t === "grocery_price_matches") rows.splice(i, 1); }
     }
   });
 

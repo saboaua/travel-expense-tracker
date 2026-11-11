@@ -19,6 +19,7 @@ const RELATIONS = {
   trips: { expenses: { many: "trip_id" } },
   expenses: { trips: { one: "trip_id" } },
   personal_projects: { personal_expenses: { many: "project_id" } },
+  grocery_items: { grocery_receipts: { one: "receipt_id" } },
 };
 
 function splitTop(s) {

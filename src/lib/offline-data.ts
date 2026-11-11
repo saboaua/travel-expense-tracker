@@ -6,7 +6,7 @@ import type { TravelDocument } from "@/lib/documents";
 import type { LoyaltyCard } from "@/lib/loyalty";
 import { LOYALTY_BUCKET } from "@/lib/loyalty-image";
 import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
-import { fetchOverview, fetchPrices, fetchReceiptBundle, overviewKey, pricesKey, receiptKey } from "@/lib/offline-grocery";
+import { fetchOverview, fetchPriceMatches, fetchPrices, fetchReceiptBundle, overviewKey, priceMatchesKey, pricesKey, receiptKey } from "@/lib/offline-grocery";
 import { fetchProjectBundle, fetchProjects, projectKey, projectsKey } from "@/lib/offline-personal";
 import { KIND_META } from "@/lib/personal/constants";
 import { warmPages } from "@/lib/offline-warm";
@@ -126,6 +126,8 @@ export async function warmGroceries(supabase: SupabaseClient, userId: string): P
   if (overview.data) await browserKv.set(overviewKey(userId), overview.data).catch(() => {});
   const prices = await fetchPrices(supabase);
   if (prices.data) await browserKv.set(pricesKey(userId), prices.data).catch(() => {});
+  const matches = await fetchPriceMatches(supabase);
+  if (matches.data) await browserKv.set(priceMatchesKey(userId), matches.data).catch(() => {});
   for (const r of (overview.data?.receipts ?? []).slice(0, RECENT_RECEIPTS)) {
     const bundle = await fetchReceiptBundle(supabase, r.id);
     if (!bundle.data) continue;

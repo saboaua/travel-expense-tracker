@@ -13,7 +13,7 @@ want_tables(name, fix) as (values
   ('roles','migration_roles.sql'), ('categories','migration_categories.sql'), ('currencies','migration_currencies.sql'),
   ('travel_categories','migration_travel_categories.sql'), ('travel_documents','migration_documents.sql'),
   ('personal_projects','migration_personal.sql'), ('personal_expenses','migration_personal.sql'),
-  ('grocery_receipts','migration_personal.sql'), ('grocery_items','migration_personal.sql'), ('grocery_categories','migration_grocery_categories.sql'),
+  ('grocery_receipts','migration_personal.sql'), ('grocery_items','migration_personal.sql'), ('grocery_price_matches','migration_price_matches.sql'), ('grocery_categories','migration_grocery_categories.sql'),
   ('audit_logs','migration_audit.sql'), ('security_events','migration_security_hardening.sql'), ('auth_throttle','migration_security_hardening.sql'),
   ('support_requests','migration_login_support.sql'),
   ('telegram_pending','migration_telegram.sql'), ('telegram_notify_prefs','migration_telegram_v2.sql'), ('telegram_sent_log','migration_telegram_v2.sql'),
