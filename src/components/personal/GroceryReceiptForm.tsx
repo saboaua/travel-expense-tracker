@@ -15,7 +15,7 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
-import { extractGroceryReceipt, howRead, scanNote, type LateUpdate } from "@/lib/receipt-extract";
+import { extractGroceryReceipt, GLARE_NOTE, howRead, scanNote, type LateUpdate } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Overview, type ReceiptBundle } from "@/lib/offline-grocery";
@@ -137,7 +137,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     if (u.from === "ocr") setWitness(true);
     if (u.from === "ai") setSecondLook(Object.keys(u.alts).length);
     const n = Object.keys(u.flags).length;
-    const extra = [n > 0 ? `${n} ${n === 1 ? "price looks" : "prices look"} uncertain.` : "", ...u.issues].filter(Boolean).join(" ");
+    const extra = [u.glare ? GLARE_NOTE : "", n > 0 ? `${n} ${n === 1 ? "price looks" : "prices look"} uncertain.` : "", ...u.issues].filter(Boolean).join(" ");
     if (extra) setNote((cur) => (cur ? `${cur} ${extra}` : extra));
   };
 

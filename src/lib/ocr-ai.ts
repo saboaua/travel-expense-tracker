@@ -365,6 +365,8 @@ export type GroceryScan = {
   tax?: number | null;
   /** The receipt's own arithmetic, checked: what to look at again. */
   check?: ScanCheck;
+  /** Part of the photo is washed out by glare (known when the on-device reader looked at it). */
+  glare?: boolean;
   /** True when the first reading failed the checks and a second look at the photo fixed some of it. */
   refined?: boolean;
 };

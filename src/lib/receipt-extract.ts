@@ -83,9 +83,12 @@ export async function extractReceipt(file: File, hints: OcrHints = {}): Promise<
 }
 
 /** A sentence for the scan note about what the checks found: empty when everything lines up. */
-export function scanNote(scan: Pick<GroceryScan, "items" | "check" | "refined">): string {
+export const GLARE_NOTE = "Part of the photo is washed out by glare. If some prices look wrong, retake it with the light at an angle.";
+
+export function scanNote(scan: Pick<GroceryScan, "items" | "check" | "refined" | "glare">): string {
   const flagged = scan.items.filter((i) => i.flag).length;
   const parts: string[] = [];
+  if (scan.glare) parts.push(GLARE_NOTE);
   if (scan.refined) parts.push("The AI took a second look because the numbers did not add up.");
   if (scan.check?.issues[0]) parts.push(scan.check.issues[0]);
   if (flagged > 0) parts.push(`${flagged} ${flagged === 1 ? "price looks" : "prices look"} uncertain.`);
@@ -99,6 +102,8 @@ export type LateUpdate = {
   alts: Record<number, number>;
   /** Rows whose price both readers printed the same: confirmed. */
   agree: number[];
+  /** The photo has a washed-out patch over the text: a retake would read better. */
+  glare?: boolean;
   /** Plain sentences about the receipt as a whole. */
   issues: string[];
   /** "ocr": the on-device reader compared prices; "ai": the AI took a second look. */
@@ -137,7 +142,7 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, on
         const cross = crossCheck(snapshot, { text: ocr.rawText, items: bestItems(ocr.rawText, ocr.layout, ocr.amount) });
         const issues: string[] = [];
         if (cross.trusted && cross.extra.length > 0) issues.push(`The second reader also saw ${cross.extra.length === 1 ? `a price of ${cross.extra[0].toFixed(2)}` : `${cross.extra.length} prices`} that the AI did not list.`);
-        if (cross.trusted) onLater({ flags: cross.flagged, alts: cross.alts, agree: cross.agreedRows, issues, from: "ocr" });
+        if (cross.trusted || ocr.glare) onLater({ flags: cross.flagged, alts: cross.alts, agree: cross.agreedRows, issues, from: "ocr", glare: ocr.glare });
       });
       // Second look, only when the numbers do not add up
       if (!check.ok && (typeof navigator === "undefined" || navigator.onLine !== false)) {
@@ -178,5 +183,6 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, on
     source: "tesseract",
     aiReason: ai.reason,
     check,
+    glare: ocr.glare,
   };
 }

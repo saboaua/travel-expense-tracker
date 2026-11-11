@@ -84,3 +84,85 @@ export function ocrScale(width: number, height: number): number {
   if (pixels > 6_000_000) scale *= Math.sqrt(6_000_000 / pixels);
   return scale;
 }
+
+export type GrayImage = { gray: Uint8ClampedArray; w: number; h: number };
+
+/** Turns a grey image clockwise by quarter turns (1 = 90°, 2 = 180°, 3 = 270°). */
+export function rotateGray(img: GrayImage, quarterTurns: number): GrayImage {
+  const q = ((quarterTurns % 4) + 4) % 4;
+  const { gray, w, h } = img;
+  if (q === 0) return img;
+  const out = new Uint8ClampedArray(gray.length);
+  if (q === 2) {
+    for (let i = 0; i < gray.length; i++) out[gray.length - 1 - i] = gray[i];
+    return { gray: out, w, h };
+  }
+  // 90° and 270° swap width and height
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const v = gray[y * w + x];
+      if (q === 1) out[x * h + (h - 1 - y)] = v; // (x, y) -> (h-1-y, x)
+      else out[(w - 1 - x) * h + y] = v; // (x, y) -> (y, w-1-x)
+    }
+  }
+  return { gray: out, w: h, h: w };
+}
+
+/** A smaller copy (nearest neighbour is enough to judge the direction of text). */
+export function downscaleGray(img: GrayImage, maxSide: number): GrayImage {
+  const longer = Math.max(img.w, img.h);
+  if (longer <= maxSide) return img;
+  const s = maxSide / longer;
+  const w = Math.max(1, Math.round(img.w * s));
+  const h = Math.max(1, Math.round(img.h * s));
+  const out = new Uint8ClampedArray(w * h);
+  for (let y = 0; y < h; y++) {
+    const sy = Math.min(img.h - 1, Math.floor(y / s));
+    for (let x = 0; x < w; x++) out[y * w + x] = img.gray[sy * img.w + Math.min(img.w - 1, Math.floor(x / s))];
+  }
+  return { gray: out, w, h };
+}
+
+/**
+ * Which quarter turn makes the text read best. `score` reads an image and says how good the reading is; the turn
+ * must beat the upright photo by `margin` points to be chosen, so a normal photo is never rotated by mistake.
+ */
+export async function pickRotation(img: GrayImage, score: (img: GrayImage) => Promise<number>, margin = 15): Promise<{ turns: number; scores: number[] }> {
+  const scores: number[] = [];
+  for (const q of [0, 1, 2, 3]) scores.push(await score(rotateGray(img, q)));
+  let best = 0;
+  for (let q = 1; q < 4; q++) if (scores[q] > scores[best]) best = q;
+  return { turns: best !== 0 && scores[best] >= scores[0] + margin ? best : 0, scores };
+}
+
+/**
+ * True when part of the text area is washed out by a reflection or a flash. The photo is cut into small tiles;
+ * a tile counts as blown out when almost every pixel is white. Only tiles inside the box around the printed text
+ * count, so the plain white margin of a bright photo does not trigger it.
+ */
+export function hasGlare(img: GrayImage, tile = 16): boolean {
+  const { gray, w, h } = img;
+  const tx = Math.floor(w / tile), ty = Math.floor(h / tile);
+  if (tx < 4 || ty < 4) return false;
+  const blown = new Uint8Array(tx * ty);
+  const ink = new Uint8Array(tx * ty);
+  for (let j = 0; j < ty; j++) {
+    for (let i = 0; i < tx; i++) {
+      let white = 0, dark = 0;
+      for (let y = 0; y < tile; y++) for (let x = 0; x < tile; x++) {
+        const v = gray[(j * tile + y) * w + i * tile + x];
+        if (v >= 250) white++;
+        else if (v < 120) dark++;
+      }
+      const n = tile * tile;
+      if (white / n >= 0.97) blown[j * tx + i] = 1;
+      if (dark / n >= 0.02) ink[j * tx + i] = 1;
+    }
+  }
+  let x0 = tx, x1 = -1, y0 = ty, y1 = -1, inkTiles = 0;
+  for (let j = 0; j < ty; j++) for (let i = 0; i < tx; i++) if (ink[j * tx + i]) { inkTiles++; x0 = Math.min(x0, i); x1 = Math.max(x1, i); y0 = Math.min(y0, j); y1 = Math.max(y1, j); }
+  if (inkTiles < 12) return false;
+  let inside = 0, bad = 0;
+  for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { inside++; if (blown[j * tx + i]) bad++; }
+  return bad / inside >= 0.12;
+}

@@ -5,7 +5,7 @@
 
 import { cleanOcrText, fixDigits } from "@/lib/ocr-clean";
 import { buildRows, slimWords, type LayoutRow, type OcrWord } from "@/lib/ocr-layout";
-import { adaptiveBinarize, grayToRgba, ocrScale, stretchContrast, toGray } from "@/lib/ocr-image";
+import { adaptiveBinarize, downscaleGray, grayToRgba, hasGlare, ocrScale, pickRotation, rotateGray, stretchContrast, toGray, type GrayImage } from "@/lib/ocr-image";
 
 export interface OcrHints {
   /** Currency the user is most likely spending in (trip currency). Used to resolve 03/04/2026 style dates. */
@@ -22,6 +22,10 @@ export interface OcrResult {
   category: string | null;
   rawText: string;
   source: "ai" | "tesseract";
+  /** Part of the text was washed out by glare in the photo (on-device reading only). */
+  glare?: boolean;
+  /** The photo was turned to read it upright (on-device reading only). */
+  turned?: boolean;
   /** Receipt rows rebuilt from word positions (on-device reading only). */
   layout?: LayoutRow[];
   /** Why the AI reader was not used, when basic OCR had to step in (see aiFallbackText). */
@@ -254,7 +258,7 @@ export function parseReceiptText(text: string, hints: OcrHints = {}): Omit<OcrRe
 /* Image preparation + Tesseract                                       */
 /* ------------------------------------------------------------------ */
 
-type Prepared = { enhanced: HTMLCanvasElement; binary: () => HTMLCanvasElement };
+type Prepared = { enhanced: HTMLCanvasElement; binary: () => HTMLCanvasElement; img: GrayImage; glare: boolean };
 
 function canvasFromGray(gray: Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
   const canvas = document.createElement("canvas");
@@ -286,8 +290,10 @@ async function preprocessForOcr(src: OcrImageSource): Promise<Prepared | null> {
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
 
-    const gray = stretchContrast(toGray(ctx.getImageData(0, 0, w, h).data));
-    return { enhanced: canvasFromGray(gray, w, h), binary: () => canvasFromGray(adaptiveBinarize(gray, w, h), w, h) };
+    const raw = toGray(ctx.getImageData(0, 0, w, h).data);
+    const glare = hasGlare(downscaleGray({ gray: raw, w, h }, 640)); // judged before the contrast stretch hides it
+    const gray = stretchContrast(raw);
+    return { enhanced: canvasFromGray(gray, w, h), binary: () => canvasFromGray(adaptiveBinarize(gray, w, h), w, h), img: { gray, w, h }, glare };
   } catch {
     return null;
   }
@@ -344,6 +350,7 @@ export async function runReceiptOcr(imageSource: OcrImageSource, hints: OcrHints
   const prepared = await preprocessForOcr(imageSource);
   const worker = await getWorker();
   const original = imageSource;
+  let turned = false;
 
   let best: (Pass & { score: number }) | null = null;
   const consider = (p: Pass) => {
@@ -358,6 +365,18 @@ export async function runReceiptOcr(imageSource: OcrImageSource, hints: OcrHints
     if (best && !convincing(best) && prepared) {
       try { consider(await recognize(worker, prepared.binary())); } catch { /* keep the first reading */ }
     }
+    // A poor reading may simply be a sideways photo: try the four directions on a small copy and read again if one is clearly better
+    if (best && (best as Pass & { score: number }).score < 60 && prepared) {
+      try {
+        const small = downscaleGray(prepared.img, 900);
+        const { turns } = await pickRotation(small, async (im) => scoreOcr((await recognize(worker, canvasFromGray(im.gray, im.w, im.h))).text, 0, hints));
+        if (turns !== 0) {
+          const r = rotateGray(prepared.img, turns);
+          consider(await recognize(worker, canvasFromGray(r.gray, r.w, r.h)));
+          turned = true;
+        }
+      } catch { /* keep what we have */ }
+    }
     if (best && (best as Pass & { score: number }).score < 55) {
       // Still poor: let Tesseract find the layout itself (tilted slip, two columns, a receipt photographed with a table around it)
       try { consider(await recognize(worker, prepared?.enhanced ?? original, "3")); } catch { /* keep what we have */ }
@@ -370,5 +389,5 @@ export async function runReceiptOcr(imageSource: OcrImageSource, hints: OcrHints
   const final = best as unknown as Pass | null;
   const text = final?.text ?? "";
   const layout = final?.words && final.words.length > 0 ? buildRows(final.words) : undefined;
-  return { ...parseReceiptText(text, hints), source: "tesseract", layout };
+  return { ...parseReceiptText(text, hints), source: "tesseract", layout, glare: prepared?.glare, turned: turned || undefined };
 }
