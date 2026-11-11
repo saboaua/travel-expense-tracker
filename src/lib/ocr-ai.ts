@@ -205,27 +205,57 @@ export async function diagnoseAi(): Promise<AiCheck> {
   return out;
 }
 
-async function askAi(
-  image: { data: Uint8Array | ArrayBuffer; mime: string },
-  prompt: string,
-  maxTokens: number
-): Promise<Record<string, unknown>> {
+/**
+ * The JSON object in a model answer. A long grocery receipt can run out of output tokens in the middle of
+ * the item list; then everything up to the last complete item is kept instead of throwing the scan away.
+ */
+export function parseModelJson(text: string): Record<string, unknown> | null {
+  const start = text.indexOf("{");
+  if (start < 0) return null;
+  const whole = text.slice(start).match(/^\{[\s\S]*\}/)?.[0];
+  if (whole) {
+    try { return JSON.parse(whole); } catch { /* maybe cut off, repaired below */ }
+  }
+  let t = text.slice(start);
+  for (let i = 0; i < 400; i++) {
+    const cut = t.lastIndexOf("}");
+    if (cut < 0) return null;
+    t = t.slice(0, cut + 1);
+    for (const tail of ["", "]}", "}", "]}}"]) {
+      try {
+        const v = JSON.parse(t + tail);
+        if (v && typeof v === "object" && !Array.isArray(v)) return v;
+      } catch { /* try the next closing */ }
+    }
+    t = t.slice(0, cut);
+  }
+  return null;
+}
+
+type AiImage = { data: Uint8Array | ArrayBuffer; mime: string };
+
+async function askAi(image: AiImage, prompt: string, maxTokens: number): Promise<Record<string, unknown>> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("AI OCR is not configured");
   if (!AI_IMAGE_TYPES.includes(image.mime)) throw new Error("Unsupported image type for AI OCR");
 
+  const started = Date.now();
   const base64 = Buffer.from(image.data instanceof ArrayBuffer ? new Uint8Array(image.data) : image.data).toString("base64");
   // An old OCR_MODEL left over from another provider is ignored
   const override = process.env.OCR_MODEL;
   const configured = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
+  // A long item list takes longer to write: more time for the grocery reader, within the route's 60 seconds
+  const long = maxTokens > 1000;
+  const firstMs = long ? 25000 : 12000;
+  const nextMs = long ? 12000 : 8000;
 
-  const call = (model: string, ms: number) =>
+  const call = (model: string, ms: number, tokens: number) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
-        generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(maxTokens, 2048), temperature: 0 },
+        generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(tokens, 2048), temperature: 0 },
       }),
       signal: AbortSignal.timeout(ms),
     }).catch(() => null); // null: no answer in time
@@ -234,13 +264,14 @@ async function askAi(
   const RETRY = new Set([404, 429, 500, 502, 503, 504]);
   const first = remembered() ?? configured;
   const tried = [first];
-  let res = await call(first, 12000);
+  let usedModel = first;
+  let res = await call(first, firstMs, maxTokens);
   if (!res || RETRY.has(res.status)) {
     const next = (await discoverModels(key)).filter((m) => !tried.includes(m)).slice(0, 2);
     for (const m of next) {
       tried.push(m);
-      const r = await call(m, 8000);
-      if (r && (r.ok || !res)) res = r;
+      const r = await call(m, nextMs, maxTokens);
+      if (r && (r.ok || !res)) { res = r; usedModel = m; }
       if (r?.ok) { remember(m); break; }
       if (r && !RETRY.has(r.status)) break;
     }
@@ -252,15 +283,26 @@ async function askAi(
     throw new Error(`AI OCR request failed (${res.status}) ${body.slice(0, 200)}`);
   }
 
-  const json = (await res.json()) as { candidates?: { content?: { parts?: { text?: string }[] } }[] };
-  const text = (json.candidates?.[0]?.content?.parts || []).map((p) => p.text || "").join("");
-  const match = text.match(/\{[\s\S]*\}/);
-  if (!match) throw new Error("AI OCR returned no JSON");
-  try {
-    return JSON.parse(match[0]);
-  } catch {
-    throw new Error("AI OCR returned invalid JSON");
+  type Answer = { candidates?: { content?: { parts?: { text?: string }[] }; finishReason?: string }[] };
+  const read = async (r: Response) => {
+    const json = (await r.json().catch(() => ({}))) as Answer;
+    const cand = json.candidates?.[0];
+    const text = (cand?.content?.parts || []).map((p) => p.text || "").join("");
+    return { text, parsed: parseModelJson(text), cut: cand?.finishReason === "MAX_TOKENS" };
+  };
+
+  let out = await read(res);
+  // Cut off or unreadable: ask once more with a bigger output budget, while there is time left
+  const left = 50000 - (Date.now() - started);
+  if ((!out.parsed || out.cut) && left > 8000) {
+    const again = await call(usedModel, Math.min(left, 25000), Math.min(Math.max(maxTokens * 3, 4096), 16000));
+    if (again?.ok) {
+      const second = await read(again);
+      if (second.parsed && (!out.parsed || !second.cut)) out = second;
+    }
   }
+  if (!out.parsed) throw new Error(out.text.includes("{") ? "AI OCR returned invalid JSON" : "AI OCR returned no JSON");
+  return out.parsed;
 }
 
 export async function extractReceiptWithAi(

@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 const MAX_BYTES = 6 * 1024 * 1024;
 const HOURLY_LIMIT = 60;

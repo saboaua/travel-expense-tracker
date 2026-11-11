@@ -3,6 +3,8 @@
  * price statistics and monthly summaries. No I/O so everything here is unit-testable.
  */
 
+import { cleanOcrText } from "@/lib/ocr-clean";
+
 /* ---------------- item name normalisation ---------------- */
 
 const SIZE_TOKENS = /\b\d+(?:[.,]\d+)?\s?(?:kg|kgs|g|gr|gm|lb|lbs|oz|l|lt|ltr|ml|cl|ct|pk|pkt|pack|pcs|pc|each|ea|dz|doz)\b/g;
@@ -133,9 +135,12 @@ export function attachWeightLines(items: GroceryLine[]): GroceryLine[] {
 
 const PRICE = /(-?\d{1,4}(?:[.,]\d{3})*[.,]\d{2})/;
 const STOP_SECTION = /\b(sub\s*-?\s*total|subtotal|total|amount\s*due|balance\s*due|grand\s*total)\b/i;
-const SKIP_LINE = /\b(tax|vat|btw|itbis|change|cash|tender(ed)?|visa|mastercard|amex|debit|credit|card|savings|you\s*saved|discount|coupon|points|rewards|approval|auth|ref|thank|receipt|cashier|store|tel|phone|www|survey|balance)\b/i;
+// Payment and housekeeping lines. Words that can also start a product ("store brand", "card holder") only count in their receipt form.
+const SKIP_LINE = /\b(tax|vat|btw|itbis|igv|gst|change|cash|tender(ed)?|visa|mastercard|master\s*card|amex|debit|credit|you\s*saved|total\s*savings|points|rewards|approval|auth(orization)?|thank|cashier|tel|phone|www|https?|survey|balance)\b|^\W*(?:ref(?:erence)?\b|receipt\b|invoice\b|savings\b|discount\b|coupon\b|card\s*(?:#|no\b|\d|x{2,}|\*|payment|type|\.{2,})|store\s*(?:#|no\b|\d))/i;
 
-const WEIGHT_LINE = new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*(kg|lb|lbs|g|oz)\\s*[@x]\\s*${PRICE.source}`, "i");
+const WEIGHT_LINE = new RegExp(`^(\\d+(?:[.,]\\d+)?)\\s*(kg|lb|lbs|g|oz)\\s*[@xX×]\\s*${PRICE.source}`, "i");
+// "3 x 1.25   3.75" or "3 @ 1.25" on a line of its own, below the product name
+const QTY_LINE = new RegExp(`^(\\d{1,3})\\s*[@xX×]\\s*${PRICE.source}(?:\\s+${PRICE.source})?\\s*[A-Z]?$`);
 
 function num(s: string): number {
   const t = s.replace(/[^\d.,-]/g, "");
@@ -144,8 +149,13 @@ function num(s: string): number {
   return parseFloat(`${t.slice(0, last).replace(/[.,]/g, "")}.${t.slice(last + 1)}`);
 }
 
+const r2 = (n: number) => Math.round(n * 100) / 100;
+
+/** Product code printed before the name ("0012345 MILK WHOLE") is not part of the name. */
+const stripCode = (name: string) => name.replace(/^#?\d{4,}\s+/, "").replace(/^[*#]+\s*/, "");
+
 export function parseLineItems(text: string): GroceryLine[] {
-  const lines = text.split(/\r?\n/).map((l) => l.replace(/\s{2,}/g, "  ").trim()).filter(Boolean);
+  const lines = cleanOcrText(text).split(/\r?\n/).map((l) => l.replace(/\s{2,}/g, "  ").trim()).filter(Boolean);
   const items: GroceryLine[] = [];
 
   for (let i = 0; i < lines.length; i++) {
@@ -160,10 +170,23 @@ export function parseLineItems(text: string): GroceryLine[] {
       if (wl && pl) {
         const total = num(pl[1]);
         if (total > 0) {
-          items.push({ name: line, quantity: num(wl[1]), unit_price: num(wl[3]), line_total: total, category: guessGroceryCategory(line), unit: wl[2].toLowerCase() });
+          items.push({ name: stripCode(line), quantity: num(wl[1]), unit_price: num(wl[3]), line_total: total, category: guessGroceryCategory(line), unit: wl[2].toLowerCase() });
         }
         i += 2;
         continue;
+      }
+      // Counted item split over two lines: "COKE 330ML" / "3 x 1.25   3.75"
+      const ql = lines[i + 1]?.match(QTY_LINE);
+      if (ql && !SKIP_LINE.test(line)) {
+        const qty = parseInt(ql[1], 10);
+        const unit = num(ql[2]);
+        const total = ql[3] ? num(ql[3]) : r2(qty * unit);
+        const name = stripCode(line.replace(/[^\p{L}\p{N}&'.\-/ ]/gu, " ").replace(/\s{2,}/g, " ").trim());
+        if (qty > 0 && total > 0 && name) {
+          items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: guessGroceryCategory(name), unit: null });
+          i += 1;
+          continue;
+        }
       }
     }
 
@@ -200,6 +223,9 @@ export function parseLineItems(text: string): GroceryLine[] {
       }
     }
 
+    // A negative amount is a discount or a refund line, not a product
+    if (total != null && total < 0) continue;
+
     // Weighted item on the next line: "1.234 kg @ 2.99/kg"
     const next = lines[i + 1];
     const w = next?.match(WEIGHT_LINE);
@@ -208,9 +234,21 @@ export function parseLineItems(text: string): GroceryLine[] {
       unit = num(w[3]);
       weightUnit = w[2].toLowerCase();
       i++;
+    } else if (qty === 1 && total != null) {
+      // Quantity printed under a priced line: "COKE 3.75" / "3 x 1.25"
+      const q = next?.match(QTY_LINE);
+      if (q) {
+        const n = parseInt(q[1], 10);
+        const u = num(q[2]);
+        if (n > 1 && Math.abs(r2(n * u) - total) < 0.02) {
+          qty = n;
+          unit = u;
+          i++;
+        }
+      }
     }
 
-    name = name.replace(/[^\p{L}\p{N}&'.\-/ ]/gu, " ").replace(/\s{2,}/g, " ").trim();
+    name = stripCode(name.replace(/[^\p{L}\p{N}&'.\-/ ]/gu, " ").replace(/\s{2,}/g, " ").trim());
     if (!name || !/\p{L}{2}/u.test(name) || total == null || !Number.isFinite(total) || total <= 0) continue;
     if (qty <= 0 || !Number.isFinite(qty)) qty = 1;
     if (unit == null || !Number.isFinite(unit)) unit = Math.round((total / qty) * 100) / 100;

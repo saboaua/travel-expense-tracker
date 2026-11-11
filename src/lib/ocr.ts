@@ -3,6 +3,9 @@
  * The AI path lives in ocr-ai.ts; this file is the offline fallback.
  */
 
+import { cleanOcrText, fixDigits } from "@/lib/ocr-clean";
+import { adaptiveBinarize, grayToRgba, ocrScale, stretchContrast, toGray } from "@/lib/ocr-image";
+
 export interface OcrHints {
   /** Currency the user is most likely spending in (trip currency). Used to resolve 03/04/2026 style dates. */
   currency?: string | null;
@@ -27,13 +30,6 @@ type OcrImageSource = File | string | Uint8Array | ArrayBuffer;
 /* ------------------------------------------------------------------ */
 /* Amount                                                              */
 /* ------------------------------------------------------------------ */
-
-/** Fix classic OCR digit mix-ups inside price-looking tokens: 4S.2O -> 45.20 */
-function fixDigits(line: string): string {
-  return line.replace(/\b[\dOolIS]{1,9}[.,][\dOolIS]{2}\b/g, (t) =>
-    /\d/.test(t) ? t.replace(/[Oo]/g, "0").replace(/[lI]/g, "1").replace(/S/g, "5") : t
-  );
-}
 
 export function normalizeNumber(raw: string): number | null {
   let s = raw.replace(/[^\d.,]/g, "");
@@ -243,7 +239,7 @@ function guessCategory(text: string, allowed?: string[]): string | null {
 export function parseReceiptText(text: string, hints: OcrHints = {}): Omit<OcrResult, "source"> {
   return {
     merchant: parseMerchant(text),
-    amount: parseAmount(text),
+    amount: parseAmount(cleanOcrText(text)),
     currency: parseCurrency(text),
     date: parseDate(text, hints),
     category: guessCategory(text, hints.categories),
@@ -255,13 +251,27 @@ export function parseReceiptText(text: string, hints: OcrHints = {}): Omit<OcrRe
 /* Image preparation + Tesseract                                       */
 /* ------------------------------------------------------------------ */
 
-/** Grayscale + contrast stretch (+ upscale small photos) in the browser: noticeably better OCR on dim photos. */
-async function preprocessForOcr(src: OcrImageSource): Promise<HTMLCanvasElement | null> {
+type Prepared = { enhanced: HTMLCanvasElement; binary: () => HTMLCanvasElement };
+
+function canvasFromGray(gray: Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("no canvas");
+  ctx.putImageData(new ImageData(grayToRgba(gray) as unknown as Uint8ClampedArray<ArrayBuffer>, w, h), 0, 0);
+  return canvas;
+}
+
+/**
+ * Browser only. Two versions of the photo: grey with stretched contrast, and a locally thresholded black and white
+ * one (built only if the first pass is not convincing). Both are scaled for OCR and rotated upright from EXIF.
+ */
+async function preprocessForOcr(src: OcrImageSource): Promise<Prepared | null> {
   if (typeof document === "undefined" || !(src instanceof Blob)) return null;
   try {
     const bitmap = await createImageBitmap(src, { imageOrientation: "from-image" });
-    const longer = Math.max(bitmap.width, bitmap.height);
-    const scale = longer < 1400 ? 1800 / longer : longer > 2600 ? 2600 / longer : 1;
+    const scale = ocrScale(bitmap.width, bitmap.height);
     const w = Math.round(bitmap.width * scale);
     const h = Math.round(bitmap.height * scale);
     const canvas = document.createElement("canvas");
@@ -273,26 +283,8 @@ async function preprocessForOcr(src: OcrImageSource): Promise<HTMLCanvasElement 
     ctx.drawImage(bitmap, 0, 0, w, h);
     bitmap.close();
 
-    const img = ctx.getImageData(0, 0, w, h);
-    const d = img.data;
-    const hist = new Uint32Array(256);
-    for (let i = 0; i < d.length; i += 4) {
-      const g = Math.round(0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]);
-      d[i] = d[i + 1] = d[i + 2] = g;
-      hist[g]++;
-    }
-    const total = w * h;
-    let acc = 0, lo = 0, hi = 255;
-    for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.02) { lo = v; break; } }
-    acc = 0;
-    for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= total * 0.02) { hi = v; break; } }
-    const range = Math.max(hi - lo, 1);
-    for (let i = 0; i < d.length; i += 4) {
-      const g = Math.min(255, Math.max(0, Math.round(((d[i] - lo) * 255) / range)));
-      d[i] = d[i + 1] = d[i + 2] = g;
-    }
-    ctx.putImageData(img, 0, 0);
-    return canvas;
+    const gray = stretchContrast(toGray(ctx.getImageData(0, 0, w, h).data));
+    return { enhanced: canvasFromGray(gray, w, h), binary: () => canvasFromGray(adaptiveBinarize(gray, w, h), w, h) };
   } catch {
     return null;
   }
@@ -323,18 +315,55 @@ async function getWorker(): Promise<TessWorker> {
   return workerPromise;
 }
 
+type Pass = { text: string; confidence: number };
+
+/**
+ * How trustworthy a reading looks, 0 to about 130: Tesseract's own confidence, plus credit for what a receipt
+ * should contain (a total, a date, several lines that end in a price). Used to pick the best of several passes.
+ */
+export function scoreOcr(text: string, confidence: number, hints: OcrHints = {}): number {
+  const parsed = parseReceiptText(text, hints);
+  const priceLines = text.split(/\r?\n/).filter((l) => amountsIn(cleanOcrText(l)).length > 0).length;
+  return confidence + (parsed.amount != null ? 10 : 0) + (parsed.date ? 5 : 0) + Math.min(15, priceLines * 1.5);
+}
+
+async function recognize(worker: TessWorker, image: unknown, psm?: string): Promise<Pass> {
+  if (psm) await worker.setParameters({ tessedit_pageseg_mode: psm as never });
+  try {
+    const { data } = await worker.recognize(image as never);
+    return { text: data.text || "", confidence: data.confidence ?? 0 };
+  } finally {
+    if (psm) await worker.setParameters({ tessedit_pageseg_mode: "4" as never }).catch(() => {}); // back to a single column
+  }
+}
+
 export async function runReceiptOcr(imageSource: OcrImageSource, hints: OcrHints = {}): Promise<OcrResult> {
   const prepared = await preprocessForOcr(imageSource);
   const worker = await getWorker();
+  const original = imageSource;
 
-  let text: string;
+  let best: (Pass & { score: number }) | null = null;
+  const consider = (p: Pass) => {
+    const score = scoreOcr(p.text, p.confidence, hints);
+    if (!best || score > best.score) best = { ...p, score };
+  };
+  // A bright, even photo reads well on the first try; only a doubtful reading earns more passes
+  const convincing = (b: { confidence: number; text: string }) => b.confidence >= 80 && parseReceiptText(b.text, hints).amount != null;
+
   try {
-    const result = await worker.recognize((prepared ?? imageSource) as never);
-    text = result.data.text || "";
+    consider(await recognize(worker, prepared?.enhanced ?? original));
+    if (best && !convincing(best) && prepared) {
+      try { consider(await recognize(worker, prepared.binary())); } catch { /* keep the first reading */ }
+    }
+    if (best && (best as Pass & { score: number }).score < 55) {
+      // Still poor: let Tesseract find the layout itself (tilted slip, two columns, a receipt photographed with a table around it)
+      try { consider(await recognize(worker, prepared?.enhanced ?? original, "3")); } catch { /* keep what we have */ }
+    }
   } catch (e) {
     workerPromise = null; // recreate on next call
     throw e;
   }
 
+  const text = (best as unknown as Pass | null)?.text ?? "";
   return { ...parseReceiptText(text, hints), source: "tesseract" };
 }
