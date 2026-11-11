@@ -2323,6 +2323,33 @@ try {
     }
   });
 
+  await test("hotel: the business dashboard shows the hotel under the flight with a Directions button", async () => {
+    const { ctx, page } = await newPage();
+    const trip = fake.table("trips").find((t) => t.id === TRIP_ID);
+    trip.hotel_name = "Courtyard Marriott";
+    trip.hotel_address = "Multiplaza Mall, Ave. Israel, Panama";
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/`);
+      await page.getByRole("tab", { name: "Business" }).click();
+      const strip = page.getByTestId("featured-hotel");
+      await strip.waitFor({ timeout: 30000 });
+      const text = await strip.innerText();
+      assert(/Courtyard Marriott/.test(text) && /Multiplaza/.test(text), "name and address: " + text);
+      const href = await page.getByTestId("featured-hotel-directions").getAttribute("href");
+      assert(href.includes("google.com/maps/dir") && href.includes(encodeURIComponent("Courtyard Marriott")), "Directions opens the maps app");
+      trip.hotel_name = null; trip.hotel_address = null;
+      await page.reload();
+      await page.getByRole("tab", { name: "Business" }).click();
+      await page.getByTestId("featured-trip").waitFor({ timeout: 30000 });
+      assert((await page.getByTestId("featured-hotel").count()) === 0, "no hotel, no panel");
+    } finally {
+      trip.hotel_name = null; trip.hotel_address = null;
+      await ctx.close();
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {

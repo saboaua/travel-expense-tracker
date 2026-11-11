@@ -26,6 +26,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
+import { hotelOf } from "@/lib/hotel";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
@@ -50,11 +51,11 @@ export default async function DashboardPage() {
       PROFILE_HOME_PLACE_COLS,
       PROFILE_HOME_COLS
     ),
-    supabase
-      .from("trips")
-      .select("id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)")
-      .eq("user_id", uid)
-      .order("start_date", { ascending: true }),
+    withColumnFallback(
+      (cols) => supabase.from("trips").select(cols).eq("user_id", uid).order("start_date", { ascending: true }),
+      "id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency), hotel_name, hotel_address",
+      "id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)",
+    ),
     // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
     withColumnFallback3(
       (cols) => supabase.from("travel_documents").select(cols).eq("user_id", uid),
@@ -71,7 +72,8 @@ export default async function DashboardPage() {
   for (const f of (flightsRes.data ?? []) as unknown as TripFlight[]) flightsByTrip.set(f.trip_id, [...(flightsByTrip.get(f.trip_id) ?? []), f]);
   const lineFor = (tripId: string) => flightLine(flightsByTrip.get(tripId) ?? [], Date.now());
   const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
-  const trips = tripsRes.data;
+  type TripRow = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string; expenses: Expense[] | null; hotel_name?: string | null; hotel_address?: string | null };
+  const trips = tripsRes.data as unknown as TripRow[] | null;
   type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null; show_on?: string | null };
   const docRows = (docRes.data || []) as unknown as DocRow[];
   const role = (profile?.role as string) || "user";
@@ -256,6 +258,7 @@ export default async function DashboardPage() {
                     imageUrl={destinationInfo?.imageUrl ?? null}
                     badge={tripBadge(featured.start_date, featured.end_date, today)!}
                     flight={fNext}
+                    hotel={hotelOf(featured as { hotel_name?: string | null; hotel_address?: string | null })}
                     moreFlights={fNext ? fFlights.length - 1 : 0}
                     total={fTotal}
                     count={featured.expenses?.length || 0}

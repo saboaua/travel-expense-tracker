@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { Camera, ChevronRight, Clock, MapPin, Plane, RefreshCw } from "lucide-react";
+import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, RefreshCw } from "lucide-react";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { StatusChip } from "@/components/flights/FlightPanel";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { BADGE_CLASS, type TripBadge } from "@/lib/trip-card";
+import { directionsUrl, type Hotel } from "@/lib/hotel";
 import { clock, durationMinutes, durationText, shownArrival, shownDeparture, type TripFlight } from "@/lib/flights";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null };
@@ -80,13 +81,42 @@ function CompactFlight({ f, href, more }: { f: TripFlight; href: string; more: n
   );
 }
 
+/** The hotel under the flight: same panel, a bed icon, the name, and a Directions button that opens the maps app. */
+function HotelStrip({ hotel }: { hotel: Hotel }) {
+  return (
+    <div className="rounded-xl border bg-muted/30 p-3 md:px-[18px] md:py-3.5" data-testid="featured-hotel">
+      <div className="flex items-center gap-2">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px] bg-blue-900 text-white md:h-9 md:w-9" aria-hidden="true"><BedDouble className="h-[18px] w-[18px]" /></span>
+        <p className="line-clamp-2 min-w-0 flex-1 text-[15px] font-semibold leading-tight">{hotel.name}</p>
+        <a
+          href={directionsUrl(hotel)}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Directions to ${hotel.name}`}
+          data-testid="featured-hotel-directions"
+          className="-my-1.5 inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-3.5 text-sm font-semibold text-blue-700 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:border-blue-900 dark:bg-blue-950 dark:text-blue-300"
+        >
+          <Navigation className="h-4 w-4" aria-hidden="true" /> Directions
+        </a>
+      </div>
+      {hotel.address && (
+        <p className="mt-2 flex items-center gap-1.5 text-[13px] text-muted-foreground">
+          <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{hotel.address}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** The trip the dashboard features: photo, dates, the next flight and what has been spent. */
-export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, total, count }: {
+export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, hotel = null, total, count }: {
   trip: Trip;
   imageUrl: string | null;
   badge: TripBadge;
   flight: TripFlight | null;
   moreFlights: number;
+  hotel?: Hotel | null;
   total: number;
   count: number;
 }) {
@@ -131,6 +161,8 @@ export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, t
             <div className="md:hidden"><CompactFlight f={flight} href={flightsHref} more={moreFlights} /></div>
           </>
         )}
+
+        {hotel && <HotelStrip hotel={hotel} />}
 
         <div className="flex items-center justify-between gap-3">
           <div>
