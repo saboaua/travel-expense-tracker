@@ -367,12 +367,47 @@ export function departureMs(f: Pick<TripFlight, "dep_local" | "dep_offset" | "fl
   return Date.parse(`${local}:00Z`) - (f.dep_offset ?? 0) * 60000;
 }
 
-/** A flight from the service is worth asking about again when it is close (from 2 days before until it lands) and the last answer is older than 10 minutes. */
+/**
+ * How many days ahead the flight service can find a flight. The free plan only has flights of today, so 0 is the default;
+ * a paid plan that sees further ahead sets NEXT_PUBLIC_FLIGHT_LOOKAHEAD_DAYS (the same number is used by the page and the server).
+ */
+export const FLIGHT_LOOKAHEAD_DAYS = Math.max(0, Math.min(365, Number(process.env.NEXT_PUBLIC_FLIGHT_LOOKAHEAD_DAYS ?? 0) || 0));
+
+/** A flight further ahead than the service can see: entered by hand now, filled in on the day. (Compared in UTC, so the local day is never cut short.) */
+export function tooEarlyToLook(date: string, now: number, aheadDays = FLIGHT_LOOKAHEAD_DAYS): boolean {
+  return isIsoDay(date) && date > new Date(now + aheadDays * 86400_000).toISOString().slice(0, 10);
+}
+
+/**
+ * A flight is worth asking the service about when the last answer is old enough and it is close:
+ * - a flight found by the service: from 2 days before until it lands, every 10 minutes;
+ * - a flight entered by hand: from a day and a half before until it lands, every 3 hours. If the service knows it by then,
+ *   the flight becomes a live one (see lookupPatch).
+ */
 export function needsRefresh(f: Pick<TripFlight, "source" | "status" | "dep_local" | "dep_offset" | "flight_date" | "last_synced_at">, now: number): boolean {
-  if (f.source !== "auto" || f.status === "landed" || f.status === "cancelled") return false;
+  if (f.status === "landed" || f.status === "cancelled") return false;
   const dep = departureMs(f);
-  if (dep - now > 48 * HOUR || now - dep > 14 * HOUR) return false;
-  return !f.last_synced_at || now - Date.parse(f.last_synced_at) > 10 * 60_000;
+  const manual = f.source === "manual";
+  if (dep - now > (manual ? 36 : 48) * HOUR || now - dep > 14 * HOUR) return false;
+  return !f.last_synced_at || now - Date.parse(f.last_synced_at) > (manual ? 3 * HOUR : 10 * 60_000);
+}
+
+/**
+ * What to save after asking the service. A live flight takes the new answer. A flight entered by hand becomes a live one
+ * only when the service found the same route (or the person left a airport out); otherwise it stays as typed.
+ * Seat, cabin and confirmation code are never touched.
+ */
+export function lookupPatch(f: Pick<TripFlight, "source" | "flight_number" | "dep_iata" | "arr_iata">, found: FlightFields | null, nowIso: string): Record<string, unknown> {
+  if (!found) return { last_synced_at: nowIso };
+  // The person's own details are never part of what the service says
+  const { pnr: _p, seat: _s, cabin: _c, ...answer } = found as FlightFields & { pnr?: unknown; seat?: unknown; cabin?: unknown };
+  void _p; void _s; void _c;
+  if (f.source === "manual") {
+    const same = (a: string | null, b: string | null) => !a || !b || a.toUpperCase() === b.toUpperCase();
+    if (!same(f.dep_iata, found.dep_iata) || !same(f.arr_iata, found.arr_iata)) return { last_synced_at: nowIso };
+    return { ...answer, flight_number: f.flight_number, source: "auto", last_synced_at: nowIso };
+  }
+  return { ...answer, flight_number: f.flight_number, last_synced_at: nowIso };
 }
 
 /** What an alert is about: changes when the status, the delay, the gate or the terminal changes. */
@@ -389,6 +424,25 @@ export function nextFlight<T extends Pick<TripFlight, "status" | "dep_local" | "
 const LEG_ORDER: Record<FlightLeg, number> = { outbound: 0, connection: 1, return: 2 };
 export const sortFlights = <T extends Pick<TripFlight, "leg" | "dep_local" | "dep_offset" | "flight_date">>(list: T[]): T[] =>
   [...list].sort((a, b) => departureMs(a) - departureMs(b) || LEG_ORDER[a.leg] - LEG_ORDER[b.leg]);
+
+/** What a trip card needs about the next flight (the line under a trip's dates). */
+export interface FlightLineInfo {
+  number: string;
+  from: string;
+  to: string;
+  time: string;
+  status: string;
+  tone: StatusTone;
+  more: number;
+}
+
+export function flightLine(all: TripFlight[], now: number): FlightLineInfo | null {
+  const f = nextFlight(all, now);
+  if (!f) return null;
+  const c = clock(shownDeparture(f));
+  const v = statusView(f);
+  return { number: f.flight_number, from: f.dep_iata ?? "?", to: f.arr_iata ?? "?", time: c ? `${c.time} ${c.period}` : "", status: v.label, tone: v.tone, more: all.length - 1 };
+}
 
 export const flightSummary = (f: Pick<TripFlight, "flight_number" | "dep_iata" | "arr_iata" | "dep_local" | "dep_est_local">) => {
   const c = clock(shownDeparture(f));

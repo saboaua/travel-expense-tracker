@@ -1,17 +1,8 @@
 import { Plane } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { StatusTone } from "@/lib/flights";
+import type { FlightLineInfo, StatusTone } from "@/lib/flights";
 
-/** What a trip card needs about the next flight (worked out on the server). */
-export interface FlightLineInfo {
-  number: string;
-  from: string;
-  to: string;
-  time: string;
-  status: string;
-  tone: StatusTone;
-  more: number;
-}
+export type { FlightLineInfo };
 
 const TONE: Record<StatusTone, string> = {
   ok: "text-emerald-800 dark:text-emerald-300",

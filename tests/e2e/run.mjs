@@ -2067,7 +2067,8 @@ try {
         await dlg.waitFor();
         await dlg.getByRole("button", { name: leg, exact: true }).click();
         await dlg.getByTestId("flight-number").fill(number);
-        await dlg.getByTestId("flight-find").click();
+        // A date far enough ahead is already in hand mode, with no Find button
+        if (await dlg.getByTestId("flight-find").count()) await dlg.getByTestId("flight-find").click();
         await dlg.getByTestId("flight-manual").waitFor();
         const pre = [await dlg.getByTestId("flight-from").inputValue(), await dlg.getByTestId("flight-to").inputValue()];
         await dlg.getByTestId("flight-from").fill(from);
@@ -2088,7 +2089,7 @@ try {
       await first.getByTestId("flight-from").fill("AUA");
       await first.getByRole("button", { name: "Return", exact: true }).click();
       assert((await first.getByTestId("flight-number").inputValue()) === "", "number is cleared when the leg changes");
-      assert((await first.getByTestId("flight-manual").count()) === 0, "back to finding by number");
+      assert((await first.getByTestId("flight-from").inputValue()) === "", "typed airports are cleared when the leg changes");
       await first.getByRole("button", { name: "Close" }).click();
       await add("Outbound", "CM 312", "AUA", "PTY", "09:45", "11:10");
       await page.getByTestId("flight-panel").waitFor({ timeout: 60000 });
@@ -2131,6 +2132,39 @@ try {
       assert(!/WK89L2|04A|Business/.test(text), "no booking details in the file");
       const other = await page.request.get(`${BASE}/api/flights/f1000000-0000-4000-8000-0000000000ff/calendar`);
       assert(other.status() === 404, "an unknown flight is not found");
+    } finally {
+      await ctx.close();
+      const t = fake.table("trip_flights");
+      t.splice(0, t.length);
+    }
+  });
+
+  await test("flights: a date too far ahead goes straight to entering it by hand, and the business dashboard shows the next flight", async () => {
+    const { ctx, page } = await newPage();
+    const FID = "f1000000-0000-4000-8000-0000000000a1";
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByTestId("flight-add").first().click();
+      const dlg = page.getByRole("dialog", { name: "Add flight" });
+      await dlg.waitFor();
+      assert((await dlg.getByTestId("flight-manual").count()) === 0, "a flight that can be looked up starts in Find flight");
+      await dlg.getByTestId("flight-date").fill(addDays(today, 5));
+      await dlg.getByTestId("flight-manual").waitFor({ timeout: 10000 });
+      assert((await dlg.getByTestId("flight-notice").innerText()).includes("close to the flight"), "says live details come close to the flight");
+      assert((await dlg.getByTestId("flight-find").count()) === 0, "no Find button in hand mode");
+      await dlg.getByTestId("flight-date").fill(today);
+      await dlg.getByTestId("flight-find").waitFor({ timeout: 10000 });
+      assert((await dlg.getByTestId("flight-manual").count()) === 0, "back to Find flight when the date can be looked up");
+      await dlg.getByRole("button", { name: "Close" }).click();
+
+      fake.table("trip_flights").push({ id: FID, trip_id: TRIP_ID, user_id: PAT, leg: "outbound", flight_number: "CM 312", airline: "Copa Airlines", aircraft: null, flight_date: today, dep_iata: "AUA", dep_city: null, dep_name: null, dep_local: `${today}T09:45`, dep_est_local: null, dep_offset: -240, dep_terminal: null, dep_gate: null, arr_iata: "PTY", arr_city: null, arr_name: null, arr_local: `${today}T10:40`, arr_est_local: null, arr_offset: -300, arr_terminal: null, arr_gate: null, status: "scheduled", pnr: null, seat: null, cabin: null, source: "manual", alerts: true, last_synced_at: new Date().toISOString(), created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/`);
+      await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
+      const hero = page.getByTestId("featured-trip");
+      await hero.waitFor({ timeout: 30000 });
+      assert((await hero.innerText()).includes("AUA to PTY"), "the business dashboard shows the flight: " + (await hero.innerText()).slice(0, 300));
     } finally {
       await ctx.close();
       const t = fake.table("trip_flights");

@@ -4,7 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { sendPush } from "@/lib/push";
 import { FLIGHT_COLS } from "@/lib/columns";
-import { changeKey, departureMs, type TripFlight } from "@/lib/flights";
+import { changeKey, lookupPatch, needsRefresh, type TripFlight } from "@/lib/flights";
 import { lookupFlight, flightLookupConfigured } from "@/lib/flights-server";
 
 export const dynamic = "force-dynamic";
@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     const now = Date.now();
     const from = new Date(now - 2 * 86400_000).toISOString().slice(0, 10);
     const to = new Date(now + 3 * 86400_000).toISOString().slice(0, 10);
-    const { data, error } = await db.from("trip_flights").select(`user_id, last_alert_key, ${FLIGHT_COLS}`).eq("source", "auto").eq("alerts", true).gte("flight_date", from).lte("flight_date", to).limit(500);
+    const { data, error } = await db.from("trip_flights").select(`user_id, last_alert_key, ${FLIGHT_COLS}`).eq("alerts", true).gte("flight_date", from).lte("flight_date", to).limit(500);
     if (error) {
       if (/does not exist|schema cache/i.test(error.message)) return NextResponse.json({ ok: true, skipped: "trip_flights is not set up" });
       throw new Error(error.message);
@@ -41,15 +41,14 @@ export async function GET(req: Request) {
     let checked = 0;
     for (const f of (data ?? []) as unknown as (TripFlight & { user_id: string; last_alert_key: string | null })[]) {
       if (f.status === "landed" || f.status === "cancelled") continue;
-      const dep = departureMs(f);
-      if (dep - now > 48 * 3600_000 || now - dep > 14 * 3600_000) continue;
+      if (!needsRefresh(f, now)) continue;
       const r = await lookupFlight(f.flight_number, f.flight_date);
       checked++;
-      if (!r.ok) continue;
-      const next = { ...f, ...r.flight, flight_number: f.flight_number };
-      const key = changeKey(next);
-      const first = f.last_alert_key == null; // the first check after adding a flight only records the state
-      await db.from("trip_flights").update({ ...r.flight, flight_number: f.flight_number, last_synced_at: new Date().toISOString(), last_alert_key: key }).eq("id", f.id);
+      if (!r.ok) { await db.from("trip_flights").update(lookupPatch(f, null, new Date().toISOString())).eq("id", f.id); continue; }
+      const patch = lookupPatch(f, r.flight, new Date().toISOString());
+      const key = changeKey({ ...f, ...patch } as TripFlight);
+      const first = f.last_alert_key == null; // the first check after adding a flight (or a flight typed by hand turning live) only records the state
+      await db.from("trip_flights").update({ ...patch, last_alert_key: key }).eq("id", f.id);
       if (!first && key !== f.last_alert_key) people.add(f.user_id);
     }
     for (const userId of people) await sendPush(userId, "flight", "trips");

@@ -142,7 +142,7 @@ export function FlightPanel({ flight: f }: { flight: TripFlight }) {
             {synced ? `Live status updated ${synced}. ` : "Live status. "}Seat and confirmation come from you.
           </>
         ) : (
-          "Added by hand. Times and status do not update automatically."
+          "Added by hand. Close to the flight, Lifolio looks it up and fills in the live details."
         )}
       </p>
     </div>

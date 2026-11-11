@@ -1,6 +1,6 @@
 import {
   parseFlightNumber, parseStamp, fromAviationstack, zoneOffsetMinutes, statusFromService, statusView, clock, delayMinutes, durationMinutes, durationText,
-  arrivalDayOffset, zoneNote, manualFlight, sanitizeFlightScan, maskPnr, needsRefresh, changeKey, nextFlight, sortFlights, flightSummary, type TripFlight,
+  arrivalDayOffset, zoneNote, manualFlight, sanitizeFlightScan, maskPnr, needsRefresh, lookupPatch, tooEarlyToLook, flightLine, changeKey, nextFlight, sortFlights, flightSummary, type TripFlight,
 } from "../src/lib/flights";
 
 let fail = 0;
@@ -95,7 +95,10 @@ const NOW = Date.parse("2026-11-17T08:00:00Z") + 4 * 3600_000; // 08:00 in Aruba
 eq("refresh: near and never checked", needsRefresh(fl(), NOW), true);
 eq("refresh: checked 2 minutes ago", needsRefresh(fl({ last_synced_at: new Date(NOW - 120_000).toISOString() }), NOW), false);
 eq("refresh: checked an hour ago", needsRefresh(fl({ last_synced_at: new Date(NOW - 3600_000).toISOString() }), NOW), true);
-eq("refresh: manual never", needsRefresh(fl({ source: "manual" }), NOW), false);
+eq("refresh: by hand, near and never tried", needsRefresh(fl({ source: "manual" }), NOW), true);
+eq("refresh: by hand, tried an hour ago waits for 3 hours", needsRefresh(fl({ source: "manual", last_synced_at: new Date(NOW - 3600_000).toISOString() }), NOW), false);
+eq("refresh: by hand, tried 4 hours ago", needsRefresh(fl({ source: "manual", last_synced_at: new Date(NOW - 4 * 3600_000).toISOString() }), NOW), true);
+eq("refresh: by hand, two days away is too early", needsRefresh(fl({ source: "manual" }), NOW - 2 * 86400_000), false);
 eq("refresh: landed never", needsRefresh(fl({ status: "landed" }), NOW), false);
 eq("refresh: a week away", needsRefresh(fl(), NOW - 7 * 86400_000), false);
 eq("refresh: long gone", needsRefresh(fl(), NOW + 3 * 86400_000), false);
@@ -108,6 +111,29 @@ eq("sorted outbound first", sortFlights([back, fl()]).map((x) => x.id), ["1", "2
 eq("next: soonest not landed", nextFlight([back, fl()], NOW)?.id, "1");
 eq("next: skips a landed one", nextFlight([fl({ status: "landed" }), back], NOW)?.id, "2");
 eq("next: none", nextFlight([], NOW), null);
+
+// look-ahead: a flight further ahead than the service sees is entered by hand
+const noon = Date.parse("2026-11-10T12:00:00Z");
+eq("lookahead: today and past days can be looked up", [tooEarlyToLook("2026-11-10", noon), tooEarlyToLook("2026-11-01", noon)], [false, false]);
+eq("lookahead: tomorrow is too early by default", tooEarlyToLook("2026-11-11", noon), true);
+eq("lookahead: a paid plan that sees a week ahead", [tooEarlyToLook("2026-11-17", noon, 7), tooEarlyToLook("2026-11-18", noon, 7)], [false, true]);
+eq("lookahead: not a date is not 'too early'", tooEarlyToLook("soon", noon), false);
+
+// what is saved after asking the service
+const found = { ...f, airline: "Copa Airlines", dep_gate: "7" };
+const at = "2026-11-10T12:00:00.000Z";
+eq("patch: a live flight takes the answer", [lookupPatch(fl(), found, at).dep_gate, lookupPatch(fl(), found, at).source], ["7", undefined]);
+eq("patch: nothing found only records the try", lookupPatch(fl({ source: "manual" }), null, at), { last_synced_at: at });
+eq("patch: a flight typed by hand turns live when the route matches", [lookupPatch(fl({ source: "manual" }), found, at).source, lookupPatch(fl({ source: "manual" }), found, at).dep_gate], ["auto", "7"]);
+eq("patch: ...but keeps the person's flight number", lookupPatch(fl({ source: "manual", flight_number: "CM 312" }), { ...found, flight_number: "CM 999" }, at).flight_number, "CM 312");
+eq("patch: a different route is not taken over", lookupPatch(fl({ source: "manual", dep_iata: "AMS" }), found, at), { last_synced_at: at });
+eq("patch: a missing airport does not block it", lookupPatch(fl({ source: "manual", dep_iata: null }), found, at).source, "auto");
+eq("patch: seat, cabin and code are never in the patch", ["pnr", "seat", "cabin"].filter((k) => k in lookupPatch(fl({ source: "manual" }), { ...found, pnr: "X", seat: "1A", cabin: "Y" } as typeof found, at)), []);
+
+// the line on trip cards and the dashboard
+const line = flightLine([fl(), fl({ id: "2", leg: "return", flight_number: "CM 313", dep_local: "2026-11-24T14:00", flight_date: "2026-11-24" })], Date.parse("2026-11-10T12:00:00Z"));
+eq("line: next flight, route, time and how many more", [line?.number, line?.from, line?.to, line?.time, line?.more], ["CM 312", "AUA", "PTY", "09:45 AM", 1]);
+eq("line: no flights, no line", flightLine([], NOW), null);
 
 console.log(fail ? `${fail} FAILED` : "flights: all checks passed");
 process.exit(fail ? 1 : 0);

@@ -1,3 +1,5 @@
+import { FlightLine } from "@/components/flights/FlightLine";
+import { flightLine, type TripFlight } from "@/lib/flights";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,7 +24,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
-import { DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -40,7 +42,7 @@ export default async function DashboardPage() {
   const uid = user?.id;
 
   // Wave 1: everything that only needs to know who is signed in, asked together
-  const [profileRes, tripsRes, docRes, flagRes, rolesRes] = await Promise.all([
+  const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes] = await Promise.all([
     withColumnFallback(
       (cols) => supabase.from("profiles").select(cols).eq("id", uid).single(),
       PROFILE_HOME_PLACE_COLS,
@@ -60,7 +62,12 @@ export default async function DashboardPage() {
     ),
     supabase.from("app_settings").select("personal_enabled").eq("id", 1).single(),
     supabase.from("roles").select("key, label, permissions, known_features"),
+    // Flights on the trips (a database without the flights table just gives none)
+    supabase.from("trip_flights").select(FLIGHT_COLS).eq("user_id", uid),
   ]);
+  const flightsByTrip = new Map<string, TripFlight[]>();
+  for (const f of (flightsRes.data ?? []) as unknown as TripFlight[]) flightsByTrip.set(f.trip_id, [...(flightsByTrip.get(f.trip_id) ?? []), f]);
+  const lineFor = (tripId: string) => flightLine(flightsByTrip.get(tripId) ?? [], Date.now());
   const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
   const trips = tripsRes.data;
   type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null; show_on?: string | null };
@@ -293,6 +300,7 @@ export default async function DashboardPage() {
                           {featured.end_date && ` \u2013 ${formatDate(featured.end_date)}`}
                         </p>
                       </Link>
+                      {lineFor(featured.id) && <FlightLine flight={lineFor(featured.id)!} />}
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <p className="text-xl font-bold tabular-nums">{formatCurrency(fTotal, "USD")}</p>
@@ -331,6 +339,7 @@ export default async function DashboardPage() {
                             {formatDate(trip.start_date)}
                             {trip.end_date && ` \u2013 ${formatDate(trip.end_date)}`} &middot; {sub}
                           </p>
+                          {lineFor(trip.id) && <div className="mt-0.5"><FlightLine flight={lineFor(trip.id)!} /></div>}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
                           <span className="font-semibold tabular-nums">{formatCurrency(tripTotal, "USD")}</span>
