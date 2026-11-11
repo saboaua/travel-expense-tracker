@@ -820,6 +820,33 @@ try {
     await ctx.close();
   });
 
+  await test("hotel: a trip can carry a hotel with a Directions button, and it shows on the trip card", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/trips/new`);
+    await page.locator("#name").fill("Hotel Trip");
+    await page.locator("#startDate").fill(today);
+    await page.getByTestId("hotel-open").click();
+    await page.locator("#hotelName").fill("Courtyard Marriott");
+    await page.locator("#hotelAddress").fill("Multiplaza Mall, Ave. Israel, Panama");
+    await page.getByRole("button", { name: "Create trip" }).click();
+    await page.getByTestId("hotel-card").waitFor({ timeout: 30000 });
+    assert((await page.getByTestId("hotel-name").innerText()) === "Courtyard Marriott", "the hotel name is shown");
+    assert((await page.getByTestId("hotel-address").innerText()).includes("Ave. Israel"), "the address is shown");
+    const href = await page.getByTestId("hotel-directions").getAttribute("href");
+    assert(href.startsWith("https://www.google.com/maps/dir/?api=1&destination=") && href.includes(encodeURIComponent("Courtyard Marriott")), "Directions opens the maps app with the hotel");
+    const saved = fake.table("trips").find((t) => t.name === "Hotel Trip");
+    assert(saved?.hotel_name === "Courtyard Marriott" && saved?.hotel_address.includes("Panama"), "the hotel is saved on the trip");
+    await page.goto(`${BASE}/trips`);
+    await page.getByTestId("trip-hotel-line").first().waitFor();
+    assert((await page.getByTestId("trip-hotel-line").first().innerText()).includes("Courtyard Marriott"), "the trip card shows the hotel");
+    // a trip without a hotel offers to add one
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByTestId("hotel-add").waitFor();
+    await ctx.close();
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

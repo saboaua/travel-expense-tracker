@@ -1,6 +1,6 @@
 import { todayISO } from "@/lib/utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, EXPENSE_COLS, TRIP_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, EXPENSE_COLS, TRIP_COLS, TRIP_COLS_BASE, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import type { TravelDocument } from "@/lib/documents";
 import type { LoyaltyCard } from "@/lib/loyalty";
@@ -84,7 +84,7 @@ const RECENT_RECEIPTS = 15;
 
 /** The latest trips with their expenses: the pages (and their edit screens), and a copy of each trip and expense. */
 export async function warmTrips(supabase: SupabaseClient, userId: string): Promise<void> {
-  const { data: trips } = await supabase.from("trips").select(TRIP_COLS).eq("user_id", userId).order("start_date", { ascending: false }).limit(RECENT_TRIPS);
+  const { data: trips } = await withColumnFallback((cols) => supabase.from("trips").select(cols).eq("user_id", userId).order("start_date", { ascending: false }).limit(RECENT_TRIPS), TRIP_COLS, TRIP_COLS_BASE);
   if (!trips?.length) return;
   const pages = ["/trips", "/trips/new"];
   for (const t of trips as unknown as { id: string }[]) {

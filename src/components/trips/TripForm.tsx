@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { CategoryButtons } from "@/components/ui/category-buttons";
-import { FileText, Trash2, X } from "lucide-react";
+import { BedDouble, FileText, Trash2, X } from "lucide-react";
 import { DOC_KINDS, type DocKind } from "@/lib/documents";
 import { DOC_ACCEPT, DOC_BUCKET } from "@/lib/document-upload";
 import { makeDocumentApi, saveDocument } from "@/lib/document-outbox";
@@ -22,7 +22,7 @@ import { tripKey } from "@/lib/offline-data";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { useTravelCategories } from "@/lib/use-categories";
 import { useCurrencies } from "@/lib/use-currencies";
-import { TRIP_COLS } from "@/lib/columns";
+import { TRIP_COLS, TRIP_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 
 /** One form for creating and editing a trip, so both screens always look and validate the same. */
@@ -41,6 +41,10 @@ export function TripForm({ tripId }: { tripId?: string }) {
   const [currency, setCurrency] = useState("USD");
   const [status, setStatus] = useState<"active" | "completed">("active");
   const [notes, setNotes] = useState("");
+  const [hotelName, setHotelName] = useState("");
+  const [hotelAddress, setHotelAddress] = useState("");
+  const [showHotel, setShowHotel] = useState(false);
+  const [hadHotel, setHadHotel] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Documents picked while creating a trip are uploaded right after the trip is saved
@@ -55,8 +59,8 @@ export function TripForm({ tripId }: { tripId?: string }) {
       const { data: { session } } = await supabase.auth.getSession(); // read from the phone, so it works offline
       const uid = session?.user.id;
       if (!uid) { setError("Sign in again to open this trip."); setLoaded(true); return; }
-      type Row = { name: string; destination: string | null; category: string | null; start_date: string; end_date: string | null; currency: string | null; status: string; notes: string | null };
-      const res = await loadWithCache<Row>(browserKv, tripKey(uid, tripId), () => supabase.from("trips").select(TRIP_COLS).eq("id", tripId).single() as unknown as PromiseLike<{ data: Row | null; error: unknown }>);
+      type Row = { name: string; destination: string | null; category: string | null; start_date: string; end_date: string | null; currency: string | null; status: string; notes: string | null; hotel_name?: string | null; hotel_address?: string | null };
+      const res = await loadWithCache<Row>(browserKv, tripKey(uid, tripId), () => withColumnFallback((cols) => supabase.from("trips").select(cols).eq("id", tripId).single(), TRIP_COLS, TRIP_COLS_BASE) as unknown as PromiseLike<{ data: Row | null; error: unknown }>);
       // A trip created or changed offline shows as it will be saved
       const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId && i.userId === uid);
       const waitingRow = waiting && isRowSave(waiting) && waiting.table === "trips" ? waiting.row : null;
@@ -75,6 +79,11 @@ export function TripForm({ tripId }: { tripId?: string }) {
       setCurrency(data.currency || "USD");
       setStatus(data.status === "completed" ? "completed" : "active");
       setNotes(data.notes || "");
+      setHotelName(data.hotel_name || "");
+      setHotelAddress(data.hotel_address || "");
+      const has = !!(data.hotel_name || data.hotel_address);
+      setHadHotel(has);
+      setShowHotel(has || (typeof window !== "undefined" && window.location.hash === "#hotel"));
       setLoaded(true);
     })();
   }, [tripId]);
@@ -105,6 +114,8 @@ export function TripForm({ tripId }: { tripId?: string }) {
         end_date: endDate || null,
         currency,
         notes: notes.trim() || null,
+        // Only sent when there is something to save (or clear), so a database without the hotel columns keeps working
+        ...(hotelName.trim() || hotelAddress.trim() || hadHotel ? { hotel_name: hotelName.trim() || null, hotel_address: hotelAddress.trim() || null } : {}),
       };
       const api = makeRowApi(supabase);
       const waiting = tripId ? (await browserOutbox.list().catch(() => [])).find((i) => i.id === tripId) ?? null : null;
@@ -228,6 +239,22 @@ export function TripForm({ tripId }: { tripId?: string }) {
               <div className="space-y-2">
                 <label htmlFor="notes" className="text-sm font-medium">Notes</label>
                 <textarea id="notes" placeholder="Optional notes about this trip..." value={notes} onChange={(e) => setNotes(e.target.value)} className="flex min-h-[80px] w-full rounded-lg border border-input bg-background px-3 py-2 text-sm" />
+              </div>
+
+              <div id="hotel" className="scroll-mt-4 space-y-2">
+                {showHotel ? (
+                  <>
+                    <label htmlFor="hotelName" className="text-sm font-medium">Hotel <span className="font-normal text-muted-foreground">(optional)</span></label>
+                    <Input id="hotelName" placeholder="e.g. Courtyard Marriott" value={hotelName} onChange={(e) => setHotelName(e.target.value)} maxLength={120} autoComplete="off" />
+                    <label htmlFor="hotelAddress" className="sr-only">Hotel address</label>
+                    <Input id="hotelAddress" placeholder="Address, e.g. Multiplaza Mall, Ave. Israel, Panama" value={hotelAddress} onChange={(e) => setHotelAddress(e.target.value)} maxLength={240} autoComplete="off" />
+                    <p className="text-xs text-muted-foreground">The trip page gets a Directions button that opens your maps app.</p>
+                  </>
+                ) : (
+                  <button type="button" onClick={() => setShowHotel(true)} className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed text-sm font-semibold text-primary hover:bg-accent" data-testid="hotel-open">
+                    <BedDouble className="h-4 w-4" aria-hidden="true" /> Add hotel
+                  </button>
+                )}
               </div>
 
               {!editing && (

@@ -4,7 +4,7 @@ import { Tabs } from "@/components/ui/tabs";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, CalendarDays, CalendarPlus, Check, CloudOff, ChevronRight, MapPin, Plane, RefreshCw, Search, X } from "lucide-react";
+import { CalendarCheck, CalendarDays, CalendarPlus, Check, CloudOff, ChevronRight, BedDouble, MapPin, Plane, RefreshCw, Search, X } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, formatCurrency, formatDateRange } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -94,6 +94,12 @@ function TripCard({
             {formatDateRange(trip.start_date, trip.end_date)}
           </p>
           {trip.flight && <FlightLine flight={trip.flight} />}
+          {trip.hotel && (
+            <p className="flex items-center gap-1.5" data-testid="trip-hotel-line">
+              <BedDouble className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{trip.hotel}</span>
+            </p>
+          )}
         </div>
 
         <div className="mt-4 flex items-end justify-between gap-3 border-t pt-4">

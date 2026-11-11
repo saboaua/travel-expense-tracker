@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Plus, Plane } from "lucide-react";
 import { todayISO } from "@/lib/utils";
 import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
-import { FLIGHT_COLS } from "@/lib/columns";
+import { FLIGHT_COLS, withColumnFallback } from "@/lib/columns";
+import { hotelOf } from "@/lib/hotel";
 import { flightLine, type TripFlight } from "@/lib/flights";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 
@@ -18,6 +19,8 @@ type Trip = {
   id: string;
   name: string;
   destination: string | null;
+  hotel_name?: string | null;
+  hotel_address?: string | null;
   start_date: string;
   end_date: string | null;
   status: string;
@@ -41,13 +44,14 @@ export default async function TripsPage() {
   // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
   if (!user) redirect("/login");
 
-  const { data } = await supabase
-    .from("trips")
-    .select("id, name, destination, start_date, end_date, status, notes, expenses(amount, amount_usd, currency)")
-    .eq("user_id", user?.id)
-    .order("start_date", { ascending: false });
+  const LIST = "id, name, destination, start_date, end_date, status, notes, expenses(amount, amount_usd, currency)";
+  const { data } = await withColumnFallback(
+    (cols) => supabase.from("trips").select(cols).eq("user_id", user?.id).order("start_date", { ascending: false }),
+    `${LIST}, hotel_name, hotel_address`,
+    LIST,
+  );
 
-  const trips = (data || []) as Trip[];
+  const trips = (data || []) as unknown as Trip[];
 
   // The next flight per trip, for the line on each card (none when the table does not exist yet)
   const { data: flightRows } = await supabase.from("trip_flights").select(FLIGHT_COLS).eq("user_id", user.id);
@@ -65,6 +69,7 @@ export default async function TripsPage() {
     total: tripTotal(t),
     count: t.expenses?.length || 0,
     flight: lineFor(t.id),
+    hotel: hotelOf(t)?.name ?? null,
   }));
 
   return (

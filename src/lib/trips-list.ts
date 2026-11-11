@@ -14,6 +14,8 @@ export type ListTrip = {
   notes?: string | null;
   /** The next flight, when one has been added */
   flight?: FlightLineInfo | null;
+  /** The hotel name, when one was entered */
+  hotel?: string | null;
 };
 
 export type Phase = "ongoing" | "upcoming" | "ended" | "completed";

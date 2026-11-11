@@ -16,7 +16,9 @@ import { TripStatusToggle } from "@/components/trips/trip-status-toggle";
 import { CategoryDonut } from "@/components/reports/CategoryDonut";
 import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { currentPassport, tripPassportCheck } from "@/lib/documents";
-import { EXPENSE_COLS, FLIGHT_COLS, TRIP_COLS } from "@/lib/columns";
+import { EXPENSE_COLS, FLIGHT_COLS, TRIP_COLS, TRIP_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { hotelOf } from "@/lib/hotel";
+import { TripHotel } from "@/components/trips/TripHotel";
 import { TripFlights } from "@/components/flights/TripFlights";
 import type { TripFlight } from "@/lib/flights";
 
@@ -40,7 +42,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
   if (!user) redirect("/login");
 
-  const { data: trip } = await supabase.from("trips").select(TRIP_COLS).eq("id", id).eq("user_id", user?.id).single();
+  const { data: tripRow } = await withColumnFallback((cols) => supabase.from("trips").select(cols).eq("id", id).eq("user_id", user?.id).single(), TRIP_COLS, TRIP_COLS_BASE);
+  const trip = tripRow as unknown as { id: string; name: string; destination: string | null; category: string | null; start_date: string; end_date: string | null; currency: string; status: string; notes: string | null; hotel_name?: string | null; hotel_address?: string | null } | null;
   if (!trip) notFound();
 
   const { data: expenses } = await supabase.from("expenses").select(EXPENSE_COLS).eq("trip_id", id).order("expense_date", { ascending: false });
@@ -156,6 +159,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
       </div>
 
       <TripFlights tripId={id} tripName={trip.name} tripStart={trip.start_date} tripEnd={endDate} userId={user.id} flights={flights} />
+
+      <TripHotel tripId={id} hotel={hotelOf(trip)} />
 
       <ShareWith kind="trip" itemId={id} />
 

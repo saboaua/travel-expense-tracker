@@ -1,11 +1,11 @@
 import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, TRIP_COLS, withColumnFallback } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, TRIP_COLS, TRIP_COLS_BASE, withColumnFallback } from "@/lib/columns";
 
 /** Tables that belong to one person (column holding the owner), and the storage bucket their files sit in. */
 export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; cols: string; base?: string }[] = [
   { table: "profiles", owner: "id", cols: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role, home_country, home_city", base: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role" },
-  { table: "trips", owner: "user_id", cols: `${TRIP_COLS}, user_id, created_at` },
+  { table: "trips", owner: "user_id", cols: `${TRIP_COLS}, user_id, created_at`, base: `${TRIP_COLS_BASE}, user_id, created_at` },
   { table: "expenses", owner: "user_id", bucket: "receipts", cols: `${EXPENSE_COLS}, user_id, trip_id, created_at` },
   { table: "personal_projects", owner: "user_id", cols: PERSONAL_PROJECT_COLS },
   { table: "personal_expenses", owner: "user_id", bucket: "receipts", cols: PERSONAL_EXPENSE_COLS },

@@ -6,7 +6,9 @@
  * tests instead of breaking a page.
  */
 
-export const TRIP_COLS = "id, name, destination, category, start_date, end_date, currency, status, notes";
+export const TRIP_COLS_BASE = "id, name, destination, category, start_date, end_date, currency, status, notes";
+/** hotel_name and hotel_address come from migration_trip_hotel.sql, which an older database may not have yet. */
+export const TRIP_COLS = `${TRIP_COLS_BASE}, hotel_name, hotel_address`;
 /** What the export workbooks need from a trip. */
 export const TRIP_EXPORT_COLS = "id, name, destination, start_date, end_date, currency, status";
 
