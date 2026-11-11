@@ -427,31 +427,32 @@ function buildRefinePrompt(hints: OcrHints, today: string, prev: GroceryScan, pr
   ].join("\n");
 }
 
+/** The grocery reading with its own arithmetic checked (a few comparisons, no waiting). */
+export async function extractGroceryChecked(image: { data: Uint8Array | ArrayBuffer; mime: string }, hints: OcrHints = {}): Promise<GroceryScan> {
+  const scan = await extractGroceryWithAi(image, hints);
+  return { ...scan, check: checkGrocery(scan) };
+}
+
 /**
- * Grocery reading with its own arithmetic check. If the items do not add up (or a line's quantity x price does not
- * match its amount), the AI is shown the photo again together with the specific problem, once. The second reading is
- * kept only if it checks out better than the first.
+ * A second look at the photo, run after the first reading is already on screen and only when its numbers do not add up.
+ * The AI is shown the photo again with the specific problem. Returns null when it has nothing better.
  */
-export async function extractGroceryChecked(
+export async function recheckGroceryWithAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
-  hints: OcrHints = {},
-  budgetMs = 28000
-): Promise<GroceryScan> {
-  const started = Date.now();
-  const first = await extractGroceryWithAi(image, hints);
+  hints: OcrHints,
+  first: GroceryScan
+): Promise<GroceryScan | null> {
   const check = checkGrocery(first);
-  const left = 56000 - (Date.now() - started);
-  if (check.ok || first.items.length === 0 || Date.now() - started > budgetMs || left < 8000) return { ...first, check };
+  if (check.ok || first.items.length === 0) return null;
   try {
     const today = todayISO();
-    const raw = await askAi(image, buildRefinePrompt(hints, today, first, check.issues), 6000, { single: true, ms: Math.min(25000, left) });
+    const raw = await askAi(image, buildRefinePrompt(hints, today, first, check.issues), 6000, { single: true, ms: 40000 });
     const better = parseGroceryAnswer(raw, hints, today);
     const again = checkGrocery(better);
-    if (better.items.length > 0 && again.score < check.score) return { ...better, check: again, refined: true };
+    return better.items.length > 0 && again.score < check.score ? { ...better, check: again, refined: true } : null;
   } catch {
-    // the first reading stands
+    return null; // the first reading stands
   }
-  return { ...first, check };
 }
 
 /* ---------------- documents: passport, visa, ID, driver's license ---------------- */

@@ -1,6 +1,6 @@
 import { runReceiptOcr, type OcrHints, type OcrResult } from "@/lib/ocr";
 import { bestItems } from "@/lib/ocr-layout";
-import { applyFlags, checkGrocery, crossCheck } from "@/lib/receipt-check";
+import { applyFlags, checkGrocery, crossCheck, diffReadings } from "@/lib/receipt-check";
 import type { GroceryScan } from "@/lib/ocr-ai";
 import { compressReceiptImage } from "@/lib/compress-image";
 
@@ -92,43 +92,75 @@ export function scanNote(scan: Pick<GroceryScan, "items" | "check" | "refined">)
   return parts.join(" ");
 }
 
-const wait = (ms: number) => new Promise<null>((r) => setTimeout(() => r(null), ms));
+/** What arrives after the first reading is already on screen. Row numbers refer to the items of the scan that was returned. */
+export type LateUpdate = {
+  flags: Record<number, string>;
+  /** Another reader's price for a row, offered as a suggestion. */
+  alts: Record<number, number>;
+  /** Plain sentences about the receipt as a whole. */
+  issues: string[];
+  /** "ocr": the on-device reader compared prices; "ai": the AI took a second look. */
+  from: "ocr" | "ai";
+};
 
 /**
- * Grocery receipts. The AI returns every line item; at the same time the on-device reader reads the same photo as an
- * independent witness. Where both print the same price it is almost certainly right; where they differ the row is
- * flagged. The receipt's own arithmetic (quantity x price, items = subtotal, subtotal + tax = total) is checked too.
- * Without AI the on-device reading (rebuilt by word positions) is used, and its rows are checked and flagged the same way.
+ * Grocery receipts. The AI's items come back and are returned at once; nothing waits for anything else. In the
+ * background the on-device reader reads the same photo as an independent witness and, when the receipt's own
+ * arithmetic does not add up, the AI looks at the photo again. What they find reaches `onLater` as suggestions
+ * for rows (flags and other prices): values are never changed on their own.
+ * Without AI the on-device reading (rebuilt by word positions) is returned, with its rows checked and flagged.
  */
-export async function extractGroceryReceipt(file: File, hints: OcrHints = {}): Promise<GroceryScan> {
+export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, onLater?: (u: LateUpdate) => void): Promise<GroceryScan> {
+  const sent = await forAi(file);
   const form = new FormData();
-  form.append("file", await forAi(file));
+  form.append("file", sent);
   form.append("mode", "grocery");
   if (hints.currency) form.append("currency", hints.currency);
   if (hints.categories?.length) form.append("categories", JSON.stringify(hints.categories));
 
-  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
   const ocrPromise = runReceiptOcr(file, hints).catch(() => null);
   const ai = await askAi(form, (r: GroceryScan) => r.items.length > 0 || r.total != null);
 
   if (ai.result) {
     const scan = ai.result as GroceryScan;
     const check = scan.check ?? checkGrocery(scan);
-    // The witness may take a little longer than the AI; do not keep the person waiting for it
-    const ocr = await Promise.race([ocrPromise, wait(offline ? 0 : 12000)]);
-    let cross: ReturnType<typeof crossCheck> | null = null;
-    if (ocr) {
-      cross = crossCheck(scan.items, { text: ocr.rawText, items: bestItems(ocr.rawText, ocr.layout, ocr.amount) });
+    applyFlags(scan.items, check.flagged);
+    const result: GroceryScan = { ...scan, check };
+
+    if (onLater && scan.items.length > 0) {
+      const snapshot = scan.items.map((i) => ({ ...i }));
+      // Witness: the on-device reading of the same photo
+      void ocrPromise.then((ocr) => {
+        if (!ocr) return;
+        const cross = crossCheck(snapshot, { text: ocr.rawText, items: bestItems(ocr.rawText, ocr.layout, ocr.amount) });
+        const issues: string[] = [];
+        if (cross.trusted && cross.extra.length > 0) issues.push(`The second reader also saw ${cross.extra.length === 1 ? `a price of ${cross.extra[0].toFixed(2)}` : `${cross.extra.length} prices`} that the AI did not list.`);
+        if (Object.keys(cross.flagged).length > 0 || issues.length > 0) onLater({ flags: cross.flagged, alts: cross.alts, issues, from: "ocr" });
+      });
+      // Second look, only when the numbers do not add up
+      if (!check.ok && (typeof navigator === "undefined" || navigator.onLine !== false)) {
+        const again = new FormData();
+        again.append("file", sent);
+        again.append("mode", "grocery-recheck");
+        again.append("first", JSON.stringify(scan));
+        if (hints.currency) again.append("currency", hints.currency);
+        if (hints.categories?.length) again.append("categories", JSON.stringify(hints.categories));
+        void fetch("/api/ocr", { method: "POST", body: again, signal: AbortSignal.timeout(AI_WAIT_MS) })
+          .then(async (res) => {
+            if (!res.ok) return;
+            const { result: better } = (await res.json()) as { result?: GroceryScan | null };
+            if (!better || better.items.length === 0) return;
+            const d = diffReadings(snapshot, better.items);
+            const issues = d.added > 0 ? [`The AI's second look found ${d.added} more ${d.added === 1 ? "line" : "lines"} on the receipt.`] : [];
+            if (Object.keys(d.flagged).length > 0 || issues.length > 0) onLater({ flags: d.flagged, alts: d.alts, issues, from: "ai" });
+          })
+          .catch(() => {});
+      }
     }
-    applyFlags(scan.items, check.flagged, cross?.flagged ?? {});
-    const issues = [...check.issues];
-    if (cross?.trusted && cross.extra.length > 0) {
-      issues.push(`The second reader also saw ${cross.extra.length === 1 ? `a price of ${cross.extra[0].toFixed(2)}` : `${cross.extra.length} prices`} that the AI did not list.`);
-    }
-    return { ...scan, check: { ...check, issues, ok: check.ok && !(cross && Object.keys(cross.flagged).length > 0) && !(cross?.extra.length) } };
+    return result;
   }
 
-  const ocr = await ocrPromise ?? (await runReceiptOcr(file, hints));
+  const ocr = (await ocrPromise) ?? (await runReceiptOcr(file, hints));
   const items = bestItems(ocr.rawText, ocr.layout, ocr.amount);
   const check = checkGrocery({ items, total: ocr.amount });
   // The reader's own doubt about a price counts too

@@ -82,6 +82,8 @@ function nearMiss(a: number, b: number): boolean {
 export type CrossCheck = {
   /** Row index -> reason, only where the two readers disagree on a price. */
   flagged: Record<number, string>;
+  /** Row index -> the other reader's price, when it differs by a slip (one wrong digit, two swapped). */
+  alts: Record<number, number>;
   /** How many AI prices the on-device reader found too. */
   agreed: number;
   /** False when the on-device reading was too poor to judge anything from (then nothing is flagged). */
@@ -106,14 +108,16 @@ export function crossCheck(aiItems: GroceryLine[], ocr: { text: string; items: G
   const found = aiItems.map((it) => take(it.line_total));
   const agreed = found.filter(Boolean).length;
   const share = aiItems.length ? agreed / aiItems.length : 0;
-  if (aiItems.length === 0 || share < 0.5) return { flagged: {}, agreed, trusted: false, extra: [] };
+  if (aiItems.length === 0 || share < 0.5) return { flagged: {}, alts: {}, agreed, trusted: false, extra: [] };
 
   const flagged: Record<number, string> = {};
+  const alts: Record<number, number> = {};
   aiItems.forEach((it, i) => {
     if (found[i]) return;
     const near = [...pool.entries()].find(([p, n]) => n > 0 && nearMiss(it.line_total, p));
     if (near) {
       flagged[i] = `The AI read ${it.line_total.toFixed(2)}, the on-device reader saw ${near[0].toFixed(2)}`;
+      alts[i] = near[0];
       take(near[0]);
     } else if (share >= 0.8) {
       flagged[i] = "The on-device reader could not find this price on the receipt";
@@ -131,7 +135,7 @@ export function crossCheck(aiItems: GroceryLine[], ocr: { text: string; items: G
       else extra.push(it.line_total);
     }
   }
-  return { flagged, agreed, trusted: true, extra };
+  return { flagged, alts, agreed, trusted: true, extra };
 }
 
 /** Folds several flag sets into the items and returns the combined plain-language issues. */
@@ -142,4 +146,28 @@ export function applyFlags(items: GroceryLine[], ...sets: Record<number, string>
     if (reasons.length) { it.flag = reasons[0]; n++; }
   });
   return n;
+}
+
+const nameKey = (n: string) => n.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+
+/**
+ * Compares a second reading with the first, row by row (matched by name, or by position when the lists are the
+ * same length). Rows where the amount changed get the new amount as a suggestion; lines only the second reading has are counted.
+ */
+export function diffReadings(first: GroceryLine[], second: GroceryLine[]): { flagged: Record<number, string>; alts: Record<number, number>; added: number } {
+  const flagged: Record<number, string> = {};
+  const alts: Record<number, number> = {};
+  const used = new Set<number>();
+  first.forEach((it, i) => {
+    let j = second.findIndex((o, k) => !used.has(k) && nameKey(o.name) === nameKey(it.name));
+    if (j < 0 && first.length === second.length && !used.has(i)) j = i;
+    if (j < 0) return;
+    used.add(j);
+    const other = second[j];
+    if (Math.abs(other.line_total - it.line_total) > 0.005) {
+      alts[i] = other.line_total;
+      flagged[i] = `The AI read ${it.line_total.toFixed(2)}, its second look read ${other.line_total.toFixed(2)}`;
+    }
+  });
+  return { flagged, alts, added: second.filter((_, k) => !used.has(k)).length };
 }

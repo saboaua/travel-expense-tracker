@@ -1,4 +1,4 @@
-import { applyFlags, checkGrocery, crossCheck } from "../src/lib/receipt-check";
+import { applyFlags, checkGrocery, crossCheck, diffReadings } from "../src/lib/receipt-check";
 import type { GroceryLine } from "../src/lib/personal/grocery";
 
 const eq = (a: unknown, b: unknown, m: string) => {
@@ -45,7 +45,7 @@ const ai = [L("Milk", 2.49), L("Bread", 3.1), L("Eggs", 4.5), L("Rice", 3.0), L(
 let x = crossCheck(ai, { text: "MILK 2.49\nBREAD 3.10\nEGGS 4.50\nRICE 3.00\nCHEESE 6.40\nTOTAL 19.49", items: [] });
 eq([x.trusted, x.agreed, x.flagged], [true, 5, {}], "same prices from both readers: nothing flagged");
 x = crossCheck(ai, { text: "MILK 2.49\nBREAD 3.10\nEGGS 4.60\nRICE 3.00\nCHEESE 6.40", items: [] });
-eq([x.trusted, Object.keys(x.flagged), (x.flagged[2] || "").includes("4.60")], [true, ["2"], true], "one price off by a digit is flagged with what the other reader saw");
+eq([x.trusted, Object.keys(x.flagged), (x.flagged[2] || "").includes("4.60"), x.alts], [true, ["2"], true, { 2: 4.6 }], "one price off by a digit is flagged with what the other reader saw, offered as the other price");
 x = crossCheck(ai, { text: "MILK 2.49\nBREAD 3.10\nEGGS 4.50\nRICE 3.00", items: [] });
 eq([x.trusted, Object.keys(x.flagged)], [true, ["4"]], "a price the good reader cannot find is flagged");
 x = crossCheck(ai, { text: "garbled text 2.49", items: [] });
@@ -57,3 +57,11 @@ eq([x.trusted, x.agreed], [true, 3], "the same price twice needs two sightings, 
 
 const items = [L("Milk", 2.49), L("Bread", 3.1)];
 eq([applyFlags(items, { 1: "x" }, {}), items[1].flag, items[0].flag], [1, "x", undefined], "flags land on the right rows");
+
+// second reading compared with the first
+const d1 = diffReadings([L("Milk", 2.49), L("Bread", 8.1)], [L("Bread", 3.1), L("Milk", 2.49)]);
+eq([d1.alts, Object.keys(d1.flagged), d1.added], [{ 1: 3.1 }, ["1"], 0], "rows matched by name even when the order differs");
+const d2 = diffReadings([L("Milk", 2.49), L("Bread", 8.1)], [L("Milk", 2.49), L("Wheat bread", 3.1)]);
+eq(d2.alts, { 1: 3.1 }, "a renamed row of the same length is matched by position");
+const d3 = diffReadings([L("Milk", 2.49)], [L("Milk", 2.49), L("Butter", 5.25)]);
+eq([d3.alts, d3.added], [{}, 1], "a line only the second look found is counted");

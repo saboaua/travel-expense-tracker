@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, extractReceiptWithAi } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, recheckGroceryWithAi, type GroceryScan, extractReceiptWithAi } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -57,6 +57,20 @@ export async function POST(request: Request) {
     }
     if (form.get("mode") === "flight") {
       const result = await extractFlightWithAi(image);
+      return NextResponse.json({ result });
+    }
+    if (form.get("mode") === "grocery-recheck") {
+      // The first reading arrives with the photo; the answer is a better reading or null
+      let first: GroceryScan | null = null;
+      try { first = JSON.parse(String(form.get("first") || "null")) as GroceryScan; } catch { /* ignored */ }
+      if (!first || !Array.isArray(first.items) || first.items.length > 200) return NextResponse.json({ error: "Bad request" }, { status: 400 });
+      const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+      first = {
+        ...first,
+        total: num(first.total), subtotal: num(first.subtotal), tax: num(first.tax),
+        items: first.items.map((i) => ({ name: String(i?.name ?? "").slice(0, 160), quantity: num(i?.quantity) || 1, unit_price: num(i?.unit_price) ?? 0, line_total: num(i?.line_total) ?? 0, category: String(i?.category ?? "Other").slice(0, 60), unit: i?.unit ? String(i.unit).slice(0, 4) : null })),
+      };
+      const result = await recheckGroceryWithAi(image, hints, first);
       return NextResponse.json({ result });
     }
     if (form.get("mode") === "grocery") {

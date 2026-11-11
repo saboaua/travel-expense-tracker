@@ -15,7 +15,7 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
-import { extractGroceryReceipt, howRead, scanNote } from "@/lib/receipt-extract";
+import { extractGroceryReceipt, howRead, scanNote, type LateUpdate } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Overview, type ReceiptBundle } from "@/lib/offline-grocery";
@@ -26,7 +26,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
 
-type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string };
+type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number };
 const uid = () => Math.random().toString(36).slice(2);
 const money = (s: string) => {
   const n = parseFloat(s);
@@ -116,33 +116,57 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [categoryNames.length]);
 
+  const blankRow = (): Row => ({ key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: allowed("Other"), unit: "" });
+  // Keys of the rows made by the latest scan, so a late suggestion lands on the right row even after edits or deletes
+  const scanKeys = useRef<string[]>([]);
+  const scanId = useRef(0);
+
+  /** Suggestions that arrive after the rows are on screen: they are attached to rows, never applied. */
+  const applyLate = (id: number, u: LateUpdate) => {
+    if (id !== scanId.current) return; // a newer scan replaced these rows
+    setRows((rs) => rs.map((r) => {
+      const i = scanKeys.current.indexOf(r.key);
+      if (i < 0 || (!u.flags[i] && u.alts[i] == null)) return r;
+      return { ...r, flag: r.flag ?? u.flags[i], alt: r.alt ?? u.alts[i] };
+    }));
+    const n = Object.keys(u.flags).length;
+    const extra = [n > 0 ? `${n} ${n === 1 ? "price looks" : "prices look"} uncertain.` : "", ...u.issues].filter(Boolean).join(" ");
+    if (extra) setNote((cur) => (cur ? `${cur} ${extra}` : extra));
+  };
+
   const scan = async (f: File) => {
     setScanning(true);
     setNote(null);
+    const id = ++scanId.current;
     try {
-      const r = await extractGroceryReceipt(f, { currency, categories: categoryNames });
+      const r = await extractGroceryReceipt(f, { currency, categories: categoryNames }, (u) => applyLate(id, u));
       if (r.store && !store) setStore(r.store);
       if (r.date) setDate(r.date);
       if (r.total != null) setTotal(r.total.toFixed(2));
       if (r.currency && r.currency !== currency && currencies.some((c) => c.code === r.currency)) setCurrency(r.currency);
-      setRows(
-        r.items.map((it) => ({
-          key: uid(),
-          name: it.name,
-          quantity: String(it.quantity),
-          unit_price: it.unit_price.toFixed(2),
-          line_total: it.line_total.toFixed(2),
-          category: allowed(it.category),
-          unit: it.unit || "",
-        }))
-      );
+      const made: Row[] = r.items.map((it) => ({
+        key: uid(),
+        name: it.name,
+        quantity: String(it.quantity),
+        unit_price: it.unit_price.toFixed(2),
+        line_total: it.line_total.toFixed(2),
+        category: allowed(it.category),
+        unit: it.unit || "",
+        flag: it.flag,
+        alt: it.alt,
+      }));
+      scanKeys.current = made.map((m) => m.key);
+      // Nothing readable: a blank row is ready so the items can be typed in straight away
+      setRows(made.length > 0 ? made : [blankRow()]);
       setNote(
         r.items.length > 0
           ? `Read ${r.items.length} items (${howRead(r)}). ${scanNote(r) ? `${scanNote(r)} ` : ""}Check names and prices before saving.`
-          : "No items could be read. Add them below, or save just the total."
+          : "No items could be read. Type them in below, or save just the total."
       );
     } catch {
-      setNote("Could not read this receipt. Enter the details manually.");
+      scanKeys.current = [];
+      setRows((rs) => (rs.length > 0 ? rs : [blankRow()]));
+      setNote("Could not read this receipt. Type the items in below, or save just the total.");
     } finally {
       setScanning(false);
     }

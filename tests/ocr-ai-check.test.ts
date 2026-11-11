@@ -1,4 +1,4 @@
-import { extractGroceryChecked, resetWorkingModel } from "../src/lib/ocr-ai";
+import { extractGroceryChecked, recheckGroceryWithAi, resetWorkingModel } from "../src/lib/ocr-ai";
 
 let failed = 0;
 const eq = (got: unknown, want: unknown, msg: string) => {
@@ -16,46 +16,45 @@ const realFetch = globalThis.fetch;
   process.env.GEMINI_API_KEY = "test";
   delete process.env.OCR_MODEL;
 
-  // first reading misreads 3.10 as 8.10; the second look fixes it
+  const WRONG = { store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 8.1)] };
+  const FIXED = { store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 3.1)] };
+
+  // the first read is one request and is checked without any waiting
   resetWorkingModel();
   const prompts: string[] = [];
-  let n = 0;
   globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
-    const body = JSON.parse(String(init?.body));
-    prompts.push(body.contents[0].parts[1].text);
-    return n++ === 0
-      ? answer({ store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 8.1)] })
-      : answer({ store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 3.1)] });
+    prompts.push(JSON.parse(String(init?.body)).contents[0].parts[1].text);
+    return answer(WRONG);
   }) as typeof fetch;
   let r = await extractGroceryChecked(img, {});
-  eq([r.refined, r.items.map((i) => i.line_total), r.check?.ok], [true, [2.49, 3.1], true], "numbers did not add up: second look fixes the price");
-  eq([prompts.length, prompts[1].includes("add up to 10.59"), prompts[1].includes('"line_total":8.1')], [2, true, true], "the second look is told the problem and shown the first reading");
+  eq([prompts.length, r.refined ?? false, r.check?.ok, r.check?.issues[0]], [1, false, false, "The items add up to 10.59, 5.00 more than the receipt total."], "first read: one request, problem reported, no second look inside it");
 
-  // a receipt that adds up is read once
+  // second look: told the problem, shown the first reading, returns a better one
   resetWorkingModel();
   prompts.length = 0;
   globalThis.fetch = (async (_u: string | URL | Request, init?: RequestInit) => {
     prompts.push(JSON.parse(String(init?.body)).contents[0].parts[1].text);
-    return answer({ store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 3.1)] });
+    return answer(FIXED);
   }) as typeof fetch;
-  r = await extractGroceryChecked(img, {});
-  eq([prompts.length, r.refined ?? false, r.check?.ok], [1, false, true], "adds up: no second look");
+  const first = await extractGroceryChecked(img, {}).then((x) => ({ ...x, items: WRONG.items.map((i) => ({ ...i, category: "Other", unit: null })) }));
+  prompts.length = 0;
+  let better = await recheckGroceryWithAi(img, {}, first);
+  eq([better?.refined, better?.items.map((i) => i.line_total), better?.check?.ok], [true, [2.49, 3.1], true], "second look fixes the price");
+  eq([prompts.length, prompts[0].includes("add up to 10.59"), prompts[0].includes('"line_total":8.1')], [1, true, true], "second look is told the problem and shown the first reading");
 
-  // second look is worse: the first reading stays
+  // a receipt that adds up gets no second look at all
   resetWorkingModel();
-  n = 0;
-  globalThis.fetch = (async () => (n++ === 0
-    ? answer({ store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 8.1)] })
-    : answer({ store: "Shop", total: 5.59, items: [item("Milk", 9.49), item("Bread", 8.1)] }))) as typeof fetch;
-  r = await extractGroceryChecked(img, {});
-  eq([r.refined ?? false, r.items.map((i) => i.line_total)], [false, [2.49, 8.1]], "second look no better: first reading kept");
+  prompts.length = 0;
+  better = await recheckGroceryWithAi(img, {}, { ...first, items: FIXED.items.map((i) => ({ ...i, category: "Other", unit: null })) });
+  eq([better, prompts.length], [null, 0], "adds up: nothing is asked");
 
-  // second look fails outright: first reading kept
+  // second look no better, or failing: nothing is offered
   resetWorkingModel();
-  n = 0;
-  globalThis.fetch = (async () => (n++ === 0 ? answer({ store: "Shop", total: 5.59, items: [item("Milk", 2.49), item("Bread", 8.1)] }) : new Response("{}", { status: 401 }))) as typeof fetch;
-  r = await extractGroceryChecked(img, {});
-  eq([r.refined ?? false, r.items.length, r.check?.ok], [false, 2, false], "second look errors: first reading kept, flagged not ok");
+  globalThis.fetch = (async () => answer({ store: "Shop", total: 5.59, items: [item("Milk", 9.49), item("Bread", 8.1)] })) as typeof fetch;
+  eq(await recheckGroceryWithAi(img, {}, first), null, "second look no better: nothing offered");
+  resetWorkingModel();
+  globalThis.fetch = (async () => new Response("{}", { status: 401 })) as typeof fetch;
+  eq(await recheckGroceryWithAi(img, {}, first), null, "second look errors: nothing offered");
 
   // subtotal and tax are read from the receipt
   resetWorkingModel();
