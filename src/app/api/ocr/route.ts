@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryWithAi, extractReceiptWithAi } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, extractReceiptWithAi } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ result });
     }
     if (form.get("mode") === "grocery") {
-      const result = await extractGroceryWithAi(image, hints);
+      const result = await extractGroceryChecked(image, hints);
       return NextResponse.json({ result });
     }
     const result = await extractReceiptWithAi(image, hints);

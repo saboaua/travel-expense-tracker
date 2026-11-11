@@ -8,6 +8,7 @@ import { todayISO } from "@/lib/utils";
 import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
+import { checkGrocery, type ScanCheck } from "@/lib/receipt-check";
 
 const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
@@ -234,7 +235,7 @@ export function parseModelJson(text: string): Record<string, unknown> | null {
 
 type AiImage = { data: Uint8Array | ArrayBuffer; mime: string };
 
-async function askAi(image: AiImage, prompt: string, maxTokens: number): Promise<Record<string, unknown>> {
+async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { single?: boolean; ms?: number } = {}): Promise<Record<string, unknown>> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("AI OCR is not configured");
   if (!AI_IMAGE_TYPES.includes(image.mime)) throw new Error("Unsupported image type for AI OCR");
@@ -246,7 +247,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number): Promise
   const configured = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
   // A long item list takes longer to write: more time for the grocery reader, within the route's 60 seconds
   const long = maxTokens > 1000;
-  const firstMs = long ? 25000 : 12000;
+  const firstMs = opts.ms ?? (long ? 25000 : 12000);
   const nextMs = long ? 12000 : 8000;
 
   const call = (model: string, ms: number, tokens: number) =>
@@ -266,7 +267,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number): Promise
   const tried = [first];
   let usedModel = first;
   let res = await call(first, firstMs, maxTokens);
-  if (!res || RETRY.has(res.status)) {
+  if (!opts.single && (!res || RETRY.has(res.status))) {
     const next = (await discoverModels(key)).filter((m) => !tried.includes(m)).slice(0, 2);
     for (const m of next) {
       tried.push(m);
@@ -294,7 +295,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number): Promise
   let out = await read(res);
   // Cut off or unreadable: ask once more with a bigger output budget, while there is time left
   const left = 50000 - (Date.now() - started);
-  if ((!out.parsed || out.cut) && left > 8000) {
+  if (!opts.single && (!out.parsed || out.cut) && left > 8000) {
     const again = await call(usedModel, Math.min(left, 25000), Math.min(Math.max(maxTokens * 3, 4096), 16000));
     if (again?.ok) {
       const second = await read(again);
@@ -330,6 +331,8 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
     '- "store": store name (string) or null',
     '- "date": purchase date as YYYY-MM-DD, or null',
     '- "total": final amount charged as a plain number, or null',
+    '- "subtotal": the printed subtotal (items before tax) as a number, or null if none is printed',
+    '- "tax": the printed tax amount as a number, or null if none is printed',
     '- "currency": 3-letter ISO code if clear, otherwise null',
     '- "items": array with one entry per purchased product, in receipt order, each:',
     '    { "name": product name written out in readable words (expand obvious abbreviations, keep it short),',
@@ -357,20 +360,22 @@ export type GroceryScan = {
   currency: string | null;
   items: GroceryLine[];
   source: "ai" | "tesseract";
+  /** Printed subtotal and tax, when the receipt shows them (used to check the items). */
+  subtotal?: number | null;
+  tax?: number | null;
+  /** The receipt's own arithmetic, checked: what to look at again. */
+  check?: ScanCheck;
+  /** True when the first reading failed the checks and a second look at the photo fixed some of it. */
+  refined?: boolean;
 };
 
-export async function extractGroceryWithAi(
-  image: { data: Uint8Array | ArrayBuffer; mime: string },
-  hints: OcrHints = {}
-): Promise<GroceryScan> {
-  const today = todayISO();
-  const raw = await askAi(image, buildGroceryPrompt(hints, today), 6000);
-
+function parseGroceryAnswer(raw: Record<string, unknown>, hints: OcrHints, today: string): GroceryScan {
   const base = sanitize({ merchant: raw.store, total: raw.total, currency: raw.currency, date: raw.date }, {}, today);
   const money = (v: unknown) => {
     const n = typeof v === "number" ? v : typeof v === "string" ? parseFloat(v.replace(/[^\d.\-]/g, "")) : NaN;
     return Number.isFinite(n) ? Math.round(n * 100) / 100 : NaN;
   };
+  const optional = (v: unknown) => { const n = money(v); return Number.isFinite(n) && n >= 0 && n < 10_000_000 ? n : null; };
 
   const items: GroceryLine[] = [];
   for (const it of Array.isArray(raw.items) ? raw.items.slice(0, 200) : []) {
@@ -392,7 +397,61 @@ export async function extractGroceryWithAi(
     items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit });
   }
 
-  return { store: base.merchant, date: base.date, total: base.amount, currency: base.currency, items: attachWeightLines(items), source: "ai" };
+  return { store: base.merchant, date: base.date, total: base.amount, currency: base.currency, items: attachWeightLines(items), source: "ai", subtotal: optional(raw.subtotal), tax: optional(raw.tax) };
+}
+
+export async function extractGroceryWithAi(
+  image: { data: Uint8Array | ArrayBuffer; mime: string },
+  hints: OcrHints = {}
+): Promise<GroceryScan> {
+  const today = todayISO();
+  const raw = await askAi(image, buildGroceryPrompt(hints, today), 6000);
+  return parseGroceryAnswer(raw, hints, today);
+}
+
+function buildRefinePrompt(hints: OcrHints, today: string, prev: GroceryScan, problems: string[]) {
+  const first = {
+    store: prev.store, date: prev.date, total: prev.total, subtotal: prev.subtotal ?? null, tax: prev.tax ?? null, currency: prev.currency,
+    items: prev.items.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit ?? null, unit_price: i.unit_price, line_total: i.line_total, category: i.category })),
+  };
+  return [
+    buildGroceryPrompt(hints, today),
+    "",
+    "This is a second look. A first reading of this same receipt returned the JSON at the end, but it fails these checks:",
+    ...problems.map((p) => `- ${p}`),
+    "Go through the photo line by line again. Correct ONLY values that are wrong: a misread digit, a missing or duplicated line, a wrong quantity. Keep everything that is right.",
+    "Every figure must be exactly what is printed. Never change a value only to make the numbers add up.",
+    "Return the complete corrected JSON in the same format.",
+    "First reading:",
+    JSON.stringify(first),
+  ].join("\n");
+}
+
+/**
+ * Grocery reading with its own arithmetic check. If the items do not add up (or a line's quantity x price does not
+ * match its amount), the AI is shown the photo again together with the specific problem, once. The second reading is
+ * kept only if it checks out better than the first.
+ */
+export async function extractGroceryChecked(
+  image: { data: Uint8Array | ArrayBuffer; mime: string },
+  hints: OcrHints = {},
+  budgetMs = 28000
+): Promise<GroceryScan> {
+  const started = Date.now();
+  const first = await extractGroceryWithAi(image, hints);
+  const check = checkGrocery(first);
+  const left = 56000 - (Date.now() - started);
+  if (check.ok || first.items.length === 0 || Date.now() - started > budgetMs || left < 8000) return { ...first, check };
+  try {
+    const today = todayISO();
+    const raw = await askAi(image, buildRefinePrompt(hints, today, first, check.issues), 6000, { single: true, ms: Math.min(25000, left) });
+    const better = parseGroceryAnswer(raw, hints, today);
+    const again = checkGrocery(better);
+    if (better.items.length > 0 && again.score < check.score) return { ...better, check: again, refined: true };
+  } catch {
+    // the first reading stands
+  }
+  return { ...first, check };
 }
 
 /* ---------------- documents: passport, visa, ID, driver's license ---------------- */

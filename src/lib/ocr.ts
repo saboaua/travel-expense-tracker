@@ -4,6 +4,7 @@
  */
 
 import { cleanOcrText, fixDigits } from "@/lib/ocr-clean";
+import { buildRows, slimWords, type LayoutRow, type OcrWord } from "@/lib/ocr-layout";
 import { adaptiveBinarize, grayToRgba, ocrScale, stretchContrast, toGray } from "@/lib/ocr-image";
 
 export interface OcrHints {
@@ -21,6 +22,8 @@ export interface OcrResult {
   category: string | null;
   rawText: string;
   source: "ai" | "tesseract";
+  /** Receipt rows rebuilt from word positions (on-device reading only). */
+  layout?: LayoutRow[];
   /** Why the AI reader was not used, when basic OCR had to step in (see aiFallbackText). */
   aiReason?: string;
 }
@@ -315,7 +318,7 @@ async function getWorker(): Promise<TessWorker> {
   return workerPromise;
 }
 
-type Pass = { text: string; confidence: number };
+type Pass = { text: string; confidence: number; words?: OcrWord[] };
 
 /**
  * How trustworthy a reading looks, 0 to about 130: Tesseract's own confidence, plus credit for what a receipt
@@ -331,7 +334,7 @@ async function recognize(worker: TessWorker, image: unknown, psm?: string): Prom
   if (psm) await worker.setParameters({ tessedit_pageseg_mode: psm as never });
   try {
     const { data } = await worker.recognize(image as never);
-    return { text: data.text || "", confidence: data.confidence ?? 0 };
+    return { text: data.text || "", confidence: data.confidence ?? 0, words: slimWords((data as { words?: unknown }).words) };
   } finally {
     if (psm) await worker.setParameters({ tessedit_pageseg_mode: "4" as never }).catch(() => {}); // back to a single column
   }
@@ -364,6 +367,8 @@ export async function runReceiptOcr(imageSource: OcrImageSource, hints: OcrHints
     throw e;
   }
 
-  const text = (best as unknown as Pass | null)?.text ?? "";
-  return { ...parseReceiptText(text, hints), source: "tesseract" };
+  const final = best as unknown as Pass | null;
+  const text = final?.text ?? "";
+  const layout = final?.words && final.words.length > 0 ? buildRows(final.words) : undefined;
+  return { ...parseReceiptText(text, hints), source: "tesseract", layout };
 }

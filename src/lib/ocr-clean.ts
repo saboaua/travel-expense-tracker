@@ -33,3 +33,17 @@ export function cleanOcrText(text: string): string {
     })
     .join("\n");
 }
+
+const MONEY_TOKEN = /(?<![\d.,])-?(\d{1,3}(?:[.,]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?![\d])/g;
+
+/** Every price-looking figure in a text, after the usual OCR repairs. A comma or dot is the decimal mark when two digits follow it. */
+export function moneyTokens(text: string): number[] {
+  const out: number[] = [];
+  for (const m of cleanOcrText(text).matchAll(MONEY_TOKEN)) {
+    const s = m[1];
+    const at = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+    const n = parseFloat(`${s.slice(0, at).replace(/[.,]/g, "")}.${s.slice(at + 1)}`);
+    if (Number.isFinite(n) && n > 0 && n < 1_000_000) out.push(Math.round(n * 100) / 100);
+  }
+  return out;
+}

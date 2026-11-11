@@ -1,5 +1,6 @@
 import { runReceiptOcr, type OcrHints, type OcrResult } from "@/lib/ocr";
-import { parseLineItems } from "@/lib/personal/grocery";
+import { bestItems } from "@/lib/ocr-layout";
+import { applyFlags, checkGrocery, crossCheck } from "@/lib/receipt-check";
 import type { GroceryScan } from "@/lib/ocr-ai";
 import { compressReceiptImage } from "@/lib/compress-image";
 
@@ -81,9 +82,23 @@ export async function extractReceipt(file: File, hints: OcrHints = {}): Promise<
   return { ...(await runReceiptOcr(file, hints)), aiReason: ai.reason };
 }
 
+/** A sentence for the scan note about what the checks found: empty when everything lines up. */
+export function scanNote(scan: Pick<GroceryScan, "items" | "check" | "refined">): string {
+  const flagged = scan.items.filter((i) => i.flag).length;
+  const parts: string[] = [];
+  if (scan.refined) parts.push("The AI took a second look because the numbers did not add up.");
+  if (scan.check?.issues[0]) parts.push(scan.check.issues[0]);
+  if (flagged > 0) parts.push(`${flagged} ${flagged === 1 ? "price looks" : "prices look"} uncertain.`);
+  return parts.join(" ");
+}
+
+const wait = (ms: number) => new Promise<null>((r) => setTimeout(() => r(null), ms));
+
 /**
- * Grocery receipts: AI returns every line item. Without AI the on-device OCR text is parsed into
- * items with a line-item parser, which is less exact, so the review screen always lets the user fix rows.
+ * Grocery receipts. The AI returns every line item; at the same time the on-device reader reads the same photo as an
+ * independent witness. Where both print the same price it is almost certainly right; where they differ the row is
+ * flagged. The receipt's own arithmetic (quantity x price, items = subtotal, subtotal + tax = total) is checked too.
+ * Without AI the on-device reading (rebuilt by word positions) is used, and its rows are checked and flagged the same way.
  */
 export async function extractGroceryReceipt(file: File, hints: OcrHints = {}): Promise<GroceryScan> {
   const form = new FormData();
@@ -91,17 +106,43 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}): P
   form.append("mode", "grocery");
   if (hints.currency) form.append("currency", hints.currency);
   if (hints.categories?.length) form.append("categories", JSON.stringify(hints.categories));
-  const ai = await askAi(form, (r: GroceryScan) => r.items.length > 0 || r.total != null);
-  if (ai.result) return ai.result as GroceryScan;
 
-  const ocr = await runReceiptOcr(file, hints);
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const ocrPromise = runReceiptOcr(file, hints).catch(() => null);
+  const ai = await askAi(form, (r: GroceryScan) => r.items.length > 0 || r.total != null);
+
+  if (ai.result) {
+    const scan = ai.result as GroceryScan;
+    const check = scan.check ?? checkGrocery(scan);
+    // The witness may take a little longer than the AI; do not keep the person waiting for it
+    const ocr = await Promise.race([ocrPromise, wait(offline ? 0 : 12000)]);
+    let cross: ReturnType<typeof crossCheck> | null = null;
+    if (ocr) {
+      cross = crossCheck(scan.items, { text: ocr.rawText, items: bestItems(ocr.rawText, ocr.layout, ocr.amount) });
+    }
+    applyFlags(scan.items, check.flagged, cross?.flagged ?? {});
+    const issues = [...check.issues];
+    if (cross?.trusted && cross.extra.length > 0) {
+      issues.push(`The second reader also saw ${cross.extra.length === 1 ? `a price of ${cross.extra[0].toFixed(2)}` : `${cross.extra.length} prices`} that the AI did not list.`);
+    }
+    return { ...scan, check: { ...check, issues, ok: check.ok && !(cross && Object.keys(cross.flagged).length > 0) && !(cross?.extra.length) } };
+  }
+
+  const ocr = await ocrPromise ?? (await runReceiptOcr(file, hints));
+  const items = bestItems(ocr.rawText, ocr.layout, ocr.amount);
+  const check = checkGrocery({ items, total: ocr.amount });
+  // The reader's own doubt about a price counts too
+  const doubt: Record<number, string> = {};
+  items.forEach((it, i) => { if (it.conf != null && it.conf < 70) doubt[i] = "The reader was not sure of this price"; });
+  applyFlags(items, check.flagged, doubt);
   return {
     store: ocr.merchant,
     date: ocr.date,
     total: ocr.amount,
     currency: ocr.currency,
-    items: parseLineItems(ocr.rawText),
+    items,
     source: "tesseract",
     aiReason: ai.reason,
+    check,
   };
 }

@@ -75,6 +75,10 @@ export type GroceryLine = {
   category: string;
   /** "kg" / "lb" / ... when quantity is a weight; null for counted items. */
   unit?: string | null;
+  /** Set by the scan checks: why this row deserves a second look (never saved). */
+  flag?: string;
+  /** On-device reader's confidence (0 to 100) in this row's price, when it read the photo. */
+  conf?: number;
 };
 
 /* ---------------- receipt name clean-up and weight lines ---------------- */

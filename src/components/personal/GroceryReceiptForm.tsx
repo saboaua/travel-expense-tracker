@@ -15,7 +15,7 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
-import { extractGroceryReceipt, howRead } from "@/lib/receipt-extract";
+import { extractGroceryReceipt, howRead, scanNote } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Overview, type ReceiptBundle } from "@/lib/offline-grocery";
@@ -138,7 +138,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       );
       setNote(
         r.items.length > 0
-          ? `Read ${r.items.length} items (${howRead(r)}). Check names and prices before saving.`
+          ? `Read ${r.items.length} items (${howRead(r)}). ${scanNote(r) ? `${scanNote(r)} ` : ""}Check names and prices before saving.`
           : "No items could be read. Add them below, or save just the total."
       );
     } catch {
