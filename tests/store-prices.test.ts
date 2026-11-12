@@ -41,7 +41,7 @@ async function readers() {
   const fake = (async (u: string | URL | Request) => { const url = String(u); calls.push(url); const skip = Number(/skip=(\d+)/.exec(url)![1]); return json({ total: 3, items: skip === 0 ? pages[0] : skip === 2 ? pages[1] : [] }); }) as typeof fetch;
   const r = await fetchSuperFood(fake, { pageSize: 2, pauseMs: 0 });
   eq([r.rows.map((x) => x.item_id), r.complete, calls.length], [["a", "b", "c"], true, 2], "Super Food: reads every page, stops at the total");
-  eq(/limit=2&skip=2/.test(calls[1]), true, "Super Food: asks for the next page with skip");
+  eq(/limit=2&skip=2&offset=2/.test(calls[1]), true, "Super Food: asks for the next page with skip");
   const same = (async () => json({ total: 99, items: [{ id: "a", name: "A", unit_price: 1 }, { id: "b", name: "B", unit_price: 2 }] })) as typeof fetch;
   const loop = await fetchSuperFood(same, { pageSize: 2, pauseMs: 0 });
   eq([loop.rows.length, loop.complete], [2, false], "Super Food: a shop that ignores skip does not loop, the read is marked short");

@@ -93,8 +93,8 @@ export function mapShopify(products: ShopifyProduct[], origin = "https://shop.li
 type Fetcher = typeof fetch;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-async function getJson<T>(url: string, fetcher: Fetcher): Promise<T> {
-  const res = await fetcher(url, { headers: { Accept: "application/json", "User-Agent": UA }, signal: AbortSignal.timeout(15000), cache: "no-store" } as RequestInit);
+async function getJson<T>(url: string, fetcher: Fetcher, extra: Record<string, string> = {}): Promise<T> {
+  const res = await fetcher(url, { headers: { Accept: "application/json", "User-Agent": UA, ...extra }, signal: AbortSignal.timeout(15000), cache: "no-store" } as RequestInit);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return (await res.json()) as T;
 }
@@ -109,7 +109,7 @@ export async function fetchSuperFood(fetcher: Fetcher = fetch, o: FetchLimits = 
   let firstId: string | null = null;
   for (let page = 0; page < (o.maxPages ?? 80); page++) {
     if (o.until && Date.now() > o.until) return { rows: [...rows.values()], complete: false };
-    const d = await getJson<{ items?: FreshopItem[]; total?: number }>(`https://api.freshop.com/1/products?app_key=${encodeURIComponent(key)}&limit=${size}&skip=${skip}`, fetcher);
+    const d = await getJson<{ items?: FreshopItem[]; total?: number }>(`https://api.freshop.com/1/products?app_key=${encodeURIComponent(key)}&limit=${size}&skip=${skip}&offset=${skip}`, fetcher, { Referer: "https://shop.superfoodaruba.com/" });
     const items = d.items ?? [];
     if (items.length === 0) return { rows: [...rows.values()], complete: true };
     // A page that repeats the first one means the shop ignored `skip`: stop instead of looping
