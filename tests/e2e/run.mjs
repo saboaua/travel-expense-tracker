@@ -2081,7 +2081,8 @@ try {
     await admin.page.getByRole("heading", { name: "Categories", level: 1 }).waitFor();
     const travel = admin.page.getByRole("button", { name: /^Travel/ });
     const groceries = admin.page.getByRole("button", { name: /^Groceries/ });
-    assert((await travel.getAttribute("aria-expanded")) === "true", "Travel starts open");
+    assert((await travel.getAttribute("aria-expanded")) === "false", "Travel starts collapsed like the rest");
+    await travel.click();
     await admin.page.getByText("2 receipt categories").waitFor();
     // receipts: two rows, the second can move up, the first cannot
     await admin.page.getByLabel("Move Meals up").waitFor();

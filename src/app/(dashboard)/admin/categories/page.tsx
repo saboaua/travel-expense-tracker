@@ -25,7 +25,7 @@ export default function AdminCategoriesPage() {
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts, trips and the house.</>} />
 
-      <AccordionGroup defaultOpen="travel">
+      <AccordionGroup>
         <AccordionSection id="travel" title="Travel" icon={<Briefcase />} summary={travelSummary}>
           <Tabs
             semantics="group"
