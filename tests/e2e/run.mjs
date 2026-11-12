@@ -2380,6 +2380,55 @@ try {
     }
   });
 
+  await test("tripweather: the trip's forecast sits under the Active trip card, with its states", async () => {
+    const { ctx, page } = await newPage();
+    const trip = fake.table("trips").find((t) => t.id === TRIP_ID);
+    const before = { destination: trip.destination };
+    trip.destination = "Panama City, Panama";
+    const day = (n, code, rain) => ({ date: addDays(today, n), code, hi: 31, lo: 24, rain });
+    const ok = { status: "ok", place: "Panama City", countryCode: "PA", updatedAt: new Date().toISOString(), days: [day(0, 61, 70), day(1, 95, 80), day(2, 2, 20)] };
+    let reply = ok;
+    try {
+      await page.route("**/api/trip-weather**", (r) => r.fulfill({ json: reply }));
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/`);
+      await page.getByRole("tab", { name: "Business" }).click();
+      const card = page.getByTestId("trip-weather").first();
+      await card.waitFor({ timeout: 30000 });
+      const text = await card.innerText();
+      assert(/Weather in Panama City/.test(text) && /31°/.test(text) && /24°/.test(text), "place and temperatures: " + text.slice(0, 300));
+      assert(/Pack a rain jacket: rain likely on 2 of 3 days/.test(text), "the packing sentence: " + text.slice(0, 300));
+      assert(/Today/.test(text), "today is marked");
+      const heroBox = await page.getByTestId("featured-trip").boundingBox();
+      const cardBox = await card.boundingBox();
+      assert(cardBox.y >= heroBox.y + heroBox.height - 2, "the forecast is below the trip card");
+
+      reply = { status: "early", opensOn: addDays(today, 10) };
+      await page.evaluate(() => { try { localStorage.clear(); } catch {} }); // a recent forecast is kept for 30 minutes
+      await page.reload(); await page.getByRole("tab", { name: "Business" }).click();
+      await page.getByTestId("trip-weather").first().waitFor({ timeout: 30000 });
+      assert(/Forecast opens/.test(await page.getByTestId("trip-weather").first().innerText()), "too early says when it opens");
+
+      reply = { status: "nolocation" };
+      await page.evaluate(() => { try { localStorage.clear(); } catch {} });
+      await page.reload(); await page.getByRole("tab", { name: "Business" }).click();
+      const nl = page.getByTestId("trip-weather").first();
+      await nl.waitFor({ timeout: 30000 });
+      assert(/couldn.t find/.test(await nl.innerText()), "an unknown place is explained");
+      const href = await nl.getByRole("link", { name: "Edit destination" }).getAttribute("href");
+      assert(href === `/trips/${TRIP_ID}/edit`, "Edit destination goes to the trip form: " + href);
+
+      trip.destination = null;
+      await page.reload(); await page.getByRole("tab", { name: "Business" }).click();
+      await page.getByTestId("featured-trip").waitFor({ timeout: 30000 });
+      assert((await page.getByTestId("trip-weather").count()) === 0, "no destination, no weather card");
+    } finally {
+      trip.destination = before.destination;
+      await ctx.close();
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {

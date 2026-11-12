@@ -1,6 +1,7 @@
 import { FlightLine } from "@/components/flights/FlightLine";
 import { flightLine, nextFlight, type TripFlight } from "@/lib/flights";
 import { FeaturedTripCard } from "@/components/dashboard/FeaturedTripCard";
+import { TripWeather } from "@/components/TripWeather";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 import { tripBadge } from "@/lib/trip-card";
 import Link from "next/link";
@@ -253,6 +254,7 @@ export default async function DashboardPage() {
                 const fFlights = flightsByTrip.get(featured.id) ?? [];
                 const fNext = nextFlight(fFlights, Date.now());
                 return (
+                  <>
                   <FeaturedTripCard
                     trip={featured}
                     imageUrl={destinationInfo?.imageUrl ?? null}
@@ -263,6 +265,8 @@ export default async function DashboardPage() {
                     total={fTotal}
                     count={featured.expenses?.length || 0}
                   />
+                  <TripWeather destination={featured.destination} start={featured.start_date} end={featured.end_date} today={today} editHref={`/trips/${featured.id}/edit`} />
+                  </>
                 );
               })()}
 

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { TripWeather } from "@/components/TripWeather";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
 import { ArrowDown, ArrowUp, Camera, ChevronRight, Hammer, MapPin, Plane, Plus, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -272,7 +273,8 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
             const spent = spentOn(t.id);
             const badge = tripBadge(t, today);
             return (
-              <div key={t.id} data-testid="personal-trip-card" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+              <Fragment key={t.id}>
+              <div data-testid="personal-trip-card" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <Link href={`/personal/travel/${t.id}`} className="relative block h-40 bg-gradient-to-b from-sky-500 via-sky-300 to-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Open ${t.name}`}>
                   <Plane className="absolute right-4 top-12 h-16 w-16 text-white/30" aria-hidden="true" />
                   <div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 via-transparent to-slate-900/75" />
@@ -293,6 +295,8 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                   </Link>
                 </div>
               </div>
+              {t.start_date && <TripWeather destination={t.destination ?? null} start={t.start_date} end={t.end_date ?? null} today={today} editHref={`/personal/travel/${t.id}/edit`} />}
+              </Fragment>
             );
           })}
           {homeProjects.map((p) => {
