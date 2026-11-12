@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { BUDGET_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { BUDGET_COLS, SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
+import { monthSavings, readEvent, readPlan } from "@/lib/personal/savings";
 import { readBudget, type BudgetSetting, type MonthInputs } from "@/lib/personal/budget";
 
 const monthEnd = (monthStart: string) => {
@@ -31,7 +32,14 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
     const e = await mine(supabase.from("personal_expenses").select("project_id, amount_usd").gte("expense_date", monthStart).lte("expense_date", end).limit(2000));
     projects = ((e.data ?? []) as { project_id: string; amount_usd: number | string | null }[]).filter((x) => homeIds.has(x.project_id));
   }
+  // savings plans: what they put aside this month (nothing when the tables are missing)
+  const [pl, ev] = await Promise.all([
+    mine(supabase.from("savings_plans").select(SAVINGS_PLAN_COLS).limit(100)),
+    mine(supabase.from("savings_events").select(SAVINGS_EVENT_COLS).limit(1000)),
+  ]);
+  const savings = pl.error || ev.error ? [] : monthSavings(((pl.data ?? []) as unknown as Parameters<typeof readPlan>[0][]).map(readPlan), ((ev.data ?? []) as unknown as Parameters<typeof readEvent>[0][]).map(readEvent), monthStart);
   return {
+    savings,
     groceries: g.error ? [] : (g.data ?? []),
     utilities: u.error ? [] : ((u.data ?? []) as MonthInputs["utilities"]),
     spends: s.error ? [] : ((s.data ?? []) as unknown as MonthInputs["spends"]),

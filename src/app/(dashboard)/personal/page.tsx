@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
+import { PiggyBank, ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
@@ -15,9 +15,11 @@ import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { BudgetCard } from "@/components/personal/BudgetCard";
+import { fetchSavings } from "@/lib/personal/savings-data";
+import { savedSoFar } from "@/lib/personal/savings";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null };
+type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; savings: { saved: number; monthly: number; currency: string; plans: number } | null };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -56,7 +58,7 @@ export default function PersonalHubPage() {
       if (flag && flag.personal_enabled === false) return setEnabled(false);
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
-      const [g, p, d, l, q, lk, u] = await Promise.all([
+      const [g, p, d, l, q, lk, u, sv] = await Promise.all([
         withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
@@ -64,8 +66,11 @@ export default function PersonalHubPage() {
         supabase.from("personal_spends").select("amount, currency").gte("expense_date", monthStart).limit(2000),
         fetchLinkedSpends(supabase),
         supabase.from("utility_bills").select("amount_usd").eq("bill_month", monthStart).limit(200),
+        fetchSavings(supabase),
       ]);
-      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data), utilities: u.error ? null : { total: (u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0), count: (u.data ?? []).length } });
+      const today = todayISO();
+      const savings = sv.failed || sv.plans.length === 0 ? null : { plans: sv.plans.length, currency: sv.plans[0].currency, saved: Math.round(sv.plans.filter((x) => x.currency === sv.plans[0].currency).reduce((t, x) => t + savedSoFar(x, sv.events, today), 0) * 100) / 100, monthly: sv.plans.filter((x) => x.currency === sv.plans[0].currency && !x.paused_on && (!x.end_date || x.end_date >= today)).reduce((t, x) => t + x.amount, 0) };
+      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data), utilities: u.error ? null : { total: (u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0), count: (u.data ?? []).length }, savings });
     })();
   }, []);
 
@@ -103,6 +108,8 @@ export default function PersonalHubPage() {
   const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; text: string; strong: boolean }[] = [
     { href: "/personal/spend", title: "Quick spend", icon: Coins, strong: !!stats?.spends,
       text: !stats ? "\u00a0" : stats.spends ? `${formatCurrency(stats.spends.total, stats.spends.currency)} this month \u00b7 ${plural(stats.spends.count, "spend")}` : "Coffee, street food, anything with no receipt" },
+    { href: "/personal/savings", title: "Savings", icon: PiggyBank, strong: !!stats?.savings,
+      text: !stats ? "\u00a0" : stats.savings ? `${formatCurrency(stats.savings.saved, stats.savings.currency)} saved \u00b7 ${formatCurrency(stats.savings.monthly, stats.savings.currency)} a month` : "Put money aside every month" },
     { href: "/personal/utilities", title: "Utilities", icon: Zap, strong: !!stats?.utilities?.count,
       text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(Math.round(stats.utilities.total * 100) / 100, "USD")} this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
     { href: "/personal/projects", title: "Home Projects", icon: Hammer, strong: !!stats && stats.projects.count > 0,

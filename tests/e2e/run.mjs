@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1064,6 +1064,66 @@ try {
       await ctx.close();
       fake.table("personal_budgets").splice(0);
       for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
+    }
+  });
+
+  await test("savings: a plan starts from what is already saved, counts its months, can skip, add extra and pause, and shows in the budget", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const first = new Date(); first.setUTCDate(1); first.setUTCMonth(first.getUTCMonth() - 2);
+      fake.table("personal_budgets").push({ id: "7d000000-0000-4000-8000-00000000d001", user_id: PAT, month: null, amount: 1000, currency: "AWG", limits: {}, alert_at_80: false });
+      await page.goto(`${BASE}/personal/savings`);
+      await page.getByTestId("savings-empty").waitFor();
+      await page.getByTestId("savings-add").click();
+      await page.waitForURL((u) => u.pathname === "/personal/savings/add");
+      await page.locator("#sv-name").fill("Emergency fund");
+      await page.locator("#sv-amount").fill("200");
+      await page.locator("#sv-start").fill(first.toISOString().slice(0, 10));
+      await page.getByRole("switch", { name: "I already have savings" }).click();
+      await page.locator("#sv-opening").fill("1000");
+      await page.getByRole("switch", { name: "Savings goal" }).click();
+      await page.getByLabel("Goal amount").fill("5000");
+      await page.getByTestId("savings-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal/savings");
+      await page.getByTestId("savings-plan").waitFor();
+      const plan = fake.table("savings_plans").find((r) => r.user_id === PAT);
+      assert(plan && plan.name === "Emergency fund" && plan.amount === 200 && plan.opening_balance === 1000 && plan.goal === 5000 && plan.end_date == null, "the plan is saved with its amount, start balance and goal: " + JSON.stringify(plan));
+      assert(/1,600/.test(await page.getByTestId("savings-total").textContent()), "1,000 already saved plus three months of 200 is 1,600: " + (await page.getByTestId("savings-total").textContent()));
+      await page.getByTestId("savings-plan").click();
+      await page.waitForURL((u) => u.pathname === "/personal/savings/plan");
+      await page.getByTestId("plan-deposit").first().waitFor();
+      assert(/1,600/.test(await page.getByTestId("plan-saved").textContent()), "the plan shows 1,600 saved");
+      assert((await page.locator("[data-testid=plan-deposit][data-status=counted]").count()) === 3, "three months are counted");
+      // skip the next month, then undo it
+      await page.getByTestId("plan-skip").click();
+      await page.locator("[data-testid=plan-deposit][data-status=skipped]").waitFor();
+      await page.getByTestId("plan-unskip").click();
+      await page.locator("[data-testid=plan-deposit][data-status=skipped]").waitFor({ state: "detached" });
+      // an extra deposit counts right away
+      await page.getByTestId("plan-extra").click();
+      await page.locator("#plan-extra-amount").fill("50");
+      await page.getByTestId("plan-extra-save").click();
+      await page.waitForFunction(() => /1,650/.test(document.querySelector("[data-testid=plan-saved]")?.textContent ?? ""));
+      assert(fake.table("savings_events").some((r) => r.kind === "extra" && r.amount === 50), "the extra deposit is saved");
+      // the budget counts this month's 200 and the extra 50 in its own Savings line, and Personal has the tile
+      await page.goto(`${BASE}/personal`);
+      await page.getByTestId("budget-area-savings").waitFor();
+      assert(/250/.test(await page.getByTestId("budget-area-savings").textContent()), "Savings in the budget is 250: " + (await page.getByTestId("budget-area-savings").textContent()));
+      assert(/1,650\.00 saved/.test(await page.locator("a[href='/personal/savings']").first().textContent()), "the Savings tile shows the total saved");
+      // pause stops deposits
+      await page.goto(`${BASE}/personal/savings`);
+      await page.getByTestId("savings-plan").click();
+      await page.getByTestId("plan-pause").click();
+      await page.waitForFunction(() => /Resume plan/.test(document.querySelector("[data-testid=plan-pause]")?.textContent ?? ""));
+      assert(fake.table("savings_plans")[0].paused_on, "the pause date is saved");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["savings_plans", "savings_events", "personal_budgets"]) fake.table(t).splice(0);
     }
   });
 
@@ -2114,10 +2174,10 @@ try {
     assert((await admin.page.getByText("0 active").count()) === 0, "empty tiles no longer read '0 active'");
     await admin.page.getByText("Keep handy").waitFor();
     assert((await admin.page.getByRole("link", { name: /Documents/ }).count()) > 0 && (await admin.page.getByRole("link", { name: /Loyalty cards/ }).count()) > 0, "Documents and Loyalty cards are listed");
-    // on a phone the items (six for an admin, with Subscriptions) are within about one and a half screens: the last one starts above 1100px
+    // on a phone the tiles (now with Savings, and Subscriptions for an admin) are within about one and a half screens: the last one starts above 1200px
     await admin.page.setViewportSize({ width: 390, height: 844 });
     const top = await admin.page.getByRole("link", { name: /Loyalty cards/ }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
-    assert(top < 1100, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
+    assert(top < 1200, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
     await admin.page.setViewportSize({ width: 1280, height: 720 });
   });
 

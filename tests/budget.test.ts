@@ -31,17 +31,20 @@ const spent = spentByArea({
   ],
   projects: [{ amount_usd: 10 }],
 }, "AWG");
-eq(spent, { groceries: 179 + 17.9, utilities: 179, quick: 4.5, house: 90 + 36 + 17.9 + 17.9 }, "each area adds up in the budget currency; house takes House spends, project and area ones, and project costs");
+eq(spent, { groceries: 179 + 17.9, utilities: 179, quick: 4.5, house: 90 + 36 + 17.9 + 17.9, savings: 0 }, "each area adds up in the budget currency; house takes House spends, project and area ones, and project costs");
 eq(spentByArea({ groceries: [{ total: 358, currency: "AWG" }], utilities: [], spends: [], projects: [] }, "USD").groceries, 200, "a USD budget converts AWG down");
 
 eq([budgetState(1000, 2000), budgetState(1600, 2000), budgetState(2000, 2000), budgetState(2001, 2000)], ["ok", "near", "near", "over"], "ok under 80%, near from 80%, over only above the budget");
 
-const v = budgetView(every, { groceries: 512, utilities: 318, quick: 164, house: 290 }, "2026-11-12");
+const v = budgetView(every, { groceries: 512, utilities: 318, quick: 164, house: 290, savings: 0 }, "2026-11-12");
 eq([v.spent, v.left, v.over, v.state, v.daysLeft, v.perDay], [1284, 716, 0, "ok", 19, 38], "the view: spent, left, days left and about how much a day");
 eq(v.pace, 11 / 30, "pace is how far through the month it is");
-const o = budgetView(every, { groceries: 1000, utilities: 500, quick: 400, house: 240 }, "2026-11-30");
+const o = budgetView(every, { groceries: 1000, utilities: 500, quick: 400, house: 240, savings: 0 }, "2026-11-30");
 eq([o.spent, o.left, o.over, o.state, o.perDay], [2140, 0, 140, "over", null], "over budget: how much over, nothing a day");
 eq(daysInMonthOf("2028-02-10"), 29, "leap years count");
+const withSavings = spentByArea({ groceries: [], utilities: [], spends: [], projects: [], savings: [{ amount: 200, currency: "AWG" }, { amount: 100, currency: "USD" }] }, "AWG");
+eq(withSavings.savings, 200 + 179, "savings plans count in their own line, converted to the budget currency");
+eq(budgetView(every, { groceries: 0, utilities: 0, quick: 0, house: 0, savings: 300 }, "2026-11-12").spent, 300, "savings count toward what you spent against the budget");
 eq(BUDGET_AREAS.map((a) => a.key), ["groceries", "utilities", "quick", "house"], "four areas");
 
 eq(pushMessage("budget", { item: "near" }, "details").body, "You have used most of this month's budget.", "the alert says most of it is used, never an amount");

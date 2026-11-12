@@ -47,6 +47,8 @@ check("PERSONAL_PROJECT_COLS", "personal_projects", C.PERSONAL_PROJECT_COLS);
 check("PERSONAL_SPEND_COLS", "personal_spends", C.PERSONAL_SPEND_COLS);
 check("UTILITY_BILL_COLS", "utility_bills", C.UTILITY_BILL_COLS);
 check("BUDGET_COLS", "personal_budgets", C.BUDGET_COLS);
+check("SAVINGS_PLAN_COLS", "savings_plans", C.SAVINGS_PLAN_COLS);
+check("SAVINGS_EVENT_COLS", "savings_events", C.SAVINGS_EVENT_COLS);
 check("PERSONAL_SPEND_COLS_MID", "personal_spends", C.PERSONAL_SPEND_COLS_MID);
 check("PERSONAL_SPEND_COLS_BASE", "personal_spends", C.PERSONAL_SPEND_COLS_BASE);
 check("PERSONAL_EXPENSE_COLS", "personal_expenses", C.PERSONAL_EXPENSE_COLS);
