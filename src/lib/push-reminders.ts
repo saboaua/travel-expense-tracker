@@ -5,6 +5,7 @@ import { clockText } from "@/lib/push-text";
 import { documentTier, type ReminderDoc } from "@/lib/telegram-reminders";
 import { kindLabel } from "@/lib/documents";
 import { addDaysISO } from "@/lib/utils";
+import { kindLabel as utilityLabel, missingKinds, monthStart } from "@/lib/personal/utilities";
 
 const missing = (m: string) => /does not exist|schema cache/i.test(m);
 const daysTo = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
@@ -67,6 +68,24 @@ export async function documentsExpiring(db: SupabaseClient, today: string): Prom
     if (!step) continue;
     if (!(await claimOnce(d.user_id, `doc:${d.id}:${d.expiry_date}:${step.tier}`))) continue;
     n += await sendPush(d.user_id, "document", "documents", { label: kindLabel(d.kind), days: step.days, date: d.expiry_date }, { today });
+  }
+  return n;
+}
+
+/** On the day of the month each person chose: lists the utilities they usually pay that have no bill yet this month. Once per person per month. */
+export async function utilityReminders(db: SupabaseClient, today: string): Promise<number> {
+  const day = Number(today.slice(8, 10));
+  const prefs = await db.from("utility_prefs").select("user_id").eq("remind_day", day).limit(5000);
+  if (prefs.error) { if (missing(prefs.error.message)) return 0; throw new Error(prefs.error.message); }
+  const month = monthStart(today);
+  let n = 0;
+  for (const p of (prefs.data ?? []) as { user_id: string }[]) {
+    const bills = await db.from("utility_bills").select("kind, bill_month").eq("user_id", p.user_id).limit(2000);
+    if (bills.error) { if (missing(bills.error.message)) return n; throw new Error(bills.error.message); }
+    const kinds = missingKinds((bills.data ?? []) as { kind: string; bill_month: string }[], month);
+    if (!kinds.length) continue;
+    if (!(await claimOnce(p.user_id, `utility:${month}`))) continue;
+    n += await sendPush(p.user_id, "utility", "reminders", { item: kinds.map(utilityLabel).join(", ") }, { today });
   }
   return n;
 }

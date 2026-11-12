@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "utility_bills", "utility_prefs", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -995,6 +995,63 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["personal_spends", "personal_projects", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || (t === "personal_projects" && a[i].name === "Kitchen remodel") || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
+    }
+  });
+
+  await test("utilities: a bill is added by hand, shown paid for the month, traced in its history and a reminder day is saved", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // an earlier phone bill, so the month shows "No bill yet" for it
+      const lastMonth = new Date(); lastMonth.setUTCDate(1); lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+      fake.table("utility_bills").push({ id: "7b000000-0000-4000-8000-00000000b001", user_id: PAT, kind: "phone", provider: "SETAR", bill_month: lastMonth.toISOString().slice(0, 10), amount: 60, currency: "AWG", exchange_rate: 0.558659, amount_usd: 33.52, paid_on: lastMonth.toISOString().slice(0, 10), due_date: null, receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/personal`);
+      await page.getByRole("link", { name: /Utilities/ }).first().click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities");
+      await page.getByTestId("util-row").first().waitFor();
+      assert(/No bill yet/.test(await page.getByTestId("util-list").textContent()), "a utility paid before shows No bill yet this month");
+      await page.getByTestId("util-add").click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities/add");
+      await page.getByRole("button", { name: "Water", exact: true }).click();
+      await page.locator("#ub-provider").fill("WEB Aruba");
+      await page.locator("#ub-amount").fill("120");
+      await page.getByTestId("util-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities");
+      await page.getByTestId("util-row").first().waitFor();
+      const saved = fake.table("utility_bills").find((r) => r.kind === "water");
+      assert(saved && saved.amount === 120 && saved.currency === "AWG" && saved.provider === "WEB Aruba" && saved.paid_on && /-01$/.test(saved.bill_month), "the bill is saved with its amount, company, month start and payment date: " + JSON.stringify(saved));
+      const list = await page.getByTestId("util-list").textContent();
+      assert(/Water/.test(list) && /Paid/.test(list) && /WEB Aruba/.test(list), "the month lists water as paid with its company");
+      assert(/\$6\d\.\d\d/.test(await page.getByTestId("util-total").textContent()), "the month total is in USD");
+      await page.getByTestId("util-row").filter({ hasText: "Water" }).getByRole("link").click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities/history");
+      await page.getByTestId("util-bill").first().waitFor();
+      assert(/WEB Aruba/.test(await page.getByTestId("util-history").textContent()), "the history lists the bill");
+      assert((await page.getByTestId("util-highest").textContent()).includes("67.0"), "the highest month is shown");
+      // change the bill to not paid, with a due date
+      await page.getByRole("link", { name: /Change .* bill/ }).first().click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities/add");
+      await page.locator("#ub-amount").waitFor();
+      await page.waitForFunction(() => document.querySelector("#ub-amount").value === "120");
+      await page.getByRole("button", { name: "Not paid yet" }).click();
+      await page.locator("#ub-due").fill(new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10));
+      await page.getByTestId("util-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities");
+      await page.getByTestId("util-row").first().waitFor();
+      await page.waitForFunction(() => /Not paid yet/.test(document.querySelector("[data-testid=util-list]").textContent));
+      assert(fake.table("utility_bills").filter((r) => r.kind === "water").length === 1 && fake.table("utility_bills").find((r) => r.kind === "water").paid_on == null, "changing the bill updates the same row");
+      // reminder day
+      await page.getByTestId("util-remind").click();
+      await page.locator("#util-day").selectOption("5");
+      await page.getByTestId("util-remind-saved").waitFor();
+      assert(fake.table("utility_prefs").some((r) => r.user_id === PAT && Number(r.remind_day) === 5), "the reminder day is saved");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["utility_bills", "utility_prefs"]) fake.table(t).splice(0);
     }
   });
 

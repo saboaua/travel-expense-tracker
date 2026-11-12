@@ -18,6 +18,7 @@ export const PUSH_TEXT = {
   flightTomorrow: { title: "Lifolio", body: "You have a flight tomorrow. Open the app to check it." },
   afterTrip: { title: "Lifolio", body: "A trip has ended. Open the app to add your last receipts." },
   document: { title: "Lifolio", body: "A document is about to expire. Open the app to check it." },
+  utility: { title: "Lifolio", body: "Time to add your utility bills for this month." },
   support: { title: "Lifolio", body: "A new support request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
@@ -100,6 +101,10 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
       const n = d.days;
       const when = n < 0 ? `expired ${-n} day${n === -1 ? "" : "s"} ago` : n === 0 ? "expires today" : n < 90 ? `expires in ${n} day${n === 1 ? "" : "s"}` : `expires in about ${Math.round(n / 30.4)} months`;
       return `Your ${label} ${when}${d.date ? ` (${shortDate(d.date, today)})` : ""}.`;
+    }
+    case "utility": {
+      const names = clean(d.item, 80);
+      return names ? `Add this month's bills: ${names}.` : null;
     }
     case "support": {
       const subject = clean(d.subject, 60);
