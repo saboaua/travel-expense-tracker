@@ -5,6 +5,8 @@ import { clockText } from "@/lib/push-text";
 import { documentTier, type ReminderDoc } from "@/lib/telegram-reminders";
 import { kindLabel } from "@/lib/documents";
 import { addDaysISO } from "@/lib/utils";
+import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
+import { fetchMonthInputs } from "@/lib/personal/budget-data";
 import { kindLabel as utilityLabel, missingKinds, monthStart } from "@/lib/personal/utilities";
 
 const missing = (m: string) => /does not exist|schema cache/i.test(m);
@@ -86,6 +88,26 @@ export async function utilityReminders(db: SupabaseClient, today: string): Promi
     if (!kinds.length) continue;
     if (!(await claimOnce(p.user_id, `utility:${month}`))) continue;
     n += await sendPush(p.user_id, "utility", "reminders", { item: kinds.map(utilityLabel).join(", ") }, { today });
+  }
+  return n;
+}
+
+/** Once a month at 80% of the budget, and once more if it goes over, for people who turned the alert on. The words never carry an amount. */
+export async function budgetAlerts(db: SupabaseClient, today: string): Promise<number> {
+  const month = monthStart(today);
+  const res = await db.from("personal_budgets").select("user_id, month, amount, currency, limits, alert_at_80").eq("alert_at_80", true).limit(5000);
+  if (res.error) { if (missing(res.error.message)) return 0; throw new Error(res.error.message); }
+  const byUser = new Map<string, ReturnType<typeof readBudget>[]>();
+  for (const r of (res.data ?? []) as (Parameters<typeof readBudget>[0] & { user_id: string })[]) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), readBudget(r)]);
+  let n = 0;
+  for (const [userId, rows] of byUser) {
+    const setting = pickBudget(rows, month);
+    if (!setting) continue;
+    const view = budgetView(setting, spentByArea(await fetchMonthInputs(db, month, userId), setting.currency), today);
+    const state = budgetState(view.spent, view.budget);
+    if (state === "ok") continue;
+    if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;
+    n += await sendPush(userId, "budget", "reminders", { item: state }, { today });
   }
   return n;
 }

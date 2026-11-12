@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -986,7 +986,7 @@ try {
       await page.getByRole("button", { name: "House", exact: true }).click();
       await page.locator("#qs-project optgroup[label='Areas of the house'] option").first().waitFor({ state: "attached" });
       await page.locator("#qs-project optgroup[label='Your home projects'] option").first().waitFor({ state: "attached" });
-      assert((await page.locator("#qs-project optgroup[label='Your home projects'] option").count()) === 1, "your project is in the first group");
+      assert((await page.locator("#qs-project optgroup[label='Your home projects'] option", { hasText: "Kitchen remodel" }).count()) === 1, "your project is in the first group");
       await page.locator("#qs-project").selectOption("area:Bathroom");
       await page.getByTestId("quick-spend-save").click();
       await page.getByTestId("quick-spend-done").waitFor();
@@ -1013,6 +1013,57 @@ try {
       await ctx.close();
       fake.table("house_areas").splice(0);
       for (const t of ["personal_spends", "personal_projects", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || (t === "personal_projects" && a[i].name === "Kitchen remodel") || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
+    }
+  });
+
+  await test("budget: a monthly budget is set with an area limit, and the Personal card shows what is left and which area is over", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const stash = {};
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const today = new Date().toISOString().slice(0, 10);
+      // start from an empty month, whatever earlier tests left behind; put it all back afterwards
+      for (const t of ["grocery_receipts", "personal_spends", "utility_bills", "personal_expenses"]) { stash[t] = fake.table(t).splice(0); }
+      fake.table("grocery_receipts").push({ id: "7c000000-0000-4000-8000-00000000c001", user_id: PAT, store: "Budget Market", purchase_date: today, total: 179, currency: "AWG", prices_only: false, created_at: new Date().toISOString() });
+      fake.table("personal_spends").push({ id: "7c000000-0000-4000-8000-00000000c002", user_id: PAT, merchant: "Hinge", amount: 90, currency: "AWG", exchange_rate: 0.558659, amount_usd: 50.28, category: "House", expense_date: today, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/personal`);
+      await page.getByTestId("budget-empty").waitFor();
+      await page.getByTestId("budget-empty").click();
+      await page.waitForURL((u) => u.pathname === "/personal/budget");
+      await page.locator("#bg-amount").fill("1000");
+      await page.getByRole("switch", { name: "Limits for each area" }).click();
+      await page.locator("#bg-limit-groceries").fill("150");
+      await page.locator("#bg-limit-house").fill("500");
+      await page.getByRole("switch", { name: "Tell me at 80%" }).click();
+      await page.getByTestId("budget-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal");
+      await page.getByTestId("budget-card").waitFor();
+      const saved = fake.table("personal_budgets").find((r) => r.user_id === PAT);
+      assert(saved && saved.amount === 1000 && saved.currency === "AWG" && saved.month == null && saved.alert_at_80 === true && saved.limits.groceries === 150 && saved.limits.house === 500 && saved.limits.utilities == null, "the budget is saved for every month with its limits: " + JSON.stringify(saved));
+      assert((await page.getByTestId("budget-card").getAttribute("data-state")) === "ok", "269 of 1,000 is on track");
+      assert(/731/.test(await page.getByTestId("budget-headline").textContent()), "731 is left: " + (await page.getByTestId("budget-headline").textContent()));
+      assert(/269/.test(await page.getByTestId("budget-line").textContent()), "269 spent is shown");
+      assert((await page.getByTestId("budget-area-bar-groceries").getAttribute("data-over")) === "true", "groceries (179 of 150) is over its limit");
+      assert((await page.getByTestId("budget-area-bar-house").getAttribute("data-over")) === null, "the house (90 of 500) is not");
+      assert(/no limit/.test(await page.getByTestId("budget-area-quick").textContent()), "an area with no limit says so");
+      // a smaller budget for just this month turns the card over
+      await page.getByTestId("budget-set-link").click();
+      await page.waitForURL((u) => u.pathname === "/personal/budget");
+      await page.getByRole("button", { name: /^Only / }).click();
+      await page.locator("#bg-amount").fill("200");
+      await page.getByTestId("budget-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal");
+      await page.waitForFunction(() => document.querySelector("[data-testid=budget-card]")?.getAttribute("data-state") === "over");
+      assert(fake.table("personal_budgets").length === 2 && fake.table("personal_budgets").some((r) => r.month), "a second budget is kept for this month only");
+      assert(/69/.test(await page.getByTestId("budget-headline").textContent()), "69 over is shown: " + (await page.getByTestId("budget-headline").textContent()));
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      fake.table("personal_budgets").splice(0);
+      for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
     }
   });
 

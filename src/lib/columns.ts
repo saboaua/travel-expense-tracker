@@ -27,6 +27,7 @@ export const PERSONAL_EXPENSE_COLS = "id, project_id, merchant, amount, currency
 
 export const GROCERY_RECEIPT_COLS_BASE = "id, store, purchase_date, total, currency, receipt_path, notes";
 export const GROCERY_RECEIPT_COLS = `${GROCERY_RECEIPT_COLS_BASE}, prices_only`;
+export const BUDGET_COLS = "id, month, amount, currency, limits, alert_at_80";
 export const PRICE_CHECK_COLS = "id, product, store, price, currency, size, seen_on, photo_path, notes";
 export const GROCERY_ITEM_COLS = "id, name, category, quantity, unit_price, unit, line_total";
 

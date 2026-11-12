@@ -7,7 +7,7 @@ import { inQuietHours, localHour } from "@/lib/telegram-notify";
 export { DEFAULT_PUSH_PREFS, PUSH_TEXT };
 export type { PushPref, PushPrefs, PushSettings, PushData, PushKind };
 
-const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", flight: "/trips", flightTomorrow: "/trips", afterTrip: "/trips", document: "/documents", utility: "/personal/utilities", support: "/admin/support", invite: "/profile#sharing", accepted: "/profile#sharing", shared: "/trips", unshared: "/trips" };
+const PUSH_URL: Partial<Record<PushKind, string>> = { subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", flight: "/trips", flightTomorrow: "/trips", afterTrip: "/trips", document: "/documents", utility: "/personal/utilities", budget: "/personal/budget", support: "/admin/support", invite: "/profile#sharing", accepted: "/profile#sharing", shared: "/trips", unshared: "/trips" };
 
 export function pushConfigured(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);

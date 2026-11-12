@@ -14,6 +14,7 @@ import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
+import { BudgetCard } from "@/components/personal/BudgetCard";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
 type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null };
@@ -128,6 +129,7 @@ export default function PersonalHubPage() {
       <div className="min-w-0 space-y-4">
       <p className={`${label} pt-2`}>Spending</p>
       <div className="grid gap-4 md:grid-cols-2">
+        <BudgetCard />
         {/* Groceries leads: the month total is the number, with the two things done most often one tap away */}
         <Card className="flex flex-col justify-between rounded-2xl lg:col-span-2 lg:flex-row lg:items-center lg:gap-6">
           <div className="flex flex-col justify-between gap-1 lg:min-w-0 lg:flex-1">
