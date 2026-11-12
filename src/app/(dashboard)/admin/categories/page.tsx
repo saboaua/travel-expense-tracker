@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Briefcase, ShoppingBasket } from "lucide-react";
+import { Briefcase, Home, ShoppingBasket } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
@@ -15,7 +15,7 @@ const TRAVEL_TABS = [
 /** All category lists in one place: Travel (receipt categories and trip types) and Groceries. One section open at a time. */
 export default function AdminCategoriesPage() {
   const [tab, setTab] = useState<(typeof TRAVEL_TABS)[number]["id"]>("receipts");
-  const [counts, setCounts] = useState<{ receipts?: number; trips?: number; grocery?: number }>({});
+  const [counts, setCounts] = useState<{ receipts?: number; trips?: number; grocery?: number; house?: number }>({});
 
   const n = (v: number | undefined, one: string, many: string) => (v === undefined ? null : `${v} ${v === 1 ? one : many}`);
   const travelSummary = [n(counts.receipts, "receipt category", "receipt categories"), n(counts.trips, "trip type", "trip types")].filter(Boolean).join(" · ") || "Receipt categories and trip types";
@@ -23,7 +23,7 @@ export default function AdminCategoriesPage() {
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
       <BackLink href="/admin/settings">Global Settings</BackLink>
-      <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts and trips.</>} />
+      <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts, trips and the house.</>} />
 
       <AccordionGroup defaultOpen="travel">
         <AccordionSection id="travel" title="Travel" icon={<Briefcase />} summary={travelSummary}>
@@ -72,6 +72,19 @@ export default function AdminCategoriesPage() {
             deleteWarning="Delete this category? Existing grocery items will keep the old name."
             defaultIcon="shopping-basket"
             onCount={(v) => setCounts((c) => ({ ...c, grocery: v }))}
+          />
+        </AccordionSection>
+
+        <AccordionSection id="house" title="House areas" icon={<Home />} summary={n(counts.house, "area", "areas") ?? "Areas of the house"}>
+          <CategoryManager
+            table="house_areas"
+            noun="house area"
+            subtitle="Shown in the Quick spend dropdown when the category is House, next to the home projects. Disabled ones are hidden from new spends."
+            addTitle="Add a house area"
+            addPlaceholder="e.g. Garage"
+            deleteWarning="Delete this area? Spends you already saved keep the name."
+            defaultIcon="home"
+            onCount={(v) => setCounts((c) => ({ ...c, house: v }))}
           />
         </AccordionSection>
       </AccordionGroup>

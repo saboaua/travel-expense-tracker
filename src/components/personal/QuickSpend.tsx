@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
-import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
+import { useHouseAreas } from "@/lib/use-categories";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
-import { parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
+import { AREA_PREFIX, houseTarget, parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
@@ -47,6 +48,7 @@ export function QuickSpend() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const isHouse = category === "House";
+  const areas = useHouseAreas();
   useEffect(() => {
     createClient().from("personal_projects").select("id, name").eq("kind", "home_project").eq("status", "active").order("created_at", { ascending: false }).limit(50)
       .then(({ data }) => setProjects((data ?? []) as { id: string; name: string }[]));
@@ -58,7 +60,7 @@ export function QuickSpend() {
     const uid = session?.user.id;
     if (!uid) return;
     const since = addDaysISO(todayISO(), -60);
-    const { data, error: e } = await withColumnFallback((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", since).order("expense_date", { ascending: false }).order("created_at", { ascending: false }).limit(300), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE);
+    const { data, error: e } = await withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", since).order("expense_date", { ascending: false }).order("created_at", { ascending: false }).limit(300), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE);
     const waiting = (await browserOutbox.list().catch(() => []))
       .filter((i) => isRowSave(i) && i.table === "personal_spends" && i.isNew)
       .map((i) => ({ id: i.id, ...(isRowSave(i) ? i.row : {}), waiting: true }) as unknown as Listed);
@@ -87,8 +89,8 @@ export function QuickSpend() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user.id;
       if (!uid) throw new Error("Sign in again to save.");
-      // Only sent when chosen, so a database without the House migration still saves everything else
-      const house = isHouse && projectId ? { project_id: projectId } : {};
+      // Only sent when chosen, so a database without the House migrations still saves everything else
+      const house = isHouse ? houseTarget(projectId) : {};
       const row = { merchant: what.trim() || null, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum), category, expense_date: date, notes: notes.trim() || null, ...house };
       const withPhoto = isHouse ? file : null;
       const r = await saveRow({
@@ -180,10 +182,11 @@ export function QuickSpend() {
           <div className="space-y-3 border-t pt-3" data-testid="house-extras">
             <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">For the house</p>
             <div>
-              <label htmlFor="qs-project" className={label}>Part of a home project <span className="font-normal text-muted-foreground">(optional)</span></label>
+              <label htmlFor="qs-project" className={label}>Part of a project or an area <span className="font-normal text-muted-foreground">(optional)</span></label>
               <Select id="qs-project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                 <option value="">None: just a repair</option>
-                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                {projects.length > 0 && <optgroup label="Your home projects">{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}
+                {areas.length > 0 && <optgroup label="Areas of the house">{areas.map((a) => <option key={a.name} value={`${AREA_PREFIX}${a.name}`}>{a.name}</option>)}</optgroup>}
               </Select>
             </div>
             <div>

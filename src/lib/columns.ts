@@ -21,7 +21,8 @@ export const EXPENSE_COLS = "id, merchant, amount, currency, exchange_rate, amou
 export const PERSONAL_PROJECT_COLS = "id, user_id, kind, name, destination, description, start_date, end_date, budget, currency, status, created_at";
 export const PERSONAL_SPEND_COLS_BASE = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes";
 export const UTILITY_BILL_COLS = "id, kind, provider, bill_month, amount, currency, exchange_rate, amount_usd, paid_on, due_date, receipt_path, notes";
-export const PERSONAL_SPEND_COLS = `${PERSONAL_SPEND_COLS_BASE}, project_id, receipt_path`;
+export const PERSONAL_SPEND_COLS_MID = `${PERSONAL_SPEND_COLS_BASE}, project_id, receipt_path`;
+export const PERSONAL_SPEND_COLS = `${PERSONAL_SPEND_COLS_MID}, house_area`;
 export const PERSONAL_EXPENSE_COLS = "id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
 export const GROCERY_RECEIPT_COLS_BASE = "id, store, purchase_date, total, currency, receipt_path, notes";

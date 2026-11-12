@@ -1,7 +1,7 @@
 import {
   Briefcase, Building2, Car, BedDouble, FileText, Fuel, GraduationCap, MapPin, Paperclip,
   Plane, Presentation, ShoppingBag, Coffee, Tag, Ticket, Train, Users, Utensils, Wrench, Phone, Gift,
-  Apple, Beef, Milk, Croissant, Wheat, CupSoda, Cookie, Snowflake, SprayCan, Droplets, ShoppingBasket,
+  Apple, Beef, Milk, Croissant, Wheat, CupSoda, Cookie, Snowflake, SprayCan, Droplets, ShoppingBasket, Home,
   type LucideIcon,
 } from "lucide-react";
 
@@ -38,6 +38,7 @@ const ICONS: Record<string, LucideIcon> = {
   "spray-can": SprayCan,
   droplets: Droplets,
   "shopping-basket": ShoppingBasket,
+  home: Home,
 };
 
 export const ICON_KEYS = Object.keys(ICONS);

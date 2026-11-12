@@ -1,4 +1,4 @@
-import { filterHouse, houseSpends, houseTotalUsd, parseAmount, recentNames, summarizeSpends, type SpendRow } from "../src/lib/personal/quick-spend";
+import { AREA_PREFIX, filterHouse, houseTarget, houseSpends, houseTotalUsd, parseAmount, recentNames, summarizeSpends, type SpendRow } from "../src/lib/personal/quick-spend";
 import { withLinkedTotals } from "../src/lib/offline-personal";
 
 let failed = 0;
@@ -33,6 +33,18 @@ const projects = [{ id: "p1", personal_expenses: [{ amount_usd: 10 }] }, { id: "
 const merged = withLinkedTotals(projects, [{ project_id: "p1", amount_usd: 60 }, { project_id: "p1", amount_usd: 49 }]);
 eq([merged[0].personal_expenses?.length, merged[0].personal_expenses?.reduce((s, e) => s + Number(e.amount_usd), 0), merged[1].personal_expenses?.length], [3, 119, 0], "attached spends count in the project's total and number");
 eq(withLinkedTotals(projects, []), projects, "no attached spends leaves the projects as they are");
+
+const withArea: SpendRow[] = [
+  row("a1", "Tile grout", 38, "2026-10-09", "House", { house_area: "Bathroom" }),
+  row("a2", "Roof sealant", 113.5, "2026-09-02", "Other", { house_area: "Roof" }),
+  row("a3", "Door lock", 54.5, "2026-11-03", "House"),
+  row("a4", "Faucet", 120, "2026-10-21", "House", { project_id: "p1" }),
+];
+const ya = houseSpends(withArea, "2026");
+eq(ya.length, 4, "a spend with an area counts as House even when its category is Other");
+eq(filterHouse(ya, `${AREA_PREFIX}Bathroom`).map((r) => r.id), ["a1"], "filter by an area");
+eq(filterHouse(ya, "none").map((r) => r.id), ["a3"], "no project and no area is the loose repairs");
+eq([houseTarget(""), houseTarget("p1"), houseTarget("area:Roof")], [{}, { project_id: "p1" }, { house_area: "Roof" }], "the dropdown value becomes a project or an area");
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
 console.log("quick-spend: all checks passed");

@@ -9,7 +9,7 @@ import {
   type CategoryOption,
 } from "@/lib/category-icons";
 
-function useCategoryTable(table: "categories" | "travel_categories" | "grocery_categories", fallback: CategoryOption[]) {
+function useCategoryTable(table: "categories" | "travel_categories" | "grocery_categories" | "house_areas", fallback: CategoryOption[]) {
   const [items, setItems] = useState<CategoryOption[]>(fallback);
 
   useEffect(() => {
@@ -36,6 +36,12 @@ export function useExpenseCategories() {
 /** Trip travel categories managed in Admin > Travel Categories */
 export function useTravelCategories() {
   return useCategoryTable("travel_categories", FALLBACK_TRAVEL_CATEGORIES);
+}
+
+/** Areas of the house managed in Admin > Categories > House areas */
+export function useHouseAreas() {
+  // No built-in list: the areas only appear once the house-areas migration has been run, so a chosen area can always be saved
+  return useCategoryTable("house_areas", []);
 }
 
 /** Grocery item categories managed in Admin > Receipt Categories > Grocery */

@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "utility_bills", "utility_prefs", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -978,6 +978,23 @@ try {
       assert(/Sliding door mechanism/.test(await page.getByTestId("house-list").textContent()) && /Kitchen remodel/.test(await page.getByTestId("house-list").textContent()), "the House list shows it with its project");
       await page.getByRole("button", { name: "Kitchen remodel", exact: true }).click();
       assert((await page.getByTestId("house-row").count()) === 1, "the project filter narrows the list");
+      // an area of the house set in the back end, offered in the same dropdown
+      for (const [i, n] of ["Kitchen", "Bathroom"].entries()) fake.table("house_areas").push({ id: `1a000000-0000-4000-8000-00000000d00${i}`, name: n, icon: "home", enabled: true, sort_order: i + 1 });
+      await page.goto(`${BASE}/personal/spend`);
+      await page.locator("#qs-amount").fill("38");
+      await page.locator("#qs-what").fill("Tile grout");
+      await page.getByRole("button", { name: "House", exact: true }).click();
+      await page.locator("#qs-project optgroup[label='Areas of the house'] option").first().waitFor({ state: "attached" });
+      await page.locator("#qs-project optgroup[label='Your home projects'] option").first().waitFor({ state: "attached" });
+      assert((await page.locator("#qs-project optgroup[label='Your home projects'] option").count()) === 1, "your project is in the first group");
+      await page.locator("#qs-project").selectOption("area:Bathroom");
+      await page.getByTestId("quick-spend-save").click();
+      await page.getByTestId("quick-spend-done").waitFor();
+      const grout = fake.table("personal_spends").find((r) => r.merchant === "Tile grout");
+      assert(grout && grout.house_area === "Bathroom" && !grout.project_id, "the area is saved and no project: " + JSON.stringify(grout));
+      await page.goto(`${BASE}/personal/house`);
+      await page.getByRole("button", { name: "Bathroom", exact: true }).click();
+      assert((await page.getByTestId("house-row").count()) === 1 && /Tile grout/.test(await page.getByTestId("house-list").textContent()), "the area filter narrows the list");
       await page.goto(`${BASE}/personal/projects/${HP}`);
       await page.getByText("Quick spend", { exact: false }).first().waitFor();
       assert(/Sliding door mechanism/.test(await page.locator("body").textContent()), "the project page lists the attached spend");
@@ -994,6 +1011,7 @@ try {
       assert(fake.table("grocery_receipts").some((r) => r.store === "Plaza Market"), "the hand-typed receipt is saved");
     } finally {
       await ctx.close();
+      fake.table("house_areas").splice(0);
       for (const t of ["personal_spends", "personal_projects", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || (t === "personal_projects" && a[i].name === "Kitchen remodel") || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
     }
   });

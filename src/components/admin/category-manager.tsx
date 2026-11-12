@@ -27,7 +27,7 @@ export function CategoryManager({
   noun,
   onCount,
 }: {
-  table: "categories" | "travel_categories" | "grocery_categories";
+  table: "categories" | "travel_categories" | "grocery_categories" | "house_areas";
   subtitle: string;
   addTitle: string;
   addPlaceholder: string;

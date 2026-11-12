@@ -3,7 +3,7 @@
 export const QUICK_CATEGORIES = ["Coffee & snacks", "Street food", "Transport", "Personal care", "House", "Other"] as const;
 export const QUICK_DEFAULT_CURRENCY = "AWG";
 
-export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; category: string; expense_date: string; project_id?: string | null; receipt_path?: string | null };
+export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; category: string; expense_date: string; project_id?: string | null; receipt_path?: string | null; house_area?: string | null };
 
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -47,7 +47,7 @@ export const HOUSE_CATEGORY = "House";
 
 /** Spends categorised House, or attached to a home project, in a calendar year; newest first. */
 export function houseSpends(rows: SpendRow[], year: string): SpendRow[] {
-  return rows.filter((r) => r.expense_date.startsWith(year) && (r.category === HOUSE_CATEGORY || !!r.project_id)).sort((a, b) => b.expense_date.localeCompare(a.expense_date));
+  return rows.filter((r) => r.expense_date.startsWith(year) && (r.category === HOUSE_CATEGORY || !!r.project_id || !!r.house_area)).sort((a, b) => b.expense_date.localeCompare(a.expense_date));
 }
 
 /** The year's House total in USD, which is comparable across currencies. */
@@ -55,9 +55,19 @@ export function houseTotalUsd(rows: SpendRow[]): number {
   return r2(rows.reduce((s, r) => s + num(r.amount_usd), 0));
 }
 
-/** Filter by a project id, "none" (no project) or "all". */
+/** The value of an area in a filter or in the dropdown: "area:Bathroom". A project is just its id. */
+export const AREA_PREFIX = "area:";
+
+/** Filter by a project id, "area:<name>", "none" (no project and no area) or "all". */
 export function filterHouse(rows: SpendRow[], by: string): SpendRow[] {
   if (by === "all") return rows;
-  if (by === "none") return rows.filter((r) => !r.project_id);
+  if (by === "none") return rows.filter((r) => !r.project_id && !r.house_area);
+  if (by.startsWith(AREA_PREFIX)) return rows.filter((r) => r.house_area === by.slice(AREA_PREFIX.length));
   return rows.filter((r) => r.project_id === by);
+}
+
+/** What the House dropdown chose, as the columns to save. A project wins over an area; neither adds nothing. */
+export function houseTarget(value: string): { project_id?: string; house_area?: string } {
+  if (value.startsWith(AREA_PREFIX)) return { house_area: value.slice(AREA_PREFIX.length) };
+  return value ? { project_id: value } : {};
 }

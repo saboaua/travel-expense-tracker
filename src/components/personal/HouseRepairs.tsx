@@ -5,8 +5,8 @@ import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
-import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, withColumnFallback } from "@/lib/columns";
-import { filterHouse, houseSpends, houseTotalUsd, type SpendRow } from "@/lib/personal/quick-spend";
+import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
+import { AREA_PREFIX, filterHouse, houseSpends, houseTotalUsd, type SpendRow } from "@/lib/personal/quick-spend";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 
 const pill = (on: boolean) =>
@@ -23,7 +23,7 @@ export function HouseRepairs() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data, error: e } = await withColumnFallback((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", `${year}-01-01`).order("expense_date", { ascending: false }).limit(1000), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE);
+      const { data, error: e } = await withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", `${year}-01-01`).order("expense_date", { ascending: false }).limit(1000), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE);
       if (e) { setRows([]); setError(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_quick_spend.sql in Supabase first." : "Could not load your spending. Check your connection."); return; }
       setRows(houseSpends((data ?? []) as unknown as SpendRow[], year));
       const { data: ps } = await supabase.from("personal_projects").select("id, name").eq("kind", "home_project").limit(200);
@@ -32,8 +32,9 @@ export function HouseRepairs() {
   }, [year]);
 
   const projectsUsed = useMemo(() => [...new Set((rows ?? []).map((r) => r.project_id).filter((x): x is string => !!x && !!names[x]))], [rows, names]);
+  const areasUsed = useMemo(() => [...new Set((rows ?? []).map((r) => r.house_area).filter((x): x is string => !!x))].sort(), [rows]);
   const shown = useMemo(() => filterHouse(rows ?? [], by), [rows, by]);
-  const hasLoose = (rows ?? []).some((r) => !r.project_id);
+  const hasLoose = (rows ?? []).some((r) => !r.project_id && !r.house_area);
 
   const openInvoice = async (path: string) => {
     const { data } = await createClient().storage.from("receipts").createSignedUrl(path, 3600);
@@ -53,10 +54,11 @@ export function HouseRepairs() {
         <p className="mt-1 text-xs text-muted-foreground">Shown in USD so different currencies add up.</p>
       </div>
 
-      {(projectsUsed.length > 0 || hasLoose) && (
+      {(projectsUsed.length > 0 || areasUsed.length > 0 || hasLoose) && (
         <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Filter">
           <button type="button" aria-pressed={by === "all"} onClick={() => setBy("all")} className={pill(by === "all")}>All</button>
           {projectsUsed.map((id) => <button key={id} type="button" aria-pressed={by === id} onClick={() => setBy(id)} className={pill(by === id)}>{names[id]}</button>)}
+          {areasUsed.map((a) => <button key={a} type="button" aria-pressed={by === `${AREA_PREFIX}${a}`} onClick={() => setBy(`${AREA_PREFIX}${a}`)} className={pill(by === `${AREA_PREFIX}${a}`)}>{a}</button>)}
           {hasLoose && <button type="button" aria-pressed={by === "none"} onClick={() => setBy("none")} className={pill(by === "none")}>No project</button>}
         </div>
       )}
@@ -70,7 +72,7 @@ export function HouseRepairs() {
               <li key={r.id} className="flex min-h-14 items-center gap-3 py-2" data-testid="house-row">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{r.merchant || r.category}</span>
-                  <span className="block text-[13px] text-muted-foreground">{formatDate(r.expense_date)} · {r.project_id && names[r.project_id] ? names[r.project_id] : "No project"}</span>
+                  <span className="block text-[13px] text-muted-foreground">{formatDate(r.expense_date)} · {r.project_id && names[r.project_id] ? names[r.project_id] : r.house_area ? r.house_area : "No project or area"}</span>
                 </span>
                 {r.receipt_path && (
                   <button type="button" onClick={() => openInvoice(r.receipt_path!)} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-[13px] font-semibold text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200"><ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />Invoice</button>
