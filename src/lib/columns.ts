@@ -19,7 +19,8 @@ export const FLIGHT_COLS =
 export const EXPENSE_COLS = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
 export const PERSONAL_PROJECT_COLS = "id, user_id, kind, name, destination, description, start_date, end_date, budget, currency, status, created_at";
-export const PERSONAL_SPEND_COLS = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes";
+export const PERSONAL_SPEND_COLS_BASE = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes";
+export const PERSONAL_SPEND_COLS = `${PERSONAL_SPEND_COLS_BASE}, project_id, receipt_path`;
 export const PERSONAL_EXPENSE_COLS = "id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
 export const GROCERY_RECEIPT_COLS = "id, store, purchase_date, total, currency, receipt_path, notes";

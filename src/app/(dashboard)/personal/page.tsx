@@ -10,6 +10,7 @@ import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { summarizeSpends } from "@/lib/personal/quick-spend";
+import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
@@ -53,14 +54,15 @@ export default function PersonalHubPage() {
       if (flag && flag.personal_enabled === false) return setEnabled(false);
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
-      const [g, p, d, l, q] = await Promise.all([
+      const [g, p, d, l, q, lk] = await Promise.all([
         supabase.from("grocery_receipts").select("total, currency").gte("purchase_date", monthStart),
-        supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("status", "active"),
+        supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
         supabase.from("personal_spends").select("amount, currency").gte("expense_date", monthStart).limit(2000),
+        fetchLinkedSpends(supabase),
       ]);
-      setStats({ ...summarizePersonal(g.data, p.data as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data) });
+      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data) });
     })();
   }, []);
 

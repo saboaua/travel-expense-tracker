@@ -3,7 +3,7 @@
 export const QUICK_CATEGORIES = ["Coffee & snacks", "Street food", "Transport", "Personal care", "House", "Other"] as const;
 export const QUICK_DEFAULT_CURRENCY = "AWG";
 
-export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; category: string; expense_date: string };
+export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; category: string; expense_date: string; project_id?: string | null; receipt_path?: string | null };
 
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -41,4 +41,23 @@ export function recentNames(rows: SpendRow[], limit = 4): { name: string; catego
 export function parseAmount(text: string): number | null {
   const n = Number(text.trim().replace(",", "."));
   return Number.isFinite(n) && n > 0 ? r2(n) : null;
+}
+
+export const HOUSE_CATEGORY = "House";
+
+/** Spends categorised House, or attached to a home project, in a calendar year; newest first. */
+export function houseSpends(rows: SpendRow[], year: string): SpendRow[] {
+  return rows.filter((r) => r.expense_date.startsWith(year) && (r.category === HOUSE_CATEGORY || !!r.project_id)).sort((a, b) => b.expense_date.localeCompare(a.expense_date));
+}
+
+/** The year's House total in USD, which is comparable across currencies. */
+export function houseTotalUsd(rows: SpendRow[]): number {
+  return r2(rows.reduce((s, r) => s + num(r.amount_usd), 0));
+}
+
+/** Filter by a project id, "none" (no project) or "all". */
+export function filterHouse(rows: SpendRow[], by: string): SpendRow[] {
+  if (by === "all") return rows;
+  if (by === "none") return rows.filter((r) => !r.project_id);
+  return rows.filter((r) => r.project_id === by);
 }

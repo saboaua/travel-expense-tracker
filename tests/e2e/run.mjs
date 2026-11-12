@@ -958,6 +958,29 @@ try {
       await page.getByTestId("recent-names").getByRole("button", { name: "Coffee" }).click();
       assert((await page.locator("#qs-what").inputValue()) === "Coffee" && (await page.locator("#qs-amount").inputValue()) === "4.5", "the chip fills in the name and last amount");
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+      // House: a repair attached to a home project, then the House & repairs list
+      const HP = "9c000000-0000-4000-8000-00000000a0a1";
+      fake.table("personal_projects").push({ id: HP, user_id: PAT, kind: "home_project", name: "Kitchen remodel", destination: null, description: null, start_date: null, end_date: null, budget: null, currency: "USD", status: "active", created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/personal/spend`);
+      await page.locator("#qs-amount").fill("86");
+      await page.locator("#qs-what").fill("Sliding door mechanism");
+      assert((await page.getByTestId("house-extras").count()) === 0, "the house fields are hidden until the category is House");
+      await page.getByRole("button", { name: "House", exact: true }).click();
+      await page.getByTestId("house-extras").waitFor();
+      await page.locator("#qs-project").selectOption(HP);
+      await page.getByTestId("quick-spend-save").click();
+      await page.getByTestId("quick-spend-done").waitFor();
+      const hs = fake.table("personal_spends").find((r) => r.merchant === "Sliding door mechanism");
+      assert(hs && hs.category === "House" && hs.project_id === HP, "the repair is saved under House and attached to the project: " + JSON.stringify(hs));
+      await page.getByTestId("house-link").click();
+      await page.waitForURL((u) => u.pathname === "/personal/house");
+      await page.getByTestId("house-row").first().waitFor();
+      assert(/Sliding door mechanism/.test(await page.getByTestId("house-list").textContent()) && /Kitchen remodel/.test(await page.getByTestId("house-list").textContent()), "the House list shows it with its project");
+      await page.getByRole("button", { name: "Kitchen remodel", exact: true }).click();
+      assert((await page.getByTestId("house-row").count()) === 1, "the project filter narrows the list");
+      await page.goto(`${BASE}/personal/projects/${HP}`);
+      await page.getByText("Quick spend", { exact: false }).first().waitFor();
+      assert(/Sliding door mechanism/.test(await page.locator("body").textContent()), "the project page lists the attached spend");
       // a receipt typed in by hand, no camera
       await page.goto(`${BASE}/personal/groceries/new`);
       await page.getByTestId("add-by-hand").click();
@@ -971,7 +994,7 @@ try {
       assert(fake.table("grocery_receipts").some((r) => r.store === "Plaza Market"), "the hand-typed receipt is saved");
     } finally {
       await ctx.close();
-      for (const t of ["personal_spends", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
+      for (const t of ["personal_spends", "personal_projects", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || (t === "personal_projects" && a[i].name === "Kitchen remodel") || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
     }
   });
 

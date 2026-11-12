@@ -25,6 +25,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
+import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { hotelOf } from "@/lib/hotel";
@@ -115,7 +116,7 @@ export default async function DashboardPage() {
       : null,
     // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
     wantsSummary ? supabase.from("grocery_receipts").select("total, currency").eq("user_id", uid).gte("purchase_date", monthStart) : null,
-    wantsSummary ? supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("user_id", uid).eq("status", "active") : null,
+    wantsSummary ? supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("user_id", uid).eq("status", "active") : null,
     // Active home projects and personal trips: places a scanned receipt can go
     wantsSummary ? supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", uid).eq("status", "active").order("created_at", { ascending: false }) : null,
     // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
@@ -143,7 +144,9 @@ export default async function DashboardPage() {
 
   let personalSummary: ReturnType<typeof summarizePersonal> | null = null;
   if (groceryRes && summaryProjectsRes && !groceryRes.error && !summaryProjectsRes.error) {
-    personalSummary = summarizePersonal(groceryRes.data, summaryProjectsRes.data as never);
+    // Quick spends attached to a home project count in that project's total too
+    const linked = await fetchLinkedSpends(supabase);
+    personalSummary = summarizePersonal(groceryRes.data, withLinkedTotals((summaryProjectsRes.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], linked) as never);
   }
 
   let scanProjects: { id: string; kind: string; name: string; destination: string | null; start_date: string | null; end_date: string | null; status: string | null }[] = [];

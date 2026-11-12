@@ -9,13 +9,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
-import { PERSONAL_SPEND_COLS } from "@/lib/columns";
+import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
+import { browserBlobs } from "@/lib/offline-store";
 import { deleteRow, isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 
 type Listed = SpendRow & { waiting?: boolean };
@@ -39,6 +41,16 @@ export function QuickSpend() {
   const [done, setDone] = useState<string | null>(null);
   const [rows, setRows] = useState<Listed[] | null>(null);
   const { rate, setRate } = useUsdRate(currency);
+  // House extras: an optional home project and a photo of the invoice
+  const [projectId, setProjectId] = useState("");
+  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [file, setFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const isHouse = category === "House";
+  useEffect(() => {
+    createClient().from("personal_projects").select("id, name").eq("kind", "home_project").eq("status", "active").order("created_at", { ascending: false }).limit(50)
+      .then(({ data }) => setProjects((data ?? []) as { id: string; name: string }[]));
+  }, []);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -46,7 +58,7 @@ export function QuickSpend() {
     const uid = session?.user.id;
     if (!uid) return;
     const since = addDaysISO(todayISO(), -60);
-    const { data, error: e } = await supabase.from("personal_spends").select(PERSONAL_SPEND_COLS).gte("expense_date", since).order("expense_date", { ascending: false }).order("created_at", { ascending: false }).limit(300);
+    const { data, error: e } = await withColumnFallback((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", since).order("expense_date", { ascending: false }).order("created_at", { ascending: false }).limit(300), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE);
     const waiting = (await browserOutbox.list().catch(() => []))
       .filter((i) => isRowSave(i) && i.table === "personal_spends" && i.isNew)
       .map((i) => ({ id: i.id, ...(isRowSave(i) ? i.row : {}), waiting: true }) as unknown as Listed);
@@ -75,10 +87,18 @@ export function QuickSpend() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user.id;
       if (!uid) throw new Error("Sign in again to save.");
-      const row = { merchant: what.trim() || null, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum), category, expense_date: date, notes: notes.trim() || null };
-      const r = await saveRow({ api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "personal_spends", row, label: row.merchant || category, summary: "Quick spend · new" });
+      // Only sent when chosen, so a database without the House migration still saves everything else
+      const house = isHouse && projectId ? { project_id: projectId } : {};
+      const row = { merchant: what.trim() || null, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum), category, expense_date: date, notes: notes.trim() || null, ...house };
+      const withPhoto = isHouse ? file : null;
+      const r = await saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "personal_spends", row,
+        file: withPhoto, fileColumn: withPhoto ? "receipt_path" : undefined, bucket: withPhoto ? "receipts" : undefined, folder: "personal/spends",
+        keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
+        label: row.merchant || category, summary: "Quick spend · new",
+      });
       setDone(`${r.queued ? "Saved on this phone, will send when you are online" : "Saved"}: ${formatCurrency(amt, currency)}${row.merchant ? ` · ${row.merchant}` : ""}`);
-      setAmount(""); setWhat(""); setNotes(""); setDate(todayISO()); setPickDate(false);
+      setAmount(""); setWhat(""); setNotes(""); setDate(todayISO()); setPickDate(false); setProjectId(""); setFile(null); setPreview(null);
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");
@@ -156,6 +176,23 @@ export function QuickSpend() {
           </div>
         </div>
 
+        {isHouse && (
+          <div className="space-y-3 border-t pt-3" data-testid="house-extras">
+            <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">For the house</p>
+            <div>
+              <label htmlFor="qs-project" className={label}>Part of a home project <span className="font-normal text-muted-foreground">(optional)</span></label>
+              <Select id="qs-project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+                <option value="">None: just a repair</option>
+                {projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+              </Select>
+            </div>
+            <div>
+              <span className={label}>Photo of the invoice <span className="font-normal text-muted-foreground">(optional, good for warranty and returns)</span></span>
+              <ReceiptCapture preview={preview} busy={false} maxSide={1600} onFile={(f, url) => { setFile(f); setPreview(url); }} onClear={() => { setFile(null); setPreview(null); }} />
+            </div>
+          </div>
+        )}
+
         <div>
           <span className={label} id="qs-date">Date</span>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="qs-date">
@@ -176,7 +213,8 @@ export function QuickSpend() {
         <Button type="submit" disabled={saving} className="h-12 w-full text-base" data-testid="quick-spend-save">{saving ? "Saving..." : "Save spend"}</Button>
       </form>
 
-      <h2 className="mt-8 text-xs font-semibold uppercase tracking-wider text-muted-foreground">This month</h2>
+      <Link href="/personal/house" className="mt-6 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="house-link">House &amp; repairs</Link>
+      <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">This month</h2>
       {monthTotal && <p className="mt-1 text-[26px] font-bold tabular-nums tracking-tight" data-testid="month-total">{formatCurrency(monthTotal.total, monthTotal.currency)} <span className="text-sm font-medium text-muted-foreground">in {monthTotal.count} {monthTotal.count === 1 ? "spend" : "spends"}</span></p>}
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="spend-list">
         {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : thisMonth.length === 0 ? (

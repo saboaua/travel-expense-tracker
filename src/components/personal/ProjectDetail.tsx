@@ -35,6 +35,12 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
     () => applyRows(bundle?.expenses ?? [], pending, "personal_expenses", (r) => r.project_id === id).map((x) => ({ ...x, amount: Number(x.amount), amount_usd: Number(x.amount_usd), currency: x.currency ?? "USD", category: x.category ?? "Other", receipt_path: x.receipt_path ?? null })) as PersonalExpense[],
     [bundle, pending, id]
   );
+  // Quick spends attached to this project (read-only here; they are edited in Quick spend)
+  const linkedIds = useMemo(() => new Set((bundle?.linked ?? []).map((l) => l.id)), [bundle]);
+  const items = useMemo(
+    () => [...expenses, ...(bundle?.linked ?? []).map((l) => ({ ...l, notes: null as string | null }))].sort((a, b) => b.expense_date.localeCompare(a.expense_date)),
+    [expenses, bundle]
+  );
   const waiting = useMemo(() => waitingRowIds(pending, "personal_expenses"), [pending]);
   const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "personal_expenses" && i.isNew).map((i) => i.id)), [pending]);
 
@@ -43,7 +49,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
   if (loading) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   if (loadError || !project) return <div className="p-8 text-sm text-red-600">{loadError || "Not found"}</div>;
 
-  const totalUsd = expenses.reduce((s, e) => s + e.amount_usd, 0);
+  const totalUsd = items.reduce((s, e) => s + e.amount_usd, 0);
 
   // Spent in the budget's own currency (converted through USD for other currencies)
   const r = Number(budgetRate);
@@ -51,19 +57,19 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
     project.currency === "USD"
       ? totalUsd
       : r > 0
-        ? expenses.reduce((s, e) => s + (e.currency === project.currency ? e.amount : e.amount_usd / r), 0)
+        ? items.reduce((s, e) => s + (e.currency === project.currency ? e.amount : e.amount_usd / r), 0)
         : null;
   const budget = project.budget != null ? Number(project.budget) : null;
   const pctUsed = budget && spentInBudget != null ? (spentInBudget / budget) * 100 : null;
 
   const byCategory = Object.entries(
-    expenses.reduce<Record<string, number>>((m, e) => ({ ...m, [e.category]: (m[e.category] || 0) + e.amount_usd }), {})
+    items.reduce<Record<string, number>>((m, e) => ({ ...m, [e.category]: (m[e.category] || 0) + e.amount_usd }), {})
   )
     .map(([label, value]) => ({ label, value: Math.round(value * 100) / 100 }))
     .sort((a, b) => b.value - a.value);
 
   const days = project.start_date && project.end_date ? Math.max(daysBetween(project.start_date, project.end_date) + 1, 1) : null;
-  const biggest = expenses.length ? [...expenses].sort((a, b) => b.amount_usd - a.amount_usd)[0] : null;
+  const biggest = items.length ? [...items].sort((a, b) => b.amount_usd - a.amount_usd)[0] : null;
 
   const toggleStatus = async () => {
     const next = project.status === "active" ? "completed" : "active";
@@ -128,7 +134,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       {kind === "personal_trip" && <ShareWith kind="personal_trip" itemId={id} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardDescription>Total spent</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{formatCurrency(totalUsd, "USD")}</p><p className="text-xs text-muted-foreground">{expenses.length} expense{expenses.length !== 1 ? "s" : ""}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardDescription>Total spent</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{formatCurrency(totalUsd, "USD")}</p><p className="text-xs text-muted-foreground">{items.length} expense{items.length !== 1 ? "s" : ""}</p></CardContent></Card>
         {budget != null ? (
           <Card>
             <CardHeader className="pb-2"><CardDescription>Budget</CardDescription></CardHeader>
@@ -164,22 +170,25 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       <Card>
         <CardHeader><CardTitle className="text-base">Expenses</CardTitle></CardHeader>
         <CardContent className="space-y-2">
-          {expenses.length === 0 ? (
+          {items.length === 0 ? (
             <div className="py-10 text-center">
               <Receipt className="mx-auto mb-3 h-10 w-10 text-muted-foreground" />
               <p className="mb-3 text-sm text-muted-foreground">No expenses yet. Scan your first receipt.</p>
               <Link href={`${meta.path}/${id}/expense`}><Button className="gap-2"><Plus className="h-4 w-4" /> Add expense</Button></Link>
             </div>
           ) : (
-            expenses.map((e) => {
-              const Row = ({ children }: { children: React.ReactNode }) => unsent.has(e.id)
+            items.map((e) => {
+              const fromSpend = linkedIds.has(e.id);
+              const Row = ({ children }: { children: React.ReactNode }) => fromSpend
+                ? <Link href="/personal/house" className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>
+                : unsent.has(e.id)
                 ? <div className="flex items-center justify-between gap-3 rounded-xl border p-3">{children}</div>
                 : <Link href={`${meta.path}/${id}/expense/${e.id}`} className="flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
               return (
               <Row key={e.id}>
                 <div className="min-w-0">
                   <p className="truncate font-medium">{e.merchant || e.category}</p>
-                  <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{e.receipt_path ? " · receipt" : ""}{waiting.has(e.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p>
+                  <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{fromSpend ? " · Quick spend" : ""}{e.receipt_path ? (fromSpend ? " · invoice" : " · receipt") : ""}{waiting.has(e.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p>
                 </div>
                 <div className="shrink-0 text-right">
                   <p className="font-semibold">{formatCurrency(e.amount_usd, "USD")}</p>
