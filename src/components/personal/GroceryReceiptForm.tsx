@@ -56,6 +56,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [incoming, setIncoming] = useState<File | null>(null);
+  // "Add by hand": no photo step, for when the camera or the scan does not work
+  const [manual, setManual] = useState(false);
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [{ key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: "Other", unit: "" }])); } }, []);
 
   // New receipt: default to the currency of the latest receipt. Edit: load everything.
   useEffect(() => {
@@ -261,12 +264,16 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       )}
       <Card>
         <CardHeader>
-          <CardTitle>{receiptId ? "Edit grocery receipt" : "Add grocery receipt"}</CardTitle>
-          <CardDescription>Scan the receipt, then check the items. Prices are tracked per item over time.</CardDescription>
+          <CardTitle>{receiptId ? "Edit grocery receipt" : manual ? "Add receipt by hand" : "Add grocery receipt"}</CardTitle>
+          <CardDescription>{manual ? "No photo? Type it in. Items you list still show up in the Price tracker. With only a total, it counts toward spending but not price comparison." : "Scan the receipt, then check the items. Prices are tracked per item over time."}</CardDescription>
         </CardHeader>
         <CardContent>
           <OfflineNotice savedAt={savedAt} writable />
           <form onSubmit={submit} className="space-y-5">
+            {!receiptId && manual && (
+              <button type="button" onClick={() => setManual(false)} className="min-h-11 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="scan-instead">Scan a photo instead</button>
+            )}
+            {(!manual || receiptId) && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>
               <ReceiptCapture
@@ -280,7 +287,11 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 onClear={() => { setFile(null); setPreview(null); setNote(null); }}
               />
               {note && <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
+              {!receiptId && !preview && !scanning && (
+                <button type="button" onClick={() => { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); }} className="min-h-11 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="add-by-hand">Camera not working? Add by hand</button>
+              )}
             </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="col-span-2 min-w-0 space-y-2 sm:col-span-3">

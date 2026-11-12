@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -931,6 +931,47 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items", "grocery_online_matches"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "grocery_online_matches" || String(a[i].id).includes("00000000f")) a.splice(i, 1); }
+    }
+  });
+
+  await test("quick spend: a purchase with no receipt is saved, listed, offered again as a chip, and a receipt can be typed in by hand", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal`);
+      await page.getByRole("link", { name: /Quick spend/ }).first().click();
+      await page.waitForURL((u) => u.pathname === "/personal/spend");
+      await page.locator("#qs-amount").fill("4.5");
+      await page.locator("#qs-what").fill("Coffee");
+      await page.getByRole("button", { name: "Street food", exact: true }).click();
+      await page.getByTestId("quick-spend-save").click();
+      await page.getByTestId("quick-spend-done").waitFor();
+      const saved = fake.table("personal_spends")[0];
+      assert(saved && saved.amount === 4.5 && saved.merchant === "Coffee" && saved.category === "Street food" && saved.currency === "AWG", "the spend is saved with its amount, name, category and AWG: " + JSON.stringify(saved));
+      assert(!fake.table("expenses").some((e) => e.merchant === "Coffee"), "it never lands in business expenses");
+      assert(/Coffee/.test(await page.getByTestId("spend-list").textContent()) && /4\.50/.test(await page.getByTestId("month-total").textContent()), "it is listed and counted this month");
+      await page.reload();
+      await page.getByTestId("recent-names").getByRole("button", { name: "Coffee" }).waitFor();
+      await page.getByTestId("recent-names").getByRole("button", { name: "Coffee" }).click();
+      assert((await page.locator("#qs-what").inputValue()) === "Coffee" && (await page.locator("#qs-amount").inputValue()) === "4.5", "the chip fills in the name and last amount");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+      // a receipt typed in by hand, no camera
+      await page.goto(`${BASE}/personal/groceries/new`);
+      await page.getByTestId("add-by-hand").click();
+      assert((await page.getByText("Receipt photo").count()) === 0, "the photo step is gone in by-hand mode");
+      await page.getByPlaceholder("Where did you shop?").fill("Plaza Market");
+      await page.getByPlaceholder("Where did you shop?").press("Tab");
+      const name = page.getByPlaceholder(/item/i).first();
+      await name.fill("Milk Whole 1 L");
+      await page.getByRole("button", { name: "Save receipt" }).click();
+      await page.waitForURL((u) => /\/personal\/groceries\//.test(u.pathname) && !/new/.test(u.pathname), { timeout: 30000 });
+      assert(fake.table("grocery_receipts").some((r) => r.store === "Plaza Market"), "the hand-typed receipt is saved");
+    } finally {
+      await ctx.close();
+      for (const t of ["personal_spends", "grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "personal_spends" || a[i].store === "Plaza Market" || a[i].name === "Milk Whole 1 L") a.splice(i, 1); }
     }
   });
 

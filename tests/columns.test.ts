@@ -44,6 +44,7 @@ check("FLIGHT_COLS", "trip_flights", C.FLIGHT_COLS);
 check("TRIP_EXPORT_COLS", "trips", C.TRIP_EXPORT_COLS);
 check("EXPENSE_COLS", "expenses", C.EXPENSE_COLS);
 check("PERSONAL_PROJECT_COLS", "personal_projects", C.PERSONAL_PROJECT_COLS);
+check("PERSONAL_SPEND_COLS", "personal_spends", C.PERSONAL_SPEND_COLS);
 check("PERSONAL_EXPENSE_COLS", "personal_expenses", C.PERSONAL_EXPENSE_COLS);
 check("GROCERY_RECEIPT_COLS", "grocery_receipts", C.GROCERY_RECEIPT_COLS);
 check("GROCERY_ITEM_COLS", "grocery_items", C.GROCERY_ITEM_COLS);

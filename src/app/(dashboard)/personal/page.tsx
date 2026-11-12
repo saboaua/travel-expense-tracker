@@ -5,15 +5,16 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat } from "lucide-react";
+import { ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
+import { summarizeSpends } from "@/lib/personal/quick-spend";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null };
+type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends> };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -52,13 +53,14 @@ export default function PersonalHubPage() {
       if (flag && flag.personal_enabled === false) return setEnabled(false);
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
-      const [g, p, d, l] = await Promise.all([
+      const [g, p, d, l, q] = await Promise.all([
         supabase.from("grocery_receipts").select("total, currency").gte("purchase_date", monthStart),
         supabase.from("personal_projects").select("kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
+        supabase.from("personal_spends").select("amount, currency").gte("expense_date", monthStart).limit(2000),
       ]);
-      setStats({ ...summarizePersonal(g.data, p.data as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0 });
+      setStats({ ...summarizePersonal(g.data, p.data as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data) });
     })();
   }, []);
 
@@ -94,6 +96,8 @@ export default function PersonalHubPage() {
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const grocery = stats?.grocery ?? null;
   const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; text: string; strong: boolean }[] = [
+    { href: "/personal/spend", title: "Quick spend", icon: Coins, strong: !!stats?.spends,
+      text: !stats ? "\u00a0" : stats.spends ? `${formatCurrency(stats.spends.total, stats.spends.currency)} this month \u00b7 ${plural(stats.spends.count, "spend")}` : "Coffee, street food, anything with no receipt" },
     { href: "/personal/projects", title: "Home Projects", icon: Hammer, strong: !!stats && stats.projects.count > 0,
       text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, "USD")} spent` : "No active projects \u00b7 tap to start one" },
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, strong: !!stats && stats.trips.count > 0,
