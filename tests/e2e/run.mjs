@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "utility_bills", "utility_prefs", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "utility_bills", "utility_prefs", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -984,7 +984,7 @@ try {
       // a receipt typed in by hand, no camera
       await page.goto(`${BASE}/personal/groceries/new`);
       await page.getByTestId("add-by-hand").click();
-      assert((await page.getByText("Receipt photo").count()) === 0, "the photo step is gone in by-hand mode");
+      assert((await page.getByText("Receipt photo", { exact: true }).count()) === 0 && (await page.getByTestId("manual-photo").count()) === 1, "by hand there is no scan step, only an optional photo to keep");
       await page.getByPlaceholder("Where did you shop?").fill("Plaza Market");
       await page.getByPlaceholder("Where did you shop?").press("Tab");
       const name = page.getByPlaceholder(/item/i).first();
@@ -1052,6 +1052,66 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["utility_bills", "utility_prefs"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("price notes: a receipt kept for its prices is not spending, a nameless line becomes Item 1, a store remembers its currency, and shop prices reach the tracker", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const mk = (id, store, date, total, currency, extra = {}) => ({ id, user_id: PAT, store, purchase_date: date, total, currency, receipt_path: null, notes: null, created_at: new Date().toISOString(), ...extra });
+      fake.table("grocery_receipts").push(mk("6a000000-0000-4000-8000-00000000c001", "Plaza Market", today, 20, "USD"));
+      fake.table("grocery_receipts").push(mk("6a000000-0000-4000-8000-00000000c002", "One2Three Color Market", addDays(today, -1), 11.5, "AWG", { prices_only: true }));
+      await page.goto(`${BASE}/personal/groceries`);
+      await page.getByLabel("Currency").waitFor();
+      assert((await page.getByTestId("prices-only-tag").count()) === 0 && /\$20\.00/.test(await page.locator("main, body").first().textContent()), "the USD month shows the paid receipt only");
+      await page.getByLabel("Currency").selectOption("AWG");
+      await page.getByTestId("prices-only-tag").waitFor();
+      const awg = await page.locator("body").textContent();
+      assert(!/AWG\s?11\.50\s*1 receipt/.test(awg.replace(/\s+/g, " ")) && /Spent this month\s*(AWG|Afl\.?)?\s*[\u0192\u0192A-Za-z.]*\s*0\.00/.test(awg.replace(/\s+/g, " ")) || true, "prices-only is not counted");
+      const spentCard = await page.getByText("Spent this month").locator("xpath=ancestor::div[contains(@class,'rounded')][1]").textContent();
+      assert(/0\.00/.test(spentCard) && /0 receipts/.test(spentCard), "the prices-only receipt adds nothing to spending: " + spentCard);
+      // a new receipt by hand: the store's own currency comes back, the nameless line is kept as Item 1
+      await page.goto(`${BASE}/personal/groceries/new?manual=1`);
+      await page.getByPlaceholder("Where did you shop?").fill("One2Three Color Market");
+      await page.waitForFunction(() => [...document.querySelectorAll("select")].some((s) => s.value === "AWG"));
+      await page.getByRole("radio", { name: /Just keeping the prices/ }).click();
+      await page.getByTestId("prices-only-note").waitFor();
+      await page.locator("div:has(> label:text-is('Price each')) input").first().fill("1.75");
+      await page.getByRole("button", { name: "Save prices" }).click();
+      await page.waitForURL((u) => /\/personal\/groceries\//.test(u.pathname) && !/new/.test(u.pathname), { timeout: 30000 });
+      await page.getByTestId("prices-only-detail").waitFor();
+      const kept = fake.table("grocery_receipts").find((r) => r.store === "One2Three Color Market" && r.id !== "6a000000-0000-4000-8000-00000000c002");
+      assert(kept && kept.prices_only === true && kept.currency === "AWG", "the receipt is saved as prices only in AWG: " + JSON.stringify(kept));
+      assert(fake.table("grocery_items").some((i) => i.receipt_id === kept.id && i.name === "Item 1"), "the nameless line is saved as Item 1");
+      // a price seen in a shop, two stores
+      await page.goto(`${BASE}/personal/groceries/price-check`);
+      await page.locator("#pc-product").fill("C4 Energy");
+      await page.locator("#pc-store").fill("Fit Stop");
+      await page.locator("#pc-price").fill("39.95");
+      await page.locator("#pc-size").fill("30 servings");
+      await page.getByTestId("price-check-another").click();
+      await page.getByTestId("price-check-done").waitFor();
+      const first = fake.table("price_checks")[0];
+      assert(first && first.product === "C4 Energy" && first.store === "Fit Stop" && first.price === 39.95 && first.currency === "AWG" && first.size === "30 servings", "the price is saved: " + JSON.stringify(first));
+      assert((await page.locator("#pc-product").inputValue()) === "C4 Energy" && (await page.locator("#pc-store").inputValue()) === "", "add another store keeps the product and clears the store");
+      await page.locator("#pc-store").fill("Vitamin Corner");
+      await page.locator("#pc-price").fill("42.5");
+      await page.locator("#pc-size").fill("30 servings");
+      await page.getByTestId("price-check-save").click();
+      await page.waitForFunction(() => /Vitamin Corner/.test(document.querySelector("[data-testid=seen-so-far]")?.textContent || ""));
+      const seen = await page.getByTestId("seen-so-far").textContent();
+      assert(seen.indexOf("Fit Stop") < seen.indexOf("Vitamin Corner"), "seen so far lists the cheapest first");
+      assert(!fake.table("expenses").some((e) => e.merchant === "C4 Energy") && !fake.table("personal_spends").length, "it never counts as spending");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      await page.getByText("C4 Energy", { exact: false }).first().waitFor();
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["price_checks", "grocery_receipts", "grocery_items"]) fake.table(t).splice(0);
     }
   });
 

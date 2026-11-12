@@ -22,6 +22,7 @@ import { fetchReceiptBundle, itemsWithWaiting, overviewKey, receiptKey, type Ove
 import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
 import { browserOutbox, newId } from "@/lib/outbox";
 import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { currencyForStore, itemName } from "@/lib/personal/price-notes";
 import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
@@ -58,7 +59,21 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const [incoming, setIncoming] = useState<File | null>(null);
   // "Add by hand": no photo step, for when the camera or the scan does not work
   const [manual, setManual] = useState(false);
+  // "Just keeping the prices": a receipt for something you did not pay for. Its items feed the Price tracker, but it is never counted as spending.
+  const [pricesOnly, setPricesOnly] = useState(false);
+  const wasPricesOnly = useRef(false);
+  // Currency per store: the one used last at that shop is filled in until you choose your own
+  const knownReceipts = useRef<{ store: string; currency: string; purchase_date: string }[]>([]);
+  const currencyChosen = useRef(false);
+  const [knownLoaded, setKnownLoaded] = useState(false);
   useEffect(() => { if (new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [{ key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: "Other", unit: "" }])); } }, []);
+
+  // The store you type brings back the currency used there last time, until you pick one yourself
+  useEffect(() => {
+    if (receiptId || currencyChosen.current || !knownLoaded) return;
+    const c = currencyForStore(knownReceipts.current, store);
+    if (c && currencies.some((x) => x.code === c)) setCurrency(c);
+  }, [store, knownLoaded, currencies, receiptId]);
 
   // New receipt: default to the currency of the latest receipt. Edit: load everything.
   useEffect(() => {
@@ -71,7 +86,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
         // Default to the currency most used on the receipts already saved
         const saved = await browserKv.get<Overview>(overviewKey(owner)).catch(() => null);
         const latest = saved?.value.receipts[0]?.currency;
+        knownReceipts.current = saved?.value.receipts ?? [];
         if (latest) setCurrency(latest);
+        setKnownLoaded(true);
         return;
       }
       const res = await loadWithCache<ReceiptBundle>(browserKv, receiptKey(owner, receiptId), () => fetchReceiptBundle(supabase, receiptId));
@@ -85,6 +102,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       setCurrency(head.currency ?? "USD");
       setTotal(String(head.total ?? ""));
       setNotes(head.notes || "");
+      setPricesOnly(head.prices_only === true);
+      wasPricesOnly.current = head.prices_only === true;
+      currencyChosen.current = true;
       setExistingPath(head.receipt_path ?? null);
       setRows(
         itemsWithWaiting(receiptId, res.ok ? res.data.items : [], waiting).map((it) => ({
@@ -208,7 +228,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     if (!store.trim()) return setError("Enter the store name.");
     const totalNum = total ? money(total) : itemsSum;
     if (!(totalNum >= 0)) return setError("Enter a valid total.");
-    const clean = rows.filter((r) => r.name.trim());
+    // A line with a price but no name is kept as Item 1, 2, 3 (some receipts only say "1 ITEM")
+    const clean = rows.map((r, i) => ({ ...r, name: itemName(r.name, i + 1), keep: !!r.name.trim() || money(r.unit_price) > 0 || money(r.line_total) > 0 })).filter((r) => r.keep);
     if (clean.some((r) => !(money(r.quantity) > 0))) return setError("Every item needs a quantity above zero.");
 
     setSaving(true);
@@ -218,7 +239,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       const owner = session?.user.id;
       if (!owner) throw new Error("Sign in again to save.");
 
-      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null };
+      // Only sent when it matters, so a database without the price-notes migration still saves the receipt
+      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -293,6 +315,27 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             </div>
             )}
 
+            {!receiptId && manual && (
+              <div className="space-y-2" data-testid="manual-photo">
+                <label className="text-sm font-medium">Photo of the receipt <span className="font-normal text-muted-foreground">(optional)</span></label>
+                <ReceiptCapture preview={preview} busy={false} maxSide={2400} onFile={(f, url) => { setFile(f); setPreview(url); }} onClear={() => { setFile(null); setPreview(null); }} />
+                <p className="text-xs text-muted-foreground">Worth keeping when the receipt only says &quot;1 ITEM&quot;. It is kept, not read.</p>
+              </div>
+            )}
+
+            <div className="space-y-2" data-testid="whose-purchase">
+              <span className="text-sm font-medium" id="whose">Whose purchase is this?</span>
+              <div className="space-y-2" role="radiogroup" aria-labelledby="whose">
+                {[{ on: false, title: "I paid for it", sub: "Counts toward your personal spending." }, { on: true, title: "Just keeping the prices", sub: "I did not pay for this, for example I bought it for someone. It is not counted in my spending." }].map((o) => (
+                  <button key={o.title} type="button" role="radio" aria-checked={pricesOnly === o.on} onClick={() => setPricesOnly(o.on)} className={`flex min-h-14 w-full items-start gap-3 rounded-xl border-2 p-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${pricesOnly === o.on ? "border-blue-600 bg-blue-50 dark:bg-blue-950" : "border-input"}`}>
+                    <span className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 ${pricesOnly === o.on ? "border-blue-600" : "border-muted-foreground"}`}>{pricesOnly === o.on && <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />}</span>
+                    <span><b className="block text-[15px]">{o.title}</b><span className="text-[13px] text-muted-foreground">{o.sub}</span></span>
+                  </button>
+                ))}
+              </div>
+              {pricesOnly && <p className="flex gap-2 rounded-xl border border-blue-200 bg-blue-50 p-3 text-[13px] text-blue-900 dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100" data-testid="prices-only-note"><Eye className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />The items still go to the Price tracker, so you can compare shops later. Nothing is added to your spending, budget or reports.</p>}
+            </div>
+
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="col-span-2 min-w-0 space-y-2 sm:col-span-3">
                 <label className="text-sm font-medium">Store</label>
@@ -304,7 +347,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               </div>
               <div className="min-w-0 space-y-2">
                 <label className="text-sm font-medium">Currency</label>
-                <Select value={currency} onChange={(e) => setCurrency(e.target.value)}>
+                <Select value={currency} onChange={(e) => { currencyChosen.current = true; setCurrency(e.target.value); }}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                 </Select>
               </div>
@@ -369,7 +412,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder="Item name" maxLength={160} />
+                    <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder={`Item name (blank saves as Item ${rows.findIndex((x) => x.key === r.key) + 1})`} maxLength={160} />
                     {r.confirmed && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800" title="Both readers agree" aria-label="Both readers agree"><Check className="h-4 w-4" /></span>}
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
                       <Trash2 className="h-4 w-4" />
@@ -410,7 +453,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             </div>
 
             {error && <Alert>{error}</Alert>}
-            <Button type="submit" disabled={saving || scanning} className="w-full">{saving ? "Saving..." : "Save receipt"}</Button>
+            <Button type="submit" disabled={saving || scanning} className="w-full">{saving ? "Saving..." : pricesOnly ? "Save prices" : "Save receipt"}</Button>
           </form>
         </CardContent>
       </Card>

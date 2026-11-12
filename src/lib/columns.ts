@@ -24,7 +24,9 @@ export const UTILITY_BILL_COLS = "id, kind, provider, bill_month, amount, curren
 export const PERSONAL_SPEND_COLS = `${PERSONAL_SPEND_COLS_BASE}, project_id, receipt_path`;
 export const PERSONAL_EXPENSE_COLS = "id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
-export const GROCERY_RECEIPT_COLS = "id, store, purchase_date, total, currency, receipt_path, notes";
+export const GROCERY_RECEIPT_COLS_BASE = "id, store, purchase_date, total, currency, receipt_path, notes";
+export const GROCERY_RECEIPT_COLS = `${GROCERY_RECEIPT_COLS_BASE}, prices_only`;
+export const PRICE_CHECK_COLS = "id, product, store, price, currency, size, seen_on, photo_path, notes";
 export const GROCERY_ITEM_COLS = "id, name, category, quantity, unit_price, unit, line_total";
 
 export const DOCUMENT_COLS_BASE = "id, user_id, trip_id, kind, title, issuing_country, expiry_date, notes, file_path, created_at";

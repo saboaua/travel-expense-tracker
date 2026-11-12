@@ -168,7 +168,10 @@ export function GroceryPrices() {
           <h1 className="text-2xl font-bold md:text-3xl">Price tracker</h1>
           <p className="mt-1 text-sm text-muted-foreground">{inCur.length} item{inCur.length === 1 ? "" : "s"} · {summary.stores} store{summary.stores === 1 ? "" : "s"}{onlineData && onlineData.enabled.length > 0 && cur === ONLINE_CURRENCY ? ` · ${onlineData.enabled.length} online` : ""} · {cur}</p>
         </div>
+        <div className="flex gap-2">
+          <Link href="/personal/groceries/price-check"><Button variant="outline" className="h-11 gap-2" data-testid="tracker-price-check"><Plus className="h-4 w-4" /> <span className="sm:hidden">Price</span><span className="hidden sm:inline">Add a price</span></Button></Link>
         <Link href="/personal/groceries/new"><Button className="h-11 gap-2"><Plus className="h-4 w-4" /> <span className="sm:hidden">Scan</span><span className="hidden sm:inline">Scan receipt</span></Button></Link>
+        </div>
       </div>
 
       <OfflineNotice savedAt={savedAt} />

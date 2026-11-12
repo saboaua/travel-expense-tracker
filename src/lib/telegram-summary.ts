@@ -113,7 +113,13 @@ export async function gatherUserSummary(supabase: SupabaseClient, today: string,
   const [bizSpend, perSpend, groc] = await Promise.all([
     spend("expenses"),
     spend("personal_expenses"),
-    fetchAll<{ total: number; currency: string }>((f, t) => supabase.from("grocery_receipts").select("total, currency").eq("user_id", userId).gte("purchase_date", monthStart).lte("purchase_date", today).order("id").range(f, t)),
+    // Receipts kept only for their prices are not spending. Before the price-notes migration there is no such column.
+    (async () => {
+      const q = (cols: string) => fetchAll<{ total: number; currency: string; prices_only?: boolean | null }>((f, t) => supabase.from("grocery_receipts").select(cols).eq("user_id", userId).gte("purchase_date", monthStart).lte("purchase_date", today).order("id").range(f, t) as never);
+      let res = await q("total, currency, prices_only");
+      if (res.failed) res = await q("total, currency");
+      return { ...res, rows: res.rows.filter((r) => r.prices_only !== true) };
+    })(),
   ]);
   const byCurrency = new Map<string, number>();
   for (const g of groc.failed ? [] : groc.rows) byCurrency.set(g.currency, (byCurrency.get(g.currency) || 0) + num(g.total));

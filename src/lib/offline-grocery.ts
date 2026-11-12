@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS } from "@/lib/columns";
+import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, isMissingColumn, withColumnFallback } from "@/lib/columns";
+import { checkToTracker, type PriceCheck } from "@/lib/personal/price-notes";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import type { ItemLite, ReceiptLite } from "@/lib/personal/grocery";
 import type { TrackerRow } from "@/lib/personal/grocery";
@@ -11,10 +12,10 @@ import type { OutboxItem } from "@/lib/outbox";
 
 type Result<T> = Promise<{ data: T | null; error: unknown }>;
 
-export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null };
+export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null };
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
-export type OverviewReceipt = ReceiptLite & { store: string };
+export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null };
 export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[] };
 
 export const overviewKey = (userId: string) => `${userId}:groceries:overview`;
@@ -32,15 +33,17 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
   // Last 14 months are plenty for monthly comparison and keep the page quick
   const from = `${shift(today.slice(0, 7), -13)}-01`;
   try {
+    const receipts = (cols: string) => fetchAll<OverviewReceipt>((a, b) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b) as never);
     const [r, i] = await Promise.all([
-      fetchAll<OverviewReceipt>((a, b) => supabase.from("grocery_receipts").select("id, store, purchase_date, total, currency").gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b)),
+      // Before the price-notes migration there is no prices_only column: everything is spending
+      receipts("id, store, purchase_date, total, currency, prices_only").catch((e) => { if (isMissingColumn({ message: e instanceof Error ? e.message : "" })) return receipts("id, store, purchase_date, total, currency"); throw e; }),
       fetchAll<ItemLite & { grocery_receipts: unknown }>((a, b) =>
         supabase.from("grocery_items").select("receipt_id, category, name, normalized_name, line_total, grocery_receipts!inner(purchase_date)").gte("grocery_receipts.purchase_date", from).range(a, b)
       ),
     ]);
     return {
       data: {
-        receipts: r.map((x) => ({ ...x, total: Number(x.total) })),
+        receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true })),
         items: i.map((x) => ({ receipt_id: x.receipt_id, category: x.category, name: x.name, normalized_name: x.normalized_name, line_total: Number(x.line_total) })),
       },
       error: null,
@@ -55,14 +58,15 @@ export async function fetchPrices(supabase: SupabaseClient): Result<TrackerRow[]
     const data = await fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
       supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").order("created_at", { ascending: false }).range(a, b)
     );
-    return {
-      data: data.map((d) => ({
-        name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
-        unit: d.unit ?? null, line_total: Number(d.line_total),
-        receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
-      })),
-      error: null,
-    };
+    const lines = data.map((d) => ({
+      name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
+      unit: d.unit ?? null, line_total: Number(d.line_total),
+      receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
+    }));
+    // Prices seen in a shop sit beside the receipt lines. Before the price-notes migration there is no table: that just means none yet.
+    const seen = await supabase.from("price_checks").select(PRICE_CHECK_COLS).order("seen_on", { ascending: false }).limit(2000);
+    const checks = seen.error ? [] : ((seen.data ?? []) as unknown as PriceCheck[]).map(checkToTracker);
+    return { data: [...lines, ...checks], error: null };
   } catch (error) {
     return { data: null, error };
   }
@@ -81,12 +85,12 @@ export async function fetchPriceMatches(supabase: SupabaseClient): Result<MatchD
 
 export async function fetchReceiptBundle(supabase: SupabaseClient, id: string): Result<ReceiptBundle> {
   const [r, i] = await Promise.all([
-    supabase.from("grocery_receipts").select(GROCERY_RECEIPT_COLS).eq("id", id).single(),
+    withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("id", id).single(), GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE),
     supabase.from("grocery_items").select(GROCERY_ITEM_COLS).eq("receipt_id", id).order("created_at"),
   ]);
   if (r.error || !r.data) return { data: null, error: r.error ?? new Error("Receipt not found") };
   if (i.error) return { data: null, error: i.error };
-  const receipt = { ...(r.data as unknown as GroceryReceipt), total: Number((r.data as { total: number }).total) };
+  const receipt = { ...(r.data as unknown as GroceryReceipt), total: Number((r.data as unknown as { total: number }).total) };
   const items = ((i.data as unknown as GroceryItem[]) ?? []).map((x) => ({ ...x, quantity: Number(x.quantity), unit_price: Number(x.unit_price), line_total: Number(x.line_total) }));
   return { data: { receipt, items }, error: null };
 }

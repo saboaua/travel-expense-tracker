@@ -12,7 +12,8 @@ import { summarizePersonal } from "@/lib/personal/summary";
 import { summarizeSpends } from "@/lib/personal/quick-spend";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { SUBSCRIPTION_COLS } from "@/lib/columns";
+import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
+import { onlySpending } from "@/lib/personal/price-notes";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
 type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null };
@@ -55,7 +56,7 @@ export default function PersonalHubPage() {
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
       const [g, p, d, l, q, lk, u] = await Promise.all([
-        supabase.from("grocery_receipts").select("total, currency").gte("purchase_date", monthStart),
+        withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),

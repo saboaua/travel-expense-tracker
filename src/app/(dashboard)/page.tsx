@@ -29,6 +29,7 @@ import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { DashboardViews } from "@/components/DashboardViews";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { hotelOf } from "@/lib/hotel";
+import { onlySpending } from "@/lib/personal/price-notes";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
@@ -115,13 +116,13 @@ export default async function DashboardPage() {
           .limit(300)
       : null,
     // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
-    wantsSummary ? supabase.from("grocery_receipts").select("total, currency").eq("user_id", uid).gte("purchase_date", monthStart) : null,
+    wantsSummary ? withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", uid).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)) : null,
     wantsSummary ? supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("user_id", uid).eq("status", "active") : null,
     // Active home projects and personal trips: places a scanned receipt can go
     wantsSummary ? supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", uid).eq("status", "active").order("created_at", { ascending: false }) : null,
     // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
     wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
-    wantsDash ? supabase.from("grocery_receipts").select("id, store, purchase_date, total, currency").eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000) : null,
+    wantsDash ? withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000), "id, store, purchase_date, total, currency, prices_only", "id, store, purchase_date, total, currency").then((r) => onlySpending<{ id: string; store: string; purchase_date: string; total: number; currency: string }>(r)) : null,
     // The lines of those receipts, so the dashboard can show where grocery money goes by category
     wantsDash ? supabase.from("grocery_items").select("receipt_id, category, line_total").eq("user_id", uid).limit(20000) : null,
     wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, destination, start_date, end_date").eq("user_id", uid) : null,

@@ -49,6 +49,8 @@ check("UTILITY_BILL_COLS", "utility_bills", C.UTILITY_BILL_COLS);
 check("PERSONAL_SPEND_COLS_BASE", "personal_spends", C.PERSONAL_SPEND_COLS_BASE);
 check("PERSONAL_EXPENSE_COLS", "personal_expenses", C.PERSONAL_EXPENSE_COLS);
 check("GROCERY_RECEIPT_COLS", "grocery_receipts", C.GROCERY_RECEIPT_COLS);
+check("GROCERY_RECEIPT_COLS_BASE", "grocery_receipts", C.GROCERY_RECEIPT_COLS_BASE);
+check("PRICE_CHECK_COLS", "price_checks", C.PRICE_CHECK_COLS);
 check("GROCERY_ITEM_COLS", "grocery_items", C.GROCERY_ITEM_COLS);
 check("DOCUMENT_COLS", "travel_documents", C.DOCUMENT_COLS);
 check("SUBSCRIPTION_COLS", "subscriptions", C.SUBSCRIPTION_COLS);
