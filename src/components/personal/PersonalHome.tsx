@@ -3,7 +3,7 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Camera, CreditCard, Hammer, Plus, Repeat } from "lucide-react";
+import { Coins, CreditCard, Hammer, Plus, Repeat } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
@@ -35,7 +35,8 @@ function KeepHandy({ testId }: { testId: string }) {
   const { perms } = useAccess();
   const tile = "flex min-h-[56px] items-center justify-start gap-2.5 rounded-xl border text-left bg-card px-3.5 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
   const items = [
-    { href: "/personal/groceries/new", label: "Scan receipt", icon: Camera, primary: true, show: perms.has("personal") },
+    // Scan and Upload already sit at the top of the home page, so the first door here is Quick spend
+    { href: "/personal/spend", label: "Quick spend", icon: Coins, primary: true, show: perms.has("personal") },
     { href: "/personal/subscriptions", label: "Add subscription", icon: Repeat, primary: false, show: perms.has("subscriptions") },
     { href: "/personal/loyalty", label: "Loyalty cards", icon: CreditCard, primary: false, show: perms.has("loyalty") },
     { href: "/personal/projects", label: "Home projects", icon: Hammer, primary: false, show: perms.has("personal") },

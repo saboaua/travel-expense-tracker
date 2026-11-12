@@ -146,8 +146,8 @@ export function GroceryOverview() {
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} unsent={unsent.has(r.id)}>
-                  <div><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
-                  {r.prices_only ? <p className="flex items-center gap-2"><span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground" data-testid="prices-only-tag">Prices only</span><span className="font-semibold text-muted-foreground">{fmt(r.total)}</span></p> : <p className="font-semibold">{fmt(r.total)}</p>}
+                  <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
+                  <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}>{fmt(r.total)}</p>
                 </ReceiptRow>
               ))}
             </CardContent>
