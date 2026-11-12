@@ -241,7 +241,7 @@ export default async function DashboardPage() {
             <Button variant="outline" size="sm">View all</Button>
           </Link>
         </CardHeader>
-        <CardContent className="space-y-4 max-md:px-0">
+        <CardContent className="space-y-4 max-md:px-0 max-md:pb-0">
           {activeTripsList.length === 0 ? (
             <div className="text-center py-8">
               <Plane className="h-10 w-10 mx-auto text-muted-foreground mb-3" />

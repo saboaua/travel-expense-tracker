@@ -2404,6 +2404,16 @@ try {
       const cardBox = await card.boundingBox();
       assert(cardBox.y >= heroBox.y + heroBox.height - 2, "the forecast is below the trip card");
 
+      // Phone: the cards below keep the same gap as everywhere else (no extra padding under the Active trips block)
+      await page.setViewportSize({ width: 390, height: 844 });
+      const gapBelow = await page.evaluate(() => {
+        const w = document.querySelector('[data-testid="trip-weather"]');
+        const block = w.closest('[class*="max-md:bg-transparent"]'); // the Active Trips block, borderless on a phone
+        return block ? Math.round(block.getBoundingClientRect().bottom - w.getBoundingClientRect().bottom) : null;
+      });
+      assert(gapBelow !== null && gapBelow <= 4, "no extra empty space under the forecast on a phone: " + gapBelow);
+      await page.setViewportSize({ width: 1280, height: 900 });
+
       reply = { status: "early", opensOn: addDays(today, 10) };
       await page.evaluate(() => { try { localStorage.clear(); } catch {} }); // a recent forecast is kept for 30 minutes
       await page.reload(); await page.getByRole("tab", { name: "Business" }).click();
