@@ -45,7 +45,7 @@ async function askAi(form: FormData, usable: (r: never) => boolean): Promise<AiA
 /** A short, plain reason why the AI reader was not used. */
 export function aiFallbackText(reason?: string): string {
   if (!reason) return "";
-  if (reason === "not_configured") return "GEMINI_API_KEY is not set on the server";
+  if (reason === "not_configured") return "no AI key (GEMINI_API_KEY or GROQ_API_KEY) is set on the server";
   if (reason === "limit") return "too many scans this hour";
   if (reason === "offline" || reason === "network") return "no connection to the AI reader";
   if (reason === "timeout" || reason === "http_504") return "the AI reader took too long";

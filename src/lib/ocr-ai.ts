@@ -9,12 +9,13 @@ import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 import { checkGrocery, type ScanCheck } from "@/lib/receipt-check";
+import { askGroq, groqConfigured, groqModels } from "@/lib/ocr-groq";
 
 const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
 
 export function aiOcrConfigured() {
-  return !!process.env.GEMINI_API_KEY;
+  return !!process.env.GEMINI_API_KEY || groqConfigured();
 }
 
 export const AI_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
@@ -139,6 +140,8 @@ export type AiCheck = {
   callMs: number | null;
   /** Other models and settings tried side by side, when the main test did not succeed. */
   probes?: { model: string; setting: string; status: number | string; ms: number; error: string | null }[];
+  /** The backup reader (Groq): key present, and a tiny test request. */
+  groq?: { keySet: boolean; model: string; status: number | string | null; ms: number | null; error: string | null };
   verdict: string;
 };
 
@@ -161,7 +164,36 @@ async function probe(key: string, model: string, setting: string, extra: Record<
   return { model, setting, status, ms: Date.now() - t0, error };
 }
 
+async function probeGroq(): Promise<NonNullable<AiCheck["groq"]>> {
+  const model = groqModels()[0];
+  const out = { keySet: groqConfigured(), model, status: null as number | string | null, ms: null as number | null, error: null as string | null };
+  if (!out.keySet) return out;
+  const t0 = Date.now();
+  try {
+    const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: { authorization: `Bearer ${process.env.GROQ_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ model, messages: [{ role: "user", content: 'Reply with the JSON {"ok":true}' }], response_format: { type: "json_object" }, max_completion_tokens: 64, temperature: 0 }),
+      signal: AbortSignal.timeout(12000),
+    });
+    out.status = res.status;
+    if (!res.ok) out.error = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 160);
+  } catch (e) {
+    out.status = e instanceof Error ? e.name : "error";
+  }
+  out.ms = Date.now() - t0;
+  return out;
+}
+
 export async function diagnoseAi(): Promise<AiCheck> {
+  const groq = await probeGroq();
+  const out = await diagnoseGemini();
+  out.groq = groq;
+  if (groq.keySet) out.verdict += groq.status === 200 ? " Backup reader (Groq) answered the test, so scans have a second reader when Gemini is busy." : ` Backup reader (Groq) did not answer the test (${groq.status}${groq.error ? `: ${groq.error}` : ""}).`;
+  return out;
+}
+
+async function diagnoseGemini(): Promise<AiCheck> {
   const key = process.env.GEMINI_API_KEY;
   const override = process.env.OCR_MODEL;
   const configuredModel = override && /^gemini/i.test(override) ? override : DEFAULT_MODEL;
@@ -235,7 +267,7 @@ export function parseModelJson(text: string): Record<string, unknown> | null {
 
 type AiImage = { data: Uint8Array | ArrayBuffer; mime: string };
 
-async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { single?: boolean; ms?: number } = {}): Promise<Record<string, unknown>> {
+async function askGemini(image: AiImage, prompt: string, maxTokens: number, opts: { single?: boolean; ms?: number; until?: number } = {}): Promise<Record<string, unknown>> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) throw new Error("AI OCR is not configured");
   if (!AI_IMAGE_TYPES.includes(image.mime)) throw new Error("Unsupported image type for AI OCR");
@@ -250,6 +282,8 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { 
   const firstMs = opts.ms ?? (long ? 25000 : 12000);
   const nextMs = long ? 12000 : 8000;
 
+  // With a backup reader, Gemini stops at `until` so the backup still has time inside the route's limit
+  const cap = (ms: number) => (opts.until ? Math.max(1000, Math.min(ms, opts.until - Date.now())) : ms);
   const call = (model: string, ms: number, tokens: number) =>
     fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
@@ -258,7 +292,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { 
         contents: [{ role: "user", parts: [{ inline_data: { mime_type: image.mime, data: base64 } }, { text: prompt }] }],
         generationConfig: { responseMimeType: "application/json", maxOutputTokens: Math.max(tokens, 2048), temperature: 0 },
       }),
-      signal: AbortSignal.timeout(ms),
+      signal: AbortSignal.timeout(cap(ms)),
     }).catch(() => null); // null: no answer in time
 
   // Google retires models (404), and busy ones answer 429/5xx or not at all. Then try the next best model from Google's own list.
@@ -270,6 +304,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { 
   if (!opts.single && (!res || RETRY.has(res.status))) {
     const next = (await discoverModels(key)).filter((m) => !tried.includes(m)).slice(0, 2);
     for (const m of next) {
+      if (opts.until && opts.until - Date.now() < 3000) break;
       tried.push(m);
       const r = await call(m, nextMs, maxTokens);
       if (r && (r.ok || !res)) { res = r; usedModel = m; }
@@ -294,7 +329,7 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { 
 
   let out = await read(res);
   // Cut off or unreadable: ask once more with a bigger output budget, while there is time left
-  const left = 50000 - (Date.now() - started);
+  const left = (opts.until ?? started + 50000) - Date.now();
   if (!opts.single && (!out.parsed || out.cut) && left > 8000) {
     const again = await call(usedModel, Math.min(left, 25000), Math.min(Math.max(maxTokens * 3, 4096), 16000));
     if (again?.ok) {
@@ -306,12 +341,46 @@ async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { 
   return out.parsed;
 }
 
+/** Gemini's share of the time when Groq is waiting as the backup (the route allows 60 seconds in all). */
+const GEMINI_SHARE_MS = 30000;
+const TOTAL_MS = 54000;
+
+/**
+ * Reads the photo with Gemini; when that fails and `backup` is on (receipts and grocery receipts only, never passports or
+ * tickets) and a GROQ_API_KEY is set, Groq reads it instead. Without a Gemini key, Groq is the only reader.
+ */
+async function askAi(image: AiImage, prompt: string, maxTokens: number, opts: { single?: boolean; ms?: number; backup?: boolean } = {}): Promise<Record<string, unknown>> {
+  const started = Date.now();
+  const backup = !!opts.backup && groqConfigured();
+  let firstError: unknown = null;
+  if (process.env.GEMINI_API_KEY) {
+    try {
+      return await askGemini(image, prompt, maxTokens, { single: opts.single, ms: opts.ms, until: backup ? started + GEMINI_SHARE_MS : undefined });
+    } catch (e) {
+      if (!backup) throw e;
+      firstError = e;
+      console.warn("Gemini could not read the receipt, trying Groq:", e instanceof Error ? e.message.slice(0, 160) : e);
+    }
+  } else if (!backup) {
+    throw new Error("AI OCR is not configured");
+  }
+  if (!AI_IMAGE_TYPES.includes(image.mime)) throw new Error("Unsupported image type for AI OCR");
+  try {
+    const out = await askGroq(image, prompt, maxTokens, Math.min(25000, TOTAL_MS - (Date.now() - started)));
+    const parsed = parseModelJson(out.text);
+    if (!parsed) throw new Error(out.text.includes("{") ? "AI OCR returned invalid JSON" : "AI OCR returned no JSON");
+    return parsed;
+  } catch (e) {
+    throw firstError ?? e; // the main reader's reason is the one worth showing
+  }
+}
+
 export async function extractReceiptWithAi(
   image: { data: Uint8Array | ArrayBuffer; mime: string },
   hints: OcrHints = {}
 ): Promise<OcrResult> {
   const today = todayISO();
-  const parsed = await askAi(image, buildPrompt(hints, today), 400);
+  const parsed = await askAi(image, buildPrompt(hints, today), 400, { backup: true });
   const fields = sanitize(parsed, hints, today);
   return { ...fields, rawText: JSON.stringify(fields), source: "ai" };
 }
@@ -407,7 +476,7 @@ export async function extractGroceryWithAi(
   hints: OcrHints = {}
 ): Promise<GroceryScan> {
   const today = todayISO();
-  const raw = await askAi(image, buildGroceryPrompt(hints, today), 6000);
+  const raw = await askAi(image, buildGroceryPrompt(hints, today), 6000, { backup: true });
   return parseGroceryAnswer(raw, hints, today);
 }
 
@@ -448,7 +517,7 @@ export async function recheckGroceryWithAi(
   if (check.ok || first.items.length === 0) return null;
   try {
     const today = todayISO();
-    const raw = await askAi(image, buildRefinePrompt(hints, today, first, check.issues), 6000, { single: true, ms: 40000 });
+    const raw = await askAi(image, buildRefinePrompt(hints, today, first, check.issues), 6000, { single: true, ms: 40000, backup: true });
     const better = parseGroceryAnswer(raw, hints, today);
     const again = checkGrocery(better);
     return better.items.length > 0 && again.score < check.score ? { ...better, check: again, refined: true } : null;
