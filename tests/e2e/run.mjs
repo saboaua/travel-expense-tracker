@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -874,6 +874,63 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("00000000e")) a.splice(i, 1); }
+    }
+  });
+
+  await test("online: shop prices sit beside what you paid, an unsure match asks once, and nothing is added to spending", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const R = ["9c000000-0000-4000-8000-00000000f001", "9c000000-0000-4000-8000-00000000f002"];
+    const mk = (id, store, days) => ({ id, user_id: PAT, store, purchase_date: addDays(today, days), total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    const item = (n, rid, name, price) => ({ id: `9d000000-0000-4000-8000-00000000f10${n}`, receipt_id: rid, user_id: PAT, name, normalized_name: name.toLowerCase(), category: "Other", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() });
+    fake.table("grocery_receipts").push(mk(R[0], "Folira Supermarket", -6), mk(R[1], "TUR DIA", -2));
+    fake.table("grocery_items").push(item(1, R[0], "Oreo", 1.5), item(2, R[1], "Oreo", 4.99));
+    const spendBefore = fake.table("grocery_receipts").reduce((s, r) => s + r.total, 0);
+    let answered = false;
+    try {
+      await page.route("**/api/store-prices", async (r) => {
+        const body = r.request().postDataJSON();
+        const key = body.products[0].key;
+        const matches = { [key]: [
+          { store: "superfood", storeName: "Super Food Plaza", itemId: "s1", name: "OREO COOKIES", size: null, price: 1.0, url: "https://shop.superfoodaruba.com/shop/x/p/1", fetchedAt: new Date().toISOString(), status: "same", confirmed: false, score: 1 },
+          { store: "ling", storeName: "Ling & Sons", itemId: "l1", name: "Oreo Double Stuf", size: null, price: 1.4, url: "https://shop.lingandsons.com/products/oreo", fetchedAt: new Date().toISOString(), status: answered ? "same" : "ask", confirmed: answered, score: 0.7 },
+        ] };
+        await r.fulfill({ json: { matches, enabled: ["superfood", "ling"], stores: [{ id: "superfood", name: "Super Food Plaza", site: "shop.superfoodaruba.com", checkedAt: new Date().toISOString() }, { id: "ling", name: "Ling & Sons", site: "shop.lingandsons.com", checkedAt: new Date().toISOString() }] } });
+      });
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const card = page.getByTestId("price-product").filter({ hasText: "Oreo" }).first();
+      await card.waitFor({ timeout: 60000 });
+      const line = card.getByTestId("online-line");
+      await line.waitFor({ timeout: 30000 });
+      const lt = await line.innerText();
+      assert(/Online/.test(lt) && /Super Food Plaza/.test(lt) && /33/.test(lt), "the list line shows the cheaper online price and the saving: " + lt);
+      assert(/Includes 1 cheaper online/.test(await page.getByTestId("price-tiles").textContent()), "the Cheaper elsewhere tile counts it");
+      await card.getByRole("button").first().click();
+      const block = card.getByTestId("online-block");
+      await block.waitFor();
+      const bt = await block.innerText();
+      assert(/online prices today/i.test(bt) && /Cheaper online at Super Food Plaza/.test(bt) && /never added to what you spent/.test(bt), "online block and note: " + bt.slice(0, 300));
+      assert(/Their name: OREO COOKIES/.test(bt), "their product name is shown so you can check it");
+      if (process.env.E2E_SHOTS) { await page.screenshot({ path: "/tmp/price/online_real.png", fullPage: true }); }
+      assert(/what you paid/i.test(await card.getByTestId("price-detail").innerText()), "your purchases keep their own heading");
+      assert((await card.getByTestId("online-yes").count()) === 1, "the unsure match asks once");
+      const link = await card.locator('a:has-text("Open in shop")').first().getAttribute("href");
+      assert(link.startsWith("https://shop.superfoodaruba.com/"), "link to the shop");
+      answered = true;
+      await card.getByTestId("online-yes").click();
+      try { await page.waitForFunction(() => !document.querySelector('[data-testid="online-yes"]'), null, { timeout: 30000 }); }
+      catch { throw new Error("the answer did not refresh the card: alerts=" + JSON.stringify(await page.locator('[role="alert"]').allInnerTexts()) + " saved=" + JSON.stringify(fake.table("grocery_online_matches"))); }
+      assert(fake.table("grocery_online_matches").some((m) => m.store === "ling" && m.item_id === "l1" && m.same === true), "the answer is saved");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+      assert(fake.table("grocery_receipts").reduce((s, r) => s + r.total, 0) === spendBefore, "your spending is unchanged");
+      await page.getByTestId("online-stores").locator("summary").click();
+      assert((await page.getByTestId("online-stores").getByRole("switch").count()) === 2, "a switch for each shop");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items", "grocery_online_matches"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "grocery_online_matches" || String(a[i].id).includes("00000000f")) a.splice(i, 1); }
     }
   });
 
@@ -2408,8 +2465,8 @@ try {
       await page.setViewportSize({ width: 390, height: 844 });
       const gapBelow = await page.evaluate(() => {
         const w = document.querySelector('[data-testid="trip-weather"]');
-        const block = w.closest('[class*="max-md:bg-transparent"]'); // the Active Trips block, borderless on a phone
-        return block ? Math.round(block.getBoundingClientRect().bottom - w.getBoundingClientRect().bottom) : null;
+        const body = w.closest('[class*="max-md:px-0"]'); // the Active Trips content: on a phone it has no extra padding under its last card
+        return body ? Math.round(parseFloat(getComputedStyle(body).paddingBottom)) : null;
       });
       assert(gapBelow !== null && gapBelow <= 4, "no extra empty space under the forecast on a phone: " + gapBelow);
       await page.setViewportSize({ width: 1280, height: 900 });

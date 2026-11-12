@@ -2,12 +2,12 @@
 
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
 import { Sparkline } from "@/components/personal/Sparkline";
 import { PriceChart, STORE_COLORS } from "@/components/personal/PriceChart";
 import type { TrackerRow } from "@/lib/personal/grocery";
@@ -18,6 +18,7 @@ import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { compareOnline, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
 
 type Sort = "saving" | "increase" | "recent" | "purchases" | "name";
 
@@ -35,6 +36,11 @@ function Change({ pct }: { pct: number | null }) {
 const Cheapest = () => <span className={`${chipBase} ${GREEN}`}><Tag className="h-3 w-3" aria-hidden="true" />Cheapest</span>;
 const day = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 const heading = "text-xs font-bold uppercase tracking-wide text-muted-foreground";
+const ONLINE_CHIP = "bg-indigo-100 text-indigo-900 dark:bg-indigo-500/20 dark:text-indigo-200";
+const OnlineChip = () => <span className={`${chipBase} ${ONLINE_CHIP}`}>Online</span>;
+
+type OnlineData = { matches: Record<string, OnlineMatch[]>; enabled: StoreId[]; stores: { id: StoreId; name: string; site?: string; checkedAt: string | null }[]; setup?: string };
+const shopLink = (url: string | null) => (url && /^https:\/\/(shop\.superfoodaruba\.com|shop\.lingandsons\.com)\//.test(url) ? url : null);
 
 export function GroceryPrices() {
   const { data, loading, error, savedAt } = useCachedQuery<TrackerRow[]>((uid) => pricesKey(uid), (sb) => fetchPrices(sb), []);
@@ -48,6 +54,8 @@ export function GroceryPrices() {
   const [filter, setFilter] = useState<PriceFilter>("all");
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [onlineData, setOnlineData] = useState<OnlineData | null>(null);
+  const [onlineTick, setOnlineTick] = useState(0);
 
   const { products, suggestions } = useMemo(() => buildProducts(rows, decisions), [rows, decisions]);
   const currencies = useMemo(() => [...new Set(products.map((p) => p.currency))], [products]);
@@ -56,6 +64,38 @@ export function GroceryPrices() {
   const summary = useMemo(() => priceSummary(inCur), [inCur]);
   const multi = inCur.filter((p) => p.stores.length > 1).length;
   const suggestion = suggestions.find((s) => s.keyA.startsWith(`${cur}|`));
+
+
+  const fmt = (n: number) => formatCurrency(n, cur);
+
+  // Online shop prices (only for AWG, the currency the shops use). They sit beside what you paid and are never added to it.
+  const wantKey = useMemo(() => (cur === ONLINE_CURRENCY ? inCur.map((p) => `${p.key}~${p.names.map((n) => n.name).join("~")}`).join("|") : ""), [cur, inCur]);
+  useEffect(() => {
+    if (!wantKey || !online) return;
+    let off = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: inCur.map((p) => ({ key: p.key, names: p.names.map((n) => n.name) })) }) });
+        if (!res.ok) throw new Error(String(res.status));
+        const j = (await res.json()) as OnlineData;
+        if (!off) setOnlineData(j);
+      } catch { /* the tracker works without them */ }
+    })();
+    return () => { off = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- wantKey is the list of products asked about
+  }, [wantKey, online, onlineTick]);
+
+  const verdicts = useMemo(() => {
+    const m = new Map<string, OnlineVerdict>();
+    if (!onlineData) return m;
+    for (const p of inCur) {
+      const found = onlineData.matches[p.key];
+      if (found?.length) m.set(p.key, compareOnline(p.stores[0]?.latest.price ?? p.stats.last, found));
+    }
+    return m;
+  }, [onlineData, inCur]);
+  const cheaperOnline = useMemo(() => inCur.filter((p) => verdicts.get(p.key)?.cheaper).length, [inCur, verdicts]);
+  const elsewhereCount = useMemo(() => inCur.filter((p) => p.saving || verdicts.get(p.key)?.cheaper).length, [inCur, verdicts]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,10 +106,31 @@ export function GroceryPrices() {
       purchases: (a, b) => b.count - a.count,
       name: (a, b) => a.name.localeCompare(b.name),
     };
-    return inCur.filter((p) => matchesFilter(p, filter) && (!q || p.names.some((n) => n.name.toLowerCase().includes(q)) || p.name.toLowerCase().includes(q))).sort(by[sort]);
-  }, [inCur, query, sort, filter]);
+    return inCur.filter((p) => (filter === "elsewhere" ? !!(p.saving || verdicts.get(p.key)?.cheaper) : matchesFilter(p, filter)) && (!q || p.names.some((n) => n.name.toLowerCase().includes(q)) || p.name.toLowerCase().includes(q))).sort(by[sort]);
+  }, [inCur, query, sort, filter, verdicts]);
 
-  const fmt = (n: number) => formatCurrency(n, cur);
+  const answerOnline = useCallback(async (productKey: string, m: OnlineMatch, same: boolean) => {
+    setNote(null);
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user.id;
+    if (!uid) { setNote("Sign in again to save this."); return; }
+    const { error: e } = await supabase.from("grocery_online_matches").upsert({ user_id: uid, product_key: productKey, store: m.store, item_id: m.itemId, same }, { onConflict: "user_id,product_key,store,item_id" });
+    if (e) { setNote(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_store_prices.sql in Supabase to save your answers." : "Could not save that. Try again."); return; }
+    setOnlineTick((n) => n + 1);
+  }, []);
+
+  const toggleStore = useCallback(async (id: StoreId, on: boolean) => {
+    const current = onlineData?.enabled ?? STORE_IDS;
+    const next = STORE_IDS.filter((s) => (s === id ? on : current.includes(s)));
+    const supabase = createClient();
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user.id;
+    if (!uid) return;
+    const { error: e } = await supabase.from("grocery_online_prefs").upsert({ user_id: uid, stores: next, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+    if (e) { setNote("Could not save that. Try again."); return; }
+    setOnlineTick((n) => n + 1);
+  }, [onlineData]);
 
   async function answer(pairs: [string, string][], same: boolean) {
     setNote(null);
@@ -105,7 +166,7 @@ export function GroceryPrices() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Price tracker</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{inCur.length} item{inCur.length === 1 ? "" : "s"} · {summary.stores} store{summary.stores === 1 ? "" : "s"} · {cur}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{inCur.length} item{inCur.length === 1 ? "" : "s"} · {summary.stores} store{summary.stores === 1 ? "" : "s"}{onlineData && onlineData.enabled.length > 0 && cur === ONLINE_CURRENCY ? ` · ${onlineData.enabled.length} online` : ""} · {cur}</p>
         </div>
         <Link href="/personal/groceries/new"><Button className="h-11 gap-2"><Plus className="h-4 w-4" /> <span className="sm:hidden">Scan</span><span className="hidden sm:inline">Scan receipt</span></Button></Link>
       </div>
@@ -118,7 +179,7 @@ export function GroceryPrices() {
         <div className="flex gap-2 sm:gap-3" data-testid="price-tiles">
           {tile("up", summary.up, "Cost more", "than last time at the same store", "text-red-800 dark:text-red-300")}
           {tile("down", summary.down, "Got cheaper", "than last time at the same store", "text-emerald-800 dark:text-emerald-300")}
-          {tile("elsewhere", summary.elsewhere, "Cheaper elsewhere", summary.saveTotal > 0 ? `Switch stores and save about ${fmt(summary.saveTotal)} on these` : "Same price everywhere so far", "text-blue-800 dark:text-blue-300")}
+          {tile("elsewhere", elsewhereCount, "Cheaper elsewhere", cheaperOnline > 0 ? `Includes ${cheaperOnline} cheaper online (Super Food Plaza, Ling & Sons)` : summary.saveTotal > 0 ? `Switch stores and save about ${fmt(summary.saveTotal)} on these` : "Same price everywhere so far", "text-blue-800 dark:text-blue-300")}
         </div>
       )}
 
@@ -168,9 +229,61 @@ export function GroceryPrices() {
       <div className="space-y-3">
         {list.map((p) => (
           <ProductCard key={p.key} p={p} fmt={fmt} isOpen={open === p.key} onToggle={() => setOpen(open === p.key ? null : p.key)} online={online}
+            onlineMatches={cur === ONLINE_CURRENCY ? onlineData?.matches[p.key] ?? null : null} verdict={verdicts.get(p.key) ?? null} onlineReady={cur === ONLINE_CURRENCY && !!onlineData && onlineData.enabled.length > 0 && !onlineData.setup}
+            onAnswerOnline={(m, same) => answerOnline(p.key, m, same)}
             onSeparate={(atomKey) => answer(p.atomKeys.filter((k) => k !== atomKey).map((k) => [atomKey, k] as [string, string]), false)} />
         ))}
       </div>
+
+      {cur === ONLINE_CURRENCY && onlineData && !onlineData.setup && (
+        <details className="rounded-2xl border bg-card px-4" data-testid="online-stores">
+          <summary className="flex min-h-12 cursor-pointer items-center gap-2 text-sm font-semibold"><Globe className="h-4 w-4" aria-hidden="true" />Online stores</summary>
+          <div className="pb-3">
+            {STORE_IDS.map((id, i) => {
+              const on = onlineData.enabled.includes(id);
+              const info = onlineData.stores.find((s) => s.id === id);
+              return (
+                <label key={id} className={`flex min-h-14 cursor-pointer items-center gap-3 ${i ? "border-t" : ""}`}>
+                  <span className="min-w-0 flex-1"><b className="block text-[15px]">{STORES[id].name}</b><span className="block text-[13px] text-muted-foreground">{STORES[id].site}{on && info?.checkedAt ? ` · checked ${formatDate(info.checkedAt.slice(0, 10))}` : ""}</span></span>
+                  <input type="checkbox" role="switch" checked={on} disabled={!online} onChange={(e) => toggleStore(id, e.target.checked)} className="h-6 w-11 shrink-0 cursor-pointer accent-primary" aria-label={`Compare with ${STORES[id].name}`} />
+                </label>
+              );
+            })}
+            <p className="border-t pt-3 text-[13px] leading-snug text-muted-foreground">Prices are read once a day from each shop&apos;s public product list. Only the names of things you bought are looked up, nothing about you is sent.</p>
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function OnlineRow({ m, best, fmt, ask, onAnswer, online, max }: { m: OnlineMatch; best: boolean; fmt: (n: number) => string; ask: boolean; onAnswer: (same: boolean) => void; online: boolean; max: number }) {
+  const link = shopLink(m.url);
+  return (
+    <div className="border-t py-2.5" data-testid="online-row" data-store={m.store}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="flex items-center gap-1.5 text-[15px] font-semibold"><Globe className="h-4 w-4 text-indigo-700 dark:text-indigo-300" aria-hidden="true" />{m.storeName}</span>
+        <OnlineChip />
+        <span className="ml-auto text-[17px] font-bold tabular-nums">{fmt(m.price)}</span>
+      </div>
+      <div className="mt-2 h-2 rounded-full bg-muted" aria-hidden="true"><div className={`h-2 rounded-full ${best ? "bg-emerald-600" : "bg-slate-400"}`} style={{ width: `${Math.max(8, Math.round((m.price / max) * 100))}%` }} /></div>
+      <p className="mt-1.5 text-[13px] text-muted-foreground">Their name: <span className="font-medium text-foreground">{m.name}{m.size ? ` (${m.size})` : ""}</span></p>
+      <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[13px] text-muted-foreground">
+        {ask
+          ? <span className="font-semibold text-amber-800 dark:text-amber-300">Similar name, not sure it is the same</span>
+          : <span className="font-semibold text-emerald-800 dark:text-emerald-300">{m.confirmed ? "Same product · you confirmed" : "Same name and size"}</span>}
+        <span>Checked {formatDate(m.fetchedAt.slice(0, 10))}</span>
+        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open in shop <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>}
+      </div>
+      {ask && (
+        <div className="mt-2 flex gap-2">
+          <Button className="h-11" disabled={!online} onClick={() => onAnswer(true)} data-testid="online-yes">Yes, same</Button>
+          <Button variant="outline" className="h-11" disabled={!online} onClick={() => onAnswer(false)} data-testid="online-no">No</Button>
+        </div>
+      )}
+      {!m.confirmed && !ask && (
+        <button type="button" disabled={!online} onClick={() => onAnswer(false)} className="mt-1 min-h-9 text-[13px] font-semibold text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Not the same product</button>
+      )}
     </div>
   );
 }
@@ -192,7 +305,7 @@ function StoreRow({ s, i, max, fmt, unit }: { s: StoreSummary; i: number; max: n
   );
 }
 
-function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online }: { p: Product; fmt: (n: number) => string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean }) {
+function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
   const multi = p.stores.length > 1;
   const best = p.stores[0];
   const max = Math.max(...p.stores.map((s) => s.latest.price));
@@ -217,10 +330,23 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online }: { p: Prod
           </div>
           {/* On a phone the store sits under the green line, so it can never run into the price on the right */}
           {multi && <p className="mt-1.5 text-[13px] text-muted-foreground sm:hidden" data-testid="price-best-store">Best price at {best.store}</p>}
+          {onlineReady && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="online-line">
+              {verdict?.cheaper ? (
+                <><OnlineChip /><span className="text-sm font-semibold">{verdict.cheaper.storeName} {fmt(verdict.cheaper.price)}</span><span className={`${chipBase} ${GREEN}`}><ArrowDown className="h-3 w-3" aria-hidden="true" />{verdict.savingPct}%</span></>
+              ) : verdict?.dearer ? (
+                <span className="text-[13px] text-muted-foreground">Cheapest you paid. Online: {verdict.dearer.storeName} {fmt(verdict.dearer.price)} ({verdict.extraPct > 0 ? "+" : ""}{verdict.extraPct}%)</span>
+              ) : onlineMatches?.length ? (
+                <span className="text-[13px] text-muted-foreground">Possible match online, open to check</span>
+              ) : (
+                <span className="text-[13px] text-muted-foreground">Not found online yet</span>
+              )}
+            </div>
+          )}
         </div>
         <div className="hidden shrink-0 sm:block"><Sparkline values={[...p.history].reverse().map((h) => h.price)} width={96} /></div>
         <div className="shrink-0 text-right">
-          {multi && <p className="text-xs text-muted-foreground">Best price</p>}
+          {multi ? <p className="text-xs text-muted-foreground">Best price</p> : onlineReady && verdict ? <p className="text-xs text-muted-foreground">you paid</p> : null}
           <p className={`text-lg font-bold tabular-nums ${multi ? "text-emerald-800 dark:text-emerald-300" : ""}`}>{fmt(shownPrice)}{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</p>
           <div className="mt-1">{multi ? <span className="hidden text-xs text-muted-foreground sm:inline">{best.store}</span> : <Change pct={p.changePct} />}</div>
         </div>
@@ -231,7 +357,22 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online }: { p: Prod
         <div className="border-t" data-testid="price-detail">
           <div className="grid gap-x-8 gap-y-4 px-3.5 pb-4 pt-3 sm:px-4 md:grid-cols-2">
             <div className="min-w-0">
-              <p className={`${heading} mb-1`}>{multi ? "Latest price by store" : "Price at this store"}</p>
+              {onlineReady && onlineMatches && onlineMatches.length > 0 && (
+                <div className="mb-4" data-testid="online-block">
+                  <p className={`${heading} mb-1`}>Online prices today</p>
+                  {(() => { const mx = Math.max(...onlineMatches.map((m) => m.price), p.stores[0].latest.price); return onlineMatches.map((m) => (
+                    <OnlineRow key={m.store} m={m} best={m.status === "same" && verdict?.cheaper?.store === m.store} fmt={fmt} ask={m.status === "ask"} online={online} max={mx} onAnswer={(same) => onAnswerOnline(m, same)} />
+                  )); })()}
+                  {verdict?.cheaper && (
+                    <p className="mt-2 flex items-start gap-2 rounded-xl bg-indigo-100 p-3 text-[15px] leading-snug text-indigo-950 dark:bg-indigo-500/20 dark:text-indigo-100" data-testid="online-saving">
+                      <Tag className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span><b>Cheaper online at {verdict.cheaper.storeName}.</b> {fmt(verdict.cheaper.price)} is <b>{fmt(verdict.savingAmount)} less</b> ({verdict.savingPct}%) than the best price you paid ({p.stores[0].store}, {fmt(p.stores[0].latest.price)}).</span>
+                    </p>
+                  )}
+                  <p className="mt-2 flex items-start gap-2 text-[13px] leading-snug text-muted-foreground"><Globe className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />Online prices are shown for comparison only. They are never added to what you spent. Shelf prices and delivery fees can differ.</p>
+                </div>
+              )}
+              <p className={`${heading} mb-1`}>{onlineReady && onlineMatches && onlineMatches.length > 0 ? "What you paid" : multi ? "Latest price by store" : "Price at this store"}</p>
               {p.stores.map((s, i) => <StoreRow key={s.store} s={s} i={i} max={max} fmt={fmt} unit={p.unit} />)}
               {p.saving && (
                 <p className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-100 p-3 text-[15px] leading-snug text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100" data-testid="price-saving">
