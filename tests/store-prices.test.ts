@@ -1,4 +1,4 @@
-import { compareOnline, fetchLing, fetchSuperFood, mapFreshop, mapShopify, matchProducts, scoreCandidate, tidySize, type CatalogItem } from "../src/lib/store-prices";
+import { doitSize, mapDoit, staleDays, compareOnline, fetchLing, fetchSuperFood, mapFreshop, mapShopify, matchProducts, scoreCandidate, tidySize, type CatalogItem } from "../src/lib/store-prices";
 import { parseSize, productWords } from "../src/lib/personal/price-compare";
 
 let failed = 0;
@@ -95,6 +95,28 @@ eq([v2.cheaper, v2.dearer?.price, v2.extraPct], [null, 3.35, 8.1], "dearer onlin
 eq(compareOnline(5, [same(1, "ask")]).cheaper, null, "an unsure match never counts as cheaper");
 
 readers().then(() => {
-  if (failed) { console.log(`${failed} failed`); process.exit(1); }
+  
+// ---- Do it Aruba file import ----
+eq([doitSize("COKE ZERO 40OZ"), doitSize("DOVE SOAP 350GR /13 OZ"), doitSize("MILK 1.5 LT"), doitSize("BANANA")], ["40 oz", "350 g", "1.5 l", null], "doit sizes are read from the description");
+const dbase = { LSC_Unit_Price_Incl_VAT: 2.5, ProductStatus: "All", ShowonWebsite: true, Blocked: false };
+const dr = mapDoit([
+  { ...dbase, No: "111", Description: "COKE\tZERO   40OZ" },
+  { ...dbase, No: "112", Description: "SOLD", ProductStatus: "Soldout" },
+  { ...dbase, No: "113", Description: "CLOSE", ProductStatus: "Closeout" },
+  { ...dbase, No: "114", Description: "HIDDEN", ShowonWebsite: false },
+  { ...dbase, No: "115", Description: "BLOCKED", Blocked: true },
+  { ...dbase, No: "116", Description: "FREE", LSC_Unit_Price_Incl_VAT: 0 },
+  { ...dbase, No: "", Description: "NOID" },
+  { ...dbase, No: "111", Description: "COKE ZERO 40OZ" },
+]);
+eq([dr.total, dr.rows.length, dr.skipped], [8, 1, { soldOut: 1, closeout: 1, hidden: 2, noPrice: 1, noName: 1 }], "doit rows: skips and counts");
+eq([dr.rows[0].name, dr.rows[0].store, dr.rows[0].size_text], ["COKE ZERO 40OZ", "doit", "40 oz"], "doit row is cleaned");
+eq(mapDoit([{ ...dbase, No: "1", Description: "X", ProductStatus: "Closeout" }], { closeout: true }).rows.length, 1, "closeout can be kept");
+eq(staleDays("doit") > staleDays("superfood"), true, "file prices stay usable longer");
+const dcat = mapDoit([{ ...dbase, No: "9", Description: "COCA COLA ZERO 40OZ", LSC_Unit_Price_Incl_VAT: 3.1 }]).rows.map((x) => ({ ...x, fetched_at: new Date().toISOString() }));
+const dm = matchProducts([{ key: "k", names: ["Coca Cola Zero 40 oz"] }], dcat as never, [], ["doit"]);
+eq(dm.k?.[0]?.status, "same", "a bought 40 oz matches the file's 40OZ");
+
+if (failed) { console.log(`${failed} failed`); process.exit(1); }
   console.log("store-prices: all checks passed");
 });

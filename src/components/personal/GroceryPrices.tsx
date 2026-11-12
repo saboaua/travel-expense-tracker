@@ -18,7 +18,7 @@ import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
-import { compareOnline, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
+import { compareOnline, FILE_STORES, OLD_FILE_DAYS, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
 
 type Sort = "saving" | "increase" | "recent" | "purchases" | "name";
 
@@ -179,7 +179,7 @@ export function GroceryPrices() {
         <div className="flex gap-2 sm:gap-3" data-testid="price-tiles">
           {tile("up", summary.up, "Cost more", "than last time at the same store", "text-red-800 dark:text-red-300")}
           {tile("down", summary.down, "Got cheaper", "than last time at the same store", "text-emerald-800 dark:text-emerald-300")}
-          {tile("elsewhere", elsewhereCount, "Cheaper elsewhere", cheaperOnline > 0 ? `Includes ${cheaperOnline} cheaper online (Super Food Plaza, Ling & Sons)` : summary.saveTotal > 0 ? `Switch stores and save about ${fmt(summary.saveTotal)} on these` : "Same price everywhere so far", "text-blue-800 dark:text-blue-300")}
+          {tile("elsewhere", elsewhereCount, "Cheaper elsewhere", cheaperOnline > 0 ? `Includes ${cheaperOnline} cheaper online` : summary.saveTotal > 0 ? `Switch stores and save about ${fmt(summary.saveTotal)} on these` : "Same price everywhere so far", "text-blue-800 dark:text-blue-300")}
         </div>
       )}
 
@@ -244,7 +244,7 @@ export function GroceryPrices() {
               const info = onlineData.stores.find((s) => s.id === id);
               return (
                 <label key={id} className={`flex min-h-14 cursor-pointer items-center gap-3 ${i ? "border-t" : ""}`}>
-                  <span className="min-w-0 flex-1"><b className="block text-[15px]">{STORES[id].name}</b><span className="block text-[13px] text-muted-foreground">{STORES[id].site}{on && info?.checkedAt ? ` · checked ${formatDate(info.checkedAt.slice(0, 10))}` : ""}</span></span>
+                  <span className="min-w-0 flex-1"><b className="block text-[15px]">{STORES[id].name}</b><span className="block text-[13px] text-muted-foreground">{STORES[id].site}{on && info?.checkedAt ? ` · ${FILE_STORES.includes(id) ? "from file" : "checked"} ${formatDate(info.checkedAt.slice(0, 10))}` : ""}</span></span>
                   <input type="checkbox" role="switch" checked={on} disabled={!online} onChange={(e) => toggleStore(id, e.target.checked)} className="h-6 w-11 shrink-0 cursor-pointer accent-primary" aria-label={`Compare with ${STORES[id].name}`} />
                 </label>
               );
@@ -272,7 +272,9 @@ function OnlineRow({ m, best, fmt, ask, onAnswer, online, max }: { m: OnlineMatc
         {ask
           ? <span className="font-semibold text-amber-800 dark:text-amber-300">Similar name, not sure it is the same</span>
           : <span className="font-semibold text-emerald-800 dark:text-emerald-300">{m.confirmed ? "Same product · you confirmed" : "Same name and size"}</span>}
-        <span>Checked {formatDate(m.fetchedAt.slice(0, 10))}</span>
+        {FILE_STORES.includes(m.store)
+          ? <span>From file, {formatDate(m.fetchedAt.slice(0, 10))}{Date.now() - Date.parse(m.fetchedAt) > OLD_FILE_DAYS * 86400000 && <b className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200" data-testid="old-file">Old</b>}</span>
+          : <span>Checked {formatDate(m.fetchedAt.slice(0, 10))}</span>}
         {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open in shop <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>}
       </div>
       {ask && (

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -57,6 +57,13 @@ const sections: { href: string; feature: string; title: string; description: str
     icon: Tv,
   },
   {
+    href: "/admin/doit",
+    feature: "admin.only",
+    title: "Do it Aruba Prices",
+    description: "Import the Do it price list from an exported Excel file for the Price tracker.",
+    icon: FileSpreadsheet,
+  },
+  {
     href: "/admin/users",
     feature: "users.manage",
     title: "User Roles & Users",
@@ -67,7 +74,7 @@ const sections: { href: string; feature: string; title: string; description: str
 
 export default function AdminSettingsPage() {
   const { role, perms, loaded } = useAccess();
-  const visible = sections.filter((s) => role === "admin" || perms.has(s.feature));
+  const visible = sections.filter((s) => role === "admin" || (s.feature !== "admin.only" && perms.has(s.feature)));
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
       <PageHeader title="Global Settings" description={<>Configure branding, currencies, categories, Telegram, and users.</>} />

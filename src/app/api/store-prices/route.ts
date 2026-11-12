@@ -2,12 +2,11 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { productWords } from "@/lib/personal/price-compare";
-import { matchProducts, STORE_IDS, STORES, type Answer, type CatalogItem, type StoreId } from "@/lib/store-prices";
+import { matchProducts, staleDays, STORE_IDS, STORES, type Answer, type CatalogItem, type StoreId } from "@/lib/store-prices";
 
 export const dynamic = "force-dynamic";
 
 const MAX_PRODUCTS = 120;
-const STALE_DAYS = 7;
 
 /**
  * For the things you bought: the matching product in each online shop, from the daily copy of their lists.
@@ -44,9 +43,9 @@ export async function POST(request: Request) {
     const missing = /relation|schema cache|does not exist/i.test(error.message);
     return NextResponse.json({ matches: {}, stores: [], enabled, setup: missing ? "migration" : "error" });
   }
-  const cutoff = Date.now() - STALE_DAYS * 86400000;
+  const now = Date.now();
   const catalog = ((data ?? []) as (Omit<CatalogItem, "store"> & { store: string })[])
-    .filter((r) => (STORE_IDS as string[]).includes(r.store) && Date.parse(r.fetched_at) >= cutoff) as CatalogItem[];
+    .filter((r) => (STORE_IDS as string[]).includes(r.store) && Date.parse(r.fetched_at) >= now - staleDays(r.store as StoreId) * 86400000) as CatalogItem[];
 
   // When did each shop last answer? (an empty catalog means the daily job has not run yet)
   const { data: fresh } = await supabase.from("store_catalog").select("store, fetched_at").in("store", enabled).order("fetched_at", { ascending: false }).limit(50);

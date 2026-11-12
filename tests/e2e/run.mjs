@@ -927,7 +927,7 @@ try {
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
       assert(fake.table("grocery_receipts").reduce((s, r) => s + r.total, 0) === spendBefore, "your spending is unchanged");
       await page.getByTestId("online-stores").locator("summary").click();
-      assert((await page.getByTestId("online-stores").getByRole("switch").count()) === 2, "a switch for each shop");
+      assert((await page.getByTestId("online-stores").getByRole("switch").count()) === 3, "a switch for each shop");
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items", "grocery_online_matches"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (t === "grocery_online_matches" || String(a[i].id).includes("00000000f")) a.splice(i, 1); }

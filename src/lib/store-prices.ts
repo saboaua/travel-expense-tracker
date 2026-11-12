@@ -5,13 +5,21 @@
  */
 import { parseSize, productWords, wordsClose, type Size } from "@/lib/personal/price-compare";
 
-export type StoreId = "superfood" | "ling";
+export type StoreId = "superfood" | "ling" | "doit";
 export const STORES: Record<StoreId, { name: string; site: string }> = {
   superfood: { name: "Super Food Plaza", site: "shop.superfoodaruba.com" },
   ling: { name: "Ling & Sons", site: "shop.lingandsons.com" },
+  doit: { name: "Do it Aruba", site: "doit.aw · from a file" },
 };
 export const STORE_IDS = Object.keys(STORES) as StoreId[];
 export const ONLINE_CURRENCY = "AWG";
+
+/** Shops whose prices an admin imports from a file instead of the daily read. The daily job never touches them. */
+export const FILE_STORES: StoreId[] = ["doit"];
+/** After this many days a saved price is no longer offered (a file price is slower to go stale than a daily read, but not forever). */
+export const staleDays = (store: StoreId) => (FILE_STORES.includes(store) ? 90 : 7);
+/** A file price older than this is shown as old. */
+export const OLD_FILE_DAYS = 30;
 
 export type CatalogRow = { store: StoreId; item_id: string; name: string; name_norm: string; size_text: string | null; price: number; url: string | null };
 export type CatalogItem = Omit<CatalogRow, "name_norm"> & { fetched_at: string };
@@ -35,7 +43,7 @@ export function tidySize(text: string | null | undefined): string | null {
   return out.slice(0, 40);
 }
 
-const searchText = (name: string, size: string | null) => `${name} ${size ?? ""}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 300);
+export const searchText = (name: string, size: string | null) => `${name} ${size ?? ""}`.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim().slice(0, 300);
 const num = (v: unknown) => { const n = typeof v === "number" ? v : Number(v); return Number.isFinite(n) ? n : null; };
 
 /* ---------------- Super Food Plaza (Freshop) ---------------- */
@@ -221,4 +229,42 @@ export function compareOnline(paid: number, matches: OnlineMatch[]): OnlineVerdi
   if (!low || paid <= 0) return { cheaper: null, savingAmount: 0, savingPct: 0, dearer: low, extraPct: low && paid > 0 ? round1(((low.price - paid) / paid) * 100) : 0 };
   if (low.price < paid) return { cheaper: low, savingAmount: Math.round((paid - low.price) * 100) / 100, savingPct: round1(((paid - low.price) / paid) * 100), dearer: null, extraPct: 0 };
   return { cheaper: null, savingAmount: 0, savingPct: 0, dearer: low, extraPct: round1(((low.price - paid) / paid) * 100) };
+}
+
+/* ---------------- Do it Aruba (admin imports an exported Excel) ---------------- */
+
+export type DoitSkip = { soldOut: number; closeout: number; hidden: number; noPrice: number; noName: number };
+export type DoitParsed = { rows: CatalogRow[]; total: number; skipped: DoitSkip };
+
+const truthy = (v: unknown) => v === true || (typeof v === "string" && /^(true|yes|y|1)$/i.test(v.trim())) || v === 1;
+const falsy = (v: unknown) => v === false || (typeof v === "string" && /^(false|no|n|0)$/i.test(v.trim())) || v === 0;
+
+/** The size written inside a Do it description ("40OZ", "350GR /13 OZ", "1.5 LT"), or null. The first size wins. */
+export function doitSize(description: string): string | null {
+  const all = [...description.toLowerCase().matchAll(/(\d+(?:[.,]\d+)?)\s*(fl\.?\s*oz|oz|gr|gm|g|kg|ml|cl|lt|ltr|l|lb|lbs|ct|pk|pack)\b/g)];
+  // a weight or volume beats a pack count ("6PACK 23.4 OZ" is 23.4 oz)
+  const m = all.find((x) => !/^(ct|pk|pack)$/.test(x[2])) ?? all[0];
+  if (!m) return null;
+  const unit = m[2].replace(/\s+/g, " ").replace(/^fl\.? ?oz$/, "fl oz").replace(/^(gr|gm)$/, "g").replace(/^(lt|ltr)$/, "l").replace(/^lbs$/, "lb").replace(/^(pk|pack)$/, "ct");
+  return tidySize(`${m[1].replace(",", ".")} ${unit}`);
+}
+
+/** Maps rows of the exported Do it sheet (header names as exported) to catalog rows, skipping what cannot be bought. */
+export function mapDoit(rows: Record<string, unknown>[], keep: { closeout?: boolean } = {}): DoitParsed {
+  const skipped: DoitSkip = { soldOut: 0, closeout: 0, hidden: 0, noPrice: 0, noName: 0 };
+  const out = new Map<string, CatalogRow>();
+  for (const r of rows) {
+    const id = String(r.No ?? "").trim();
+    const name = String(r.Description ?? "").replace(/\s+/g, " ").trim();
+    const status = String(r.ProductStatus ?? "").trim().toLowerCase();
+    const price = num(r.LSC_Unit_Price_Incl_VAT);
+    if (!id || !name) { skipped.noName++; continue; }
+    if (status === "soldout") { skipped.soldOut++; continue; }
+    if (status === "closeout" && !keep.closeout) { skipped.closeout++; continue; }
+    if (truthy(r.Blocked) || falsy(r.ShowonWebsite)) { skipped.hidden++; continue; }
+    if (price == null || price <= 0) { skipped.noPrice++; continue; }
+    const size = doitSize(name);
+    out.set(id, { store: "doit", item_id: id.slice(0, 120), name: name.slice(0, 200), name_norm: searchText(name, size), size_text: size, price: Math.round(price * 100) / 100, url: null });
+  }
+  return { rows: [...out.values()], total: rows.length, skipped };
 }
