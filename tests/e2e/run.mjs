@@ -1238,12 +1238,12 @@ try {
       assert(saved && saved.amount === 120 && saved.currency === "AWG" && saved.provider === "WEB Aruba" && saved.paid_on === new Date().toISOString().slice(0, 10) && saved.bill_month === lastMonth.toISOString().slice(0, 10), "the bill is saved with its amount, company, the month it is for (one back by default) and today as the payment date: " + JSON.stringify(saved));
       const list = await page.getByTestId("util-list").textContent();
       assert(/Water/.test(list) && /for /.test(list) && /paid /.test(list) && /WEB Aruba/.test(list), "this month lists water as paid today, labelled with the month it is for");
-      assert(/\$6\d\.\d\d/.test(await page.getByTestId("util-total").textContent()), "the month total is in USD");
+      assert(/AWG.{0,2}120\.0\d/.test(await page.getByTestId("util-total").textContent()), "the month total is in florins (AWG)");
       await page.getByTestId("util-row").filter({ hasText: "Water" }).getByRole("link").click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities/history");
       await page.getByTestId("util-bill").first().waitFor();
       assert(/WEB Aruba/.test(await page.getByTestId("util-history").textContent()), "the history lists the bill");
-      assert((await page.getByTestId("util-highest").textContent()).includes("67.0"), "the highest month is shown");
+      assert((await page.getByTestId("util-highest").textContent()).includes("120.0"), "the highest month is shown in florins");
       // change the bill to not paid, with a due date
       await page.getByRole("link", { name: /Change .* bill/ }).first().click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities/add");
@@ -1255,7 +1255,7 @@ try {
       await page.waitForURL((u) => u.pathname === "/personal/utilities");
       await page.getByTestId("util-due").first().waitFor();
       assert(/Water/.test(await page.getByTestId("util-due-list").textContent()), "a bill not paid yet moves to the Due list");
-      assert(/\$0\.00/.test(await page.getByTestId("util-total").textContent()), "an unpaid bill is not in the month total");
+      assert(/AWG.{0,2}0\.00/.test(await page.getByTestId("util-total").textContent()), "an unpaid bill is not in the month total");
       assert(fake.table("utility_bills").filter((r) => r.kind === "water").length === 1 && fake.table("utility_bills").find((r) => r.kind === "water").paid_on == null, "changing the bill updates the same row");
       // a bill waiting in Due can be deleted from its own form (it used to need the history page)
       await page.getByTestId("util-due").first().getByRole("link").click();
@@ -1324,7 +1324,7 @@ try {
       await page.getByTestId("util-from-email").first().waitFor();
       const due = await page.getByTestId("util-due-list").textContent();
       assert(/Elmar/i.test(due) && /116\.17/.test(due), "the emailed bill waits in the Due list: " + due);
-      assert(/\$0\.00/.test(await page.getByTestId("util-total").textContent()), "an emailed bill is not counted until paid");
+      assert(/AWG.{0,2}0\.00/.test(await page.getByTestId("util-total").textContent()), "an emailed bill is not counted until paid");
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
     } finally {
       await ctx.close();

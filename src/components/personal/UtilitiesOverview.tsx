@@ -9,6 +9,7 @@ import { Select } from "@/components/ui/select";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
 import { dueBills, dueState, kindLabel, monthChange, monthLabel, monthStart, paidIn, shiftMonth } from "@/lib/personal/utilities";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
+import { toAwg } from "@/lib/personal/utilities";
 
 /** This month's water, electricity and the rest: what you added, what is paid, what is still missing. */
 export function UtilitiesOverview() {
@@ -56,9 +57,9 @@ export function UtilitiesOverview() {
       </div>
 
       <div className="mt-3 rounded-2xl border bg-card p-4 lg:mt-3">
-        <p className="text-[28px] font-bold tabular-nums leading-none" data-testid="util-total">{formatCurrency(total, "USD")} <span className="text-sm font-semibold text-muted-foreground">in {monthLabel(month).split(" ")[0]}</span></p>
+        <p className="text-[28px] font-bold tabular-nums leading-none" data-testid="util-total">{formatCurrency(toAwg(total), "AWG")} <span className="text-sm font-semibold text-muted-foreground">in {monthLabel(month).split(" ")[0]}</span></p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {change == null ? "Shown in USD so different currencies add up." : change === 0 ? "The same as last month." : `${formatCurrency(Math.abs(change), "USD")} ${change > 0 ? "more" : "less"} than last month.`}
+          {change == null ? "Shown in florins (AWG, the same as Afl.). Other currencies are converted." : change === 0 ? "The same as last month." : `${formatCurrency(toAwg(Math.abs(change)), "AWG")} ${change > 0 ? "more" : "less"} than last month.`}
         </p>
       </div>
 

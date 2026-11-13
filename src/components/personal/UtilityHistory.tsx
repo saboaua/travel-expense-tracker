@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { useConfirm } from "@/components/ui/confirm";
 import { useUtilityBills, type ListedBill } from "@/lib/personal/use-utility-bills";
-import { history, isKind, kindLabel, monthLabel, monthShort, monthStart } from "@/lib/personal/utilities";
+import { history, isKind, kindLabel, monthLabel, monthShort, monthStart, toAwg } from "@/lib/personal/utilities";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { deleteRow, makeRowApi } from "@/lib/row-outbox";
@@ -53,8 +53,8 @@ export function UtilityHistory() {
 
       <div className="mt-4 rounded-2xl border bg-card p-4" data-testid="util-stats">
         <div className="flex gap-6">
-          <div><p className="text-xs text-muted-foreground">Average</p><p className="text-xl font-bold tabular-nums" data-testid="util-average">{formatCurrency(h.average, "USD")}</p></div>
-          <div><p className="text-xs text-muted-foreground">Highest</p><p className="text-xl font-bold tabular-nums" data-testid="util-highest">{formatCurrency(h.highest, "USD")}</p></div>
+          <div><p className="text-xs text-muted-foreground">Average</p><p className="text-xl font-bold tabular-nums" data-testid="util-average">{formatCurrency(toAwg(h.average), "AWG")}</p></div>
+          <div><p className="text-xs text-muted-foreground">Highest</p><p className="text-xl font-bold tabular-nums" data-testid="util-highest">{formatCurrency(toAwg(h.highest), "AWG")}</p></div>
         </div>
         <div className="mt-4 flex h-24 items-end gap-2" role="img" aria-label="Last six months">
           {h.bars.map((b) => (
@@ -64,7 +64,7 @@ export function UtilityHistory() {
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Shown in USD so different currencies add up.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Shown in florins (AWG, the same as Afl.). Other currencies are converted.</p>
       </div>
 
       <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bills</h2>

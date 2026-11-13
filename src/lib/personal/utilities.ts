@@ -1,3 +1,4 @@
+import { AWG_PER_USD } from "@/lib/personal/dashboard";
 /** Utility bills you add yourself (no link to the companies): water, electricity, septic, trash, phone, internet. */
 
 export const UTILITY_KINDS = [
@@ -113,3 +114,6 @@ export function dueState(bill: BillRow, today: string): "late" | "soon" | null {
   const d = (Date.parse(bill.due_date) - Date.parse(today)) / 86400000;
   return d <= 7 ? "soon" : null;
 }
+
+/** A USD amount in florins (AWG, shown as Afl.), at the fixed peg of 1.79 florins to the dollar. */
+export const toAwg = (usd: number) => Math.round((Number(usd) || 0) * AWG_PER_USD * 100) / 100;

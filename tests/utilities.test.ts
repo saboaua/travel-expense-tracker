@@ -1,4 +1,4 @@
-import { defaultBillMonth, dueBills, history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthStart, paidIn, shiftMonth, dueState, usualLag, type BillRow } from "../src/lib/personal/utilities";
+import { toAwg, defaultBillMonth, dueBills, history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthStart, paidIn, shiftMonth, dueState, usualLag, type BillRow } from "../src/lib/personal/utilities";
 import { pushMessage } from "../src/lib/push-text";
 
 let failed = 0;
@@ -21,6 +21,7 @@ const rows: BillRow[] = [
 ];
 eq(paidIn(rows, "2026-11-01").map((r) => r.id), ["1", "3", "4", "5"], "a month lists the bills paid in it, whatever month they are for");
 eq(dueBills(rows).map((r) => r.id), ["2"], "unpaid bills wait in the due list");
+eq([toAwg(172.08), toAwg(0), toAwg(1), toAwg(67.04)], [308.02, 0, 1.79, 120], "dollars convert to florins at the 1.79 peg");
 eq(monthChange(rows, "2026-11-01"), { total: 155, previous: 0, change: null }, "the month total counts what was paid, not unpaid bills");
 eq(monthChange(rows, "2026-05-01").change, null, "no change figure when nothing was paid last month");
 const lagRows: BillRow[] = [bill("e1", "electricity", "2026-09-01", 50, { provider: "Elmar", paid_on: "2026-11-03" }), bill("s1", "phone", "2026-10-01", 20, { provider: "Setar", paid_on: "2026-11-03" })];
