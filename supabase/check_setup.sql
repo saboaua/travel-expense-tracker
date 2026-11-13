@@ -21,6 +21,8 @@ need_cols(tbl, col, fix) as (values
   ('utility_bills','dedupe_key','migration_bill_emails.sql'),
   ('utility_bills','needs_check','migration_bill_emails.sql'),
   ('bill_email_log','status','migration_bill_emails.sql'),
+  ('bill_email_senders','accounts','migration_bill_email_accounts.sql'),
+  ('bill_email_log','account','migration_bill_email_accounts.sql'),
   ('utility_prefs','remind_day','migration_utilities.sql'),
   -- Groceries
   ('grocery_receipts','prices_only','migration_price_notes.sql'),

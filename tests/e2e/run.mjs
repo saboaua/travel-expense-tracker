@@ -1298,6 +1298,16 @@ try {
       assert(badKey.status() === 403 && none.status() === 403, "a wrong or missing key is refused: " + badKey.status() + "/" + none.status());
       const list = await page.request.get(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key } });
       assert(list.status() === 200 && JSON.stringify((await list.json()).senders) === JSON.stringify(["noreply@elmar.aw"]), "the script learns which senders are allowed");
+      // your own account numbers: a parent's bill from the same company is skipped, and one tap adds an account
+      await page.getByTestId("email-account-input-noreply@elmar.aw").fill("541324-1019191");
+      await page.getByTestId("email-account-add-noreply@elmar.aw").click();
+      await page.getByTestId("email-account-chip").waitFor();
+      assert(fake.table("bill_email_senders").some((r) => r.email === "noreply@elmar.aw" && JSON.stringify(r.accounts) === JSON.stringify(["541324-1019191"])), "an account number is saved on the sender");
+      const mom = await page.request.post(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key }, data: { From: "ELMAR <noreply@elmar.aw>", Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), MessageID: "gm0", TextBody: "Account Number: 600118-2204\n- New Bill Amount: AWG 50.00\n- Bill Due Date: Dec 14, 2026", Auth: "", Attachments: [] } });
+      assert(mom.status() === 200 && (await mom.json()).status === "wrong_account" && fake.table("utility_bills").length === 0, "another account's bill is skipped and not added");
+      await page.reload();
+      await page.getByTestId("email-add-account").waitFor();
+      assert(/600118-2204/.test(await page.getByTestId("email-log").textContent()), "the skipped account is shown in Recent emails");
       const el = await page.request.post(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key }, data: { From: "ELMAR <noreply@elmar.aw>", Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), MessageID: "gm1", TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12", Auth: "", Attachments: [] } });
       assert(el.status() === 200 && (await el.json()).status === "added", "the emailed bill is added: " + el.status());
       await page.reload();

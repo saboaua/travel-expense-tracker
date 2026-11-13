@@ -1,4 +1,4 @@
-import { billRow, handleInbound, gmailAuthPasses, senderVerified, verifyMode } from "../src/lib/bill-email-inbound";
+import { billRow, handleInbound, normAccount, gmailAuthPasses, senderVerified, verifyMode } from "../src/lib/bill-email-inbound";
 import { parseBillEmail, type ParsedBill } from "../src/lib/personal/bill-email";
 
 let failed = 0;
@@ -94,6 +94,32 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   await handleInbound(m.db, webMail({ Attachments: [{ Name: "bill.pdf", ContentType: "application/pdf", Content: Buffer.from("%PDF-1").toString("base64"), ContentLength: 6 }] }), notify);
   eq([m.uploads.length, m.uploads[0]?.path.startsWith("u1/personal/utilities/"), String(m.t.utility_bills[0].receipt_path).endsWith(".pdf")], [1, true, true], "the PDF is stored with the bill");
 
+  // your own account numbers: the same company also bills a parent
+  const accts = (accounts: string[]) => ({ ...seed(), bill_email_senders: [{ user_id: "u1", email: "bocuenta@oci.webaruba.com", accounts }, { user_id: "u1", email: "noreply@elmar.aw", accounts: ["541324-1019191"] }] });
+  const forMom = webMail({ Subject: "Your WEB Aruba Nov 2026 Bill - Account 1770442100", MessageID: "m9" });
+  m = makeDb(accts(["1881500000"]));
+  r = await handleInbound(m.db, forMom, notify);
+  eq([r.ok && r.status, m.t.utility_bills.length, m.t.bill_email_log[0]?.status, m.t.bill_email_log[0]?.account], ["wrong_account", 0, "wrong_account", "1770442100"], "a bill for another account is skipped, with its account shown in the log");
+  m = makeDb(accts(["1881500000"]));
+  r = await handleInbound(m.db, webMail(), notify);
+  eq([r.ok && r.status, m.t.utility_bills.length, m.t.bill_email_log[0]?.account], ["added", 1, "1881500000"], "a bill for your account is added and the log keeps its account");
+  m = makeDb(accts([]));
+  r = await handleInbound(m.db, forMom, notify);
+  eq([r.ok && r.status, m.t.utility_bills.length], ["added", 1], "with no accounts listed every account from the sender is added");
+  m = makeDb(accts(["1881 500 000"]));
+  r = await handleInbound(m.db, webMail(), notify);
+  eq(r.ok && r.status, "added", "spaces and dashes in the listed number do not matter");
+  m = makeDb(accts(["541324-1019191"]));
+  r = await handleInbound(m.db, { From: "noreply@elmar.aw", To: `bills-${TOKEN}@in.example.com`, Subject: "Your new ELMAR bill is ready", Date: "2026-10-21", MessageID: "e1", TextBody: "Account Number: 5413241019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026" }, notify);
+  eq([r.ok && r.status, m.t.utility_bills[0]?.amount], ["added", 116.17], "Elmar's account matches with or without the dash");
+  m = makeDb(accts(["541324-1019191"]));
+  r = await handleInbound(m.db, { From: "noreply@elmar.aw", To: `bills-${TOKEN}@in.example.com`, Subject: "Your new ELMAR bill is ready", Date: "2026-10-21", MessageID: "e2", TextBody: "Account Number: 600118-2204\n- New Bill Amount: AWG 50.00\n- Bill Due Date: Dec 14, 2026" }, notify);
+  eq([r.ok && r.status, m.t.utility_bills.length], ["wrong_account", 0], "another Elmar account is skipped");
+  m = makeDb(accts(["1881500000"]));
+  r = await handleInbound(m.db, webMail({ Subject: "Your WEB Aruba bill", TextBody: "Due Date:09-12-2026\nCurrent Charges:67.1" }), notify);
+  eq([r.ok && r.status, m.t.utility_bills[0]?.needs_check], ["added", true], "a bill whose account cannot be read is added and marked to check");
+
+  eq([normAccount("541324-1019191"), normAccount(" 18 81-5 "), normAccount(null)], ["5413241019191", "188 15".replace(" ", "") === "18815" ? "18815" : "", ""], "account numbers compare without dashes and spaces");
   // forged "From": only mail the company really signed becomes a bill
   const hdr = (tests: string) => ({ Headers: [{ Name: "X-Spam-Status", Value: "No" }, { Name: "X-Spam-Tests", Value: tests }] });
   eq([senderVerified({}, "strict"), senderVerified(hdr("SPF_PASS"), "strict"), senderVerified(hdr("DKIM_SIGNED,DKIM_VALID"), "strict"), senderVerified(hdr("DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,SPF_PASS"), "strict")], [false, false, false, true], "strict needs the company's own valid signature");

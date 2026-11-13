@@ -11,10 +11,11 @@ import { Input } from "@/components/ui/input";
 import { useConfirm } from "@/components/ui/confirm";
 import { setupNeeded } from "@/lib/setup-message";
 import { formatDate } from "@/lib/utils";
+import { isMissingColumn } from "@/lib/columns";
 import { gmailScript } from "@/lib/personal/gmail-script";
 
-type Sender = { id: string; name: string; email: string };
-type LogRow = { id: string; sender: string | null; subject: string | null; status: string; summary: string | null; code: string | null; created_at: string };
+type Sender = { id: string; name: string; email: string; accounts?: string[] };
+type LogRow = { id: string; sender: string | null; subject: string | null; status: string; summary: string | null; code: string | null; account?: string | null; created_at: string };
 
 /** Known companies, offered with one tap. Setar's address appears under Recent emails after its first forwarded mail. */
 const SUGGESTED = [{ name: "WEB Aruba", email: "bocuenta@oci.webaruba.com" }, { name: "Elmar", email: "noreply@elmar.aw" }];
@@ -22,6 +23,7 @@ const SUGGESTED = [{ name: "WEB Aruba", email: "bocuenta@oci.webaruba.com" }, { 
 const STATUS: Record<string, { text: string; cls: string }> = {
   added: { text: "Added", cls: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" },
   skipped_duplicate: { text: "Skipped", cls: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200" },
+  wrong_account: { text: "Skipped", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   ignored_sender: { text: "Ignored", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   unreadable: { text: "Add by hand", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   confirmation: { text: "Code", cls: "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" },
@@ -36,16 +38,16 @@ export function BillEmails() {
   const [log, setLog] = useState<LogRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
+  const [acct, setAcct] = useState<Record<string, string>>({});
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
 
   const load = useCallback(async () => {
     const supabase = createClient();
-    const [a, s, l] = await Promise.all([
-      fetch("/api/email/address").then((r) => r.json()).catch(() => ({ setup: "error" })),
-      supabase.from("bill_email_senders").select("id, name, email").order("name").limit(100),
-      supabase.from("bill_email_log").select("id, sender, subject, status, summary, code, created_at").order("created_at", { ascending: false }).limit(20),
-    ]);
+    // the account columns come from migration 66: older databases are read without them
+    const senderQ = async () => { const r = await supabase.from("bill_email_senders").select("id, name, email, accounts").order("name").limit(100); return r.error && isMissingColumn(r.error) ? supabase.from("bill_email_senders").select("id, name, email").order("name").limit(100) : r; };
+    const logQ = async () => { const r = await supabase.from("bill_email_log").select("id, sender, subject, status, summary, code, account, created_at").order("created_at", { ascending: false }).limit(20); return r.error && isMissingColumn(r.error) ? supabase.from("bill_email_log").select("id, sender, subject, status, summary, code, created_at").order("created_at", { ascending: false }).limit(20) : r; };
+    const [a, s, l] = await Promise.all([fetch("/api/email/address").then((r) => r.json()).catch(() => ({ setup: "error" })), senderQ(), logQ()]);
     if (a.setup === "migration" || (s.error && /relation|schema cache|does not exist/i.test(s.error.message))) { setSetup(setupNeeded("Bill emails", "migration_bill_emails.sql")); setSenders([]); setLog([]); return; }
     setKey(a.key ?? null);
     setSenders(s.error ? [] : ((s.data ?? []) as Sender[]));
@@ -66,6 +68,20 @@ export function BillEmails() {
     const { error: err } = await supabase.from("bill_email_senders").upsert({ user_id: session.user.id, name: (n.trim() || em.split("@")[0]).slice(0, 80), email: em }, { onConflict: "user_id,email" });
     if (err) return setError("Could not save that sender. Check your connection.");
     setName(""); setEmail(""); await load();
+  };
+  const saveAccounts = async (sd: Sender, accounts: string[]) => {
+    setError(null);
+    const { error: err } = await createClient().from("bill_email_senders").update({ accounts }).eq("id", sd.id);
+    if (err) return setError(isMissingColumn(err) ? "Run migration_bill_email_accounts.sql in Supabase first, then try again." : "Could not save that account. Check your connection.");
+    await load();
+  };
+  const addAccount = async (sd: Sender, raw: string) => {
+    const a = raw.trim().slice(0, 40);
+    if (!/^[A-Za-z0-9][A-Za-z0-9 -]{2,}$/.test(a)) return setError("Enter the account number exactly as it is on the bill.");
+    const norm = (x: string) => x.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+    if ((sd.accounts ?? []).some((x) => norm(x) === norm(a))) { setAcct((o) => ({ ...o, [sd.id]: "" })); return; }
+    await saveAccounts(sd, [...(sd.accounts ?? []), a]);
+    setAcct((o) => ({ ...o, [sd.id]: "" }));
   };
   const removeSender = async (s: Sender) => {
     if (!(await confirm({ title: "Remove this sender?", message: `${s.name} (${s.email}). Its emails will be ignored.`, destructive: true }))) return;
@@ -117,10 +133,26 @@ export function BillEmails() {
             <h2 className={cap}>Allowed senders</h2>
             <ul className="mt-1 divide-y" data-testid="email-senders">
               {(senders ?? []).map((s) => (
-                <li key={s.id} className="flex min-h-14 items-center gap-3 py-2">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200"><Mail className="h-[19px] w-[19px]" aria-hidden="true" /></span>
-                  <span className="min-w-0 flex-1"><b className="block text-[15px]">{s.name}</b><span className="block truncate text-xs text-muted-foreground">{s.email}</span></span>
-                  <button type="button" onClick={() => removeSender(s)} className="min-h-11 px-2 text-[13px] font-semibold text-red-700 dark:text-red-300" aria-label={`Remove ${s.name}`}>Remove</button>
+                <li key={s.id} className="py-2.5" data-testid="email-sender">
+                  <div className="flex min-h-14 items-center gap-3">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-200"><Mail className="h-[19px] w-[19px]" aria-hidden="true" /></span>
+                    <span className="min-w-0 flex-1"><b className="block text-[15px]">{s.name}</b><span className="block truncate text-xs text-muted-foreground">{s.email}</span></span>
+                    <button type="button" onClick={() => removeSender(s)} className="min-h-11 px-2 text-[13px] font-semibold text-red-700 dark:text-red-300" aria-label={`Remove ${s.name}`}>Remove</button>
+                  </div>
+                  <div className="ml-[52px]">
+                    <p className="text-xs font-bold text-foreground/70">{(s.accounts ?? []).length ? "Only these accounts are added" : "Every account from this sender is added"}</p>
+                    <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                      {(s.accounts ?? []).map((a) => (
+                        <span key={a} className="inline-flex min-h-9 items-center gap-1.5 rounded-full bg-blue-50 pl-3 pr-1 text-sm font-bold tabular-nums text-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="email-account-chip">{a}
+                          <button type="button" onClick={() => saveAccounts(s, (s.accounts ?? []).filter((x) => x !== a))} className="flex h-8 w-8 items-center justify-center rounded-full text-base" aria-label={`Remove account ${a}`}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <Input value={acct[s.id] ?? ""} onChange={(e) => setAcct((o) => ({ ...o, [s.id]: e.target.value }))} placeholder="Account number" maxLength={40} className="h-11 min-w-0 flex-1" aria-label={`Add an account number for ${s.name}`} data-testid={`email-account-input-${s.email}`} />
+                      <Button type="button" variant="outline" className="h-11" onClick={() => addAccount(s, acct[s.id] ?? "")} data-testid={`email-account-add-${s.email}`}>Add</Button>
+                    </div>
+                  </div>
                 </li>
               ))}
               {suggestions.map((s) => (
@@ -170,6 +202,9 @@ export function BillEmails() {
                 {log.map((r) => {
                   const st = STATUS[r.status] ?? STATUS.skipped_duplicate;
                   const canAllow = r.status === "ignored_sender" && r.sender && !have.has(r.sender);
+                  const owner = (senders ?? []).find((x) => x.email === r.sender);
+                  const norm = (x: string) => x.replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+                  const canAddAccount = !!owner && !!r.account && (r.status === "wrong_account" || r.status === "added" || r.status === "skipped_duplicate") && !(owner.accounts ?? []).some((x) => norm(x) === norm(r.account!));
                   return (
                     <li key={r.id} className="py-2.5" data-testid="email-log-row">
                       <div className="flex items-center gap-3">
@@ -179,6 +214,7 @@ export function BillEmails() {
                       {r.status === "confirmation" && r.code && (
                         <div className="mt-1.5 flex items-center gap-3"><span className="text-2xl font-bold tracking-[0.12em] tabular-nums" data-testid="email-code">{r.code}</span><Button type="button" variant="outline" className="h-10 gap-1.5" onClick={() => copy(r.code!, r.id)}><Copy className="h-4 w-4" aria-hidden="true" />{copied === r.id ? "Copied" : "Copy code"}</Button></div>
                       )}
+                      {canAddAccount && <button type="button" onClick={() => addAccount(owner!, r.account!)} className="mt-1 min-h-11 text-[13px] font-bold text-primary" data-testid="email-add-account">{r.status === "wrong_account" ? "Add this account" : `Only add account ${r.account}`}</button>}
                       {canAllow && <button type="button" onClick={() => addSender(r.sender!.split("@")[0], r.sender!)} className="mt-1 min-h-11 text-[13px] font-bold text-primary" data-testid="email-allow-sender">Add as a sender</button>}
                     </li>
                   );

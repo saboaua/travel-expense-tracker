@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { htmlToText, MONTH_NAMES, originalSender, parseBillEmail, senderEmail, tokenFromRecipient, type ParsedBill } from "@/lib/personal/bill-email";
 import { AWG_PER_USD } from "@/lib/personal/dashboard";
+import { isMissingColumn } from "@/lib/columns";
 import { todayISO } from "@/lib/utils";
 import { UTILITY_KINDS } from "@/lib/personal/utilities";
 
@@ -13,7 +14,7 @@ export type InboundPayload = {
 };
 
 export type InboundResult =
-  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "unreadable" | "confirmation" | "skipped_duplicate" | "added"; billId?: string }
+  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "wrong_account" | "unreadable" | "confirmation" | "skipped_duplicate" | "added"; billId?: string }
   | { ok: false; error: string };
 
 const MAX_PDF = 4 * 1024 * 1024;
@@ -21,6 +22,9 @@ const LOG_KEEP = 50;
 const HOURLY_LIMIT = 60;
 const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
 const r2 = (n: number) => Math.round(n * 100) / 100;
+/** Account numbers compare without dashes, spaces or case: "541324-1019191" is "5413241019191". */
+export const normAccount = (a: string | null | undefined) => (a ?? "").replace(/[^A-Za-z0-9]/g, "").toLowerCase();
+
 export const monthName = (m: string) => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?? "";
 
 /** "strict": the company's own DKIM signature must be valid (survives Gmail forwarding; SPF does not). "relaxed": any valid DKIM. "off": no check. */
@@ -76,8 +80,15 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   const sender = /forwarded message/i.test(text) && !/forwarding-noreply@google\.com/i.test(direct) ? originalSender(text) ?? direct : direct;
   const date = p.Date && !Number.isNaN(Date.parse(p.Date)) ? todayISO("America/Aruba", new Date(p.Date)) : todayISO();
 
-  const log = async (status: string, extra: { summary?: string; code?: string; bill_id?: string } = {}) => {
-    await db.from("bill_email_log").insert({ user_id: userId, sender: sender.slice(0, 200) || null, subject: subject || null, status, ...extra });
+  const log = async (status: string, extra: { summary?: string; code?: string; bill_id?: string; account?: string | null } = {}) => {
+    const row = { user_id: userId, sender: sender.slice(0, 200) || null, subject: subject || null, status, ...extra };
+    const first = await db.from("bill_email_log").insert(row);
+    if (first.error && (isMissingColumn(first.error) || /check constraint/i.test(first.error.message))) {
+      // the account migration is not run yet: keep the line, without the account
+      const { account: _a, ...rest } = row as typeof row & { account?: string | null };
+      void _a;
+      await db.from("bill_email_log").insert({ ...rest, status: status === "wrong_account" ? "ignored_sender" : status });
+    }
     // keep the newest entries only
     const old = await db.from("bill_email_log").select("id").eq("user_id", userId).order("created_at", { ascending: false }).range(LOG_KEEP, LOG_KEEP + 200);
     const ids = ((old.data ?? []) as { id: string }[]).map((r) => r.id);
@@ -94,14 +105,26 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   // Gmail's confirmation code is accepted from Google whatever your sender list says
   if (parsed.type === "confirmation") { await log("confirmation", { summary: "Gmail asks you to confirm forwarding", code: parsed.code }); return { ok: true, status: "confirmation" }; }
 
-  const allowed = await db.from("bill_email_senders").select("id").eq("user_id", userId).eq("email", sender).maybeSingle();
+  let allowed = await db.from("bill_email_senders").select("id, accounts").eq("user_id", userId).eq("email", sender).maybeSingle();
+  if (allowed.error && isMissingColumn(allowed.error)) allowed = await db.from("bill_email_senders").select("id").eq("user_id", userId).eq("email", sender).maybeSingle();
+  const mine = ((allowed.data as { accounts?: string[] | null } | null)?.accounts ?? []).map(normAccount).filter(Boolean);
   if (!allowed.data) { await log("ignored_sender", { summary: "Not on your list of senders" }); return { ok: true, status: "ignored_sender" }; }
   // anyone can type any "From"; only mail the company really signed becomes a bill
   if (!senderVerified(p, verify, sender || direct)) { await log("ignored_sender", { summary: verify === "strict" ? "Not signed by the sender's own domain, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
   if (parsed.type !== "bill") { await log("unreadable", { summary: "Could not read a bill from this email. Add it by hand." }); return { ok: true, status: "unreadable" }; }
 
-  const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", parsed.dedupe_key).maybeSingle();
-  if (dup.data) { await log("skipped_duplicate", { summary: `${parsed.company} ${monthName(parsed.bill_month)}: already added`, bill_id: (dup.data as { id: string }).id }); return { ok: true, status: "skipped_duplicate" }; }
+  // the same companies also bill other people (a parent's account): only the account numbers you listed are added
+  let bill: ParsedBill = parsed;
+  if (mine.length) {
+    if (!parsed.account) bill = { ...parsed, check: true, why: [...parsed.why, "account number not found"] };
+    else if (!mine.includes(normAccount(parsed.account))) {
+      await log("wrong_account", { summary: `${parsed.company} · account ${parsed.account} is not one of yours`, account: parsed.account });
+      return { ok: true, status: "wrong_account" };
+    }
+  }
+
+  const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", bill.dedupe_key).maybeSingle();
+  if (dup.data) { await log("skipped_duplicate", { summary: `${parsed.company} ${monthName(parsed.bill_month)}: already added`, bill_id: (dup.data as { id: string }).id, account: parsed.account }); return { ok: true, status: "skipped_duplicate" }; }
 
   // use the wording and type you already use for this company
   const prev = await db.from("utility_bills").select("kind, provider").eq("user_id", userId).ilike("provider", parsed.company).order("bill_month", { ascending: false }).limit(1).maybeSingle();
@@ -109,7 +132,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   const kind = pv && UTILITY_KINDS.some((k) => k.id === pv.kind) ? pv.kind : parsed.kind;
   const company = pv?.provider?.trim() || parsed.company;
 
-  const row = billRow(userId, parsed, kind, company, p.MessageID);
+  const row = billRow(userId, bill, kind, company, p.MessageID);
   const ins = await db.from("utility_bills").insert(row).select("id").single();
   if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? "could not save the bill" };
   const billId = (ins.data as { id: string }).id;
@@ -125,7 +148,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   }
 
   const summary = `${company} · for ${monthName(parsed.bill_month)} · ${parsed.amount == null ? "no amount found" : `${parsed.currency} ${r2(parsed.amount).toFixed(2)}`}`;
-  await log("added", { summary, bill_id: billId });
+  await log("added", { summary, bill_id: billId, account: parsed.account });
   await notify(userId, { company, month: monthName(parsed.bill_month), due: parsed.due_date });
   return { ok: true, status: "added", billId };
 }
