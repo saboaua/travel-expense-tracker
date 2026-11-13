@@ -192,7 +192,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
               .map((c) => (
                 <span key={c.key} className="inline-flex min-h-[44px] items-center gap-1 rounded-full bg-primary py-0 pl-3.5 pr-1.5 text-sm font-semibold text-primary-foreground">
                   <span className="max-w-[10rem] truncate">{c.label}</span>
-                  <button type="button" aria-label={`Remove ${c.label} filter`} onClick={() => set({ [c.key]: "" })} className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
+                  <button type="button" aria-label={`Remove ${c.label} filter`} onClick={() => set({ [c.key]: "" })} className="flex h-11 w-11 items-center justify-center rounded-full bg-white/20 hover:bg-white/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white">
                     <X className="h-3.5 w-3.5" aria-hidden="true" />
                   </button>
                 </span>

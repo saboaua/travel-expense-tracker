@@ -1,11 +1,13 @@
+import { convert, dominantCurrency, round2, type BudgetCurrency } from "@/lib/personal/money";
+
 type GroceryRow = { total: number | string; currency: string };
 type ProjectRow = { kind: string; status?: string; personal_expenses?: { amount_usd: number | string | null }[] | null };
 
 export type PersonalSummary = {
   /** This month's receipts in the most-used currency (null when there are none). */
   grocery: { total: number; currency: string; count: number } | null;
-  projects: { count: number; spent: number };
-  trips: { count: number; spent: number };
+  projects: { count: number; spent: number; currency: string };
+  trips: { count: number; spent: number; currency: string };
 };
 
 const num = (v: unknown) => {
@@ -14,21 +16,19 @@ const num = (v: unknown) => {
 };
 
 /** Totals shown on the Personal page and the dashboard tiles. Pass only active projects. */
-export function summarizePersonal(groceries: GroceryRow[] | null | undefined, projects: ProjectRow[] | null | undefined): PersonalSummary {
+export function summarizePersonal(groceries: GroceryRow[] | null | undefined, projects: ProjectRow[] | null | undefined, show?: BudgetCurrency): PersonalSummary {
   let grocery: PersonalSummary["grocery"] = null;
   if (groceries && groceries.length) {
-    const by = new Map<string, { total: number; count: number }>();
-    for (const r of groceries) {
-      const cur = by.get(r.currency) || { total: 0, count: 0 };
-      by.set(r.currency, { total: cur.total + num(r.total), count: cur.count + 1 });
-    }
-    const [currency, v] = [...by.entries()].sort((a, b) => b[1].count - a[1].count)[0];
-    grocery = { currency, total: Math.round(v.total * 100) / 100, count: v.count };
+    const currency = show ?? dominantCurrency(groceries);
+    let total = 0;
+    for (const r of groceries) total += convert(num(r.total), r.currency, currency) ?? 0;
+    grocery = { currency, total: round2(total), count: groceries.length };
   }
+  // Project and trip spending is stored in USD; show it in the same currency as everything else
   const sum = (kind: string) => {
     const rows = (projects || []).filter((r) => r.kind === kind);
-    const spent = rows.reduce((s, r) => s + (r.personal_expenses || []).reduce((a, e) => a + num(e.amount_usd), 0), 0);
-    return { count: rows.length, spent: Math.round(spent * 100) / 100 };
+    const usd = rows.reduce((s, r) => s + (r.personal_expenses || []).reduce((a, e) => a + num(e.amount_usd), 0), 0);
+    return { count: rows.length, spent: round2(convert(usd, "USD", show ?? "USD") ?? usd), currency: show ?? "USD" };
   };
   return { grocery, projects: sum("home_project"), trips: sum("personal_trip") };
 }

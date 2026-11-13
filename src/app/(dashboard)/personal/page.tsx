@@ -5,11 +5,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { PiggyBank, ShoppingCart, Hammer, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
+import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
-import { summarizeSpends } from "@/lib/personal/quick-spend";
+import { houseSpends, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
+import { convert, convertedCount, dominantCurrency, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
@@ -19,7 +20,7 @@ import { fetchSavings } from "@/lib/personal/savings-data";
 import { savingsSummary } from "@/lib/personal/savings";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
+type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; currency: BudgetCurrency; converted: number; house: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -63,13 +64,20 @@ export default function PersonalHubPage() {
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
-        supabase.from("personal_spends").select("amount, currency, amount_usd").gte("expense_date", monthStart).limit(2000),
+        supabase.from("personal_spends").select("id, merchant, amount, currency, amount_usd, category, expense_date, project_id, house_area").gte("expense_date", monthStart).limit(2000),
         fetchLinkedSpends(supabase),
         supabase.from("utility_bills").select("amount_usd").eq("bill_month", monthStart).limit(200),
         fetchSavings(supabase),
       ]);
-      const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO());
-      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data), utilities: u.error ? null : { total: (u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0), count: (u.data ?? []).length }, savings });
+      // One currency for the whole page: AWG or USD, whichever the month's receipts and spends use more
+      const spendRows = (q.error ? [] : q.data ?? []) as unknown as SpendRow[];
+      const money = [...((g.data ?? []) as { currency: string }[]), ...spendRows];
+      const cur = dominantCurrency(money);
+      const toCur = (usd: number) => round2(convert(usd, "USD", cur) ?? usd);
+      const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO(), cur);
+      const houseRows = houseSpends(spendRows, todayISO().slice(0, 7));
+      const house = q.error ? null : { count: houseRows.length, total: round2(houseRows.reduce((t, r) => t + (convert(Number(r.amount), r.currency, cur, r.amount_usd == null ? null : Number(r.amount_usd)) ?? 0), 0)) };
+      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data, cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
     })();
   }, []);
 
@@ -107,14 +115,16 @@ export default function PersonalHubPage() {
   const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; text: string; strong: boolean }[] = [
     { href: "/personal/spend", title: "Quick spend", icon: Coins, strong: !!stats?.spends,
       text: !stats ? "\u00a0" : stats.spends ? `${formatCurrency(stats.spends.total, stats.spends.currency)} this month \u00b7 ${plural(stats.spends.count, "spend")}` : "Coffee, street food, anything with no receipt" },
+    { href: "/personal/house", title: "House & repairs", icon: Home, strong: !!stats?.house?.count,
+      text: !stats ? "\u00a0" : stats.house?.count ? `${formatCurrency(stats.house.total, stats.currency)} this month \u00b7 ${plural(stats.house.count, "item")}` : "Repairs and fixes for the house" },
     { href: "/personal/savings", title: "Savings", icon: PiggyBank, strong: !!stats?.savings,
       text: !stats ? "\u00a0" : stats.savings ? `${formatCurrency(stats.savings.saved, stats.savings.currency)} saved \u00b7 ${formatCurrency(stats.savings.monthly, stats.savings.currency)} a month` : "Put money aside every month" },
     { href: "/personal/utilities", title: "Utilities", icon: Zap, strong: !!stats?.utilities?.count,
-      text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(Math.round(stats.utilities.total * 100) / 100, "USD")} this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
+      text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(stats.utilities.total, stats.currency)} this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
     { href: "/personal/projects", title: "Home Projects", icon: Hammer, strong: !!stats && stats.projects.count > 0,
-      text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, "USD")} spent` : "No active projects \u00b7 tap to start one" },
+      text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, stats.currency)} spent` : "No active projects \u00b7 tap to start one" },
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, strong: !!stats && stats.trips.count > 0,
-      text: !stats ? "\u00a0" : stats.trips.count > 0 ? `${stats.trips.count} active \u00b7 ${formatCurrency(stats.trips.spent, "USD")} spent` : "No active trips \u00b7 tap to start one" },
+      text: !stats ? "\u00a0" : stats.trips.count > 0 ? `${stats.trips.count} active \u00b7 ${formatCurrency(stats.trips.spent, stats.currency)} spent` : "No active trips \u00b7 tap to start one" },
   ];
   const handy: { href: string; title: string; icon: typeof ShoppingCart; stat: string; right?: string }[] = [
     ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
@@ -134,6 +144,11 @@ export default function PersonalHubPage() {
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:space-y-0">
       <div className="min-w-0 space-y-4">
       <p className={`${label} pt-2`}>Spending</p>
+      {stats && stats.converted > 0 && (
+        <p className="flex gap-2 rounded-xl bg-blue-50 px-3 py-2 text-[13px] leading-snug text-blue-900 dark:bg-blue-950 dark:text-blue-100" data-testid="hub-currency-note">
+          Amounts in {stats.currency === "AWG" ? "USD" : "AWG"} are shown in {stats.currency} at the fixed rate, 1 USD = 1.79 AWG.
+        </p>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <BudgetCard />
         {/* Groceries leads: the month total is the number, with the two things done most often one tap away */}

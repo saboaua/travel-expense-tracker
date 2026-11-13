@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
+import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { parseAmount, QUICK_DEFAULT_CURRENCY } from "@/lib/personal/quick-spend";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
@@ -134,24 +135,7 @@ export function UtilityBillForm() {
 
         <div>
           <label htmlFor="ub-amount" className={label}>Amount</label>
-          <div className="flex items-center gap-2 rounded-xl border bg-background px-3">
-            <input id="ub-amount" inputMode="decimal" autoComplete="off" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-14 min-w-0 flex-1 bg-transparent text-2xl font-bold tabular-nums outline-none" />
-            {choices.length > 0 ? (
-              <div className="flex overflow-hidden rounded-lg border" role="group" aria-label="Currency">
-                {choices.map((c) => <button key={c} type="button" aria-pressed={currency === c} onClick={() => setCurrency(c)} className={`min-h-10 px-3 text-sm font-semibold ${currency === c ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : ""}`}>{c}</button>)}
-              </div>
-            ) : null}
-          </div>
-          {(others.length > 0 || choices.length === 0) && (
-            <Select value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-2" aria-label="Currency">
-              {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-            </Select>
-          )}
-          {currency !== "USD" && (
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              Rate to USD <input aria-label="Exchange rate to USD" value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" className="ml-1 w-20 rounded border bg-background px-1.5 py-0.5 tabular-nums" />
-            </p>
-          )}
+          <AmountField id="ub-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={setRate} />
         </div>
 
         <div>

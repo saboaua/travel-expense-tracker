@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ export function BudgetForm() {
   const [loaded, setLoaded] = useState(false);
   const [rows, setRows] = useState<BudgetSetting[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [setupMissing, setSetupMissing] = useState(false);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState<BudgetCurrency>("AWG");
   const [onlyThisMonth, setOnlyThisMonth] = useState(false);
@@ -52,7 +54,7 @@ export function BudgetForm() {
     let alive = true;
     fetchBudgets(createClient()).then(({ rows: r, missing }) => {
       if (!alive) return;
-      if (missing) setError("Run supabase/migration_budget.sql in Supabase first.");
+      if (missing) { setError(setupNeeded("The monthly budget", "migration_budget.sql")); setSetupMissing(true); }
       setRows(r);
       fill(pickBudget(r, thisMonth));
       setOnlyThisMonth(!!r.find((x) => x.month === thisMonth));
@@ -83,7 +85,7 @@ export function BudgetForm() {
     const body = { user_id: session.user.id, month, amount: value, currency, limits: out, alert_at_80: alertOn };
     const { error: err } = existing?.id ? await supabase.from("personal_budgets").update(body).eq("id", existing.id) : await supabase.from("personal_budgets").insert(body);
     setBusy(false);
-    if (err) return setError(/relation|schema cache|does not exist/i.test(err.message) ? "Run supabase/migration_budget.sql in Supabase first." : "Could not save the budget. Check your connection.");
+    if (err) return setError(/relation|schema cache|does not exist/i.test(err.message) ? setupNeeded("The monthly budget", "migration_budget.sql") : "Could not save the budget. Check your connection.");
     router.push("/personal");
   };
 
@@ -153,7 +155,7 @@ export function BudgetForm() {
           <Toggle on={alertOn} onChange={setAlertOn} label="Tell me at 80%" />
         </div>
 
-        <Button type="submit" disabled={busy || !loaded} className="h-[52px] w-full text-base" data-testid="budget-save">{busy ? "Saving…" : "Save budget"}</Button>
+        <Button type="submit" disabled={busy || !loaded || setupMissing} className="h-[52px] w-full text-base" data-testid="budget-save">{busy ? "Saving…" : "Save budget"}</Button>
         {hasSaved && <button type="button" onClick={remove} disabled={busy} className="inline-flex min-h-11 w-full items-center justify-center text-sm font-semibold text-red-600 hover:text-red-700" data-testid="budget-remove">Remove this budget</button>}
       </form>
     </div>

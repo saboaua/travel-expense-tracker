@@ -338,22 +338,22 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="col-span-2 min-w-0 space-y-2 sm:col-span-3">
-                <label className="text-sm font-medium">Store</label>
-                <Input value={store} onChange={(e) => setStore(e.target.value)} placeholder="Where did you shop?" maxLength={120} />
+                <label htmlFor="gr-store" className="text-sm font-medium">Store</label>
+                <Input id="gr-store" value={store} onChange={(e) => setStore(e.target.value)} placeholder="Where did you shop?" maxLength={120} />
               </div>
               <div className="col-span-2 min-w-0 space-y-2 sm:col-span-1">
-                <label className="text-sm font-medium">Date</label>
-                <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
+                <label htmlFor="gr-date" className="text-sm font-medium">Date</label>
+                <Input id="gr-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
               </div>
               <div className="min-w-0 space-y-2">
-                <label className="text-sm font-medium">Currency</label>
-                <Select value={currency} onChange={(e) => { currencyChosen.current = true; setCurrency(e.target.value); }}>
+                <label htmlFor="gr-currency" className="text-sm font-medium">Currency</label>
+                <Select id="gr-currency" value={currency} onChange={(e) => { currencyChosen.current = true; setCurrency(e.target.value); }}>
                   {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
                 </Select>
               </div>
               <div className="min-w-0 space-y-2">
-                <label className="text-sm font-medium">Receipt total</label>
-                <Input type="number" step="0.01" min="0" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={itemsSum ? itemsSum.toFixed(2) : "0.00"} />
+                <label htmlFor="gr-total" className="text-sm font-medium">Receipt total</label>
+                <Input id="gr-total" type="number" step="0.01" min="0" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={itemsSum ? itemsSum.toFixed(2) : "0.00"} />
               </div>
             </div>
 
@@ -412,19 +412,19 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Input value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder={`Item name (blank saves as Item ${rows.findIndex((x) => x.key === r.key) + 1})`} maxLength={160} />
-                    {r.confirmed && <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800" title="Both readers agree" aria-label="Both readers agree"><Check className="h-4 w-4" /></span>}
+                    <Input aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} name`} value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder={`Item name (blank saves as Item ${rows.findIndex((x) => x.key === r.key) + 1})`} maxLength={160} />
+                    {r.confirmed && <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800" title="Both readers agree" aria-label="Both readers agree"><Check className="h-4 w-4" /></span>}
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
                   {r.unit && <p className="text-xs text-muted-foreground">Weighed: {money(r.quantity)} {r.unit} @ {formatCurrency(money(r.unit_price), currency)}/{r.unit}</p>}
                   <div className="grid grid-cols-3 gap-2">
-                    <div><label className="text-xs text-muted-foreground">{r.unit ? `Weight (${r.unit})` : "Qty"}</label><Input type="number" step="any" min="0" value={r.quantity} onChange={(e) => setQty(r, e.target.value)} /></div>
-                    <div><label className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
-                    <div><label className="text-xs text-muted-foreground">Line total</label><Input type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
+                    <div><label htmlFor={`gr-${r.key}-qty`} className="text-xs text-muted-foreground">{r.unit ? `Weight (${r.unit})` : "Qty"}</label><Input id={`gr-${r.key}-qty`} type="number" step="any" min="0" value={r.quantity} onChange={(e) => setQty(r, e.target.value)} /></div>
+                    <div><label htmlFor={`gr-${r.key}-price`} className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input id={`gr-${r.key}-price`} type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
+                    <div><label htmlFor={`gr-${r.key}-line`} className="text-xs text-muted-foreground">Line total</label><Input id={`gr-${r.key}-line`} type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
-                  <Select className="h-9 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
+                  <Select aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} category`} className="h-11 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
                     {(categoryNames.includes(r.category) ? categoryNames : [r.category, ...categoryNames]).map((c) => <option key={c} value={c}>{c}</option>)}
                   </Select>
                 </div>
@@ -448,8 +448,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span></label>
-              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <label htmlFor="gr-notes" className="text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span></label>
+              <Input id="gr-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
             </div>
 
             {error && <Alert>{error}</Alert>}

@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, PiggyBank, Plus } from "lucide-react";
@@ -46,7 +47,7 @@ export function SavingsOverview() {
     let alive = true;
     fetchSavings(createClient()).then((r) => {
       if (!alive) return;
-      if (r.missing) setError("Run supabase/migration_savings.sql in Supabase first.");
+      if (r.missing) setError(setupNeeded("Savings","migration_savings.sql"));
       else if (r.failed) setError("Could not load your savings. Check your connection.");
       setData({ plans: r.plans, events: r.events });
     });

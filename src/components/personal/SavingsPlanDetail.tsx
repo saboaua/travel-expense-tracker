@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Pause, PiggyBank, Pencil, Play, Plus, SkipForward, Check } from "lucide-react";
@@ -35,7 +36,7 @@ export function SavingsPlanDetail() {
 
   const load = useCallback(async (planId: string) => {
     const r = await fetchSavings(createClient());
-    if (r.failed) setError(r.missing ? "Run supabase/migration_savings.sql in Supabase first." : "Could not load your savings. Check your connection.");
+    if (r.failed) setError(r.missing ? setupNeeded("Savings","migration_savings.sql") : "Could not load your savings. Check your connection.");
     setPlan(r.plans.find((p) => p.id === planId) ?? null);
     setEvents(r.events.filter((e) => e.plan_id === planId));
   }, []);
@@ -85,8 +86,8 @@ export function SavingsPlanDetail() {
       {error && <Alert className="mt-3">{error}</Alert>}
 
       <div className="mt-3 rounded-2xl border bg-card p-4">
-        <div className="flex items-end">
-          <span className="flex-1"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p><p className="mt-1 text-[32px] font-bold leading-none tabular-nums" data-testid="plan-saved">{formatCurrency(saved, plan.currency)}</p></span>
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+          <span className="min-w-0 flex-1 basis-48"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p><p className="mt-1 break-words text-[32px] font-bold leading-tight tabular-nums" data-testid="plan-saved">{formatCurrency(saved, plan.currency)}</p></span>
           {pct != null && <span className="text-right text-[13px] text-muted-foreground">of {formatCurrency(plan.goal ?? 0, plan.currency)}<br /><b className="text-[15px] text-foreground">{pct}%</b></span>}
         </div>
         {pct != null && <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full" style={{ width: `${pct}%`, background: TEAL }} /></div>}
@@ -96,7 +97,7 @@ export function SavingsPlanDetail() {
       <div className="mt-3 flex gap-2">
         <button type="button" className={action} onClick={() => setExtraOpen(!extraOpen)} data-testid="plan-extra"><Plus className="h-[18px] w-[18px]" aria-hidden="true" />Extra deposit</button>
         <button type="button" className={action} disabled={busy || !next} onClick={() => next && run((db, uid) => db.from("savings_events").insert({ user_id: uid, plan_id: plan.id, kind: "skip", month: next.month }))} data-testid="plan-skip"><SkipForward className="h-[18px] w-[18px]" aria-hidden="true" />Skip a month</button>
-        <button type="button" className={action} disabled={busy} onClick={() => run(async (db) => { const paused = isPaused(plan); const body = { pauses: paused ? resumedToday(plan, today) : pausedToday(plan, today), paused_on: paused ? null : today }; const r = await db.from("savings_plans").update(body).eq("id", plan.id); return isMissingColumn(r.error) ? db.from("savings_plans").update({ paused_on: body.paused_on }).eq("id", plan.id) : r; })} data-testid="plan-pause">{isPaused(plan) ? <Play className="h-[18px] w-[18px]" aria-hidden="true" /> : <Pause className="h-[18px] w-[18px]" aria-hidden="true" />}{isPaused(plan) ? "Resume plan" : "Pause plan"}</button>
+        <button type="button" className={action} disabled={busy} onClick={() => run(async (db) => { const paused = isPaused(plan); const body = { pauses: paused ? resumedToday(plan, today) : pausedToday(plan, today), paused_on: paused ? null : today }; const r = await db.from("savings_plans").update(body).eq("id", plan.id); if (!isMissingColumn(r.error)) return r; setError(setupNeeded("Pausing and resuming several times", "migration_audit_fixes.sql") + " Pausing works until then."); return db.from("savings_plans").update({ paused_on: body.paused_on }).eq("id", plan.id); })} data-testid="plan-pause">{isPaused(plan) ? <Play className="h-[18px] w-[18px]" aria-hidden="true" /> : <Pause className="h-[18px] w-[18px]" aria-hidden="true" />}{isPaused(plan) ? "Resume plan" : "Pause plan"}</button>
       </div>
 
       {extraOpen && (

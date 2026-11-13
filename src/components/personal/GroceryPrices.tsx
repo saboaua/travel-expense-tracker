@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -116,7 +117,7 @@ export function GroceryPrices() {
     const uid = session?.user.id;
     if (!uid) { setNote("Sign in again to save this."); return; }
     const { error: e } = await supabase.from("grocery_online_matches").upsert({ user_id: uid, product_key: productKey, store: m.store, item_id: m.itemId, same }, { onConflict: "user_id,product_key,store,item_id" });
-    if (e) { setNote(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_store_prices.sql in Supabase to save your answers." : "Could not save that. Try again."); return; }
+    if (e) { setNote(/relation|schema cache/i.test(e.message) ? setupNeeded("Saving your answers","migration_store_prices.sql") : "Could not save that. Try again."); return; }
     setOnlineTick((n) => n + 1);
   }, []);
 
@@ -142,7 +143,7 @@ export function GroceryPrices() {
       pairs.map(([a, b]) => { const [key_a, key_b] = pairOf(a, b); return { user_id: uid, key_a, key_b, same }; }),
       { onConflict: "user_id,key_a,key_b" },
     );
-    if (e) { setNote(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_price_matches.sql in Supabase to save your answers." : "Could not save that. Try again."); return; }
+    if (e) { setNote(/relation|schema cache/i.test(e.message) ? setupNeeded("Saving your answers","migration_price_matches.sql") : "Could not save that. Try again."); return; }
     await matchesQ.reload();
   }
 
@@ -287,7 +288,7 @@ function OnlineRow({ m, best, fmt, ask, onAnswer, online, max }: { m: OnlineMatc
         </div>
       )}
       {!m.confirmed && !ask && (
-        <button type="button" disabled={!online} onClick={() => onAnswer(false)} className="mt-1 min-h-9 text-[13px] font-semibold text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Not the same product</button>
+        <button type="button" disabled={!online} onClick={() => onAnswer(false)} className="mt-1 min-h-11 text-[13px] font-semibold text-primary disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Not the same product</button>
       )}
     </div>
   );

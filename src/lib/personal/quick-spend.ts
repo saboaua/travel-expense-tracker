@@ -1,4 +1,4 @@
-import { convert, type BudgetCurrency } from "@/lib/personal/money";
+import { convert, dominantCurrency, type BudgetCurrency } from "@/lib/personal/money";
 
 /** Quick spend: purchases with no receipt. Personal only; a business expense still needs a receipt or invoice. */
 
@@ -15,10 +15,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
  * more, and spends in the other one are converted at the peg, so the figure and the count describe the same spends.
  * `skipped` counts any that could not be converted (another currency without a USD amount).
  */
-export function summarizeSpends(rows: { amount: number | string; currency: string; amount_usd?: number | string | null }[] | null | undefined): { total: number; currency: string; count: number; skipped: number } | null {
+export function summarizeSpends(rows: { amount: number | string; currency: string; amount_usd?: number | string | null }[] | null | undefined, show?: BudgetCurrency): { total: number; currency: string; count: number; skipped: number } | null {
   if (!rows?.length) return null;
-  const awg = rows.filter((r) => r.currency === "AWG").length, usd = rows.filter((r) => r.currency === "USD").length;
-  const currency: BudgetCurrency = usd > awg ? "USD" : "AWG";
+  const currency: BudgetCurrency = show ?? dominantCurrency(rows);
   let total = 0, skipped = 0;
   for (const r of rows) {
     const v = convert(num(r.amount), r.currency, currency, r.amount_usd == null ? null : num(r.amount_usd));

@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UTILITY_BILL_COLS } from "@/lib/columns";
@@ -18,7 +19,7 @@ export function useUtilityBills() {
     const supabase = createClient();
     const { data, error: e } = await supabase.from("utility_bills").select(UTILITY_BILL_COLS).order("bill_month", { ascending: false }).order("created_at", { ascending: false }).limit(1000);
     const items = await browserOutbox.list().catch(() => []);
-    if (e && /relation|schema cache|does not exist/i.test(e.message)) { setError("Run supabase/migration_utilities.sql in Supabase first."); setRows(applyRows([], items, "utility_bills")); return; }
+    if (e && /relation|schema cache|does not exist/i.test(e.message)) { setError(setupNeeded("Utilities","migration_utilities.sql")); setRows(applyRows([], items, "utility_bills")); return; }
     if (e && !items.length) { setError("Could not load your bills. Check your connection."); setRows([]); return; }
     setError(null);
     const waiting = waitingRowIds(items, "utility_bills");

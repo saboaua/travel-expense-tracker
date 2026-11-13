@@ -945,6 +945,11 @@ try {
       await page.getByRole("link", { name: /Quick spend/ }).first().click();
       await page.waitForURL((u) => u.pathname === "/personal/spend");
       await page.locator("#qs-amount").fill("4.5");
+      // one currency control: AWG asks for no rate, USD shows what it comes to in AWG
+      assert((await page.getByLabel("Exchange rate to USD").count()) === 0, "AWG shows no rate box");
+      await page.getByRole("button", { name: "USD", exact: true }).click();
+      assert(/8\.06/.test(await page.getByTestId("amount-in-awg").textContent()), "USD 4.50 shows as AWG 8.06");
+      await page.getByRole("button", { name: "AWG", exact: true }).click();
       await page.locator("#qs-what").fill("Coffee");
       await page.getByRole("button", { name: "Street food", exact: true }).click();
       await page.getByTestId("quick-spend-save").click();
@@ -952,6 +957,7 @@ try {
       const saved = fake.table("personal_spends")[0];
       assert(saved && saved.amount === 4.5 && saved.merchant === "Coffee" && saved.category === "Street food" && saved.currency === "AWG", "the spend is saved with its amount, name, category and AWG: " + JSON.stringify(saved));
       assert(!fake.table("expenses").some((e) => e.merchant === "Coffee"), "it never lands in business expenses");
+      await page.getByTestId("spend-list").getByText("Coffee").waitFor(); // the list refreshes after the save
       assert(/Coffee/.test(await page.getByTestId("spend-list").textContent()) && /4\.50/.test(await page.getByTestId("month-total").textContent()), "it is listed and counted this month");
       await page.reload();
       await page.getByTestId("recent-names").getByRole("button", { name: "Coffee" }).waitFor();
@@ -1059,6 +1065,11 @@ try {
       await page.waitForFunction(() => document.querySelector("[data-testid=budget-card]")?.getAttribute("data-state") === "over");
       assert(fake.table("personal_budgets").length === 2 && fake.table("personal_budgets").some((r) => r.month), "a second budget is kept for this month only");
       assert(/69/.test(await page.getByTestId("budget-headline").textContent()), "69 over is shown: " + (await page.getByTestId("budget-headline").textContent()));
+      assert(/Over by/.test(await page.getByTestId("budget-headline").textContent()), "the headline says how far over");
+      await page.getByTestId("budget-legend").waitFor();
+      assert((await page.getByTestId("budget-area-groceries").getAttribute("href")) === "/personal/groceries", "an area row opens that area");
+      const houseTile = page.getByRole("link", { name: /House & repairs/ }).first();
+      assert(/90/.test(await houseTile.textContent()) && (await houseTile.getAttribute("href")) === "/personal/house", "the House & repairs tile shows this month's house spending: " + (await houseTile.textContent()));
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
     } finally {
       await ctx.close();
@@ -1113,7 +1124,7 @@ try {
       await page.goto(`${BASE}/personal`);
       await page.getByTestId("budget-area-savings").waitFor();
       assert(/250/.test(await page.getByTestId("budget-area-savings").textContent()), "Savings in the budget is 250: " + (await page.getByTestId("budget-area-savings").textContent()));
-      assert(/1,650\.00 saved/.test(await page.locator("a[href='/personal/savings']").first().textContent()), "the Savings tile shows the total saved");
+      assert(/1,650\.00 saved/.test(await page.locator("a[href='/personal/savings']").filter({ hasText: "a month" }).first().textContent()), "the Savings tile shows the total saved");
       // pause stops deposits
       await page.goto(`${BASE}/personal/savings`);
       await page.getByTestId("savings-plan").click();
@@ -2174,10 +2185,10 @@ try {
     assert((await admin.page.getByText("0 active").count()) === 0, "empty tiles no longer read '0 active'");
     await admin.page.getByText("Keep handy").waitFor();
     assert((await admin.page.getByRole("link", { name: /Documents/ }).count()) > 0 && (await admin.page.getByRole("link", { name: /Loyalty cards/ }).count()) > 0, "Documents and Loyalty cards are listed");
-    // on a phone the tiles (now with Savings, and Subscriptions for an admin) are within about one and a half screens: the last one starts above 1200px
+    // on a phone the tiles (now with Savings, House & repairs, and Subscriptions for an admin) are within about one and a half screens: the last one starts above 1300px
     await admin.page.setViewportSize({ width: 390, height: 844 });
     const top = await admin.page.getByRole("link", { name: /Loyalty cards/ }).evaluate((el) => el.getBoundingClientRect().top + window.scrollY);
-    assert(top < 1200, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
+    assert(top < 1300, `Loyalty cards starts within the first screen and a bit (top ${Math.round(top)}px)`);
     await admin.page.setViewportSize({ width: 1280, height: 720 });
   });
 

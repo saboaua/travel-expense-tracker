@@ -92,7 +92,7 @@ export function GroceryOverview() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/personal/groceries/prices"><Button variant="outline" className="gap-2"><TrendingUp className="h-4 w-4" /> Price tracker</Button></Link>
-          <Link href="/personal/groceries/price-check"><Button variant="outline" className="gap-2" data-testid="price-check-link"><Tag className="h-4 w-4" /> Price check</Button></Link>
+          <Link href="/personal/groceries/price-check"><Button variant="outline" className="gap-2" data-testid="price-check-link"><Tag className="h-4 w-4" /> Add a price</Button></Link>
           <Link href="/personal/groceries/new"><Button className="gap-2"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
@@ -7,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
-import { AREA_PREFIX, filterHouse, houseSpends, houseTotalUsd, type SpendRow } from "@/lib/personal/quick-spend";
+import { convert, convertedCount, dominantCurrency, round2 } from "@/lib/personal/money";
+import { AREA_PREFIX, filterHouse, houseSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 
 const pill = (on: boolean) =>
@@ -30,7 +32,7 @@ export function HouseRepairs() {
         // page through every row: the server hands back at most 1000 at a time
         data = await fetchAll<unknown>((from, to) => withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", `${year}-01-01`).order("expense_date", { ascending: false }).order("id").range(from, to), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>);
       } catch (err) { e = { message: err instanceof Error ? err.message : "" }; }
-      if (e) { setRows([]); setError(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_quick_spend.sql in Supabase first." : "Could not load your spending. Check your connection."); return; }
+      if (e) { setRows([]); setError(/relation|schema cache/i.test(e.message) ? setupNeeded("Quick spend","migration_quick_spend.sql") : "Could not load your spending. Check your connection."); return; }
       setRows(houseSpends((data ?? []) as unknown as SpendRow[], year));
       const { data: ps } = await supabase.from("personal_projects").select("id, name").eq("kind", "home_project").limit(200);
       setNames(Object.fromEntries(((ps ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name])));
@@ -40,6 +42,11 @@ export function HouseRepairs() {
   const projectsUsed = useMemo(() => [...new Set((rows ?? []).map((r) => r.project_id).filter((x): x is string => !!x && !!names[x]))], [rows, names]);
   const areasUsed = useMemo(() => [...new Set((rows ?? []).map((r) => r.house_area).filter((x): x is string => !!x))].sort(), [rows]);
   const shown = useMemo(() => filterHouse(rows ?? [], by), [rows, by]);
+  // Everything is shown in one currency (AWG or USD, whichever the rows use more); a row in the other keeps its own amount underneath
+  const cur = useMemo(() => dominantCurrency(rows), [rows]);
+  const inCur = (r: SpendRow) => convert(Number(r.amount), r.currency, cur, r.amount_usd == null ? null : Number(r.amount_usd));
+  const total = round2(shown.reduce((t, r) => t + (inCur(r) ?? 0), 0));
+  const converted = convertedCount(shown, cur);
   const hasLoose = (rows ?? []).some((r) => !r.project_id && !r.house_area);
 
   const openInvoice = async (path: string) => {
@@ -56,8 +63,8 @@ export function HouseRepairs() {
       {error && <Alert className="mt-3">{error}</Alert>}
 
       <div className="mt-4 rounded-2xl border bg-card p-4">
-        <p className="text-[28px] font-bold tabular-nums leading-none text-blue-700 dark:text-blue-300" data-testid="house-total">{formatCurrency(houseTotalUsd(shown), "USD")} <span className="text-sm font-semibold text-foreground">spent in {year}</span></p>
-        <p className="mt-1 text-xs text-muted-foreground">Shown in USD so different currencies add up.</p>
+        <p className="text-[28px] font-bold tabular-nums leading-none text-blue-700 dark:text-blue-300" data-testid="house-total">{formatCurrency(total, cur)} <span className="text-sm font-semibold text-foreground">spent in {year}</span></p>
+        {converted > 0 && <p className="mt-1 text-xs text-muted-foreground" data-testid="house-converted">{converted === 1 ? "One entry is" : `${converted} entries are`} in {cur === "AWG" ? "USD" : "AWG"} and added at the fixed rate, 1 USD = 1.79 AWG.</p>}
       </div>
 
       {(projectsUsed.length > 0 || areasUsed.length > 0 || hasLoose) && (
@@ -81,9 +88,12 @@ export function HouseRepairs() {
                   <span className="block text-[13px] text-muted-foreground">{formatDate(r.expense_date)} · {r.project_id && names[r.project_id] ? names[r.project_id] : r.house_area ? r.house_area : "No project or area"}</span>
                 </span>
                 {r.receipt_path && (
-                  <button type="button" onClick={() => openInvoice(r.receipt_path!)} className="inline-flex min-h-9 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-[13px] font-semibold text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200"><ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />Invoice</button>
+                  <button type="button" onClick={() => openInvoice(r.receipt_path!)} className="inline-flex min-h-11 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-[13px] font-semibold text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200"><ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />Invoice</button>
                 )}
-                <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(r.amount), r.currency)}</span>
+                <span className="text-right">
+                  <span className="block text-[15px] font-bold tabular-nums">{formatCurrency(inCur(r) ?? Number(r.amount), inCur(r) == null ? r.currency : cur)}</span>
+                  {r.currency !== cur && <span className="block text-xs text-muted-foreground tabular-nums" data-testid="house-original">{formatCurrency(Number(r.amount), r.currency)}</span>}
+                </span>
               </li>
             ))}
           </ul>

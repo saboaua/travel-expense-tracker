@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check } from "lucide-react";
@@ -45,7 +46,7 @@ export function PriceCheckForm() {
     const supabase = createClient();
     const { data, error: e } = await supabase.from("price_checks").select(PRICE_CHECK_COLS).order("seen_on", { ascending: false }).order("created_at", { ascending: false }).limit(500);
     const items = await browserOutbox.list().catch(() => []);
-    if (e && /relation|schema cache|does not exist/i.test(e.message)) setError("Run supabase/migration_price_notes.sql in Supabase first.");
+    if (e && /relation|schema cache|does not exist/i.test(e.message)) setError(setupNeeded("Price notes","migration_price_notes.sql"));
     setRows(applyRows(((data ?? []) as unknown as PriceCheck[]), items, "price_checks"));
     const { data: rec } = await supabase.from("grocery_receipts").select("store").order("purchase_date", { ascending: false }).limit(200);
     setStoreNames(((rec ?? []) as { store: string }[]).map((r) => r.store));
@@ -82,7 +83,7 @@ export function PriceCheckForm() {
         api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "price_checks", row,
         file, fileColumn: file ? "photo_path" : undefined, bucket: file ? "receipts" : undefined, folder: "personal/price-checks",
         keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
-        label: `${row.product} at ${row.store}`, summary: "Price check · new",
+        label: `${row.product} at ${row.store}`, summary: "Price added",
       });
       setSavedMsg(`${r.queued ? "Saved on this phone, will send when you are online" : "Saved"}: ${row.product} at ${row.store}, ${formatCurrency(amt, currency)}`);
       setLastProduct(row.product);
@@ -101,7 +102,7 @@ export function PriceCheckForm() {
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
       <Link href="/personal/groceries" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
-      <h1 className="text-xl font-bold">Price check</h1>
+      <h1 className="text-xl font-bold">Add a price</h1>
       <p className="mt-1 text-sm text-muted-foreground">Saw a price in a shop? Save it here to compare later. It never counts as spending.</p>
 
       <form onSubmit={(e) => { e.preventDefault(); save(false); }} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="price-check-form">
@@ -111,7 +112,7 @@ export function PriceCheckForm() {
           {products.length > 0 && (
             <div className="mt-2" data-testid="check-products">
               <div className="flex flex-wrap gap-2">
-                {products.map((n) => <button key={n} type="button" onClick={() => setProduct(n)} className="inline-flex min-h-9 items-center rounded-full bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200">{n}</button>)}
+                {products.map((n) => <button key={n} type="button" onClick={() => setProduct(n)} className="inline-flex min-h-11 items-center rounded-full bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200">{n}</button>)}
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">Products you checked before.</p>
             </div>

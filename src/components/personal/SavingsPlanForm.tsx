@@ -1,5 +1,6 @@
 "use client";
 
+import { setupNeeded } from "@/lib/setup-message";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -42,12 +43,15 @@ export function SavingsPlanForm() {
   const [goal, setGoal] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [setupMissing, setSetupMissing] = useState(false);
 
   useEffect(() => {
     const id = new URLSearchParams(window.location.search).get("id");
-    if (!id) return;
-    setEditId(id);
-    fetchSavings(createClient()).then(({ plans }) => {
+    if (id) setEditId(id);
+    fetchSavings(createClient()).then(({ plans, missing }) => {
+      // The table is not there yet: say so now and keep Save off, instead of failing when it is tapped
+      if (missing) { setError(setupNeeded("Savings", "migration_savings.sql")); setSetupMissing(true); }
+      if (!id) return;
       const p = plans.find((x) => x.id === id);
       if (!p) return;
       setName(p.name); setAmount(String(p.amount)); setCurrency(p.currency); setStart(p.start_date);
@@ -78,7 +82,7 @@ export function SavingsPlanForm() {
     const body = { user_id: session.user.id, name: name.trim(), amount: value, currency, start_date: start, end_date: until ? end : null, opening_balance: open ?? 0, goal: goalValue };
     const { error: err } = editId ? await supabase.from("savings_plans").update(body).eq("id", editId) : await supabase.from("savings_plans").insert(body);
     setBusy(false);
-    if (err) return setError(/relation|schema cache|does not exist/i.test(err.message) ? "Run supabase/migration_savings.sql in Supabase first." : "Could not save the plan. Check your connection.");
+    if (err) return setError(/relation|schema cache|does not exist/i.test(err.message) ? setupNeeded("Savings", "migration_savings.sql") : "Could not save the plan. Check your connection.");
     router.push(editId ? `/personal/savings/plan?id=${editId}` : "/personal/savings");
   };
 
@@ -148,7 +152,7 @@ export function SavingsPlanForm() {
           )}
         </div>
 
-        <Button type="submit" disabled={busy} className="h-[52px] w-full text-base" data-testid="savings-save">{busy ? "Saving…" : "Save plan"}</Button>
+        <Button type="submit" disabled={busy || setupMissing} className="h-[52px] w-full text-base" data-testid="savings-save">{busy ? "Saving…" : "Save plan"}</Button>
         {!editId && <p className="text-[13px] text-muted-foreground">Starting from today with nothing saved yet? Leave &lsquo;I already have savings&rsquo; off.</p>}
       </form>
     </div>

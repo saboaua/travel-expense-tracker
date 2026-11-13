@@ -14,6 +14,7 @@ import { useHouseAreas } from "@/lib/use-categories";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
+import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { AREA_PREFIX, houseTarget, parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
@@ -136,24 +137,7 @@ export function QuickSpend() {
       <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="quick-spend-form">
         <div>
           <label htmlFor="qs-amount" className={label}>Amount</label>
-          <div className="flex items-center gap-2 rounded-xl border bg-background px-3">
-            <input id="qs-amount" inputMode="decimal" autoComplete="off" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0.00" className="h-14 min-w-0 flex-1 bg-transparent text-2xl font-bold tabular-nums outline-none" />
-            {choices.length > 0 ? (
-              <div className="flex overflow-hidden rounded-lg border" role="group" aria-label="Currency">
-                {choices.map((c) => <button key={c} type="button" aria-pressed={currency === c} onClick={() => setCurrency(c)} className={`min-h-10 px-3 text-sm font-semibold ${currency === c ? "bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900" : ""}`}>{c}</button>)}
-              </div>
-            ) : null}
-          </div>
-          {(others.length > 0 || choices.length === 0) && (
-            <Select value={currency} onChange={(e) => setCurrency(e.target.value)} className="mt-2" aria-label="Currency">
-              {currencies.map((c) => <option key={c.code} value={c.code}>{c.code}</option>)}
-            </Select>
-          )}
-          {currency !== "USD" && (
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              Rate to USD <input aria-label="Exchange rate to USD" value={rate} onChange={(e) => setRate(e.target.value)} inputMode="decimal" className="ml-1 w-20 rounded border bg-background px-1.5 py-0.5 tabular-nums" />
-            </p>
-          )}
+          <AmountField id="qs-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={setRate} />
         </div>
 
         <div>
@@ -163,7 +147,7 @@ export function QuickSpend() {
             <div className="mt-2" data-testid="recent-names">
               <div className="flex flex-wrap gap-2">
                 {names.map((n) => (
-                  <button key={n.name} type="button" onClick={() => { setWhat(n.name); setCategory(n.category); if (!amount) { setAmount(n.amount ? String(n.amount) : ""); setCurrency(n.currency); } }} className="inline-flex min-h-9 items-center rounded-full bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200">{n.name}</button>
+                  <button key={n.name} type="button" onClick={() => { setWhat(n.name); setCategory(n.category); if (!amount) { setAmount(n.amount ? String(n.amount) : ""); setCurrency(n.currency); } }} className="inline-flex min-h-11 items-center rounded-full bg-blue-50 px-3 text-sm font-semibold text-blue-800 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200">{n.name}</button>
                 ))}
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">Your recent ones. Tap to fill in the name, category and last amount.</p>

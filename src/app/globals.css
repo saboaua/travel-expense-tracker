@@ -137,3 +137,11 @@ textarea,
   -webkit-user-select: text;
   user-select: text;
 }
+
+/* Dark mode: bare coloured text written for a light page (red-600, amber-600 ...) is too dark on the dark page.
+   Lift the -600 shades to a lighter tint of the same colour, only where the element has no dark: colour of its own.
+   The darker -700 to -900 shades are left alone: they sit on light tinted boxes, where they are the readable choice. */
+.dark .text-red-600:not([class*="dark:text-"]) { color: rgb(252 165 165); }
+.dark .text-amber-600:not([class*="dark:text-"]) { color: rgb(252 211 77); }
+.dark :is(.text-green-600, .text-emerald-600):not([class*="dark:text-"]) { color: rgb(134 239 172); }
+.dark .text-blue-600:not([class*="dark:text-"]) { color: rgb(147 197 253); }

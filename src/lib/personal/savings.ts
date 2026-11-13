@@ -148,10 +148,10 @@ export function plannedDeposits(startDate: string, endDate: string, amount: numb
   return { count, total: round2(count * amount) };
 }
 
-/** The totals shown for all plans together, the same on the Personal tile and on the Savings page. Currency is the first plan's. */
-export function savingsSummary(plans: SavingsPlan[], events: SavingsEvent[], today: string): { currency: BudgetCurrency; saved: number; monthly: number; plans: number } | null {
+/** The totals shown for all plans together, the same on the Personal tile and on the Savings page. Currency is the first plan's unless one is given. */
+export function savingsSummary(plans: SavingsPlan[], events: SavingsEvent[], today: string, show?: BudgetCurrency): { currency: BudgetCurrency; saved: number; monthly: number; plans: number } | null {
   if (!plans.length) return null;
-  const currency = plans[0].currency;
+  const currency = show ?? plans[0].currency;
   const saved = plans.reduce((t, p) => t + (convert(savedSoFar(p, events, today), p.currency, currency) ?? 0), 0);
   const monthly = plans.filter((p) => !isPaused(p) && p.start_date <= today && (!p.end_date || p.end_date >= today)).reduce((t, p) => t + (convert(p.amount, p.currency, currency) ?? 0), 0);
   return { currency, saved: round2(saved), monthly: round2(monthly), plans: plans.length };
