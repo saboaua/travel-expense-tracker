@@ -1022,6 +1022,40 @@ try {
     }
   });
 
+  await test("quick spend: a spend from an earlier month can be opened, changed and deleted", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const stash = fake.table("personal_spends").splice(0);
+    try {
+      const d = new Date(); d.setUTCDate(15); d.setUTCMonth(d.getUTCMonth() - 3);
+      const old = d.toISOString().slice(0, 10);
+      fake.table("personal_spends").push({ id: "7e000000-0000-4000-8000-00000000e001", user_id: PAT, merchant: "Door handle", amount: 38.5, currency: "AWG", exchange_rate: 0.558659, amount_usd: 21.51, category: "House", expense_date: old, receipt_path: `${PAT}/personal/spends/old.jpg`, created_at: new Date().toISOString() });
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/spend`);
+      await page.getByTestId("month-stepper").waitFor();
+      for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Earlier month" }).click();
+      await page.getByRole("button", { name: "Change Door handle" }).click();
+      assert((await page.locator("#qs-amount").inputValue()) === "38.5" && (await page.locator("#qs-what").inputValue()) === "Door handle", "the form is filled in with the spend");
+      await page.getByTestId("spend-photo-saved").waitFor();
+      await page.locator("#qs-amount").fill("41");
+      await page.getByTestId("quick-spend-save").click();
+      await page.getByTestId("quick-spend-done").waitFor();
+      const changed = fake.table("personal_spends").find((r) => r.id === "7e000000-0000-4000-8000-00000000e001");
+      assert(changed && changed.amount === 41 && changed.expense_date === old && changed.exchange_rate === 0.558659, "the amount changed, the date and the saved rate stayed: " + JSON.stringify(changed));
+      assert(fake.table("personal_spends").length === 1, "it is still one spend, not a copy");
+      await page.getByRole("button", { name: "Change Door handle" }).click();
+      await page.getByTestId("spend-edit-delete").click();
+      await page.getByRole("button", { name: "Delete", exact: true }).last().click();
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=spend-row]").length === 0);
+      assert(fake.table("personal_spends").length === 0, "the spend is deleted");
+    } finally {
+      await ctx.close();
+      const a = fake.table("personal_spends"); a.splice(0); a.push(...stash);
+    }
+  });
+
   await test("budget: a monthly budget is set with an area limit, and the Personal card shows what is left and which area is over", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
@@ -1250,6 +1284,12 @@ try {
       const seen = await page.getByTestId("seen-so-far").textContent();
       assert(seen.indexOf("Fit Stop") < seen.indexOf("Vitamin Corner"), "seen so far lists the cheapest first");
       assert(!fake.table("expenses").some((e) => e.merchant === "C4 Energy") && !fake.table("personal_spends").length, "it never counts as spending");
+      // a price added by mistake can be deleted, after a question
+      assert((await page.getByTestId("added-price").count()) === 2, "both prices are listed for the product");
+      await page.getByRole("button", { name: "Delete Vitamin Corner price" }).click();
+      await page.getByRole("button", { name: "Delete", exact: true }).last().click();
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=added-price]").length === 1);
+      assert(fake.table("price_checks").length === 1 && fake.table("price_checks")[0].store === "Fit Stop", "the wrong price is gone and the other stays");
       await page.goto(`${BASE}/personal/groceries/prices`);
       await page.getByText("C4 Energy", { exact: false }).first().waitFor();
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");

@@ -3,7 +3,8 @@
 import { setupNeeded } from "@/lib/setup-message";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, Check, Trash2 } from "lucide-react";
+import { useConfirm } from "@/components/ui/confirm";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,10 +15,10 @@ import { PRICE_CHECK_COLS } from "@/lib/columns";
 import { useCurrencies } from "@/lib/use-currencies";
 import { parseAmount, QUICK_DEFAULT_CURRENCY } from "@/lib/personal/quick-spend";
 import { knownStores, recentProducts, type PriceCheck } from "@/lib/personal/price-notes";
-import { addDaysISO, formatCurrency, todayISO } from "@/lib/utils";
+import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
-import { applyRows, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { applyRows, deleteRow, makeRowApi, saveRow } from "@/lib/row-outbox";
 
 const chip = (on: boolean) =>
   `inline-flex min-h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
@@ -25,6 +26,7 @@ const chip = (on: boolean) =>
 /** Save a price you saw in a shop. It never counts as spending; the Price tracker compares it with your receipts. */
 export function PriceCheckForm() {
   const currencies = useCurrencies();
+  const confirm = useConfirm();
   const [product, setProduct] = useState("");
   const [store, setStore] = useState("");
   const [price, setPrice] = useState("");
@@ -65,6 +67,27 @@ export function PriceCheckForm() {
     for (const r of rows) if (r.product.trim().toLowerCase() === key && !latest.has(r.store.toLowerCase())) latest.set(r.store.toLowerCase(), r);
     return [...latest.values()].sort((a, b) => Number(a.price) - Number(b.price));
   }, [rows, product, lastProduct]);
+
+  // Every price you added for the product being typed, newest first, so a wrong one can be removed
+  const added = useMemo(() => {
+    const key = (lastProduct ?? product).trim().toLowerCase();
+    return key ? rows.filter((r) => r.product.trim().toLowerCase() === key) : [];
+  }, [rows, product, lastProduct]);
+  const removePrice = async (r: PriceCheck) => {
+    if (!(await confirm({ title: "Delete this price?", message: `${r.store}, ${formatCurrency(Number(r.price), r.currency)}, ${formatDate(r.seen_on)}`, destructive: true }))) return;
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete.");
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "price_checks", id: r.id, paths: r.photo_path ? [r.photo_path] : [],
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === r.id) ?? null, label: `${r.product} at ${r.store}`, summary: "Price · delete",
+      });
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete that price.");
+    }
+  };
 
   const save = async (another: boolean) => {
     setError(null); setSavedMsg(null);
@@ -185,6 +208,20 @@ export function PriceCheckForm() {
               <p className="mt-2 text-[13px] text-muted-foreground">Seen so far, cheapest first:</p>
               <ul className="mt-1 divide-y" data-testid="seen-so-far">
                 {soFar.map((r) => <li key={r.id} className="flex min-h-9 items-center justify-between text-sm"><span>{r.store}</span><b className="tabular-nums">{formatCurrency(Number(r.price), r.currency)}</b></li>)}
+              </ul>
+            </>
+          )}
+          {added.length > 0 && (
+            <>
+              <p className="mt-3 text-[13px] text-muted-foreground">Prices you added for this product:</p>
+              <ul className="mt-1 divide-y" data-testid="added-prices">
+                {added.map((r) => (
+                  <li key={r.id} className="flex min-h-12 items-center gap-2 text-sm" data-testid="added-price">
+                    <span className="min-w-0 flex-1"><b className="block truncate">{r.store}</b><span className="text-[13px] text-muted-foreground">{formatDate(r.seen_on)}{r.waiting ? " · waiting to send" : ""}</span></span>
+                    <b className="tabular-nums">{formatCurrency(Number(r.price), r.currency)}</b>
+                    <button type="button" onClick={() => removePrice(r)} aria-label={`Delete ${r.store} price`} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-red-950" data-testid="added-price-delete"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
+                  </li>
+                ))}
               </ul>
             </>
           )}

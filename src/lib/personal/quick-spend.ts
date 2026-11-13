@@ -5,7 +5,7 @@ import { convert, dominantCurrency, type BudgetCurrency } from "@/lib/personal/m
 export const QUICK_CATEGORIES = ["Coffee & snacks", "Street food", "Transport", "Personal care", "House", "Other"] as const;
 export const QUICK_DEFAULT_CURRENCY = "AWG";
 
-export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; category: string; expense_date: string; project_id?: string | null; receipt_path?: string | null; house_area?: string | null };
+export type SpendRow = { id: string; merchant: string | null; amount: number | string; currency: string; amount_usd?: number | string | null; exchange_rate?: number | string | null; category: string; expense_date: string; project_id?: string | null; receipt_path?: string | null; house_area?: string | null };
 
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const r2 = (n: number) => Math.round(n * 100) / 100;

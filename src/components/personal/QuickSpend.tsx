@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2 } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,9 @@ import { useCurrencies } from "@/lib/use-currencies";
 import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { AREA_PREFIX, houseTarget, parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
+import { openSigned } from "@/lib/open-signed";
+import { fetchAll } from "@/lib/personal/fetch-all";
+import { monthLabel, shiftMonth } from "@/lib/personal/utilities";
 import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
@@ -42,6 +45,12 @@ export function QuickSpend() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [rows, setRows] = useState<Listed[] | null>(null);
+  // Looking back: the month shown in the list, and any one spend opened to change or delete
+  const [viewMonth, setViewMonth] = useState(todayISO().slice(0, 7));
+  const [older, setOlder] = useState<Listed[] | null>(null);
+  const [editing, setEditing] = useState<Listed | null>(null);
+  const [photoGone, setPhotoGone] = useState(false);
+  const [rateTouched, setRateTouched] = useState(false);
   const { rate, setRate } = useUsdRate(currency);
   // House extras: an optional home project and a photo of the invoice
   const [projectId, setProjectId] = useState("");
@@ -69,11 +78,23 @@ export function QuickSpend() {
     setRows([...waiting, ...((data ?? []) as unknown as Listed[])]);
   }, []);
   useEffect(() => { load(); }, [load]);
+  // An earlier month is loaded on its own, so any spend can be found, not just the last two months
+  const loadOlder = useCallback(async (m: string) => {
+    const supabase = createClient();
+    const from = `${m}-01`, to = `${shiftMonth(from, 1)}`;
+    try {
+      const data = await fetchAll<Listed>((a, b) => withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", from).lt("expense_date", to).order("expense_date", { ascending: false }).order("id").range(a, b), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE) as unknown as PromiseLike<{ data: Listed[] | null; error: { message: string } | null }>);
+      setOlder(data);
+    } catch { setOlder(null); setError("Could not load that month. Check your connection."); }
+  }, []);
+  const currentMonth = todayISO().slice(0, 7);
+  useEffect(() => { if (viewMonth === currentMonth) setOlder(null); else loadOlder(viewMonth); }, [viewMonth, currentMonth, loadOlder]);
 
   const names = useMemo(() => recentNames(rows ?? []), [rows]);
   const month = todayISO().slice(0, 7);
   const thisMonth = useMemo(() => (rows ?? []).filter((r) => r.expense_date.startsWith(month)), [rows, month]);
-  const monthTotal = summarizeSpends(thisMonth);
+  const shown = viewMonth === month ? thisMonth : older;
+  const monthTotal = summarizeSpends(shown);
   const choices = currencies.some((c) => c.code === "USD") && currencies.some((c) => c.code === QUICK_DEFAULT_CURRENCY) ? [QUICK_DEFAULT_CURRENCY, "USD"] : [];
   const others = currencies.filter((c) => !choices.includes(c.code));
 
@@ -92,22 +113,46 @@ export function QuickSpend() {
       if (!uid) throw new Error("Sign in again to save.");
       // Only sent when chosen, so a database without the House migrations still saves everything else
       const house = isHouse ? houseTarget(projectId) : {};
-      const row = { merchant: what.trim() || null, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum), category, expense_date: date, notes: notes.trim() || null, ...house };
+      // Changing a spend keeps the rate it was entered with unless you type another; the house columns are only cleared if it had them
+      const keepRate = editing && editing.currency === currency && !rateTouched && Number(editing.exchange_rate) > 0 ? Number(editing.exchange_rate) : null;
+      const rateUsed = currency === "USD" ? 1 : keepRate ?? rateNum;
+      const cleared = editing && (editing.project_id || editing.house_area) ? { project_id: null, house_area: null } : {};
+      const removePhoto = !!editing && !!editing.receipt_path && photoGone && !file;
+      const row = { merchant: what.trim() || null, amount: amt, currency, exchange_rate: rateUsed, amount_usd: toUsd(amt, rateUsed), category, expense_date: date, notes: notes.trim() || null, ...cleared, ...house, ...(removePhoto ? { receipt_path: null } : {}) };
       const withPhoto = isHouse ? file : null;
+      const waiting = editing ? (await browserOutbox.list().catch(() => [])).find((i) => i.id === editing.id) ?? null : null;
       const r = await saveRow({
-        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "personal_spends", row,
-        file: withPhoto, fileColumn: withPhoto ? "receipt_path" : undefined, bucket: withPhoto ? "receipts" : undefined, folder: "personal/spends",
+        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "personal_spends", row, id: editing?.id, waiting,
+        file: withPhoto, fileColumn: withPhoto ? "receipt_path" : undefined, bucket: withPhoto ? "receipts" : undefined, folder: "personal/spends", currentPath: editing?.receipt_path ?? null,
         keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
-        label: row.merchant || category, summary: "Quick spend · new",
+        label: row.merchant || category, summary: editing ? "Quick spend · change" : "Quick spend · new",
       });
-      setDone(`${r.queued ? "Saved on this phone, will send when you are online" : "Saved"}: ${formatCurrency(amt, currency)}${row.merchant ? ` · ${row.merchant}` : ""}`);
-      setAmount(""); setWhat(""); setNotes(""); setDate(todayISO()); setPickDate(false); setProjectId(""); setFile(null); setPreview(null);
+      // A photo you removed is deleted from storage too, so nothing is left behind
+      if (removePhoto && editing?.receipt_path) await supabase.storage.from("receipts").remove([editing.receipt_path]).catch(() => {});
+      setDone(`${r.queued ? "Saved on this phone, will send when you are online" : editing ? "Changed" : "Saved"}: ${formatCurrency(amt, currency)}${row.merchant ? ` · ${row.merchant}` : ""}`);
+      clearForm();
       await load();
+      if (viewMonth !== month) await loadOlder(viewMonth);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save.");
     } finally {
       setSaving(false);
     }
+  };
+
+  const clearForm = () => {
+    setEditing(null); setPhotoGone(false); setRateTouched(false);
+    setAmount(""); setWhat(""); setNotes(""); setDate(todayISO()); setPickDate(false); setProjectId(""); setFile(null); setPreview(null);
+  };
+  /** Opens one spend, from any month, in the form above to change it */
+  const startEdit = (r: Listed) => {
+    setError(null); setDone(null);
+    setEditing(r); setPhotoGone(false); setRateTouched(false); setFile(null); setPreview(null);
+    setAmount(String(r.amount)); setCurrency(r.currency); setWhat(r.merchant ?? ""); setCategory(r.category);
+    setDate(r.expense_date); setPickDate(r.expense_date !== todayISO() && r.expense_date !== addDaysISO(todayISO(), -1));
+    setNotes((r as unknown as { notes?: string | null }).notes ?? "");
+    setProjectId(r.project_id ?? (r.house_area ? `${AREA_PREFIX}${r.house_area}` : ""));
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const remove = async (r: Listed) => {
@@ -120,7 +165,9 @@ export function QuickSpend() {
         api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_spends", id: r.id, paths: r.receipt_path ? [r.receipt_path] : [],
         waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === r.id) ?? null, label: r.merchant || r.category, summary: "Quick spend · delete",
       });
+      if (editing?.id === r.id) clearForm();
       await load();
+      if (viewMonth !== month) await loadOlder(viewMonth);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not delete.");
     }
@@ -131,13 +178,13 @@ export function QuickSpend() {
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
-      <h1 className="text-xl font-bold">Quick spend</h1>
+      <h1 className="text-xl font-bold">{editing ? "Change spend" : "Quick spend"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">For purchases with no receipt. It counts toward your personal spending and never goes to a business trip, which still needs a receipt or invoice.</p>
 
       <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="quick-spend-form">
         <div>
           <label htmlFor="qs-amount" className={label}>Amount</label>
-          <AmountField id="qs-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={setRate} />
+          <AmountField id="qs-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={(v) => { setRateTouched(true); setRate(v); }} />
         </div>
 
         <div>
@@ -175,7 +222,15 @@ export function QuickSpend() {
             </div>
             <div>
               <span className={label}>Photo of the invoice <span className="font-normal text-muted-foreground">(optional, good for warranty and returns)</span></span>
-              <ReceiptCapture preview={preview} busy={false} maxSide={1600} onFile={(f, url) => { setFile(f); setPreview(url); }} onClear={() => { setFile(null); setPreview(null); }} />
+              {editing?.receipt_path && !photoGone && !file ? (
+                <div className="flex items-center gap-3 rounded-xl border bg-muted/40 px-3 py-2" data-testid="spend-photo-saved">
+                  <span className="min-w-0 flex-1 text-sm font-semibold">Photo saved</span>
+                  <button type="button" onClick={() => openSigned(async () => (await createClient().storage.from("receipts").createSignedUrl(editing.receipt_path!, 3600)).data?.signedUrl)} className="min-h-11 px-2 text-sm font-semibold text-primary">View</button>
+                  <button type="button" onClick={() => setPhotoGone(true)} className="min-h-11 px-2 text-sm font-semibold text-red-600" data-testid="spend-photo-remove">Remove</button>
+                </div>
+              ) : (
+                <ReceiptCapture preview={preview} busy={false} maxSide={1600} onFile={(f, url) => { setFile(f); setPreview(url); }} onClear={() => { setFile(null); setPreview(null); }} />
+              )}
             </div>
           </div>
         )}
@@ -197,24 +252,36 @@ export function QuickSpend() {
 
         {error && <Alert>{error}</Alert>}
         {done && <Alert variant="success" data-testid="quick-spend-done">{done}</Alert>}
-        <Button type="submit" disabled={saving} className="h-12 w-full text-base" data-testid="quick-spend-save">{saving ? "Saving..." : "Save spend"}</Button>
+        <Button type="submit" disabled={saving} className="h-12 w-full text-base" data-testid="quick-spend-save">{saving ? "Saving..." : editing ? "Save changes" : "Save spend"}</Button>
+        {editing && (
+          <div className="flex gap-2">
+            <Button type="button" variant="outline" className="h-12 flex-1" onClick={clearForm} data-testid="spend-edit-cancel">Cancel</Button>
+            <button type="button" onClick={() => remove(editing)} className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-md text-sm font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950" data-testid="spend-edit-delete"><Trash2 className="h-4 w-4" aria-hidden="true" /> Delete this spend</button>
+          </div>
+        )}
       </form>
 
       <Link href="/personal/house" className="mt-6 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="house-link">House &amp; repairs</Link>
-      <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">This month</h2>
+      <div className="mt-4 flex items-center gap-1" data-testid="month-stepper">
+        <button type="button" onClick={() => setViewMonth(shiftMonth(`${viewMonth}-01`, -1).slice(0, 7))} aria-label="Earlier month" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
+        <h2 className="flex-1 text-center text-[17px] font-bold" data-testid="month-label">{viewMonth === month ? "This month" : monthLabel(`${viewMonth}-01`)}</h2>
+        <button type="button" onClick={() => setViewMonth(shiftMonth(`${viewMonth}-01`, 1).slice(0, 7))} disabled={viewMonth >= month} aria-label="Later month" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent disabled:opacity-30"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
+      </div>
       {monthTotal && <p className="mt-1 text-[26px] font-bold tabular-nums tracking-tight" data-testid="month-total">{formatCurrency(monthTotal.total, monthTotal.currency)} <span className="text-sm font-medium text-muted-foreground">in {monthTotal.count} {monthTotal.count === 1 ? "spend" : "spends"}</span></p>}
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="spend-list">
-        {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : thisMonth.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">Nothing yet this month.</p>
+        {rows === null || shown === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : shown.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground">{viewMonth === month ? "Nothing yet this month." : "Nothing in this month."}</p>
         ) : (
           <ul className="divide-y">
-            {thisMonth.map((r) => (
+            {shown.map((r) => (
               <li key={r.id} className="flex min-h-14 items-center gap-3 py-2" data-testid="spend-row">
+                <button type="button" onClick={() => startEdit(r)} className="flex min-w-0 flex-1 items-center gap-3 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="spend-open" aria-label={`Change ${r.merchant || r.category}`}>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{r.merchant || r.category}</span>
                   <span className="block text-[13px] text-muted-foreground">{formatDate(r.expense_date)} · {r.category}{r.waiting ? " · waiting to send" : ""}</span>
                 </span>
                 <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(r.amount), r.currency)}</span>
+                </button>
                 <button type="button" onClick={() => remove(r)} aria-label={`Delete ${r.merchant || r.category}`} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-red-950"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
               </li>
             ))}
