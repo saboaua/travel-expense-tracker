@@ -56,19 +56,22 @@ export function HouseRepairs() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-x-8">
+      <div className="lg:col-span-2">
       <Link href="/personal/spend" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Quick spend</Link>
       <h1 className="text-[26px] font-bold leading-tight">House &amp; repairs</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">{year} · {rows ? `${rows.length} item${rows.length === 1 ? "" : "s"}` : " "}</p>
       {error && <Alert className="mt-3">{error}</Alert>}
+      </div>
 
+      <div className="lg:col-start-1 lg:row-start-2 lg:sticky lg:top-4">
       <div className="mt-4 rounded-2xl border bg-card p-4">
         <p className="text-[28px] font-bold tabular-nums leading-none text-blue-700 dark:text-blue-300" data-testid="house-total">{formatCurrency(total, cur)} <span className="text-sm font-semibold text-foreground">spent in {year}</span></p>
         {converted > 0 && <p className="mt-1 text-xs text-muted-foreground" data-testid="house-converted">{converted === 1 ? "One entry is" : `${converted} entries are`} in {cur === "AWG" ? "USD" : "AWG"} and added at the fixed rate, 1 USD = 1.79 AWG.</p>}
       </div>
 
       {(projectsUsed.length > 0 || areasUsed.length > 0 || hasLoose) && (
-        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Filter">
+        <div className="-mx-4 mt-3 flex gap-2 overflow-x-auto px-4 pb-1 lg:mx-0 lg:flex-col lg:items-start lg:overflow-visible lg:px-0" role="group" aria-label="Filter">
           <button type="button" aria-pressed={by === "all"} onClick={() => setBy("all")} className={pill(by === "all")}>All</button>
           {projectsUsed.map((id) => <button key={id} type="button" aria-pressed={by === id} onClick={() => setBy(id)} className={pill(by === id)}>{names[id]}</button>)}
           {areasUsed.map((a) => <button key={a} type="button" aria-pressed={by === `${AREA_PREFIX}${a}`} onClick={() => setBy(`${AREA_PREFIX}${a}`)} className={pill(by === `${AREA_PREFIX}${a}`)}>{a}</button>)}
@@ -76,7 +79,9 @@ export function HouseRepairs() {
         </div>
       )}
 
-      <div className="mt-3 rounded-2xl border bg-card px-4" data-testid="house-list">
+      </div>
+
+      <div className="mt-3 rounded-2xl border bg-card px-4 lg:col-start-2 lg:row-start-2 lg:mt-4" data-testid="house-list">
         {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : shown.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">Nothing yet. In Quick spend, choose the category House.</p>
         ) : (

@@ -47,36 +47,38 @@ export function UtilitiesOverview() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-[26px] font-bold leading-tight">Utilities</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself, then trace back what you paid and when.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 
-      <div className="mt-4 flex items-center justify-between rounded-2xl border bg-card px-2">
+      <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-4">
+      <div className="mt-4 flex items-center justify-between rounded-2xl border bg-card px-2 lg:mt-3">
         <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
         <span className="text-[15px] font-bold" data-testid="util-month">{monthLabel(month)}</span>
         <button type="button" onClick={() => setMonth(shiftMonth(month, 1))} disabled={isNow} aria-label="Next month" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
       </div>
 
-      <div className="mt-3 rounded-2xl border bg-card p-4">
+      <div className="mt-3 rounded-2xl border bg-card p-4 lg:mt-3">
         <p className="text-[28px] font-bold tabular-nums leading-none" data-testid="util-total">{formatCurrency(total, "USD")} <span className="text-sm font-semibold text-muted-foreground">in {monthLabel(month).split(" ")[0]}</span></p>
         <p className="mt-1 text-xs text-muted-foreground">
           {change == null ? "Shown in USD so different currencies add up." : change === 0 ? "The same as last month." : `${formatCurrency(Math.abs(change), "USD")} ${change > 0 ? "more" : "less"} than last month.`}
         </p>
       </div>
 
-      <div className="mt-3 rounded-2xl border bg-card px-4" data-testid="util-list">
+      </div>
+      <div className="mt-3 rounded-2xl border bg-card px-4 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-list">
         {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : lines.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">No bills yet. Tap Add bill to start with water or electricity.</p>
         ) : (
-          <ul className="divide-y">
+          <ul className="divide-y lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0">
             {lines.map((l) => {
               const first = l.bills[0];
               const due = first ? dueState(first, today) : null;
               const st = STATUS[l.status];
               return (
-                <li key={l.kind} data-testid="util-row">
+                <li key={l.kind} data-testid="util-row" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
                   <Link href={`/personal/utilities/history?kind=${l.kind}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold">{kindLabel(l.kind)}{l.provider ? <span className="font-normal text-muted-foreground"> · {l.provider}</span> : null}</span>
@@ -97,7 +99,7 @@ export function UtilitiesOverview() {
         )}
       </div>
 
-      <Link href="/personal/utilities/add" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
+      <Link href="/personal/utilities/add" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground lg:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
 
       <div className="mt-4">
         <button type="button" onClick={() => setAskDay((v) => !v)} aria-expanded={askDay} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-remind">{day ? `Reminder: day ${day} of the month` : "Remind me to add bills"}</button>

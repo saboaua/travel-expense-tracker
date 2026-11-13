@@ -1022,6 +1022,31 @@ try {
     }
   });
 
+  await test("desktop: the Personal pages use the wide screen, with the form beside the list, and nothing scrolls sideways", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/spend`);
+      const form = await page.getByTestId("quick-spend-form").boundingBox();
+      const list = await page.getByTestId("spend-list").boundingBox();
+      assert(form && list && list.x > form.x + form.width - 1 && Math.abs(list.y - form.y) < 160, "Quick spend: the list sits beside the form: " + JSON.stringify({ form, list }));
+      assert(form.width < 520, "the form keeps a comfortable width: " + form.width);
+      for (const path of ["/personal/spend", "/personal/house", "/personal/savings", "/personal/savings/add", "/personal/utilities", "/personal/utilities/add", "/personal/groceries/price-check", "/personal/budget"]) {
+        await page.goto(`${BASE}${path}`);
+        await page.waitForLoadState("networkidle");
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${path}: no sideways scroll on desktop`);
+        if (process.env.E2E_SHOTS) await page.screenshot({ path: `${process.env.E2E_SHOTS}/${path.replace(/\//g, "_")}.png` });
+        const w = await page.evaluate(() => Math.round(document.querySelector("main")?.querySelector("[class*=max-w]")?.getBoundingClientRect().width ?? 0));
+        assert(w > 700, `${path}: uses the wide screen (${w}px)`);
+      }
+    } finally {
+      await ctx.close();
+    }
+  });
+
   await test("quick spend: a spend from an earlier month can be opened, changed and deleted", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);

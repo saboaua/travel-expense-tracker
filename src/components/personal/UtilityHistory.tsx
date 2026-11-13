@@ -45,7 +45,7 @@ export function UtilityHistory() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-3xl">
       <Link href="/personal/utilities" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
       <h1 className="text-[26px] font-bold leading-tight">{kindLabel(kind)}</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">{mine.length} bill{mine.length === 1 ? "" : "s"}</p>

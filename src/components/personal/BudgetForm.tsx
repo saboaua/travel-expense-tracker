@@ -101,13 +101,13 @@ export function BudgetForm() {
 
   const hasSaved = rows.some((x) => (x.month ?? null) === (onlyThisMonth ? thisMonth : null));
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-[26px] font-bold leading-tight">Monthly budget</h1>
       <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">What you plan to spend each month. Groceries, utilities, quick spends and house costs are counted against it.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 
-      <form onSubmit={save} className="mt-4 space-y-3" data-testid="budget-form">
+      <form onSubmit={save} className="mt-4 space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0" data-testid="budget-form">
         <div className="space-y-4 rounded-2xl border bg-card p-4">
           <div>
             <label htmlFor="bg-amount" className={label}>Budget per month</label>
@@ -155,7 +155,7 @@ export function BudgetForm() {
           <Toggle on={alertOn} onChange={setAlertOn} label="Tell me at 80%" />
         </div>
 
-        <Button type="submit" disabled={busy || !loaded || setupMissing} className="h-[52px] w-full text-base" data-testid="budget-save">{busy ? "Saving…" : "Save budget"}</Button>
+        <Button type="submit" disabled={busy || !loaded || setupMissing} className="h-[52px] w-full text-base lg:col-span-2 lg:w-64" data-testid="budget-save">{busy ? "Saving…" : "Save budget"}</Button>
         {hasSaved && <button type="button" onClick={remove} disabled={busy} className="inline-flex min-h-11 w-full items-center justify-center text-sm font-semibold text-red-600 hover:text-red-700" data-testid="budget-remove">Remove this budget</button>}
       </form>
     </div>

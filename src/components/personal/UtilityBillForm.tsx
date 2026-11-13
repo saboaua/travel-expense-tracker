@@ -113,11 +113,11 @@ export function UtilityBillForm() {
 
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal/utilities" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
       <h1 className="text-xl font-bold">{editId ? "Change bill" : "Add bill"}</h1>
 
-      <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="util-form">
+      <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:space-y-0 lg:gap-y-4 lg:p-6" data-testid="util-form">
         <div>
           <span className={label} id="ub-kind">Utility</span>
           <div className="flex flex-wrap gap-2" role="group" aria-labelledby="ub-kind">
@@ -166,8 +166,8 @@ export function UtilityBillForm() {
           <Input id="ub-note" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Account number, meter reading" maxLength={500} />
         </div>
 
-        {error && <Alert>{error}</Alert>}
-        <Button type="submit" disabled={saving} className="h-12 w-full text-base" data-testid="util-save">{saving ? "Saving..." : "Save bill"}</Button>
+        {error && <Alert className="lg:col-span-2">{error}</Alert>}
+        <Button type="submit" disabled={saving} className="h-12 w-full text-base lg:col-span-2 lg:w-64" data-testid="util-save">{saving ? "Saving..." : "Save bill"}</Button>
       </form>
     </div>
   );

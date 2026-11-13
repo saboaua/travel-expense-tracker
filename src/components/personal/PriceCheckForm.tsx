@@ -123,12 +123,12 @@ export function PriceCheckForm() {
   const yesterday = addDaysISO(todayISO(), -1);
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal/groceries" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
       <h1 className="text-xl font-bold">Add a price</h1>
       <p className="mt-1 text-sm text-muted-foreground">Saw a price in a shop? Save it here to compare later. It never counts as spending.</p>
 
-      <form onSubmit={(e) => { e.preventDefault(); save(false); }} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="price-check-form">
+      <form onSubmit={(e) => { e.preventDefault(); save(false); }} className="mt-4 space-y-4 rounded-2xl border bg-card p-4 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:space-y-0 lg:gap-y-4 lg:p-6" data-testid="price-check-form">
         <div>
           <label htmlFor="pc-product" className={label}>Product</label>
           <Input id="pc-product" value={product} onChange={(e) => setProduct(e.target.value)} placeholder="C4 Energy" maxLength={160} className="h-12 text-base" />
@@ -195,9 +195,9 @@ export function PriceCheckForm() {
           <Input id="pc-note" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Promo until Sunday" maxLength={500} />
         </div>
 
-        {error && <Alert>{error}</Alert>}
-        <Button type="submit" disabled={saving} className="h-12 w-full text-base" data-testid="price-check-save">{saving ? "Saving..." : "Save price"}</Button>
-        <Button type="button" variant="outline" disabled={saving} onClick={() => save(true)} className="h-12 w-full text-base" data-testid="price-check-another">Save and add another store</Button>
+        {error && <Alert className="lg:col-span-2">{error}</Alert>}
+        <Button type="submit" disabled={saving} className="h-12 w-full text-base lg:col-span-2 lg:w-64" data-testid="price-check-save">{saving ? "Saving..." : "Save price"}</Button>
+        <Button type="button" variant="outline" disabled={saving} onClick={() => save(true)} className="h-12 w-full text-base lg:col-span-2 lg:w-64" data-testid="price-check-another">Save and add another store</Button>
       </form>
 
       {savedMsg && (

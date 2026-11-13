@@ -176,12 +176,14 @@ export function QuickSpend() {
   const yesterday = addDaysISO(todayISO(), -1);
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8">
+      <div className="lg:col-span-2">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-xl font-bold">{editing ? "Change spend" : "Quick spend"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">For purchases with no receipt. It counts toward your personal spending and never goes to a business trip, which still needs a receipt or invoice.</p>
 
-      <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4" data-testid="quick-spend-form">
+      </div>
+      <form onSubmit={submit} className="mt-4 space-y-4 self-start rounded-2xl border bg-card p-4 lg:col-start-1 lg:row-start-2" data-testid="quick-spend-form">
         <div>
           <label htmlFor="qs-amount" className={label}>Amount</label>
           <AmountField id="qs-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={(v) => { setRateTouched(true); setRate(v); }} />
@@ -261,7 +263,8 @@ export function QuickSpend() {
         )}
       </form>
 
-      <Link href="/personal/house" className="mt-6 inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="house-link">House &amp; repairs</Link>
+      <div className="lg:col-start-2 lg:row-start-2 lg:min-w-0">
+      <Link href="/personal/house" className="mt-6 inline-flex lg:mt-4 min-h-11 items-center gap-1 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="house-link">House &amp; repairs</Link>
       <div className="mt-4 flex items-center gap-1" data-testid="month-stepper">
         <button type="button" onClick={() => setViewMonth(shiftMonth(`${viewMonth}-01`, -1).slice(0, 7))} aria-label="Earlier month" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
         <h2 className="flex-1 text-center text-[17px] font-bold" data-testid="month-label">{viewMonth === month ? "This month" : monthLabel(`${viewMonth}-01`)}</h2>
@@ -287,6 +290,7 @@ export function QuickSpend() {
             ))}
           </ul>
         )}
+      </div>
       </div>
     </div>
   );

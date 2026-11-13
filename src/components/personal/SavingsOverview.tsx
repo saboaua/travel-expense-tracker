@@ -64,7 +64,7 @@ export function SavingsOverview() {
   const max = Math.max(...(view?.chart.map((c) => c.total) ?? [0]), 1);
   const btn = "inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-semibold text-primary-foreground hover:bg-primary/90";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-[26px] font-bold leading-tight">Savings</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">What you set aside each month, and what you have saved so far.</p>
@@ -81,8 +81,8 @@ export function SavingsOverview() {
           <div className="rounded-2xl border bg-card p-4"><b className="block text-[15px]">Already saving somewhere?</b><p className="mt-1.5 text-sm leading-snug text-muted-foreground">When you add a plan, turn on <b className="text-foreground">I already have savings</b> and type what you have so far. The monthly amount starts from the date you choose.</p></div>
         </div>
       ) : data && view ? (
-        <div className="mt-4 space-y-3">
-          <div className="rounded-2xl border bg-card p-4">
+        <div className="mt-4 space-y-3 lg:grid lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:items-start lg:gap-x-8 lg:space-y-0">
+          <div className="rounded-2xl border bg-card p-4 lg:row-span-4 lg:self-start">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p>
             <p className="mt-1.5 text-[34px] font-bold leading-none tabular-nums" data-testid="savings-total">{formatCurrency(view.total, view.currency)}</p>
             <p className="mt-1 text-[13px] text-muted-foreground">across {data.plans.length} {data.plans.length === 1 ? "plan" : "plans"} · <b className="text-foreground">{formatCurrency(view.monthly, view.currency)}</b> goes in each month</p>
@@ -97,10 +97,10 @@ export function SavingsOverview() {
             </div>
             <p className="mt-1.5 text-xs text-muted-foreground">Total saved at the end of each month.</p>
           </div>
-          <p className="pt-1 text-xs font-bold uppercase tracking-wider text-muted-foreground">Your plans</p>
-          {data.plans.map((p) => <PlanCard key={p.id} plan={p} events={data.events} today={today} />)}
-          <Link href="/personal/savings/add" className={btn} data-testid="savings-add"><Plus className="h-4 w-4" aria-hidden="true" /> Add a savings plan</Link>
-          <p className="text-[13px] leading-snug text-muted-foreground">Each plan puts its amount aside every month by itself. It counts as spending in your monthly budget, in its own Savings line, because that money is already set aside.</p>
+          <p className="pt-1 text-xs font-bold uppercase tracking-wider text-muted-foreground lg:col-start-2 lg:pt-0">Your plans</p>
+          <div className="space-y-3 lg:col-start-2">{data.plans.map((p) => <PlanCard key={p.id} plan={p} events={data.events} today={today} />)}</div>
+          <Link href="/personal/savings/add" className={`${btn} lg:col-start-2`} data-testid="savings-add"><Plus className="h-4 w-4" aria-hidden="true" /> Add a savings plan</Link>
+          <p className="text-[13px] leading-snug text-muted-foreground lg:col-start-2">Each plan puts its amount aside every month by itself. It counts as spending in your monthly budget, in its own Savings line, because that money is already set aside.</p>
         </div>
       ) : <p className="mt-6 text-sm text-muted-foreground">&nbsp;</p>}
     </div>

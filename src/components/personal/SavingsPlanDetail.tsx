@@ -76,7 +76,8 @@ export function SavingsPlanDetail() {
   const action = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border bg-card px-1 text-[13px] font-semibold hover:bg-accent disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8">
+      <div className="lg:col-span-2">
       <Link href="/personal/savings" className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Savings</Link>
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: "#ccfbf1", color: TEAL }}><PiggyBank className="h-[22px] w-[22px]" aria-hidden="true" /></span>
@@ -84,6 +85,8 @@ export function SavingsPlanDetail() {
         <Link href={`/personal/savings/add?id=${plan.id}`} aria-label="Change plan" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><Pencil className="h-5 w-5" aria-hidden="true" /></Link>
       </div>
       {error && <Alert className="mt-3">{error}</Alert>}
+      </div>
+      <div className="lg:col-start-1 lg:row-start-2">
 
       <div className="mt-3 rounded-2xl border bg-card p-4">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
@@ -113,7 +116,9 @@ export function SavingsPlanDetail() {
         </form>
       )}
 
-      <p className="mt-5 text-xs font-bold uppercase tracking-wider text-muted-foreground">Deposits</p>
+      </div>
+      <div className="lg:col-start-2 lg:row-start-2 lg:min-w-0">
+      <p className="mt-5 lg:mt-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">Deposits</p>
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="plan-deposits">
         {list.map((d, i) => {
           const b = BADGE[d.status];
@@ -140,6 +145,7 @@ export function SavingsPlanDetail() {
             <Button variant="outline" onClick={() => setConfirmDelete(false)} className="h-11">Keep</Button>
             <Button onClick={() => run((db) => db.from("savings_plans").delete().eq("id", plan.id)).then((ok) => { if (ok) window.location.href = "/personal/savings"; })} className="h-11 bg-red-600 hover:bg-red-700" data-testid="plan-delete-yes">Delete</Button></div>
         ) : <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex min-h-11 w-full items-center justify-center text-sm font-semibold text-red-600 hover:text-red-700" data-testid="plan-delete">Delete this plan</button>}
+      </div>
       </div>
     </div>
   );

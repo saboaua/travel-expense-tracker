@@ -87,12 +87,12 @@ export function SavingsPlanForm() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href={editId ? `/personal/savings/plan?id=${editId}` : "/personal/savings"} className="mb-2 inline-flex min-h-11 items-center gap-2 text-lg font-bold"><X className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> {editId ? "Change savings plan" : "Add a savings plan"}</Link>
       <p className="text-[13px] leading-snug text-muted-foreground">Set the amount once. It is counted every month from the start date, with nothing to type each time.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 
-      <form onSubmit={save} className="mt-3 space-y-3" data-testid="savings-form">
+      <form onSubmit={save} className="mt-3 space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-x-6 lg:gap-y-3 lg:space-y-0" data-testid="savings-form">
         <div className="space-y-4 rounded-2xl border bg-card p-4">
           <div>
             <label htmlFor="sv-name" className={label}>Name</label>
@@ -152,8 +152,8 @@ export function SavingsPlanForm() {
           )}
         </div>
 
-        <Button type="submit" disabled={busy || setupMissing} className="h-[52px] w-full text-base" data-testid="savings-save">{busy ? "Saving…" : "Save plan"}</Button>
-        {!editId && <p className="text-[13px] text-muted-foreground">Starting from today with nothing saved yet? Leave &lsquo;I already have savings&rsquo; off.</p>}
+        <Button type="submit" disabled={busy || setupMissing} className="h-[52px] w-full text-base lg:col-span-2 lg:w-64" data-testid="savings-save">{busy ? "Saving…" : "Save plan"}</Button>
+        {!editId && <p className="text-[13px] text-muted-foreground lg:col-span-2">Starting from today with nothing saved yet? Leave &lsquo;I already have savings&rsquo; off.</p>}
       </form>
     </div>
   );
