@@ -99,9 +99,25 @@ async function getJson<T>(url: string, fetcher: Fetcher, extra: Record<string, s
   return (await res.json()) as T;
 }
 
+/** One try again after a pause: a shop that answers 429 or 5xx once is usually fine a moment later. */
+async function getJsonRetry<T>(url: string, fetcher: Fetcher, extra: Record<string, string> = {}, pauseMs = 1500): Promise<T> {
+  try { return await getJson<T>(url, fetcher, extra); } catch { await sleep(pauseMs); return getJson<T>(url, fetcher, extra); }
+}
+
+/** Rows the database would refuse (its limits on name, size, link and price), so one bad row cannot sink a whole save. */
+export function catalogProblems(r: CatalogRow): string | null {
+  if (!r.item_id || r.item_id.length > 120) return "item id empty or longer than 120";
+  if (r.name.length > 200 || !r.name) return "name empty or longer than 200";
+  if (r.name_norm.length > 300 || !r.name_norm) return "search text empty or longer than 300";
+  if (r.size_text && r.size_text.length > 40) return "size longer than 40";
+  if (r.url && r.url.length > 500) return "link longer than 500";
+  if (!(r.price > 0) || r.price >= 100000000) return "price out of range";
+  return null;
+}
+
 export type FetchLimits = { maxPages?: number; pageSize?: number; pauseMs?: number; until?: number };
 
-export async function fetchSuperFood(fetcher: Fetcher = fetch, o: FetchLimits = {}): Promise<{ rows: CatalogRow[]; complete: boolean }> {
+export async function fetchSuperFood(fetcher: Fetcher = fetch, o: FetchLimits = {}): Promise<{ rows: CatalogRow[]; complete: boolean; error?: string }> {
   const key = process.env.FRESHOP_APP_KEY || "super_food_plaza_aruba";
   const size = o.pageSize ?? 100;
   const rows = new Map<string, CatalogRow>();
@@ -109,7 +125,14 @@ export async function fetchSuperFood(fetcher: Fetcher = fetch, o: FetchLimits = 
   let firstId: string | null = null;
   for (let page = 0; page < (o.maxPages ?? 80); page++) {
     if (o.until && Date.now() > o.until) return { rows: [...rows.values()], complete: false };
-    const d = await getJson<{ items?: FreshopItem[]; total?: number }>(`https://api.freshop.com/1/products?app_key=${encodeURIComponent(key)}&limit=${size}&skip=${skip}&offset=${skip}`, fetcher, { Referer: "https://shop.superfoodaruba.com/" });
+    let d: { items?: FreshopItem[]; total?: number };
+    try {
+      d = await getJsonRetry<{ items?: FreshopItem[]; total?: number }>(`https://api.freshop.com/1/products?app_key=${encodeURIComponent(key)}&limit=${size}&skip=${skip}&offset=${skip}`, fetcher, { Referer: "https://shop.superfoodaruba.com/" });
+    } catch (e) {
+      // a later page failing keeps what was already read; only a failure on the very first page is an error
+      if (page === 0) throw e;
+      return { rows: [...rows.values()], complete: false, error: `page ${page + 1}: ${e instanceof Error ? e.message : String(e)}` };
+    }
     const items = d.items ?? [];
     if (items.length === 0) return { rows: [...rows.values()], complete: true };
     // A page that repeats the first one means the shop ignored `skip`: stop instead of looping
@@ -124,12 +147,18 @@ export async function fetchSuperFood(fetcher: Fetcher = fetch, o: FetchLimits = 
   return { rows: [...rows.values()], complete: false };
 }
 
-export async function fetchLing(fetcher: Fetcher = fetch, o: FetchLimits = {}): Promise<{ rows: CatalogRow[]; complete: boolean }> {
+export async function fetchLing(fetcher: Fetcher = fetch, o: FetchLimits = {}): Promise<{ rows: CatalogRow[]; complete: boolean; error?: string }> {
   const size = o.pageSize ?? 250;
   const rows = new Map<string, CatalogRow>();
   for (let page = 1; page <= (o.maxPages ?? 60); page++) {
     if (o.until && Date.now() > o.until) return { rows: [...rows.values()], complete: false };
-    const d = await getJson<{ products?: ShopifyProduct[] }>(`https://shop.lingandsons.com/collections/all/products.json?limit=${size}&page=${page}`, fetcher);
+    let d: { products?: ShopifyProduct[] };
+    try {
+      d = await getJsonRetry<{ products?: ShopifyProduct[] }>(`https://shop.lingandsons.com/collections/all/products.json?limit=${size}&page=${page}`, fetcher);
+    } catch (e) {
+      if (page === 1) throw e;
+      return { rows: [...rows.values()], complete: false, error: `page ${page}: ${e instanceof Error ? e.message : String(e)}` };
+    }
     const products = d.products ?? [];
     if (products.length === 0) return { rows: [...rows.values()], complete: true };
     for (const r of mapShopify(products)) rows.set(r.item_id, r);

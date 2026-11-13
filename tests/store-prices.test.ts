@@ -47,6 +47,28 @@ async function readers() {
   eq([loop.rows.length, loop.complete], [2, false], "Super Food: a shop that ignores skip does not loop, the read is marked short");
   let bad = ""; try { await fetchSuperFood((async () => new Response("no", { status: 500 })) as typeof fetch, { pauseMs: 0 }); } catch (e) { bad = (e as Error).message; }
   eq(bad, "HTTP 500", "Super Food: a failing shop raises an error");
+  // a later page failing keeps what was already read instead of losing everything
+  let n = 0;
+  const flaky = (async () => { n++; if (n === 1) return json({ total: 9, items: [{ id: "a", name: "A", unit_price: 1 }, { id: "b", name: "B", unit_price: 2 }] }); return new Response("busy", { status: 429 }); }) as typeof fetch;
+  const part = await fetchSuperFood(flaky, { pageSize: 2, pauseMs: 0 });
+  eq([part.rows.map((x) => x.item_id), part.complete, /page 2/.test(part.error ?? "")], [["a", "b"], false, true], "Super Food: a later page that keeps failing keeps the rows already read");
+  let m = 0;
+  const once = (async () => { m++; if (m === 2) return new Response("busy", { status: 429 }); return json({ total: 3, items: m === 1 ? [{ id: "a", name: "A", unit_price: 1 }, { id: "b", name: "B", unit_price: 2 }] : [{ id: "c", name: "C", unit_price: 3 }] }); }) as typeof fetch;
+  const retried = await fetchSuperFood(once, { pageSize: 2, pauseMs: 0 });
+  eq([retried.rows.length, retried.complete], [3, true], "Super Food: a page that fails once is tried again");
+}
+{
+  const { catalogProblems } = await import("../src/lib/store-prices");
+  const ok = { store: "superfood" as const, item_id: "1", name: "A", name_norm: "a", size_text: null, price: 1, url: null };
+  eq([catalogProblems(ok), catalogProblems({ ...ok, url: "x".repeat(501) }), catalogProblems({ ...ok, size_text: "y".repeat(41) }), catalogProblems({ ...ok, price: 0 })], [null, "link longer than 500", "size longer than 40", "price out of range"], "rows the database would refuse are found");
+  const { syncStorePrices } = await import("../src/lib/store-sync");
+  // a fake database that refuses any chunk holding the poison row: only that row is lost
+  const saved: string[] = [];
+  const db = { from: () => ({ upsert: async (rows: { item_id: string }[]) => { if (rows.some((r) => r.item_id === "bad")) return { error: { message: "check violated" } }; saved.push(...rows.map((r) => r.item_id)); return { error: null }; }, delete: () => ({ eq: () => ({ lt: () => ({ select: async () => ({ data: [], error: null }) }) }) }) }) } as never;
+  const shop = (async (u: string | URL | Request) => String(u).includes("freshop") ? json({ total: 3, items: [{ id: "a", name: "A", unit_price: 1 }, { id: "bad", name: "B", unit_price: 2 }, { id: "c", name: "C", unit_price: 3 }] }) : json({ products: [] })) as typeof fetch;
+  const res = await syncStorePrices(db, shop, 5000);
+  const sf = res.find((r) => r.store === "superfood")!;
+  eq([saved.sort(), sf.error, sf.skipped, /refused/.test(sf.problem ?? "")], [["a", "c"], null, 1, true], "one refused row is skipped, the rest of the shop is still saved");
 }
 {
   const fake = (async (u: string | URL | Request) => { const page = Number(/page=(\d+)/.exec(String(u))![1]); return json({ products: page === 1 ? [{ title: "X 1 L", handle: "x", variants: [{ price: "2" }] }, { title: "Y", handle: "y", variants: [{ price: "3" }] }] : page === 2 ? [{ title: "Z", handle: "z", variants: [{ price: "4" }] }] : [] }); }) as typeof fetch;

@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { fetchLing, fetchSuperFood, STORE_IDS } from "@/lib/store-prices";
+import { catalogProblems, fetchLing, fetchSuperFood, STORE_IDS, type CatalogRow } from "@/lib/store-prices";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
 /** Open this page while signed in: can the server read both shops, and what is saved so far? Reads one page each, saves nothing. */
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,6 +16,19 @@ export async function GET() {
     try { const r = await run(); return { ok: r.rows.length > 0, ms: Date.now() - t, rows: r.rows.length, complete: r.complete, sample: r.rows.slice(0, 3).map((x) => `${x.name}${x.size_text ? ` (${x.size_text})` : ""} ${x.price}`) }; }
     catch (e) { return { ok: false, ms: Date.now() - t, error: e instanceof Error ? e.message : String(e) }; }
   };
+  // ?full=1 reads a shop's whole list (up to about 40 seconds) and says how many rows there are, whether the read finished, and which rows the database would refuse
+  const full = new URL(request.url).searchParams.get("full");
+  if (full === "superfood" || full === "ling") {
+    const t = Date.now();
+    try {
+      const r = await (full === "superfood" ? fetchSuperFood : fetchLing)(fetch, { until: Date.now() + 40000 });
+      const reasons: Record<string, number> = {};
+      for (const row of r.rows as CatalogRow[]) { const p = catalogProblems(row); if (p) reasons[p] = (reasons[p] ?? 0) + 1; }
+      return NextResponse.json({ store: full, rows: r.rows.length, complete: r.complete, error: r.error ?? null, wouldRefuse: reasons, seconds: Math.round((Date.now() - t) / 100) / 10 }, { headers: { "Cache-Control": "no-store" } });
+    } catch (e) {
+      return NextResponse.json({ store: full, error: e instanceof Error ? e.message : String(e), seconds: Math.round((Date.now() - t) / 100) / 10 }, { headers: { "Cache-Control": "no-store" } });
+    }
+  }
   const [superfood, ling] = await Promise.all([
     probe(() => fetchSuperFood(fetch, { maxPages: 1, pageSize: 25 })),
     probe(() => fetchLing(fetch, { maxPages: 1, pageSize: 25 })),

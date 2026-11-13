@@ -23,6 +23,8 @@ export async function GET(req: Request) {
   const results = await syncStorePrices(db);
   if (results.some((r) => /relation|schema cache|does not exist/i.test(r.error ?? ""))) return NextResponse.json({ ok: true, skipped: true, reason: "Run supabase/migration_store_prices.sql" });
   const failed = results.filter((r) => r.error);
-  if (failed.length === results.length) await notifyJobFailure(db, "Store prices (both shops failed)").catch(() => {});
+  // Anything that went wrong is written to the log, and any shop that saved nothing raises an alert (not only when both fail)
+  for (const r of results) if (r.error || r.problem) console.error(`[cron] store prices ${r.store}: ${r.error ?? r.problem}`);
+  if (failed.length > 0) await notifyJobFailure(db, `Store prices (${failed.map((r) => r.store).join(", ")} saved nothing)`).catch(() => {});
   return NextResponse.json({ ok: failed.length === 0, results });
 }
