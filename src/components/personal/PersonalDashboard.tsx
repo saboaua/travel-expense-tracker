@@ -331,7 +331,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
       ) : (
         <>
           {/* Where it goes: every row filters the page */}
-          <h2 className={cn(sectionLabel, "pt-1")}>Where it goes</h2>
+          <h2 className={cn(sectionLabel, "pt-1")}>Groceries by category</h2>
           <section aria-label="Where it goes" className="rounded-2xl border bg-card p-2">
             <div className="flex flex-col items-center gap-2 p-2 md:flex-row md:gap-6">
               <Donut

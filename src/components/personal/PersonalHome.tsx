@@ -13,6 +13,7 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
+import { WhereItGoes } from "@/components/personal/WhereItGoes";
 const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDashboard"), {
   ssr: false,
   loading: () => <p className="py-10 text-center text-sm text-muted-foreground">Loading your personal dashboard…</p>,
@@ -146,6 +147,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
       <div className="min-w-0 space-y-4">
         <div className="lg:hidden"><KeepHandy testId="keep-handy-mobile" /></div>
+        <WhereItGoes />
         <PersonalDashboard rows={rows} projects={projects} today={today} afterTrips={afterTrips} />
       </div>
       <aside aria-label="Subscriptions and shortcuts" className="hidden space-y-4 lg:sticky lg:top-6 lg:block">

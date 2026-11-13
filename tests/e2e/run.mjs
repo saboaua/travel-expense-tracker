@@ -2064,6 +2064,8 @@ try {
       await admin.page.getByTestId("active-filters").waitFor({ state: "detached" });
     }
     await admin.page.getByRole("heading", { name: "Active now" }).waitFor();
+    await admin.page.getByTestId("where-it-goes").waitFor();
+    assert((await admin.page.getByRole("heading", { name: "Groceries by category" }).count()) <= 1 && (await admin.page.getByRole("heading", { name: "Where it goes" }).count()) === 1, "the home Personal view has the all-parts Where it goes, and the grocery chart is named Groceries by category");
     // the ring chart and its percent-only legend
     if ((await admin.page.getByRole("region", { name: "Where it goes" }).count()) > 0) {
       await admin.page.getByTestId("where-donut").waitFor();
