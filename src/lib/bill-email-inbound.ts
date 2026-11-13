@@ -8,6 +8,7 @@ import { UTILITY_KINDS } from "@/lib/personal/utilities";
 export type InboundPayload = {
   From?: string; FromFull?: { Email?: string; Name?: string } | null; To?: string; OriginalRecipient?: string; MailboxHash?: string;
   Subject?: string; TextBody?: string; HtmlBody?: string; Date?: string; MessageID?: string;
+  Headers?: { Name?: string; Value?: string }[];
   Attachments?: { Name?: string; ContentType?: string; Content?: string; ContentLength?: number }[];
 };
 
@@ -22,13 +23,24 @@ const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) :
 const r2 = (n: number) => Math.round(n * 100) / 100;
 export const monthName = (m: string) => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?? "";
 
+/** "strict": the company's own DKIM signature must be valid (survives Gmail forwarding; SPF does not). "relaxed": any valid DKIM. "off": no check. */
+export type VerifyMode = "strict" | "relaxed" | "off";
+export const verifyMode = (v: string | undefined): VerifyMode => (v === "relaxed" || v === "off" ? v : "strict");
+
+/** Postmark lists what SpamAssassin found in X-Spam-Tests, e.g. "DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,SPF_PASS". */
+export function senderVerified(p: InboundPayload, mode: VerifyMode): boolean {
+  if (mode === "off") return true;
+  const tests = (p.Headers ?? []).filter((h) => /^x-spam-tests$/i.test(h.Name ?? "")).map((h) => h.Value ?? "").join(",").toUpperCase().split(/[\s,]+/);
+  return tests.includes(mode === "strict" ? "DKIM_VALID_AU" : "DKIM_VALID");
+}
+
 type Notify = (userId: string, bill: { company: string; month: string; due: string | null }) => Promise<unknown>;
 
 /**
  * One email arriving at someone's private address. `db` is the service client (nobody signed in is calling).
  * Never throws for bad mail: everything ends in a log line the person can read.
  */
-export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0): Promise<InboundResult> {
+export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0, verify: VerifyMode = "off"): Promise<InboundResult> {
   const token = tokenFromRecipient(p.OriginalRecipient || p.To, p.MailboxHash);
   if (!token) return { ok: true, status: "no_address" };
   const addr = await db.from("bill_email_addresses").select("user_id").eq("token", token).maybeSingle();
@@ -63,6 +75,8 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
 
   const allowed = await db.from("bill_email_senders").select("id").eq("user_id", userId).eq("email", sender).maybeSingle();
   if (!allowed.data) { await log("ignored_sender", { summary: "Not on your list of senders" }); return { ok: true, status: "ignored_sender" }; }
+  // anyone can type any "From"; only mail the company really signed becomes a bill
+  if (!senderVerified(p, verify)) { await log("ignored_sender", { summary: verify === "strict" ? "Not signed by the sender's own domain, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
   if (parsed.type !== "bill") { await log("unreadable", { summary: "Could not read a bill from this email. Add it by hand." }); return { ok: true, status: "unreadable" }; }
 
   const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", parsed.dedupe_key).maybeSingle();

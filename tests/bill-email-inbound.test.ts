@@ -1,4 +1,4 @@
-import { billRow, handleInbound } from "../src/lib/bill-email-inbound";
+import { billRow, handleInbound, senderVerified, verifyMode } from "../src/lib/bill-email-inbound";
 import { parseBillEmail, type ParsedBill } from "../src/lib/personal/bill-email";
 
 let failed = 0;
@@ -93,6 +93,21 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   m = makeDb(seed());
   await handleInbound(m.db, webMail({ Attachments: [{ Name: "bill.pdf", ContentType: "application/pdf", Content: Buffer.from("%PDF-1").toString("base64"), ContentLength: 6 }] }), notify);
   eq([m.uploads.length, m.uploads[0]?.path.startsWith("u1/personal/utilities/"), String(m.t.utility_bills[0].receipt_path).endsWith(".pdf")], [1, true, true], "the PDF is stored with the bill");
+
+  // forged "From": only mail the company really signed becomes a bill
+  const hdr = (tests: string) => ({ Headers: [{ Name: "X-Spam-Status", Value: "No" }, { Name: "X-Spam-Tests", Value: tests }] });
+  eq([senderVerified({}, "strict"), senderVerified(hdr("SPF_PASS"), "strict"), senderVerified(hdr("DKIM_SIGNED,DKIM_VALID"), "strict"), senderVerified(hdr("DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,SPF_PASS"), "strict")], [false, false, false, true], "strict needs the company's own valid signature");
+  eq([senderVerified(hdr("DKIM_VALID"), "relaxed"), senderVerified(hdr("SPF_PASS"), "relaxed"), senderVerified({}, "off")], [true, false, true], "relaxed needs any valid signature; off needs none");
+  eq([verifyMode(undefined), verifyMode("relaxed"), verifyMode("off"), verifyMode("whatever")], ["strict", "relaxed", "off", "strict"], "unset or unknown means strict");
+  m = makeDb(seed());
+  r = await handleInbound(m.db, webMail({ ...hdr("SPF_PASS") }), notify, "strict");
+  eq([r.ok && r.status, m.t.utility_bills.length, m.t.bill_email_log[0]?.status], ["ignored_sender", 0, "ignored_sender"], "a forged bill (no valid signature) is logged and not added");
+  m = makeDb(seed());
+  r = await handleInbound(m.db, webMail({ ...hdr("DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU") }), notify, "strict");
+  eq([r.ok && r.status, m.t.utility_bills.length], ["added", 1], "a properly signed bill is added");
+  m = makeDb(seed());
+  r = await handleInbound(m.db, { From: "Gmail Team <forwarding-noreply@google.com>", To: `bills-${TOKEN}@in.example.com`, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: "2026-11-01" }, notify, "strict");
+  eq(r.ok && r.status, "confirmation", "Gmail's code is still shown when the check is strict (it only displays a number)");
 
   // a bill with no amount is kept, marked to check
   const noAmount = parseBillEmail({ from: "noreply@elmar.aw", subject: "Your new ELMAR bill is ready", date: "2026-10-21", text: "Bill Due Date: Dec 14, 2026" }) as ParsedBill;

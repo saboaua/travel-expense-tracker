@@ -89,7 +89,8 @@ const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", 
     TURNSTILE_SECRET_KEY: "",
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
     INBOUND_EMAIL_BASE: "@in.example.com",
-    INBOUND_EMAIL_SECRET: "e2e-inbound-secret",
+    INBOUND_EMAIL_SECRET: "e2e-inbound-secret-long",
+    INBOUND_EMAIL_AUTH: "off",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -1278,6 +1279,9 @@ try {
       // the webhook refuses a wrong secret and accepts the right one
       const bad = await page.request.post(`${BASE}/api/email/inbound?secret=nope`, { data: { From: "x@y.com" } });
       assert(bad.status() === 403, "a wrong secret is refused: " + bad.status());
+      const basicOk = await page.request.post(`${BASE}/api/email/inbound`, { headers: { authorization: "Basic " + Buffer.from("postmark:e2e-inbound-secret-long").toString("base64") }, data: { From: "x@y.com" } });
+      const basicBad = await page.request.post(`${BASE}/api/email/inbound`, { headers: { authorization: "Basic " + Buffer.from("postmark:wrong").toString("base64") }, data: { From: "x@y.com" } });
+      assert(basicOk.status() === 200 && basicBad.status() === 403, "the secret works as a basic-auth password and a wrong one is refused: " + basicOk.status() + "/" + basicBad.status());
       await page.goto(`${BASE}/personal/utilities/emails`);
       await page.getByTestId("email-address").waitFor();
       const addr = await page.getByTestId("email-address").textContent();
@@ -1287,10 +1291,10 @@ try {
       await page.waitForFunction(() => /elmar\.aw/.test(document.querySelector("[data-testid=email-senders]")?.textContent || ""));
       assert(fake.table("bill_email_senders").some((r) => r.user_id === PAT && r.email === "noreply@elmar.aw"), "an allowed sender is saved");
       // Gmail's confirmation arrives through the webhook
-      const gm = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret`, { data: { From: "Gmail Team <forwarding-noreply@google.com>", To: addr, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: new Date().toISOString() } });
+      const gm = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret-long`, { data: { From: "Gmail Team <forwarding-noreply@google.com>", To: addr, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: new Date().toISOString() } });
       assert(gm.status() === 200, "the webhook accepts mail: " + gm.status());
       // and so does an Elmar bill
-      const el = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret`, { data: { From: "noreply@elmar.aw", To: addr, Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12" } });
+      const el = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret-long`, { data: { From: "noreply@elmar.aw", To: addr, Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12" } });
       assert(el.status() === 200, "the bill email is accepted: " + el.status());
       await page.reload();
       await page.getByTestId("email-code").waitFor();
