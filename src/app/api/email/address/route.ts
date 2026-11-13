@@ -20,7 +20,7 @@ async function current(regenerate: boolean) {
     const { error } = await supabase.from("bill_email_addresses").upsert({ user_id: user.id, token }, { onConflict: "user_id" });
     if (error) return NextResponse.json({ setup: "error" });
   }
-  return NextResponse.json({ address: inboundAddress(process.env.INBOUND_EMAIL_BASE, token), configured: configured() }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ address: inboundAddress(process.env.INBOUND_EMAIL_BASE, token), configured: configured(), key: token }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** Your private forwarding address (made the first time you ask). */

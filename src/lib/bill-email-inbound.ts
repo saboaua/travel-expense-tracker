@@ -27,11 +27,32 @@ export const monthName = (m: string) => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?
 export type VerifyMode = "strict" | "relaxed" | "off";
 export const verifyMode = (v: string | undefined): VerifyMode => (v === "relaxed" || v === "off" ? v : "strict");
 
-/** Postmark lists what SpamAssassin found in X-Spam-Tests, e.g. "DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,SPF_PASS". */
-export function senderVerified(p: InboundPayload, mode: VerifyMode): boolean {
+/** Domain of a sender address, lowercase. */
+const domainOf = (email: string) => email.toLowerCase().split("@")[1] ?? "";
+const aligned = (a: string, b: string) => !!a && !!b && (a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`));
+
+/**
+ * Gmail's own verdict, e.g. "Authentication-Results: mx.google.com; dkim=pass header.i=@elmar.aw header.s=x; spf=pass ...".
+ * Only Google's line counts (the sender cannot write one that starts with mx.google.com ahead of Google's own).
+ */
+export function gmailAuthPasses(value: string, mode: VerifyMode, sender: string): boolean {
+  const v = value.replace(/^\s*authentication-results:\s*/i, "").trim();
+  if (!/^mx\.google\.com\s*;/i.test(v)) return false;
+  const found = [...v.matchAll(/dkim=pass\b[^;]*?header\.(?:i=@?|d=)([a-z0-9.-]+)/gi)].map((m) => m[1].toLowerCase());
+  if (!found.length) return false;
+  return mode === "strict" ? found.some((d) => aligned(d, domainOf(sender))) : true;
+}
+
+/**
+ * Anyone can type any "From". Postmark lists what SpamAssassin found in X-Spam-Tests ("DKIM_SIGNED,DKIM_VALID,DKIM_VALID_AU,SPF_PASS"),
+ * and Gmail adds an Authentication-Results line; either one proving the company's own signature is enough.
+ */
+export function senderVerified(p: InboundPayload, mode: VerifyMode, sender = ""): boolean {
   if (mode === "off") return true;
-  const tests = (p.Headers ?? []).filter((h) => /^x-spam-tests$/i.test(h.Name ?? "")).map((h) => h.Value ?? "").join(",").toUpperCase().split(/[\s,]+/);
-  return tests.includes(mode === "strict" ? "DKIM_VALID_AU" : "DKIM_VALID");
+  const header = (name: string) => (p.Headers ?? []).filter((h) => (h.Name ?? "").toLowerCase() === name).map((h) => h.Value ?? "");
+  const tests = header("x-spam-tests").join(",").toUpperCase().split(/[\s,]+/);
+  if (tests.includes(mode === "strict" ? "DKIM_VALID_AU" : "DKIM_VALID")) return true;
+  return header("authentication-results").some((v) => gmailAuthPasses(v, mode, sender));
 }
 
 type Notify = (userId: string, bill: { company: string; month: string; due: string | null }) => Promise<unknown>;
@@ -76,7 +97,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   const allowed = await db.from("bill_email_senders").select("id").eq("user_id", userId).eq("email", sender).maybeSingle();
   if (!allowed.data) { await log("ignored_sender", { summary: "Not on your list of senders" }); return { ok: true, status: "ignored_sender" }; }
   // anyone can type any "From"; only mail the company really signed becomes a bill
-  if (!senderVerified(p, verify)) { await log("ignored_sender", { summary: verify === "strict" ? "Not signed by the sender's own domain, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
+  if (!senderVerified(p, verify, sender || direct)) { await log("ignored_sender", { summary: verify === "strict" ? "Not signed by the sender's own domain, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
   if (parsed.type !== "bill") { await log("unreadable", { summary: "Could not read a bill from this email. Add it by hand." }); return { ok: true, status: "unreadable" }; }
 
   const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", parsed.dedupe_key).maybeSingle();

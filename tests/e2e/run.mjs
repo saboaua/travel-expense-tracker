@@ -1269,7 +1269,7 @@ try {
     }
   });
 
-  await test("bill emails: the private address is shown, a sender is allowed, the log shows Gmail's code, and an emailed bill waits in the Due list marked from email", async () => {
+  await test("bill emails: your Gmail script and key are shown, a sender is allowed, the script's calls are checked, and an emailed bill waits in the Due list marked from email", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
     const page = await ctx.newPage();
@@ -1283,22 +1283,26 @@ try {
       const basicBad = await page.request.post(`${BASE}/api/email/inbound`, { headers: { authorization: "Basic " + Buffer.from("postmark:wrong").toString("base64") }, data: { From: "x@y.com" } });
       assert(basicOk.status() === 200 && basicBad.status() === 403, "the secret works as a basic-auth password and a wrong one is refused: " + basicOk.status() + "/" + basicBad.status());
       await page.goto(`${BASE}/personal/utilities/emails`);
-      await page.getByTestId("email-address").waitFor();
-      const addr = await page.getByTestId("email-address").textContent();
-      assert(/^bills-[0-9a-f]{32}@in\.example\.com$/.test(addr || ""), "the private address is shown: " + addr);
-      assert(fake.table("bill_email_addresses").some((r) => r.user_id === PAT), "the address is saved for the account");
+      await page.getByTestId("email-script").waitFor();
+      const script = await page.getByTestId("email-script").textContent();
+      const key = (/const KEY = "([0-9a-f]{32})"/.exec(script || "") || [])[1];
+      assert(key && /const ENDPOINT = "http:\/\/localhost:\d+\/api\/email\/gmail"/.test(script || ""), "the script holds your key and this app's address");
+      assert(fake.table("bill_email_addresses").some((r) => r.user_id === PAT && r.token === key), "the key is saved for the account");
+      assert(/Not connected yet/.test(await page.getByTestId("email-status").textContent()), "before any mail, the status says not connected");
       await page.getByTestId("email-suggest-noreply@elmar.aw").click();
       await page.waitForFunction(() => /elmar\.aw/.test(document.querySelector("[data-testid=email-senders]")?.textContent || ""));
       assert(fake.table("bill_email_senders").some((r) => r.user_id === PAT && r.email === "noreply@elmar.aw"), "an allowed sender is saved");
-      // Gmail's confirmation arrives through the webhook
-      const gm = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret-long`, { data: { From: "Gmail Team <forwarding-noreply@google.com>", To: addr, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: new Date().toISOString() } });
-      assert(gm.status() === 200, "the webhook accepts mail: " + gm.status());
-      // and so does an Elmar bill
-      const el = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret-long`, { data: { From: "noreply@elmar.aw", To: addr, Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12" } });
-      assert(el.status() === 200, "the bill email is accepted: " + el.status());
+      // the script's calls: a wrong key is refused, the right key gets the sender list
+      const badKey = await page.request.get(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": "0".repeat(32) } });
+      const none = await page.request.get(`${BASE}/api/email/gmail`);
+      assert(badKey.status() === 403 && none.status() === 403, "a wrong or missing key is refused: " + badKey.status() + "/" + none.status());
+      const list = await page.request.get(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key } });
+      assert(list.status() === 200 && JSON.stringify((await list.json()).senders) === JSON.stringify(["noreply@elmar.aw"]), "the script learns which senders are allowed");
+      const el = await page.request.post(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key }, data: { From: "ELMAR <noreply@elmar.aw>", Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), MessageID: "gm1", TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12", Auth: "", Attachments: [] } });
+      assert(el.status() === 200 && (await el.json()).status === "added", "the emailed bill is added: " + el.status());
       await page.reload();
-      await page.getByTestId("email-code").waitFor();
-      assert((await page.getByTestId("email-code").textContent()).trim() === "482913321", "Gmail's code is shown to copy");
+      await page.getByTestId("email-log").waitFor();
+      assert(/Connected/.test(await page.getByTestId("email-status").textContent()), "after the first email, the status says connected");
       await page.goto(`${BASE}/personal/utilities`);
       await page.getByTestId("util-from-email").first().waitFor();
       const due = await page.getByTestId("util-due-list").textContent();

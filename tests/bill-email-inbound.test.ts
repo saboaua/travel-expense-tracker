@@ -1,4 +1,4 @@
-import { billRow, handleInbound, senderVerified, verifyMode } from "../src/lib/bill-email-inbound";
+import { billRow, handleInbound, gmailAuthPasses, senderVerified, verifyMode } from "../src/lib/bill-email-inbound";
 import { parseBillEmail, type ParsedBill } from "../src/lib/personal/bill-email";
 
 let failed = 0;
@@ -108,6 +108,17 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   m = makeDb(seed());
   r = await handleInbound(m.db, { From: "Gmail Team <forwarding-noreply@google.com>", To: `bills-${TOKEN}@in.example.com`, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: "2026-11-01" }, notify, "strict");
   eq(r.ok && r.status, "confirmation", "Gmail's code is still shown when the check is strict (it only displays a number)");
+
+  // Gmail's own verdict (the Gmail script path)
+  const GOOD = "Authentication-Results: mx.google.com; dkim=pass header.i=@elmar.aw header.s=sel header.b=abc; spf=pass smtp.mailfrom=elmar.aw";
+  eq([gmailAuthPasses(GOOD, "strict", "noreply@elmar.aw"), gmailAuthPasses(GOOD, "strict", "noreply@mail.elmar.aw"), gmailAuthPasses(GOOD, "strict", "noreply@evil.com"), gmailAuthPasses(GOOD, "relaxed", "noreply@evil.com")], [true, true, false, true], "a valid signature must belong to the sender's own domain (strict)");
+  eq([gmailAuthPasses("Authentication-Results: mx.google.com; dkim=fail header.i=@elmar.aw", "strict", "noreply@elmar.aw"), gmailAuthPasses("Authentication-Results: evil.example; dkim=pass header.i=@elmar.aw", "strict", "noreply@elmar.aw"), gmailAuthPasses("", "relaxed", "a@b.com")], [false, false, false], "a failed signature, a line not written by Gmail, or none is not trusted");
+  m = makeDb(seed());
+  r = await handleInbound(m.db, webMail({ Headers: [{ Name: "Authentication-Results", Value: "Authentication-Results: mx.google.com; dkim=pass header.i=@oci.webaruba.com header.s=s header.b=x" }] }), notify, "strict");
+  eq([r.ok && r.status, m.t.utility_bills.length], ["added", 1], "a bill Gmail marked as signed by the company is added");
+  m = makeDb(seed());
+  r = await handleInbound(m.db, webMail({ Headers: [{ Name: "Authentication-Results", Value: "Authentication-Results: mx.google.com; dkim=none; spf=fail" }] }), notify, "strict");
+  eq([r.ok && r.status, m.t.utility_bills.length], ["ignored_sender", 0], "an unsigned forgery that reached Gmail is not added");
 
   // a bill with no amount is kept, marked to check
   const noAmount = parseBillEmail({ from: "noreply@elmar.aw", subject: "Your new ELMAR bill is ready", date: "2026-10-21", text: "Bill Due Date: Dec 14, 2026" }) as ParsedBill;
