@@ -169,7 +169,8 @@ export function originalSender(text: string): string | null {
 
 export function parseBillEmail(input: BillEmailInput): ParsedEmail {
   const ref = refDate(input.date);
-  const i = { ...input, text: input.text.replace(/\r/g, "") };
+  // Gmail's plain text wraps bold labels in asterisks ("*Account Number:* 541324"): drop them so the value is read, not the star
+  const i = { ...input, text: input.text.replace(/\r/g, "").replace(/\*/g, "") };
   const conf = parseConfirmation(i);
   if (conf) return conf;
   for (const read of READERS) {

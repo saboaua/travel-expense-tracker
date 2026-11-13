@@ -24,6 +24,10 @@ const setarNoMonth = parseBillEmail({ from: "noreply@setar.aw", subject: "Your m
 eq([bill(setarNoMonth).bill_month, bill(setarNoMonth).check], ["2026-10-01", true], "Setar with no month: the month before the due month, marked to check");
 eq(bill(parseBillEmail({ from: "noreply@elmar.aw", subject: "Your new ELMAR bill is ready", date: "2026-10-21", text: "Bill Due Date: Dec 14, 2026" })).amount, null, "no amount in the email: null, marked to check");
 
+// the real Elmar email as Gmail's plain text shows it: bold labels wrapped in asterisks
+const star = parseBillEmail({ from: "ELMAR <noreply@elmar.aw>", subject: "Your new ELMAR bill is ready", date: "2026-10-21", text: "Dear *Saskia Chantal M Franken*,\n\nYour latest bill is now available on your ELMAR account. To view it, please visit *customer.elmar.aw* <https://customer.elmar.aw>.\n\nHere are the details for your reference:\n\n- *Account Number:* 541324-1019191\n- *Service Address:* 200 A TANKI LEENDERT ORANJESTAD 16000-0\n- *New Bill Amount:* AWG 116.17\n- *Bill Due Date:* Dec 14, 2026\n- *Prior Open Balance:* AWG 93.12" });
+eq([bill(star).account, bill(star).amount, bill(star).due_date, bill(star).prior_balance], ["541324-1019191", 116.17, "2026-12-14", 93.12], "Elmar's plain text with asterisks around the labels is read correctly");
+
 // Gmail's forwarding confirmation
 eq(parseBillEmail({ from: "Gmail Team <forwarding-noreply@google.com>", subject: "Gmail Forwarding Confirmation - Receive Mail from x@gmail.com", text: "x@gmail.com has requested to automatically forward mail to your email address bills@z.com.\nConfirmation code: 482913321\nTo allow..." }), { type: "confirmation", code: "482913321" }, "Gmail's confirmation code is found");
 eq(parseBillEmail({ from: "someone@else.com", subject: "Hi", text: "Confirmation code: 123456789" }).type, "unknown", "a code from anyone else is not a Gmail confirmation");

@@ -36,12 +36,19 @@ const domainOf = (email: string) => email.toLowerCase().split("@")[1] ?? "";
 const aligned = (a: string, b: string) => !!a && !!b && (a === b || a.endsWith(`.${b}`) || b.endsWith(`.${a}`));
 
 /**
- * Gmail's own verdict, e.g. "Authentication-Results: mx.google.com; dkim=pass header.i=@elmar.aw header.s=x; spf=pass ...".
+ * Gmail's own verdict, e.g. "Authentication-Results: mx.google.com; dkim=pass header.i=@elmar.aw ...; spf=pass ...; dmarc=pass (p=NONE) header.from=elmar.aw".
  * Only Google's line counts (the sender cannot write one that starts with mx.google.com ahead of Google's own).
+ * Strict: DMARC pass (Gmail confirmed the From address belongs to its domain, by an aligned SPF or DKIM, so a company that signs
+ * through a mail provider such as Mimecast still passes) or a DKIM pass for the sender's own domain. Relaxed: any DKIM pass too.
  */
 export function gmailAuthPasses(value: string, mode: VerifyMode, sender: string): boolean {
   const v = value.replace(/^\s*authentication-results:\s*/i, "").trim();
   if (!/^mx\.google\.com\s*;/i.test(v)) return false;
+  const dmarc = /dmarc=pass\b([^;]*)/i.exec(v);
+  if (dmarc) {
+    const from = /header\.from=@?([a-z0-9.-]+)/i.exec(dmarc[1])?.[1]?.toLowerCase();
+    if (!from || aligned(from, domainOf(sender))) return true;
+  }
   const found = [...v.matchAll(/dkim=pass\b[^;]*?header\.(?:i=@?|d=)([a-z0-9.-]+)/gi)].map((m) => m[1].toLowerCase());
   if (!found.length) return false;
   return mode === "strict" ? found.some((d) => aligned(d, domainOf(sender))) : true;
@@ -110,7 +117,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   const mine = ((allowed.data as { accounts?: string[] | null } | null)?.accounts ?? []).map(normAccount).filter(Boolean);
   if (!allowed.data) { await log("ignored_sender", { summary: "Not on your list of senders" }); return { ok: true, status: "ignored_sender" }; }
   // anyone can type any "From"; only mail the company really signed becomes a bill
-  if (!senderVerified(p, verify, sender || direct)) { await log("ignored_sender", { summary: verify === "strict" ? "Not signed by the sender's own domain, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
+  if (!senderVerified(p, verify, sender || direct)) { await log("ignored_sender", { summary: verify === "strict" ? "Could not confirm this email really came from the sender, so it was not trusted" : "No valid signature, so it was not trusted" }); return { ok: true, status: "ignored_sender" }; }
   if (parsed.type !== "bill") { await log("unreadable", { summary: "Could not read a bill from this email. Add it by hand." }); return { ok: true, status: "unreadable" }; }
 
   // the same companies also bill other people (a parent's account): only the account numbers you listed are added
