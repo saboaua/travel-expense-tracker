@@ -16,7 +16,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
-import { AREA_PREFIX, houseTarget, parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
+import { AREA_PREFIX, houseTarget, parseAmount, QUICK_CATEGORIES, QUICK_DEFAULT_CURRENCY, recentNames, quickSpends, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { openSigned } from "@/lib/open-signed";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import { monthLabel, shiftMonth } from "@/lib/personal/utilities";
@@ -94,7 +94,8 @@ export function QuickSpend() {
   const month = todayISO().slice(0, 7);
   const thisMonth = useMemo(() => (rows ?? []).filter((r) => r.expense_date.startsWith(month)), [rows, month]);
   const shown = viewMonth === month ? thisMonth : older;
-  const monthTotal = summarizeSpends(shown);
+  const monthTotal = summarizeSpends(quickSpends(shown));
+  const houseInMonth = summarizeSpends((shown ?? []).filter((r) => !quickSpends([r]).length));
   const choices = currencies.some((c) => c.code === "USD") && currencies.some((c) => c.code === QUICK_DEFAULT_CURRENCY) ? [QUICK_DEFAULT_CURRENCY, "USD"] : [];
   const others = currencies.filter((c) => !choices.includes(c.code));
 
@@ -271,6 +272,7 @@ export function QuickSpend() {
         <button type="button" onClick={() => setViewMonth(shiftMonth(`${viewMonth}-01`, 1).slice(0, 7))} disabled={viewMonth >= month} aria-label="Later month" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent disabled:opacity-30"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
       </div>
       {monthTotal && <p className="mt-1 text-[26px] font-bold tabular-nums tracking-tight" data-testid="month-total">{formatCurrency(monthTotal.total, monthTotal.currency)} <span className="text-sm font-medium text-muted-foreground">in {monthTotal.count} {monthTotal.count === 1 ? "spend" : "spends"}</span></p>}
+      {houseInMonth && <p className="mt-1 text-xs text-muted-foreground" data-testid="month-house-note">Not included: {formatCurrency(houseInMonth.total, houseInMonth.currency)} of house costs, counted under House &amp; repairs.</p>}
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="spend-list">
         {rows === null || shown === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : shown.length === 0 ? (
           <p className="py-4 text-sm text-muted-foreground">{viewMonth === month ? "Nothing yet this month." : "Nothing in this month."}</p>

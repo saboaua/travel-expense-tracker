@@ -10,7 +10,7 @@ import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen,
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
-import { houseSpends, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
+import { houseSpends, quickSpends, summarizeSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { convert, convertedCount, dominantCurrency, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
@@ -79,7 +79,7 @@ export default function PersonalHubPage() {
       const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO(), cur);
       const houseRows = houseSpends(spendRows, todayISO().slice(0, 7));
       const house = q.error ? null : { count: houseRows.length, total: round2(houseRows.reduce((t, r) => t + (convert(Number(r.amount), r.currency, cur, r.amount_usd == null ? null : Number(r.amount_usd)) ?? 0), 0)) };
-      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data, cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
+      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(quickSpends(q.data as unknown as SpendRow[]), cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
     })();
   }, []);
 

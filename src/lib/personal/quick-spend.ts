@@ -56,6 +56,14 @@ export function houseSpends(rows: SpendRow[], year: string): SpendRow[] {
   return rows.filter((r) => r.expense_date.startsWith(year) && (r.category === HOUSE_CATEGORY || !!r.project_id || !!r.house_area)).sort((a, b) => b.expense_date.localeCompare(a.expense_date));
 }
 
+/** True for a spend that belongs to the house: the House category, a home project or an area of the house. */
+export const isHouseRow = (r: { category: string; project_id?: string | null; house_area?: string | null }) => r.category === HOUSE_CATEGORY || !!r.project_id || !!r.house_area;
+
+/** The everyday spends only. House costs are counted once, under House & repairs, so they are left out of Quick spend totals. */
+export function quickSpends<T extends { category: string; project_id?: string | null; house_area?: string | null }>(rows: T[] | null | undefined): T[] {
+  return (rows ?? []).filter((r) => !isHouseRow(r));
+}
+
 /** The year's House total in USD, which is comparable across currencies. */
 export function houseTotalUsd(rows: SpendRow[]): number {
   return r2(rows.reduce((s, r) => s + num(r.amount_usd), 0));

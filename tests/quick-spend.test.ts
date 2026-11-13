@@ -1,4 +1,4 @@
-import { AREA_PREFIX, filterHouse, houseTarget, houseSpends, houseTotalUsd, parseAmount, recentNames, summarizeSpends, type SpendRow } from "../src/lib/personal/quick-spend";
+import { AREA_PREFIX, filterHouse, houseTarget, houseSpends, houseTotalUsd, parseAmount, quickSpends, recentNames, summarizeSpends, type SpendRow } from "../src/lib/personal/quick-spend";
 import { withLinkedTotals } from "../src/lib/offline-personal";
 
 let failed = 0;
@@ -47,5 +47,9 @@ eq(filterHouse(ya, `${AREA_PREFIX}Bathroom`).map((r) => r.id), ["a1"], "filter b
 eq(filterHouse(ya, "none").map((r) => r.id), ["a3"], "no project and no area is the loose repairs");
 eq([houseTarget(""), houseTarget("p1"), houseTarget("area:Roof")], [{}, { project_id: "p1" }, { house_area: "Roof" }], "the dropdown value becomes a project or an area");
 
+const mixed = [row("q1", "Coffee", 10, "2026-11-02"), row("h1", "Door", 90, "2026-11-03", "House"), row("h2", "Grout", 20, "2026-11-04", "Other", { house_area: "Bathroom" }), row("h3", "Paint", 30, "2026-11-05", "Other", { project_id: "p1" })];
+eq(quickSpends(mixed).map((r) => r.id), ["q1"], "house costs (category, area or project) are left out of Quick spend");
+eq(summarizeSpends(quickSpends(mixed), "AWG")?.total, 10, "the Quick spend total no longer includes house costs");
+eq(summarizeSpends(quickSpends([mixed[1]]), "AWG"), null, "only house costs: Quick spend shows nothing");
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
 console.log("quick-spend: all checks passed");
