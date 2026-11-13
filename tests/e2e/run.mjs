@@ -823,6 +823,51 @@ try {
     await ctx.close();
   });
 
+  await test("scan: a receipt with only a $ in Aruba asks once, Switch to AWG keeps the amounts and offers Undo, Keep USD is respected, a printed USD is not questioned", async () => {
+    const me = fake.table("profiles").find((p) => p.id === PAT);
+    const before = me.home_country;
+    me.home_country = "Aruba";
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    let reply = { store: "Super Food", date: null, total: 5.59, currency: null, bareDollar: true, source: "ai", items: [item("Milk", 2.49), item("Bread", 3.1)] };
+    // A fresh form, the currency set by hand, then a photo is chosen
+    const scanFresh = async (page, cur) => {
+      await page.goto(`${BASE}/personal/groceries/new`);
+      await page.locator("#gr-currency").selectOption(cur);
+      await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+      await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    };
+    try {
+      const { ctx, page } = await newPage();
+      await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: reply } }));
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // The starting currency follows your home place: AWG in Aruba
+      await page.goto(`${BASE}/personal/groceries/new`);
+      await page.waitForFunction(() => document.querySelector("#gr-currency")?.value === "AWG", null, { timeout: 15_000 });
+      // 1. a bare $ on a USD form: asked once, amounts untouched
+      await scanFresh(page, "USD");
+      await page.getByTestId("dollar-sheet").waitFor({ timeout: 20_000 });
+      assert(/\$ found on this receipt/.test(await page.getByTestId("dollar-sheet").innerText()), "the sheet explains the $");
+      await page.getByTestId("dollar-switch").click();
+      assert((await page.locator("#gr-currency").inputValue()) === "AWG", "Switch changes the currency to AWG");
+      assert((await page.getByTestId("currency-note").innerText()).includes("Amounts were not changed"), "the note says the amounts are the same");
+      assert((await page.locator("#gr-total").inputValue()) === "5.59", "the total is not converted");
+      await page.getByTestId("currency-undo").click();
+      assert((await page.locator("#gr-currency").inputValue()) === "USD", "Undo puts the currency back");
+      // 2. Keep USD
+      await scanFresh(page, "USD");
+      await page.getByTestId("dollar-sheet").waitFor({ timeout: 20_000 });
+      await page.getByTestId("dollar-keep").click();
+      assert((await page.locator("#gr-currency").inputValue()) === "USD", "Keep leaves USD alone");
+      // 3. a printed USD is never questioned
+      reply = { ...reply, currency: "USD", bareDollar: undefined };
+      await scanFresh(page, "USD");
+      await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+      assert((await page.getByTestId("dollar-sheet").count()) === 0, "a printed USD does not open the sheet");
+      await ctx.close();
+    } finally { if (before === undefined) delete me.home_country; else me.home_country = before; }
+  });
+
   await test("hotel: a trip can carry a hotel with a Directions button, and it shows on the trip card", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

@@ -23,6 +23,9 @@ import { browserBlobs, browserKv, loadWithCache } from "@/lib/offline-store";
 import { browserOutbox, newId } from "@/lib/outbox";
 import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { currencyForStore, itemName } from "@/lib/personal/price-notes";
+import { dollarCall, homeCurrency } from "@/lib/personal/currency-guess";
+import { AWG_PER_USD } from "@/lib/personal/dashboard";
+import { isMissingColumn } from "@/lib/columns";
 import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
@@ -65,6 +68,10 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   // Currency per store: the one used last at that shop is filled in until you choose your own
   const knownReceipts = useRef<{ store: string; currency: string; purchase_date: string }[]>([]);
   const currencyChosen = useRef(false);
+  // Where you live: a "$" with no code means the local currency there. Asked once, never guessed silently.
+  const homeRef = useRef<string | null>(null);
+  const [dollarAsk, setDollarAsk] = useState<{ suggest: string; was: string } | null>(null);
+  const [currencyNote, setCurrencyNote] = useState<{ text: string; undo: string | null; tone: "good" | "info" | "warn" } | null>(null);
   const [knownLoaded, setKnownLoaded] = useState(false);
   useEffect(() => { if (new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [{ key: uid(), name: "", quantity: "1", unit_price: "", line_total: "", category: "Other", unit: "" }])); } }, []);
 
@@ -89,6 +96,14 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
         knownReceipts.current = saved?.value.receipts ?? [];
         if (latest) setCurrency(latest);
         setKnownLoaded(true);
+        // Your home place picks the starting currency when there are no receipts yet (Aruba: AWG, not USD)
+        void (async () => {
+          const { data, error: err } = await supabase.from("profiles").select("home_country").eq("id", owner).single();
+          if (isMissingColumn(err) || err) return;
+          homeRef.current = (data as { home_country?: string | null } | null)?.home_country ?? null;
+          const hc = homeCurrency(homeRef.current);
+          if (hc && !latest && !currencyChosen.current && currencies.some((x) => x.code === hc)) setCurrency(hc);
+        })().catch(() => {});
         return;
       }
       const res = await loadWithCache<ReceiptBundle>(browserKv, receiptKey(owner, receiptId), () => fetchReceiptBundle(supabase, receiptId));
@@ -167,6 +182,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const scan = async (f: File) => {
     setScanning(true);
     setNote(null);
+    setCurrencyNote(null);
+    setDollarAsk(null);
     const id = ++scanId.current;
     setWitness(false);
     setSecondLook(0);
@@ -176,7 +193,21 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       if (r.store && !store) setStore(r.store);
       if (r.date) setDate(r.date);
       if (r.total != null) setTotal(r.total.toFixed(2));
-      if (r.currency && r.currency !== currency && currencies.some((c) => c.code === r.currency)) setCurrency(r.currency);
+      const known = (c: string) => currencies.some((x) => x.code === c);
+      const homeCur = homeCurrency(homeRef.current);
+      if (r.currency && r.currency !== currency && known(r.currency)) {
+        setCurrency(r.currency);
+        setCurrencyNote({ text: `Currency set to ${r.currency} because the receipt says ${r.currency}. Amounts were not changed.`, undo: currency, tone: "info" });
+      } else if (r.currency && homeCur && r.currency !== homeCur && r.currency === currency) {
+        setCurrencyNote({ text: `This receipt says ${r.currency}, so it is kept in ${r.currency === "USD" ? "dollars" : r.currency}.`, undo: null, tone: "info" });
+      } else {
+        const call = dollarCall({ bareDollar: r.bareDollar, home: homeRef.current, formCurrency: currency, storeCurrency: currencyForStore(knownReceipts.current, r.store || store) });
+        if (call.kind === "apply" && known(call.currency)) {
+          setCurrency(call.currency);
+          setCurrencyNote({ text: `Currency set to ${call.currency}, the one you used at ${r.store || store} before. Amounts were not changed.`, undo: currency, tone: "good" });
+        } else if (call.kind === "ask" && known(call.suggest)) setDollarAsk({ suggest: call.suggest, was: currency });
+        else if (call.kind === "hint") setCurrencyNote({ text: "Only a $ is printed, so I cannot tell which dollar. Set your home place in Profile and I can tell next time.", undo: null, tone: "warn" });
+      }
       const made: Row[] = r.items.map((it) => ({
         key: uid(),
         name: it.name,
@@ -309,6 +340,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 onClear={() => { setFile(null); setPreview(null); setNote(null); }}
               />
               {note && <p className="rounded-lg bg-muted p-2 text-xs text-muted-foreground">{note}</p>}
+              {currencyNote && (
+                <div className={`flex items-start gap-2 rounded-xl p-3 text-sm ${currencyNote.tone === "warn" ? "bg-amber-50 text-amber-900" : currencyNote.tone === "good" ? "bg-green-50 text-green-900" : "bg-blue-50 text-blue-900"}`} data-testid="currency-note" role="status">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+                  <span className="flex-1">{currencyNote.text}</span>
+                  {currencyNote.undo && <button type="button" className="min-h-11 shrink-0 px-1 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="currency-undo" onClick={() => { currencyChosen.current = true; setCurrency(currencyNote.undo as string); setCurrencyNote(null); }}>Undo</button>}
+                </div>
+              )}
               {!receiptId && !preview && !scanning && (
                 <button type="button" onClick={() => { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); }} className="min-h-11 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="add-by-hand">Camera not working? Add by hand</button>
               )}
@@ -457,6 +495,35 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
           </form>
         </CardContent>
       </Card>
+      {dollarAsk && (() => {
+        const t = money(total);
+        const was = dollarAsk.was;
+        const pick = (code: string, text: string) => { currencyChosen.current = true; setCurrency(code); setDollarAsk(null); setCurrencyNote({ text, undo: code === dollarAsk.suggest ? was : null, tone: "good" }); };
+        return (
+          <div className="app-frame fixed inset-0 z-[70] flex items-end justify-center bg-slate-950/60 sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-labelledby="dollar-title" data-testid="dollar-sheet">
+            <div className="w-full max-w-md rounded-t-3xl bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-xl sm:rounded-3xl">
+              <div className="flex items-start gap-3">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><AlertTriangle className="h-5 w-5" aria-hidden="true" /></span>
+                <div>
+                  <h2 id="dollar-title" className="text-lg font-bold leading-tight">$ found on this receipt</h2>
+                  <p className="mt-1.5 text-sm text-muted-foreground">The receipt only shows a <b>$</b> sign, no “USD”. You live in <b>{(homeRef.current || "").trim()}</b>, where shops price in florins, so this is most likely <b>{dollarAsk.suggest}</b> (Afl.).</p>
+                </div>
+              </div>
+              {t > 0 && (
+                <dl className="mt-3 space-y-1 rounded-xl border bg-muted/40 p-3 text-sm">
+                  <div className="flex justify-between gap-3"><dt>Total on the receipt</dt><dd className="font-semibold">{t.toFixed(2)}</dd></div>
+                  <div className="flex justify-between gap-3"><dt>Switch to {dollarAsk.suggest}</dt><dd className="font-semibold text-green-700">{formatCurrency(t, dollarAsk.suggest)} · numbers stay the same</dd></div>
+                  <div className="flex justify-between gap-3"><dt>Keep {was}</dt><dd className="font-semibold">{formatCurrency(t, was)}{was === "USD" ? ` ≈ ${formatCurrency(Math.round(t * AWG_PER_USD * 100) / 100, "AWG")}` : ""}</dd></div>
+                </dl>
+              )}
+              <Button type="button" className="mt-4 min-h-12 w-full text-base" data-testid="dollar-switch" onClick={() => pick(dollarAsk.suggest, `Currency set to ${dollarAsk.suggest} because the receipt only showed $ and you live in ${(homeRef.current || "").trim()}. Amounts were not changed.`)}>Switch to {dollarAsk.suggest}</Button>
+              <Button type="button" variant="outline" className="mt-2 min-h-12 w-full" data-testid="dollar-keep" onClick={() => pick(was, `Kept as ${was}.${store.trim() ? ` ${store.trim()} will use it next time you save.` : ""}`)}>{was === "USD" ? "Keep USD, it is a dollar receipt" : `Keep ${was}`}</Button>
+              <p className="mt-2 text-center text-xs text-muted-foreground">You can change it any time in Currency.</p>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
+

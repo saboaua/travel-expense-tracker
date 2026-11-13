@@ -402,7 +402,8 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
     '- "total": final amount charged as a plain number, or null',
     '- "subtotal": the printed subtotal (items before tax) as a number, or null if none is printed',
     '- "tax": the printed tax amount as a number, or null if none is printed',
-    '- "currency": 3-letter ISO code if clear, otherwise null',
+    '- "currency": 3-letter ISO code ONLY when the receipt prints a code or unambiguous text (USD, US$, AWG, Afl, EUR). A bare "$" sign alone is NOT enough: use null',
+    '- "bare_dollar": true when prices are marked only with a "$" sign and no currency code anywhere on the receipt, otherwise false',
     '- "items": array with one entry per purchased product, in receipt order, each:',
     '    { "name": product name written out in readable words (expand obvious abbreviations, keep it short),',
     '      "quantity": number bought (the weight for weighed items), "unit": "kg" | "lb" | "g" for weighed items otherwise null,',
@@ -427,6 +428,8 @@ export type GroceryScan = {
   date: string | null;
   total: number | null;
   currency: string | null;
+  /** Prices carry only a "$" and no currency code, so the currency is unknown (USD, AWG...). */
+  bareDollar?: boolean;
   items: GroceryLine[];
   source: "ai" | "tesseract";
   /** Printed subtotal and tax, when the receipt shows them (used to check the items). */
@@ -468,7 +471,8 @@ function parseGroceryAnswer(raw: Record<string, unknown>, hints: OcrHints, today
     items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit });
   }
 
-  return { store: base.merchant, date: base.date, total: base.amount, currency: base.currency, items: attachWeightLines(items), source: "ai", subtotal: optional(raw.subtotal), tax: optional(raw.tax) };
+  const bareDollar = raw.bare_dollar === true;
+  return { store: base.merchant, date: base.date, total: base.amount, currency: bareDollar ? null : base.currency, ...(bareDollar ? { bareDollar: true } : {}), items: attachWeightLines(items), source: "ai", subtotal: optional(raw.subtotal), tax: optional(raw.tax) };
 }
 
 export async function extractGroceryWithAi(
@@ -482,7 +486,7 @@ export async function extractGroceryWithAi(
 
 function buildRefinePrompt(hints: OcrHints, today: string, prev: GroceryScan, problems: string[]) {
   const first = {
-    store: prev.store, date: prev.date, total: prev.total, subtotal: prev.subtotal ?? null, tax: prev.tax ?? null, currency: prev.currency,
+    store: prev.store, date: prev.date, total: prev.total, subtotal: prev.subtotal ?? null, tax: prev.tax ?? null, currency: prev.currency, bare_dollar: prev.bareDollar === true,
     items: prev.items.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit ?? null, unit_price: i.unit_price, line_total: i.line_total, category: i.category })),
   };
   return [

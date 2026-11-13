@@ -53,6 +53,16 @@ const realFetch = globalThis.fetch;
   try { await extractGroceryWithAi(img, {}); } catch (e) { msg = (e as Error).message; }
   eq(msg, "AI OCR returned no JSON", "never JSON: error, so basic OCR is used");
 
+  // a bare $: the reader says so and the currency stays unknown, even if the model guessed USD
+  resetWorkingModel();
+  globalThis.fetch = (async () => answer(JSON.stringify({ ...JSON.parse(FULL), bare_dollar: true }))) as typeof fetch;
+  r = await extractGroceryWithAi(img, {});
+  eq([r.currency, r.bareDollar], [null, true], "bare $: currency unknown and flagged");
+  resetWorkingModel();
+  globalThis.fetch = (async () => answer(FULL)) as typeof fetch;
+  r = await extractGroceryWithAi(img, {});
+  eq([r.currency, r.bareDollar], ["USD", undefined], "a printed USD is kept and not flagged");
+
   globalThis.fetch = realFetch;
   console.log(failed ? `${failed} FAILED` : "all retry checks passed");
   process.exit(failed ? 1 : 0);

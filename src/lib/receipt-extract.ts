@@ -179,6 +179,7 @@ export async function extractGroceryReceipt(file: File, hints: OcrHints = {}, on
     date: ocr.date,
     total: ocr.amount,
     currency: ocr.currency,
+    ...(ocr.bareDollar ? { bareDollar: true } : {}),
     items,
     source: "tesseract",
     aiReason: ai.reason,

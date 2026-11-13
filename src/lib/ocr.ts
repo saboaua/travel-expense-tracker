@@ -18,6 +18,8 @@ export interface OcrResult {
   merchant: string | null;
   amount: number | null;
   currency: string | null; // ISO code, only when clearly printed on the receipt
+  /** Only a "$" is printed, no code: the currency is unknown. Set only when true. */
+  bareDollar?: boolean;
   date: string | null; // YYYY-MM-DD
   category: string | null;
   rawText: string;
@@ -262,10 +264,12 @@ function guessCategory(text: string, allowed?: string[]): string | null {
 
 /** Parse plain OCR text into fields. Exported so it can be tested without an image. */
 export function parseReceiptText(text: string, hints: OcrHints = {}, now = new Date()): Omit<OcrResult, "source"> {
+  const currency = parseCurrency(text);
   return {
     merchant: parseMerchant(text),
     amount: parseAmount(cleanOcrText(text)),
-    currency: parseCurrency(text),
+    currency,
+    ...(currency === null && /\$/.test(text) ? { bareDollar: true } : {}),
     date: parseDate(text, hints, now),
     category: guessCategory(text, hints.categories),
     rawText: text,
