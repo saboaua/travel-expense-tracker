@@ -31,6 +31,7 @@ const PUBLIC_PREFIXES = [
   "/auth",
   "/api/telegram/",
   "/api/cron/",
+  "/api/email/inbound",
   "/api/manifest",
   "/api/icon",
   "/api/version",

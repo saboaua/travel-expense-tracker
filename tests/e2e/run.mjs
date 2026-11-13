@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -88,6 +88,8 @@ const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", 
     NEXT_TELEMETRY_DISABLED: "1",
     TURNSTILE_SECRET_KEY: "",
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
+    INBOUND_EMAIL_BASE: "@in.example.com",
+    INBOUND_EMAIL_SECRET: "e2e-inbound-secret",
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -1263,6 +1265,45 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["utility_bills", "utility_prefs"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("bill emails: the private address is shown, a sender is allowed, the log shows Gmail's code, and an emailed bill waits in the Due list marked from email", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // the webhook refuses a wrong secret and accepts the right one
+      const bad = await page.request.post(`${BASE}/api/email/inbound?secret=nope`, { data: { From: "x@y.com" } });
+      assert(bad.status() === 403, "a wrong secret is refused: " + bad.status());
+      await page.goto(`${BASE}/personal/utilities/emails`);
+      await page.getByTestId("email-address").waitFor();
+      const addr = await page.getByTestId("email-address").textContent();
+      assert(/^bills-[0-9a-f]{32}@in\.example\.com$/.test(addr || ""), "the private address is shown: " + addr);
+      assert(fake.table("bill_email_addresses").some((r) => r.user_id === PAT), "the address is saved for the account");
+      await page.getByTestId("email-suggest-noreply@elmar.aw").click();
+      await page.waitForFunction(() => /elmar\.aw/.test(document.querySelector("[data-testid=email-senders]")?.textContent || ""));
+      assert(fake.table("bill_email_senders").some((r) => r.user_id === PAT && r.email === "noreply@elmar.aw"), "an allowed sender is saved");
+      // Gmail's confirmation arrives through the webhook
+      const gm = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret`, { data: { From: "Gmail Team <forwarding-noreply@google.com>", To: addr, Subject: "Gmail Forwarding Confirmation", TextBody: "Confirmation code: 482913321", Date: new Date().toISOString() } });
+      assert(gm.status() === 200, "the webhook accepts mail: " + gm.status());
+      // and so does an Elmar bill
+      const el = await page.request.post(`${BASE}/api/email/inbound?secret=e2e-inbound-secret`, { data: { From: "noreply@elmar.aw", To: addr, Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026\n- Prior Open Balance: AWG 93.12" } });
+      assert(el.status() === 200, "the bill email is accepted: " + el.status());
+      await page.reload();
+      await page.getByTestId("email-code").waitFor();
+      assert((await page.getByTestId("email-code").textContent()).trim() === "482913321", "Gmail's code is shown to copy");
+      await page.goto(`${BASE}/personal/utilities`);
+      await page.getByTestId("util-from-email").first().waitFor();
+      const due = await page.getByTestId("util-due-list").textContent();
+      assert(/Elmar/i.test(due) && /116\.17/.test(due), "the emailed bill waits in the Due list: " + due);
+      assert(/\$0\.00/.test(await page.getByTestId("util-total").textContent()), "an emailed bill is not counted until paid");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["utility_bills", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t).splice(0);
     }
   });
 

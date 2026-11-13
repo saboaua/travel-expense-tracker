@@ -1,0 +1,109 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { htmlToText, MONTH_NAMES, originalSender, parseBillEmail, senderEmail, tokenFromRecipient, type ParsedBill } from "@/lib/personal/bill-email";
+import { AWG_PER_USD } from "@/lib/personal/dashboard";
+import { todayISO } from "@/lib/utils";
+import { UTILITY_KINDS } from "@/lib/personal/utilities";
+
+/** What an email service hands us, in the shape Postmark's inbound webhook uses. */
+export type InboundPayload = {
+  From?: string; FromFull?: { Email?: string; Name?: string } | null; To?: string; OriginalRecipient?: string; MailboxHash?: string;
+  Subject?: string; TextBody?: string; HtmlBody?: string; Date?: string; MessageID?: string;
+  Attachments?: { Name?: string; ContentType?: string; Content?: string; ContentLength?: number }[];
+};
+
+export type InboundResult =
+  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "unreadable" | "confirmation" | "skipped_duplicate" | "added"; billId?: string }
+  | { ok: false; error: string };
+
+const MAX_PDF = 4 * 1024 * 1024;
+const LOG_KEEP = 50;
+const HOURLY_LIMIT = 60;
+const clip = (v: unknown, n: number) => (typeof v === "string" ? v.slice(0, n) : "");
+const r2 = (n: number) => Math.round(n * 100) / 100;
+export const monthName = (m: string) => MONTH_NAMES[Number(m.slice(5, 7)) - 1] ?? "";
+
+type Notify = (userId: string, bill: { company: string; month: string; due: string | null }) => Promise<unknown>;
+
+/**
+ * One email arriving at someone's private address. `db` is the service client (nobody signed in is calling).
+ * Never throws for bad mail: everything ends in a log line the person can read.
+ */
+export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0): Promise<InboundResult> {
+  const token = tokenFromRecipient(p.OriginalRecipient || p.To, p.MailboxHash);
+  if (!token) return { ok: true, status: "no_address" };
+  const addr = await db.from("bill_email_addresses").select("user_id").eq("token", token).maybeSingle();
+  if (addr.error) return { ok: false, error: addr.error.message };
+  const userId = (addr.data as { user_id: string } | null)?.user_id;
+  if (!userId) return { ok: true, status: "no_address" };
+
+  const subject = clip(p.Subject, 200);
+  const text = (p.TextBody && p.TextBody.trim()) ? p.TextBody : htmlToText(p.HtmlBody ?? "");
+  // a manual "Forward" hides the real sender in the body; an automatic Gmail forward keeps it in From
+  const direct = senderEmail(p.FromFull?.Email || p.From || "");
+  const sender = /forwarded message/i.test(text) && !/forwarding-noreply@google\.com/i.test(direct) ? originalSender(text) ?? direct : direct;
+  const date = p.Date && !Number.isNaN(Date.parse(p.Date)) ? todayISO("America/Aruba", new Date(p.Date)) : todayISO();
+
+  const log = async (status: string, extra: { summary?: string; code?: string; bill_id?: string } = {}) => {
+    await db.from("bill_email_log").insert({ user_id: userId, sender: sender.slice(0, 200) || null, subject: subject || null, status, ...extra });
+    // keep the newest entries only
+    const old = await db.from("bill_email_log").select("id").eq("user_id", userId).order("created_at", { ascending: false }).range(LOG_KEEP, LOG_KEEP + 200);
+    const ids = ((old.data ?? []) as { id: string }[]).map((r) => r.id);
+    if (ids.length) await db.from("bill_email_log").delete().in("id", ids);
+  };
+
+  // a flood of mail cannot fill the account
+  const since = new Date(Date.now() - 3600_000).toISOString();
+  const recent = await db.from("bill_email_log").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
+  if ((recent.count ?? 0) >= HOURLY_LIMIT) return { ok: true, status: "rate_limited" };
+
+  const parsed = parseBillEmail({ from: sender || direct, subject, text, date, messageId: p.MessageID });
+
+  // Gmail's confirmation code is accepted from Google whatever your sender list says
+  if (parsed.type === "confirmation") { await log("confirmation", { summary: "Gmail asks you to confirm forwarding", code: parsed.code }); return { ok: true, status: "confirmation" }; }
+
+  const allowed = await db.from("bill_email_senders").select("id").eq("user_id", userId).eq("email", sender).maybeSingle();
+  if (!allowed.data) { await log("ignored_sender", { summary: "Not on your list of senders" }); return { ok: true, status: "ignored_sender" }; }
+  if (parsed.type !== "bill") { await log("unreadable", { summary: "Could not read a bill from this email. Add it by hand." }); return { ok: true, status: "unreadable" }; }
+
+  const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", parsed.dedupe_key).maybeSingle();
+  if (dup.data) { await log("skipped_duplicate", { summary: `${parsed.company} ${monthName(parsed.bill_month)}: already added`, bill_id: (dup.data as { id: string }).id }); return { ok: true, status: "skipped_duplicate" }; }
+
+  // use the wording and type you already use for this company
+  const prev = await db.from("utility_bills").select("kind, provider").eq("user_id", userId).ilike("provider", parsed.company).order("bill_month", { ascending: false }).limit(1).maybeSingle();
+  const pv = prev.data as { kind: string; provider: string } | null;
+  const kind = pv && UTILITY_KINDS.some((k) => k.id === pv.kind) ? pv.kind : parsed.kind;
+  const company = pv?.provider?.trim() || parsed.company;
+
+  const row = billRow(userId, parsed, kind, company, p.MessageID);
+  const ins = await db.from("utility_bills").insert(row).select("id").single();
+  if (ins.error || !ins.data) return { ok: false, error: ins.error?.message ?? "could not save the bill" };
+  const billId = (ins.data as { id: string }).id;
+
+  // the PDF, when there is one
+  const pdf = (p.Attachments ?? []).find((a) => /pdf/i.test(a.ContentType ?? "") && a.Content && (a.ContentLength ?? a.Content.length * 0.75) <= MAX_PDF);
+  if (pdf?.Content) {
+    try {
+      const path = `${userId}/personal/utilities/${billId}.pdf`;
+      const up = await db.storage.from("receipts").upload(path, Buffer.from(pdf.Content, "base64"), { contentType: "application/pdf", upsert: true });
+      if (!up.error) await db.from("utility_bills").update({ receipt_path: path }).eq("id", billId);
+    } catch { /* the bill is saved without its PDF */ }
+  }
+
+  const summary = `${company} · for ${monthName(parsed.bill_month)} · ${parsed.amount == null ? "no amount found" : `${parsed.currency} ${r2(parsed.amount).toFixed(2)}`}`;
+  await log("added", { summary, bill_id: billId });
+  await notify(userId, { company, month: monthName(parsed.bill_month), due: parsed.due_date });
+  return { ok: true, status: "added", billId };
+}
+
+/** The utility_bills row for a parsed email: amount 0 with a check mark when the email had none. */
+export function billRow(userId: string, b: ParsedBill, kind: string, company: string, messageId?: string | null) {
+  const amount = b.amount ?? 0;
+  const usd = b.currency === "USD" ? amount : amount / AWG_PER_USD;
+  const notes = [b.account ? `Account ${b.account}` : null, b.prior_balance ? `The company also lists ${b.currency} ${r2(b.prior_balance).toFixed(2)} from before as open` : null].filter(Boolean).join(". ");
+  return {
+    user_id: userId, kind, provider: company.slice(0, 80), bill_month: b.bill_month, amount, currency: b.currency,
+    exchange_rate: b.currency === "USD" ? 1 : r2(1 / AWG_PER_USD * 1e6) / 1e6, amount_usd: r2(usd),
+    paid_on: null, due_date: b.due_date, notes: notes ? notes.slice(0, 500) : null,
+    source: "email", dedupe_key: (b.dedupe_key || messageId || "").slice(0, 200) || null, needs_check: b.check,
+  };
+}

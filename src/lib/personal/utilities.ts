@@ -17,6 +17,8 @@ export type BillRow = {
   id: string; kind: string; provider?: string | null; bill_month: string;
   amount: number | string; currency: string; exchange_rate?: number | string | null; amount_usd?: number | string | null;
   paid_on?: string | null; due_date?: string | null; receipt_path?: string | null; notes?: string | null; waiting?: boolean;
+  /** "email" when the bill came in by forwarded email; needs_check when its month was guessed or its amount was missing */
+  source?: string | null; needs_check?: boolean | null;
 };
 
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };

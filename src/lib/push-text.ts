@@ -19,6 +19,7 @@ export const PUSH_TEXT = {
   afterTrip: { title: "Lifolio", body: "A trip has ended. Open the app to add your last receipts." },
   document: { title: "Lifolio", body: "A document is about to expire. Open the app to check it." },
   utility: { title: "Lifolio", body: "Time to add your utility bills for this month." },
+  billEmail: { title: "Lifolio", body: "A new utility bill arrived by email." },
   budget: { title: "Lifolio", body: "A reminder about your monthly budget." },
   support: { title: "Lifolio", body: "A new support request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
@@ -106,6 +107,12 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
     case "utility": {
       const names = clean(d.item, 80);
       return names ? `Add this month's bills: ${names}.` : null;
+    }
+    case "billEmail": {
+      const co = clean(d.item, 40);
+      if (!co) return null;
+      const month = clean(d.label, 20);
+      return `New ${co} bill${month ? ` for ${month}` : ""}${d.date ? `, due ${shortDate(d.date, today)}` : ""}.`;
     }
     case "budget": return d.item === "over" ? "You are over this month's budget." : d.item === "near" ? "You have used most of this month's budget." : null;
     case "support": {

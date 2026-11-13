@@ -17,6 +17,10 @@ need_cols(tbl, col, fix) as (values
   ('utility_bills','provider','migration_utilities.sql'),
   ('utility_bills','receipt_path','migration_utilities.sql'),
   ('utility_bills','amount_usd','migration_utilities.sql'),
+  ('utility_bills','source','migration_bill_emails.sql'),
+  ('utility_bills','dedupe_key','migration_bill_emails.sql'),
+  ('utility_bills','needs_check','migration_bill_emails.sql'),
+  ('bill_email_log','status','migration_bill_emails.sql'),
   ('utility_prefs','remind_day','migration_utilities.sql'),
   -- Groceries
   ('grocery_receipts','prices_only','migration_price_notes.sql'),
@@ -47,6 +51,9 @@ col_checks as (
 need_tables(tbl, fix) as (values
   ('house_areas','migration_house_areas.sql'),
   ('utility_bills','migration_utilities.sql'),
+  ('bill_email_addresses','migration_bill_emails.sql'),
+  ('bill_email_senders','migration_bill_emails.sql'),
+  ('bill_email_log','migration_bill_emails.sql'),
   ('utility_prefs','migration_utilities.sql'),
   ('personal_budgets','migration_budget.sql'),
   ('savings_plans','migration_savings.sql'),
@@ -80,6 +87,10 @@ other_checks as (
   select 'constraint', 'personal_budgets: limits is an object',
          case when exists (select 1 from pg_constraint where conname='personal_budgets_limits_object') then 'OK' else 'MISSING' end,
          'migration_audit_fixes.sql'
+  union all
+  select 'index', 'utility_bills: one bill per email',
+         case when exists (select 1 from pg_indexes where schemaname='public' and indexname='utility_bills_dedupe_idx') then 'OK' else 'MISSING' end,
+         'migration_bill_emails.sql'
   union all
   select 'help topic', s.slug,
          case when to_regclass('public.help_topics') is not null

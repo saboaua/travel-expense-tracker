@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,7 @@ export function UtilityBillForm() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loadedEdit, setLoadedEdit] = useState(false);
+  const [fromEmail, setFromEmail] = useState<{ check: boolean } | null>(null);
   const { rate, setRate } = useUsdRate(currency);
   // The rate a saved bill was entered with: editing it must not quietly swap in today's rate
   const [rateTouched, setRateTouched] = useState(false);
@@ -66,7 +67,11 @@ export function UtilityBillForm() {
     if (!b) return;
     setLoadedEdit(true);
     setKind(b.kind); setProvider(b.provider ?? ""); setProviderTouched(true); setMonth(b.bill_month); setMonthTouched(true);
-    setAmount(String(b.amount)); setCurrency(b.currency); setPaid(!!b.paid_on); setPaidOn(b.paid_on ?? todayISO());
+    setAmount(Number(b.amount) > 0 ? String(b.amount) : ""); setCurrency(b.currency);
+    // a bill that came by email and is still unpaid is opened to be paid: Paid, today, ready to confirm
+    const emailDue = b.source === "email" && !b.paid_on;
+    if (b.source === "email") setFromEmail({ check: !!b.needs_check });
+    setPaid(emailDue ? true : !!b.paid_on); setPaidOn(b.paid_on ?? todayISO());
     setDueDate(b.due_date ?? ""); setNotes(b.notes ?? ""); setCurrentPath(b.receipt_path ?? null);
     if (Number(b.exchange_rate) > 0) setSavedRate({ currency: b.currency, rate: Number(b.exchange_rate) });
   }, [editId, rows, loadedEdit]);
@@ -105,6 +110,7 @@ export function UtilityBillForm() {
       const row = {
         kind, provider: provider.trim() || null, bill_month: month, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum),
         paid_on: paid ? paidOn || todayISO() : null, due_date: !paid && dueDate ? dueDate : null, notes: notes.trim() || null,
+        ...(fromEmail ? { needs_check: false } : {}),
       };
       const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === editId) ?? null;
       await saveRow({
@@ -124,7 +130,10 @@ export function UtilityBillForm() {
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal/utilities" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
-      <h1 className="text-xl font-bold">{editId ? "Change bill" : "Add bill"}</h1>
+      <h1 className="text-xl font-bold">{editId ? (fromEmail ? "Bill from email" : "Change bill") : "Add bill"}</h1>
+      {fromEmail && (
+        <p className="mt-2 flex gap-2 rounded-xl bg-blue-50 px-3 py-2 text-[13px] leading-snug text-blue-900 dark:bg-blue-950 dark:text-blue-100" data-testid="util-email-banner"><Mail className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{fromEmail.check ? "From your email. Check the amount and the month, then tap Save when you pay." : "From your email. Tap Save when you pay, or choose Not paid yet."}</p>
+      )}
 
       <form onSubmit={submit} className="mt-4 space-y-4 rounded-2xl border bg-card p-4 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:space-y-0 lg:gap-y-4 lg:p-6" data-testid="util-form">
         <div>

@@ -137,7 +137,7 @@ export function createFakeSupabase() {
       return send(res, status, shaped, { "Content-Range": `0-${Math.max(shaped.length - 1, 0)}/${shaped.length}` });
     };
 
-    if (req.method === "GET" || req.method === "HEAD") return req.method === "HEAD" ? send(res, 200, undefined, { "Content-Range": `*/${hit.length}` }) : out(limit ? hit.slice(0, Number(limit)) : hit);
+    if (req.method === "GET" || req.method === "HEAD") return req.method === "HEAD" ? send(res, 200, undefined, { "Content-Range": `*/${hit.length}` }) : out(limit ? hit.slice(Number(url.searchParams.get("offset") || 0), Number(url.searchParams.get("offset") || 0) + Number(limit)) : hit);
 
     if (req.method === "POST") {
       const items = Array.isArray(body) ? body : [body];

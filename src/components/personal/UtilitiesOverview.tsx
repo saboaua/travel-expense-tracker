@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ArrowLeft, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
@@ -96,9 +96,10 @@ export function UtilitiesOverview() {
                   <Link href={`/personal/utilities/add?id=${b.id}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-[15px] font-semibold">{kindLabel(b.kind)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
-                      <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]} · {b.due_date ? `due ${formatDate(b.due_date)}${st === "late" ? " · late" : ""}` : "no due date"}{b.waiting ? " · waiting to send" : ""}</span>
+                      <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]}{b.needs_check && b.source === "email" && Number(b.amount) > 0 ? " (check)" : ""} · {b.due_date ? `due ${formatDate(b.due_date)}${st === "late" ? " · late" : ""}` : "no due date"}{b.waiting ? " · waiting to send" : ""}</span>
+                      {b.source === "email" && <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="util-from-email"><Mail className="h-3 w-3" aria-hidden="true" />From email</span>}
                     </span>
-                    <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
+                    {Number(b.amount) > 0 ? <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span> : <span className="text-[13px] font-bold text-amber-800 dark:text-amber-200" data-testid="util-amount-missing">Amount missing</span>}
                   </Link>
                 </li>
               );
@@ -109,7 +110,9 @@ export function UtilitiesOverview() {
 
       <Link href="/personal/utilities/add" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground lg:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
 
-      <div className="mt-4">
+      <Link href="/personal/utilities/emails" className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-emails-link"><Mail className="h-4 w-4" aria-hidden="true" />Add bills from email</Link>
+
+      <div className="mt-2">
         <button type="button" onClick={() => setAskDay((v) => !v)} aria-expanded={askDay} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-remind">{day ? `Reminder: day ${day} of the month` : "Remind me to add bills"}</button>
         {askDay && (
           <div className="mt-1 rounded-2xl border bg-card p-4">
