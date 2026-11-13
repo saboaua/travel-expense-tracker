@@ -71,6 +71,8 @@ export const BRANDING_COLS = `${BRANDING_COLS_BASE}, login_logo_size, privacy_po
 export const PROFILE_HOME_COLS = "first_name, last_name, full_name, avatar_url, role";
 /** Home place comes from migration_home_place.sql; an older database does not have it yet. */
 export const PROFILE_HOME_PLACE_COLS = `${PROFILE_HOME_COLS}, home_country, home_city`;
+/** The welcome tour: when it was seen and what the person chose to track (migration_welcome_tour.sql). */
+export const PROFILE_HOME_WELCOME_COLS = `${PROFILE_HOME_PLACE_COLS}, welcome_seen_at, welcome_tracks`;
 
 /** True when an error means "a column in my select list does not exist" (a migration has not been run). */
 export function isMissingColumn(err: { code?: string; message?: string } | null | undefined): boolean {

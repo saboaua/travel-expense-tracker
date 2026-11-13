@@ -27,10 +27,13 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { DashboardViews } from "@/components/DashboardViews";
+import { WelcomeTour } from "@/components/welcome/WelcomeTour";
+import { GettingStarted } from "@/components/welcome/GettingStarted";
+import { cleanTracks, shouldShowWelcome } from "@/lib/welcome";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { hotelOf } from "@/lib/hotel";
 import { onlySpending } from "@/lib/personal/price-notes";
-import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PROFILE_HOME_WELCOME_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
 
@@ -40,7 +43,8 @@ function usdOf(e: Expense) {
   return 0;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ tour?: string }> }) {
+  const forcedTour = (await searchParams)?.tour === "1";
   const supabase = await createClient();
   const user = await getCurrentUser();
   // Failsafe: the middleware already sends signed-out visitors away; if one ever got here, never run a query without an owner
@@ -49,8 +53,9 @@ export default async function DashboardPage() {
 
   // Wave 1: everything that only needs to know who is signed in, asked together
   const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes] = await Promise.all([
-    withColumnFallback(
+    withColumnFallback3(
       (cols) => supabase.from("profiles").select(cols).eq("id", uid).single(),
+      PROFILE_HOME_WELCOME_COLS,
       PROFILE_HOME_PLACE_COLS,
       PROFILE_HOME_COLS
     ),
@@ -74,7 +79,7 @@ export default async function DashboardPage() {
   const flightsByTrip = new Map<string, TripFlight[]>();
   for (const f of (flightsRes.data ?? []) as unknown as TripFlight[]) flightsByTrip.set(f.trip_id, [...(flightsByTrip.get(f.trip_id) ?? []), f]);
   const lineFor = (tripId: string) => flightLine(flightsByTrip.get(tripId) ?? [], Date.now());
-  const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null } | null;
+  const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null; welcome_seen_at?: string | null; welcome_tracks?: string[] | null } | null;
   type TripRow = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string; expenses: Expense[] | null; hotel_name?: string | null; hotel_address?: string | null };
   const trips = tripsRes.data as unknown as TripRow[] | null;
   type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null; show_on?: string | null };
@@ -324,6 +329,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+      {shouldShowWelcome(profile?.welcome_seen_at, forcedTour) && (
+        <WelcomeTour userId={uid} forced={forcedTour} home={{ country: profile?.home_country ?? "", city: profile?.home_city ?? "" }} tracks={cleanTracks(profile?.welcome_tracks)} />
+      )}
       <DashboardHeader
         firstName={firstName}
         initials={initials}
@@ -336,6 +344,11 @@ export default async function DashboardPage() {
         weather={<WeatherCard inline />}
         hasPersonalView={!!dashRows}
       />
+
+      {/* After the tour: the steps that are left. People who were here before the tour existed have no picks, so no card. */}
+      {Array.isArray(profile?.welcome_tracks) && !forcedTour && (
+        <GettingStarted userId={uid} homeSet={!!(profile?.home_country || profile?.home_city)} tracksSet={profile.welcome_tracks.length > 0} />
+      )}
 
       {dashRows ? (
         <DashboardViews

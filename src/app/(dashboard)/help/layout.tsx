@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronRight, Search, X } from "lucide-react";
+import { ChevronRight, Play, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Alert } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -55,6 +55,14 @@ function Shell({ children }: { children: React.ReactNode }) {
           </button>
         )}
       </div>
+
+      {!searching && (
+        <Link href="/?tour=1" className="flex min-h-16 items-center gap-3 rounded-2xl bg-gradient-to-br from-blue-700 to-sky-400 p-3.5 text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="replay-tour">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px] bg-white/20" aria-hidden="true"><Play className="h-5 w-5" /></span>
+          <span className="flex-1"><b className="block text-base">Replay the welcome tour</b><span className="text-[13px] opacity-90">One minute, covers the highlights</span></span>
+          <ChevronRight className="h-[18px] w-[18px]" aria-hidden="true" />
+        </Link>
+      )}
 
       {searching && !loading && !error && groups.length > 0 && (
         <p className="hidden text-sm text-muted-foreground md:block" role="status">{results.length} topic{results.length !== 1 ? "s" : ""} match “{query.trim()}”</p>

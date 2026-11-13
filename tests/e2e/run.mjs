@@ -868,6 +868,64 @@ try {
     } finally { if (before === undefined) delete me.home_country; else me.home_country = before; }
   });
 
+  await test("welcome tour: a new person gets the popup once, picks are saved, a person from before never sees it, Help replays it", async () => {
+    const TOUR = fake.addUser({ email: "tour@example.com", password: "Correct-Horse-1", role: "user", full_name: "Tour Tester" });
+    const mine = () => fake.table("profiles").find((p) => p.id === TOUR);
+    mine().welcome_seen_at = null;
+    const { ctx, page } = await newPage();
+    await signIn(page, "tour@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByTestId("welcome-tour").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("tour-count").innerText()).includes("1 of 5"), "the tour starts at 1 of 5");
+    await page.getByTestId("tour-next").click();
+    assert((await page.getByTestId("welcome-tour").innerText()).includes("Scan, don't type"), "the first highlight is the scan");
+    await page.getByTestId("tour-next").click();
+    await page.getByTestId("tour-budget").waitFor();
+    assert((await page.getByTestId("welcome-tour").innerText()).includes("Know where your money goes"), "the second highlight is the budget");
+    await page.getByTestId("tour-next").click();
+    assert((await page.getByTestId("welcome-tour").innerText()).includes("Bills from your Gmail"), "the third highlight is bills and more");
+    await page.getByTestId("tour-next").click();
+    assert((await page.getByTestId("tour-count").innerText()).includes("3 of 5"), "then the picks step");
+    await page.getByTestId("track-spending").click();
+    await page.getByTestId("track-bills").click();
+    await page.getByTestId("tour-next").click();
+    await page.locator("#tour-country").fill("Aruba");
+    assert((await page.getByTestId("tour-currency").innerText()).includes("AWG"), "Aruba shows that receipts start in AWG");
+    await page.getByTestId("tour-next").click();
+    assert((await page.getByTestId("tour-count").innerText()).includes("5 of 5"), "the last step is the home screen");
+    assert((await page.getByTestId("tour-install-steps").innerText()).includes("Add to Home Screen"), "the iPhone steps show first");
+    await page.getByTestId("tour-tab-android").click();
+    assert((await page.getByTestId("tour-install-steps").innerText()).includes("Install app"), "the Android steps are one tap away");
+    await page.getByTestId("tour-back").click();
+    await page.getByTestId("tour-next").click();
+    await page.getByTestId("tour-next").click();
+    await page.getByTestId("welcome-tour").waitFor({ state: "detached", timeout: 15_000 });
+    assert(!!mine().welcome_seen_at && JSON.stringify(mine().welcome_tracks) === JSON.stringify(["spending", "bills"]) && mine().home_country === "Aruba", "the date, the picks and the home place are saved");
+    // The checklist takes over, and the popup does not come back
+    await page.reload();
+    await page.getByTestId("getting-started").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("welcome-tour").count()) === 0, "the popup does not return");
+    assert((await page.getByTestId("getting-started-count").innerText()).includes("of 6"), "the checklist counts six steps");
+    await page.getByTestId("getting-started-hide").click();
+    await page.reload();
+    await page.waitForTimeout(1500);
+    assert((await page.getByTestId("getting-started").count()) === 0, "Hide keeps the checklist away");
+    // Help replays it
+    await page.goto(`${BASE}/help`);
+    await page.getByTestId("replay-tour").first().click();
+    await page.getByTestId("welcome-tour").waitFor({ timeout: 20_000 });
+    await page.getByTestId("tour-skip").click();
+    await page.getByTestId("welcome-tour").waitFor({ state: "detached", timeout: 15_000 });
+    await ctx.close();
+    // A person from before the tour existed (no date, no picks) never sees it or the checklist
+    const old = await newPage();
+    await signIn(old.page, "pat@example.com", "Correct-Horse-1");
+    await old.page.waitForURL((u) => u.pathname === "/");
+    await old.page.waitForTimeout(1500);
+    assert((await old.page.getByTestId("welcome-tour").count()) === 0 && (await old.page.getByTestId("getting-started").count()) === 0, "nothing new for people who were here before");
+    await old.ctx.close();
+  });
+
   await test("hotel: a trip can carry a hotel with a Directions button, and it shows on the trip card", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

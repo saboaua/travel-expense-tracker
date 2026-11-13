@@ -50,7 +50,7 @@ export function createFakeSupabase() {
   function addUser({ email, password, role = "user", full_name }) {
     const id = randomUUID();
     users.set(id, { id, email, password });
-    table("profiles").push({ id, email, role, full_name: full_name || email.split("@")[0], first_name: null, last_name: null, avatar_url: null, must_change_password: false, created_at: new Date().toISOString() });
+    table("profiles").push({ id, email, role, full_name: full_name || email.split("@")[0], first_name: null, last_name: null, avatar_url: null, must_change_password: false, welcome_seen_at: "2026-01-01T00:00:00Z", welcome_tracks: null, created_at: new Date().toISOString() }); // like the migration: people who were here before have seen the welcome tour
     return id;
   }
 
