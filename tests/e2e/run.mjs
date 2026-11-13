@@ -1257,6 +1257,13 @@ try {
       assert(/Water/.test(await page.getByTestId("util-due-list").textContent()), "a bill not paid yet moves to the Due list");
       assert(/\$0\.00/.test(await page.getByTestId("util-total").textContent()), "an unpaid bill is not in the month total");
       assert(fake.table("utility_bills").filter((r) => r.kind === "water").length === 1 && fake.table("utility_bills").find((r) => r.kind === "water").paid_on == null, "changing the bill updates the same row");
+      // a bill waiting in Due can be deleted from its own form (it used to need the history page)
+      await page.getByTestId("util-due").first().getByRole("link").click();
+      await page.getByTestId("util-delete").click();
+      await page.getByRole("button", { name: "Delete", exact: true }).last().click();
+      await page.waitForURL((u) => u.pathname === "/personal/utilities");
+      await page.waitForFunction(() => !document.querySelector("[data-testid=util-due]"));
+      assert(fake.table("utility_bills").filter((r) => r.kind === "water").length === 0, "Delete this bill removes it from the database");
       // reminder day
       await page.getByTestId("util-remind").click();
       await page.locator("#util-day").selectOption("5");

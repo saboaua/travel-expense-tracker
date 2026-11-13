@@ -20,7 +20,8 @@ import { isKind, kindLabel, lastProvider, defaultBillMonth, usualLag, monthLabel
 import { todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
-import { makeRowApi, saveRow } from "@/lib/row-outbox";
+import { deleteRow, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { useConfirm } from "@/components/ui/confirm";
 
 const chip = (on: boolean) =>
   `inline-flex min-h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
@@ -28,6 +29,7 @@ const chip = (on: boolean) =>
 /** Add a bill, or change one (?id=). Saves on this phone first, so it works with no signal. */
 export function UtilityBillForm() {
   const router = useRouter();
+  const confirm = useConfirm();
   const currencies = useCurrencies();
   const { rows } = useUtilityBills();
   const [editId, setEditId] = useState<string | null>(null);
@@ -127,6 +129,25 @@ export function UtilityBillForm() {
   };
 
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
+  const removeBill = async () => {
+    if (!editId) return;
+    if (!(await confirm({ title: "Delete this bill?", message: `${kindLabel(kind)}${provider.trim() ? `, ${provider.trim()}` : ""}, ${monthLabel(month)}`, destructive: true }))) return;
+    setSaving(true); setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Sign in again to delete.");
+      await deleteRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "utility_bills", id: editId, bucket: "receipts", paths: [currentPath],
+        waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === editId) ?? null, label: `${kindLabel(kind)} bill`, summary: "Utility bill · delete",
+      });
+      router.push("/personal/utilities");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete.");
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal/utilities" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
@@ -187,6 +208,7 @@ export function UtilityBillForm() {
 
         {error && <Alert className="lg:col-span-2">{error}</Alert>}
         <Button type="submit" disabled={saving} className="h-12 w-full text-base lg:col-span-2 lg:w-64" data-testid="util-save">{saving ? "Saving..." : "Save bill"}</Button>
+        {editId && <Button type="button" variant="outline" disabled={saving} onClick={removeBill} className="h-12 w-full border-red-300 text-base text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950 lg:col-span-2 lg:w-64" data-testid="util-delete">Delete this bill</Button>}
       </form>
     </div>
   );
