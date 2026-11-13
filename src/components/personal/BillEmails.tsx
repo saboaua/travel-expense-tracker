@@ -17,8 +17,8 @@ import { gmailScript } from "@/lib/personal/gmail-script";
 type Sender = { id: string; name: string; email: string; accounts?: string[] };
 type LogRow = { id: string; sender: string | null; subject: string | null; status: string; summary: string | null; code: string | null; account?: string | null; created_at: string };
 
-/** Known companies, offered with one tap. Setar's address appears under Recent emails after its first forwarded mail. */
-const SUGGESTED = [{ name: "WEB Aruba", email: "bocuenta@oci.webaruba.com" }, { name: "Elmar", email: "noreply@elmar.aw" }];
+/** Known companies, offered with one tap. If a company mails from another address, it appears under Recent emails and can be added from there. */
+const SUGGESTED = [{ name: "WEB Aruba", email: "bocuenta@oci.webaruba.com" }, { name: "Elmar", email: "noreply@elmar.aw" }, { name: "Setar", email: "customercare@setar.aw" }];
 
 const STATUS: Record<string, { text: string; cls: string }> = {
   added: { text: "Added", cls: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" },

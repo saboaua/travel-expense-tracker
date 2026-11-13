@@ -28,6 +28,16 @@ eq(bill(parseBillEmail({ from: "noreply@elmar.aw", subject: "Your new ELMAR bill
 const star = parseBillEmail({ from: "ELMAR <noreply@elmar.aw>", subject: "Your new ELMAR bill is ready", date: "2026-10-21", text: "Dear *Saskia Chantal M Franken*,\n\nYour latest bill is now available on your ELMAR account. To view it, please visit *customer.elmar.aw* <https://customer.elmar.aw>.\n\nHere are the details for your reference:\n\n- *Account Number:* 541324-1019191\n- *Service Address:* 200 A TANKI LEENDERT ORANJESTAD 16000-0\n- *New Bill Amount:* AWG 116.17\n- *Bill Due Date:* Dec 14, 2026\n- *Prior Open Balance:* AWG 93.12" });
 eq([bill(star).account, bill(star).amount, bill(star).due_date, bill(star).prior_balance], ["541324-1019191", 116.17, "2026-12-14", 93.12], "Elmar's plain text with asterisks around the labels is read correctly");
 
+// the real Setar email (Sep 2026 invoice, due 8 Oct 2026), in the layouts Gmail's plain text can produce
+const realSetar = (text: string) => bill(parseBillEmail({ from: "SETAR NV - Customer Care <customercare@setar.aw>", subject: "Your monthly bill is ready - PLEASE DO NOT REPLY", date: "2026-09-26", text }));
+const want = ["Setar", "phone", 120, "AWG", "2026-10-08", "2026-09-01", "10347772", false];
+const got = (b: ParsedBill) => [b.company, b.kind, b.amount, b.currency, b.due_date, b.bill_month, b.account, b.check];
+eq(got(realSetar("Dear Patrick,\n\nYour monthly invoice is ready. You can use this invoice to pay using the Pay.aw App.\n\nInvoice for: Sep 2026\nAccount: 10347772\nInvoice: 279897306\nDue date: 8 Oct 2026\n\nBill amount:\nAfl. 120.00\nView Bill")), want, "Setar: month from 'Invoice for', account, amount, due date");
+eq(got(realSetar("Invoice for: Sep 2026\nBill amount:\nAccount: 10347772\nAfl. 120.00\nInvoice: 279897306\nDue date: 8 Oct 2026")), want, "Setar: the amount is found when the two columns are interleaved");
+eq(got(realSetar("*Invoice for: Sep 2026*\nAccount: 10347772\nInvoice: 279897306\nDue date: 8 Oct 2026\nBill amount: *Afl. 120.00*")), want, "Setar: asterisks around values do not matter");
+eq(realSetar("Invoice for: Sep 2026\nAccount: 10347772\nInvoice: 279897306\nDue date: 8 Oct 2026\nBill amount: Afl. 120.00").dedupe_key, "setar|10347772|279897306", "Setar: the invoice number makes the bill unique");
+eq(realSetar("Invoice for: Sep 2026\nAccount: 55501234\nInvoice: 279897999\nDue date: 8 Oct 2026\nBill amount: Afl. 80.00").account, "55501234", "Setar: another account (a parent's) is read too");
+
 // Gmail's forwarding confirmation
 eq(parseBillEmail({ from: "Gmail Team <forwarding-noreply@google.com>", subject: "Gmail Forwarding Confirmation - Receive Mail from x@gmail.com", text: "x@gmail.com has requested to automatically forward mail to your email address bills@z.com.\nConfirmation code: 482913321\nTo allow..." }), { type: "confirmation", code: "482913321" }, "Gmail's confirmation code is found");
 eq(parseBillEmail({ from: "someone@else.com", subject: "Hi", text: "Confirmation code: 123456789" }).type, "unknown", "a code from anyone else is not a Gmail confirmation");

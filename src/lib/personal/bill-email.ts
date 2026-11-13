@@ -125,21 +125,26 @@ const elmar: Reader = (i, ref) => {
 const setar: Reader = (i, ref) => {
   if (!/setar/i.test(i.from) && !/\bSETAR\b/i.test(i.subject + " " + i.text.slice(0, 400))) return null;
   const t = i.text;
-  const m = new RegExp(String.raw`(?:Afl\.?|AWG|ƒ)\s*([0-9][0-9.,]*)`, "i").exec(t);
-  const amount = m ? parseAmount(m[1]) : null;
-  const dueM = /due\s*(?:on|date)?\s*:?\s*([^\n\r.]{3,25})/i.exec(t);
+  // "Bill amount: Afl. 120.00" (Afl. is the Aruban florin); if the layout puts other words between, the first Afl. amount is used
+  const amtM = new RegExp(String.raw`Bill\s+amount\s*:?\s*(?:Afl\.?|AWG|ƒ)?\s*([0-9][0-9.,]*)`, "i").exec(t) ?? new RegExp(String.raw`(?:Afl\.?|AWG|ƒ)\s*([0-9][0-9.,]*)`, "i").exec(t);
+  const amount = amtM ? parseAmount(amtM[1]) : null;
+  const dueM = /due\s+date\s*:?\s*([^\n\r]{3,25})/i.exec(t) ?? /due\s*(?:on)?\s*:?\s*([^\n\r.]{3,25})/i.exec(t);
   const due = dueM ? parseDate(dueM[1], ref) : null;
-  // the month the invoice is for, read next to the words invoice / bill / period (never from the due date)
-  const body = t.replace(/due\s*(?:on|date)?\s*:?\s*[^\n\r.]{3,25}/gi, " ");
+  const account = /\bAccount\s*(?:number|no\.?)?\s*:?\s*(\d{4,})/i.exec(t)?.[1] ?? null;
+  const invoice = /\bInvoice\s*(?:number|no\.?|#)?\s*:\s*(\d{5,})/i.exec(t)?.[1] ?? null;
+  // "Invoice for: Sep 2026" names the month; older layouts name it next to the words invoice / bill / period (never from the due date)
+  const forM = /Invoice\s+for\s*:?\s*([A-Za-z]{3,9})\.?\s*(\d{4})?/i.exec(t);
+  const body = t.replace(/due\s*(?:on|date)?\s*:?\s*[^\n\r]{3,25}/gi, " ");
   const near = /(?:invoice|bill|period|statement)[^\n\r]{0,3}(?:\s|:|for|of|-|\n)+(?:for\s+|of\s+)?(January|February|March|April|May|June|July|August|September|October|November|December)\b(?:\s+(\d{4}))?/i.exec(body)
     ?? /\b(January|February|March|April|May|June|July|August|September|October|November|December)\b(?:\s+(\d{4}))?\s+(?:invoice|bill)/i.exec(body);
-  const named = near ? namedMonth(near[1] + (near[2] ? " " + near[2] : ""), ref) : namedMonth(i.subject, ref);
+  const named = (forM && monthIndex(forM[1]) >= 0 ? namedMonth(forM[1] + (forM[2] ? " " + forM[2] : ""), ref) : null)
+    ?? (near ? namedMonth(near[1] + (near[2] ? " " + near[2] : ""), ref) : namedMonth(i.subject, ref));
   const why: string[] = [];
   let check = false;
-  // no month in the email: the month before the one the bill is due in (October's invoice is due in November)
+  // no month in the email: the month before the one the bill is due in (September's invoice is due in October)
   const month = named ?? (() => { check = true; why.push("month guessed"); return shiftMonth(monthStart(due ?? ref), -1); })();
   if (amount == null) { check = true; why.push("no amount found"); }
-  return { ...base("Setar", "phone"), amount, currency: "AWG", due_date: due, bill_month: month, account: null, check, why, dedupe_key: `setar|${month.slice(0, 7)}|${amount ?? "?"}` };
+  return { ...base("Setar", "phone"), amount, currency: "AWG", due_date: due, bill_month: month, account, check, why, dedupe_key: invoice ? `setar|${account ?? "?"}|${invoice}` : `setar|${account ?? "?"}|${month.slice(0, 7)}|${amount ?? "?"}` };
 };
 
 const READERS: Reader[] = [web, elmar, setar];
