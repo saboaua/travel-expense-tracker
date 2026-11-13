@@ -1214,8 +1214,9 @@ try {
       await page.goto(`${BASE}/personal`);
       await page.getByRole("link", { name: /Utilities/ }).first().click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities");
-      await page.getByTestId("util-row").first().waitFor();
-      assert(/No bill yet/.test(await page.getByTestId("util-list").textContent()), "a utility paid before shows No bill yet this month");
+      await page.getByTestId("util-list").waitFor();
+      await page.waitForFunction(() => /Nothing paid/.test(document.querySelector("[data-testid=util-list]").textContent));
+      assert(true, "a month with no payments says so (last month's payment is not counted here)");
       await page.getByTestId("util-add").click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities/add");
       await page.getByRole("button", { name: "Water", exact: true }).click();
@@ -1225,9 +1226,9 @@ try {
       await page.waitForURL((u) => u.pathname === "/personal/utilities");
       await page.getByTestId("util-row").first().waitFor();
       const saved = fake.table("utility_bills").find((r) => r.kind === "water");
-      assert(saved && saved.amount === 120 && saved.currency === "AWG" && saved.provider === "WEB Aruba" && saved.paid_on && /-01$/.test(saved.bill_month), "the bill is saved with its amount, company, month start and payment date: " + JSON.stringify(saved));
+      assert(saved && saved.amount === 120 && saved.currency === "AWG" && saved.provider === "WEB Aruba" && saved.paid_on === new Date().toISOString().slice(0, 10) && saved.bill_month === lastMonth.toISOString().slice(0, 10), "the bill is saved with its amount, company, the month it is for (one back by default) and today as the payment date: " + JSON.stringify(saved));
       const list = await page.getByTestId("util-list").textContent();
-      assert(/Water/.test(list) && /Paid/.test(list) && /WEB Aruba/.test(list), "the month lists water as paid with its company");
+      assert(/Water/.test(list) && /for /.test(list) && /paid /.test(list) && /WEB Aruba/.test(list), "this month lists water as paid today, labelled with the month it is for");
       assert(/\$6\d\.\d\d/.test(await page.getByTestId("util-total").textContent()), "the month total is in USD");
       await page.getByTestId("util-row").filter({ hasText: "Water" }).getByRole("link").click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities/history");
@@ -1243,8 +1244,9 @@ try {
       await page.locator("#ub-due").fill(new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10));
       await page.getByTestId("util-save").click();
       await page.waitForURL((u) => u.pathname === "/personal/utilities");
-      await page.getByTestId("util-row").first().waitFor();
-      await page.waitForFunction(() => /Not paid yet/.test(document.querySelector("[data-testid=util-list]").textContent));
+      await page.getByTestId("util-due").first().waitFor();
+      assert(/Water/.test(await page.getByTestId("util-due-list").textContent()), "a bill not paid yet moves to the Due list");
+      assert(/\$0\.00/.test(await page.getByTestId("util-total").textContent()), "an unpaid bill is not in the month total");
       assert(fake.table("utility_bills").filter((r) => r.kind === "water").length === 1 && fake.table("utility_bills").find((r) => r.kind === "water").paid_on == null, "changing the bill updates the same row");
       // reminder day
       await page.getByTestId("util-remind").click();

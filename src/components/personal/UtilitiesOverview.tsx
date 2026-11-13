@@ -7,14 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
-import { dueState, kindLabel, monthChange, monthLabel, monthLines, monthStart, shiftMonth } from "@/lib/personal/utilities";
+import { dueBills, dueState, kindLabel, monthChange, monthLabel, monthStart, paidIn, shiftMonth } from "@/lib/personal/utilities";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
-
-const STATUS = {
-  paid: { text: "Paid", cls: "bg-emerald-50 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" },
-  unpaid: { text: "Not paid yet", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
-  missing: { text: "No bill yet", cls: "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300" },
-} as const;
 
 /** This month's water, electricity and the rest: what you added, what is paid, what is still missing. */
 export function UtilitiesOverview() {
@@ -33,7 +27,8 @@ export function UtilitiesOverview() {
   }, []);
 
   const all = rows ?? [];
-  const lines = useMemo(() => monthLines(all, month), [all, month]);
+  const paid = useMemo(() => paidIn(all, month), [all, month]);
+  const due = useMemo(() => dueBills(all), [all]);
   const { total, change } = useMemo(() => monthChange(all, month), [all, month]);
   const isNow = month === monthStart(today);
 
@@ -50,7 +45,7 @@ export function UtilitiesOverview() {
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-[26px] font-bold leading-tight">Utilities</h1>
-      <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself, then trace back what you paid and when.</p>
+      <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself. Money counts in the month you paid it; each bill says which month it is for.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 
       <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-4">
@@ -68,36 +63,49 @@ export function UtilitiesOverview() {
       </div>
 
       </div>
-      <div className="mt-3 rounded-2xl border bg-card px-4 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-list">
-        {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : lines.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">No bills yet. Tap Add bill to start with water or electricity.</p>
+      <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paid in {monthLabel(month).split(" ")[0]}</h2>
+      <div className="mt-2 rounded-2xl border bg-card px-4 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-list">
+        {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : paid.length === 0 ? (
+          <p className="py-4 text-sm text-muted-foreground lg:rounded-2xl lg:border lg:bg-card lg:px-4">{all.length === 0 ? "No bills yet. Tap Add bill to start with water or electricity." : `Nothing paid in ${monthLabel(month).split(" ")[0]}.`}</p>
         ) : (
           <ul className="divide-y lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0">
-            {lines.map((l) => {
-              const first = l.bills[0];
-              const due = first ? dueState(first, today) : null;
-              const st = STATUS[l.status];
+            {paid.map((b) => (
+              <li key={b.id} data-testid="util-row" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
+                <Link href={`/personal/utilities/history?kind=${b.kind}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15px] font-semibold">{kindLabel(b.kind)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
+                    <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]}{b.bill_month.slice(0, 4) !== month.slice(0, 4) ? ` ${b.bill_month.slice(0, 4)}` : ""} · paid {b.paid_on ? formatDate(b.paid_on) : ""}{b.waiting ? " · waiting to send" : ""}</span>
+                  </span>
+                  <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {due.length > 0 && (
+        <>
+          <h2 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Due, not paid yet</h2>
+          <p className="mt-0.5 text-xs text-muted-foreground">These count in your total and budget when you pay them.</p>
+          <ul className="mt-2 divide-y rounded-2xl border bg-card px-4 lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-due-list">
+            {due.map((b) => {
+              const st = dueState(b, today);
               return (
-                <li key={l.kind} data-testid="util-row" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
-                  <Link href={`/personal/utilities/history?kind=${l.kind}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <li key={b.id} data-testid="util-due" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
+                  <Link href={`/personal/utilities/add?id=${b.id}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold">{kindLabel(l.kind)}{l.provider ? <span className="font-normal text-muted-foreground"> · {l.provider}</span> : null}</span>
-                      <span className="block text-[13px] text-muted-foreground">
-                        {l.status === "missing" ? "Tap to see past bills" : l.status === "paid" ? `Paid ${first?.paid_on ? formatDate(first.paid_on) : ""}` : first?.due_date ? `Due ${formatDate(first.due_date)}${due === "late" ? " · late" : ""}` : "Add the payment when you pay"}
-                        {l.bills.some((b) => b.waiting) ? " · waiting to send" : ""}
-                      </span>
+                      <span className="block truncate text-[15px] font-semibold">{kindLabel(b.kind)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
+                      <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]} · {b.due_date ? `due ${formatDate(b.due_date)}${st === "late" ? " · late" : ""}` : "no due date"}{b.waiting ? " · waiting to send" : ""}</span>
                     </span>
-                    <span className="flex flex-col items-end gap-1">
-                      {l.status !== "missing" && <span className="text-[15px] font-bold tabular-nums">{l.bills.length === 1 ? formatCurrency(Number(first.amount), first.currency) : formatCurrency(l.usd, "USD")}</span>}
-                      <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.text}</span>
-                    </span>
+                    <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
                   </Link>
                 </li>
               );
             })}
           </ul>
-        )}
-      </div>
+        </>
+      )}
 
       <Link href="/personal/utilities/add" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground lg:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
 

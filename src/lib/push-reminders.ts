@@ -84,9 +84,9 @@ export async function utilityReminders(db: SupabaseClient, today: string): Promi
   let n = 0;
   for (const p of (prefs.data ?? []) as { user_id: string }[]) {
     try {
-      const bills = await db.from("utility_bills").select("kind, bill_month").eq("user_id", p.user_id).order("bill_month", { ascending: false }).limit(2000);
+      const bills = await db.from("utility_bills").select("kind, paid_on").eq("user_id", p.user_id).order("bill_month", { ascending: false }).limit(2000);
       if (bills.error) { if (missing(bills.error.message)) return n; throw new Error(bills.error.message); }
-      const kinds = missingKinds((bills.data ?? []) as { kind: string; bill_month: string }[], month);
+      const kinds = missingKinds((bills.data ?? []) as { kind: string; paid_on: string | null }[], month);
       if (!kinds.length) continue;
       if (!(await claimOnce(p.user_id, `utility:${month}`))) continue;
       n += await sendPush(p.user_id, "utility", "reminders", { item: kinds.map(utilityLabel).join(", ") }, { today });

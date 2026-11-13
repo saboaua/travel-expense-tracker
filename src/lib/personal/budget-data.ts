@@ -20,9 +20,11 @@ export async function fetchBudgets(supabase: SupabaseClient): Promise<{ rows: Bu
 export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: string, userId?: string): Promise<MonthInputs> {
   const end = monthEnd(monthStart);
   const mine = <T,>(q: T): T => (userId ? (q as unknown as { eq: (c: string, v: string) => T }).eq("user_id", userId) : q);
-  const [g, u, s, pr] = await Promise.all([
+  const [g, u, ud, s, pr] = await Promise.all([
     withColumnFallback((cols) => mine(supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000)), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
-    mine(supabase.from("utility_bills").select("amount_usd").eq("bill_month", monthStart).limit(200)),
+    // utilities count in the month they were PAID; bills not paid yet are only reported as "still due"
+    mine(supabase.from("utility_bills").select("amount_usd").gte("paid_on", monthStart).lte("paid_on", end).limit(200)),
+    mine(supabase.from("utility_bills").select("amount_usd").is("paid_on", null).limit(200)),
     withColumnFallback3((cols) => mine(supabase.from("personal_spends").select(cols).gte("expense_date", monthStart).lte("expense_date", end).limit(2000)), "amount, currency, amount_usd, category, project_id, house_area", "amount, currency, amount_usd, category, project_id", "amount, currency, amount_usd, category"),
     mine(supabase.from("personal_projects").select("id").eq("kind", "home_project").limit(500)),
   ]);
@@ -42,6 +44,7 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
     savings,
     groceries: g.error ? [] : (g.data ?? []),
     utilities: u.error ? [] : ((u.data ?? []) as MonthInputs["utilities"]),
+    utilitiesDue: ud.error ? [] : ((ud.data ?? []) as MonthInputs["utilities"]),
     spends: s.error ? [] : ((s.data ?? []) as unknown as MonthInputs["spends"]),
     projects,
   };

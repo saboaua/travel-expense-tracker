@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronRight, Coins, Home, PiggyBank, Settings, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, type BudgetView, type SpentArea } from "@/lib/personal/budget";
+import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
 import { fetchBudgets, fetchMonthInputs } from "@/lib/personal/budget-data";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
@@ -65,6 +65,7 @@ function AreaRow({ k, v }: { k: SpentArea; v: BudgetView }) {
 /** The monthly budget on Personal: what is left, a bar of what you spent, and each area with its optional limit. */
 export function BudgetCard() {
   const [view, setView] = useState<BudgetView | null>(null);
+  const [due, setDue] = useState(0);
   const [none, setNone] = useState(false);
   const [hidden, setHidden] = useState(false);
 
@@ -79,7 +80,9 @@ export function BudgetCard() {
       const setting = pickBudget(rows, month);
       if (!setting) return setNone(true);
       const inputs = await fetchMonthInputs(supabase, month);
-      if (alive) setView(budgetView(setting, spentByArea(inputs, setting.currency), today, uncountedEntries(inputs, setting.currency)));
+      if (!alive) return;
+      setDue(utilitiesDueAmount(inputs, setting.currency));
+      setView(budgetView(setting, spentByArea(inputs, setting.currency), today, uncountedEntries(inputs, setting.currency)));
     })().catch(() => { if (alive) setHidden(true); });
     return () => { alive = false; };
   }, []);
@@ -119,6 +122,7 @@ export function BudgetCard() {
       {BUDGET_AREAS.map((a) => <AreaRow key={a.key} k={a.key} v={view} />)}
       {view.byArea.savings > 0 && <AreaRow k="savings" v={view} />}
       {view.byArea.savings > 0 && <p className="mt-1 rounded-lg bg-teal-50 px-3 py-2 text-xs leading-snug text-teal-900 dark:bg-teal-950 dark:text-teal-100" data-testid="budget-savings-note">Savings counts as spending: that money is already set aside for your plans.</p>}
+      {due > 0 && <p className="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="budget-due-note">{formatCurrency(due, view.currency)} more is due in utilities. It counts once you pay it.</p>}
       {view.uncounted > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="budget-uncounted">{view.uncounted} {view.uncounted === 1 ? "entry is" : "entries are"} in another currency and not counted here.</p>}
       <Link href="/personal/budget" className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary" data-testid="budget-set-link"><Settings className="h-4 w-4" aria-hidden="true" /> Set or change budget</Link>
     </Card>

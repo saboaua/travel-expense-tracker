@@ -38,18 +38,36 @@ export const monthShort = (month: string) => (MONTHS[Number(month.slice(5, 7)) -
 
 export const totalUsd = (rows: BillRow[]) => r2(rows.reduce((s, r) => s + num(r.amount_usd), 0));
 
-export type UtilityLine = { kind: string; bills: BillRow[]; status: "paid" | "unpaid" | "missing"; usd: number; provider: string | null };
+/** The month a payment counts in: the month it was paid (cash basis). Unpaid bills count nowhere yet. */
+export const payMonth = (b: { paid_on?: string | null }) => (b.paid_on ? monthStart(b.paid_on) : null);
 
-/** One line for each utility you have ever added a bill for, plus any other with a bill this month. */
-export function monthLines(rows: BillRow[], month: string): UtilityLine[] {
-  const order = UTILITY_KINDS.map((k) => k.id as string);
-  const kinds = [...new Set(rows.map((r) => r.kind))].sort((a, b) => order.indexOf(a) - order.indexOf(b));
-  return kinds.map((kind) => {
-    const bills = rows.filter((r) => r.kind === kind && r.bill_month === month);
-    const status = bills.length === 0 ? "missing" : bills.every((b) => !!b.paid_on) ? "paid" : "unpaid";
-    return { kind, bills, status, usd: totalUsd(bills), provider: lastProvider(rows, kind) };
-  });
+/** Bills paid in `month`, newest payment first. Each still says which month it is for (bill_month). */
+export function paidIn(rows: BillRow[], month: string): BillRow[] {
+  return rows.filter((r) => payMonth(r) === month).sort((a, b) => (b.paid_on ?? "").localeCompare(a.paid_on ?? ""));
 }
+
+/** Bills not paid yet, soonest due first (no due date last). */
+export function dueBills(rows: BillRow[]): BillRow[] {
+  return rows.filter((r) => !r.paid_on).sort((a, b) => (a.due_date ?? "9999").localeCompare(b.due_date ?? "9999") || a.bill_month.localeCompare(b.bill_month));
+}
+
+/** Whole months from the month a bill is for to the month it was paid ("September" bill paid in November = 2). */
+const lagOf = (b: { bill_month: string; paid_on?: string | null }) => {
+  if (!b.paid_on) return null;
+  const n = (Number(b.paid_on.slice(0, 4)) - Number(b.bill_month.slice(0, 4))) * 12 + Number(b.paid_on.slice(5, 7)) - Number(b.bill_month.slice(5, 7));
+  return n >= 0 && n <= 6 ? n : null;
+};
+
+/** How many months back a utility's bill usually is when you pay it: your latest paid bill of that company (or of that utility). One month when there is no history. */
+export function usualLag(rows: BillRow[], kind: string, provider?: string | null): number {
+  const paid = rows.filter((r) => r.kind === kind && lagOf(r) != null).sort((a, b) => (b.paid_on ?? "").localeCompare(a.paid_on ?? ""));
+  const co = provider?.trim().toLowerCase();
+  const pick = (co ? paid.find((r) => r.provider?.trim().toLowerCase() === co) : null) ?? paid[0];
+  return pick ? (lagOf(pick) as number) : 1;
+}
+
+/** The month a bill paid on `paidOn` is probably for. */
+export const defaultBillMonth = (paidOn: string, lag: number) => shiftMonth(monthStart(paidOn), -lag);
 
 /** The company you used last for a utility (newest bill first). */
 export function lastProvider(rows: BillRow[], kind: string): string | null {
@@ -57,10 +75,10 @@ export function lastProvider(rows: BillRow[], kind: string): string | null {
   return mine[0]?.provider?.trim() ?? null;
 }
 
-/** This month's total against last month's; change is null when last month has no bills. */
+/** What you paid this month against last month; change is null when nothing was paid last month. */
 export function monthChange(rows: BillRow[], month: string): { total: number; previous: number; change: number | null } {
-  const total = totalUsd(rows.filter((r) => r.bill_month === month));
-  const previous = totalUsd(rows.filter((r) => r.bill_month === shiftMonth(month, -1)));
+  const total = totalUsd(paidIn(rows, month));
+  const previous = totalUsd(paidIn(rows, shiftMonth(month, -1)));
   return { total, previous, change: previous > 0 ? r2(total - previous) : null };
 }
 
@@ -79,11 +97,11 @@ export function history(rows: BillRow[], kind: string, month: string): { bars: {
   };
 }
 
-/** Utilities you pay regularly (a bill in an earlier month) with no bill yet for `month`. Used by the reminder. */
-export function missingKinds(rows: { kind: string; bill_month: string }[], month: string): string[] {
-  const seen = new Set(rows.filter((r) => r.bill_month < month).map((r) => r.kind));
-  const have = new Set(rows.filter((r) => r.bill_month === month).map((r) => r.kind));
-  return [...seen].filter((k) => !have.has(k));
+/** Utilities you usually pay (paid in an earlier month) with nothing paid or waiting to be paid for `month`. Used by the reminder. */
+export function missingKinds(rows: { kind: string; paid_on?: string | null }[], month: string): string[] {
+  const before = new Set(rows.filter((r) => r.paid_on && monthStart(r.paid_on) < month).map((r) => r.kind));
+  const have = new Set(rows.filter((r) => !r.paid_on || monthStart(r.paid_on) === month).map((r) => r.kind));
+  return [...before].filter((k) => !have.has(k));
 }
 
 /** "2026-11-05" is due soon/late relative to today; only for bills not paid yet. */

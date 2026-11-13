@@ -1,5 +1,6 @@
 "use client";
 
+import { shiftMonth } from "@/lib/personal/utilities";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -59,6 +60,7 @@ export default function PersonalHubPage() {
       if (flag && flag.personal_enabled === false) return setEnabled(false);
 
       const monthStart = `${todayISO().slice(0, 7)}-01`;
+      const nextMonthStart = shiftMonth(monthStart, 1);
       const [g, p, d, l, q, lk, u, sv] = await Promise.all([
         withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
@@ -66,7 +68,7 @@ export default function PersonalHubPage() {
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
         supabase.from("personal_spends").select("id, merchant, amount, currency, amount_usd, category, expense_date, project_id, house_area").gte("expense_date", monthStart).limit(2000),
         fetchLinkedSpends(supabase),
-        supabase.from("utility_bills").select("amount_usd").eq("bill_month", monthStart).limit(200),
+        supabase.from("utility_bills").select("amount_usd").gte("paid_on", monthStart).lt("paid_on", nextMonthStart).limit(200),
         fetchSavings(supabase),
       ]);
       // One currency for the whole page: AWG or USD, whichever the month's receipts and spends use more
@@ -120,7 +122,7 @@ export default function PersonalHubPage() {
     { href: "/personal/savings", title: "Savings", icon: PiggyBank, strong: !!stats?.savings,
       text: !stats ? "\u00a0" : stats.savings ? `${formatCurrency(stats.savings.saved, stats.savings.currency)} saved \u00b7 ${formatCurrency(stats.savings.monthly, stats.savings.currency)} a month` : "Put money aside every month" },
     { href: "/personal/utilities", title: "Utilities", icon: Zap, strong: !!stats?.utilities?.count,
-      text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(stats.utilities.total, stats.currency)} this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
+      text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(stats.utilities.total, stats.currency)} paid this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
     { href: "/personal/projects", title: "Home Projects", icon: Hammer, strong: !!stats && stats.projects.count > 0,
       text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, stats.currency)} spent` : "No active projects \u00b7 tap to start one" },
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, strong: !!stats && stats.trips.count > 0,

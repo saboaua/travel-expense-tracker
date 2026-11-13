@@ -16,7 +16,7 @@ import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { parseAmount, QUICK_DEFAULT_CURRENCY } from "@/lib/personal/quick-spend";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
-import { isKind, kindLabel, lastProvider, monthLabel, monthStart, shiftMonth, UTILITY_KINDS } from "@/lib/personal/utilities";
+import { isKind, kindLabel, lastProvider, defaultBillMonth, usualLag, monthLabel, monthStart, shiftMonth, UTILITY_KINDS } from "@/lib/personal/utilities";
 import { todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
@@ -34,7 +34,8 @@ export function UtilityBillForm() {
   const [kind, setKind] = useState<string>("water");
   const [provider, setProvider] = useState("");
   const [providerTouched, setProviderTouched] = useState(false);
-  const [month, setMonth] = useState(monthStart(todayISO()));
+  const [month, setMonth] = useState(shiftMonth(monthStart(todayISO()), -1));
+  const [monthTouched, setMonthTouched] = useState(false);
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(QUICK_DEFAULT_CURRENCY);
   const [paid, setPaid] = useState(true);
@@ -64,7 +65,7 @@ export function UtilityBillForm() {
     const b = rows.find((r) => r.id === editId);
     if (!b) return;
     setLoadedEdit(true);
-    setKind(b.kind); setProvider(b.provider ?? ""); setProviderTouched(true); setMonth(b.bill_month);
+    setKind(b.kind); setProvider(b.provider ?? ""); setProviderTouched(true); setMonth(b.bill_month); setMonthTouched(true);
     setAmount(String(b.amount)); setCurrency(b.currency); setPaid(!!b.paid_on); setPaidOn(b.paid_on ?? todayISO());
     setDueDate(b.due_date ?? ""); setNotes(b.notes ?? ""); setCurrentPath(b.receipt_path ?? null);
     if (Number(b.exchange_rate) > 0) setSavedRate({ currency: b.currency, rate: Number(b.exchange_rate) });
@@ -74,6 +75,14 @@ export function UtilityBillForm() {
     if (!rows || editId || providerTouched) return;
     setProvider(lastProvider(rows, kind) ?? "");
   }, [rows, kind, editId, providerTouched]);
+
+  // "Bill for" follows how late this company's bills usually are, until you pick a month yourself
+  const lag = rows ? usualLag(rows, kind, provider) : 1;
+  const hasHistory = !!rows?.some((r) => r.kind === kind && r.paid_on);
+  useEffect(() => {
+    if (editId || monthTouched || !rows) return;
+    setMonth(defaultBillMonth(paid && paidOn ? paidOn : todayISO(), lag));
+  }, [rows, editId, monthTouched, paid, paidOn, lag]);
 
   const months = Array.from({ length: 13 }, (_, i) => shiftMonth(monthStart(todayISO()), -i));
   if (!months.includes(month)) months.push(month);
@@ -131,13 +140,6 @@ export function UtilityBillForm() {
         </div>
 
         <div>
-          <label htmlFor="ub-month" className={label}>Bill for</label>
-          <Select id="ub-month" value={month} onChange={(e) => setMonth(e.target.value)}>
-            {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-          </Select>
-        </div>
-
-        <div>
           <label htmlFor="ub-amount" className={label}>Amount</label>
           <AmountField id="ub-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={(v) => { setRateTouched(true); setRate(v); }} />
         </div>
@@ -149,10 +151,18 @@ export function UtilityBillForm() {
             <button type="button" aria-pressed={!paid} onClick={() => setPaid(false)} className={chip(!paid)}>Not paid yet</button>
           </div>
           {paid ? (
-            <div className="mt-2"><label htmlFor="ub-paidon" className="mb-1 block text-xs text-muted-foreground">Paid on</label><Input id="ub-paidon" type="date" value={paidOn} max={todayISO()} onChange={(e) => setPaidOn(e.target.value)} className="h-12" /></div>
+            <div className="mt-2"><label htmlFor="ub-paidon" className="mb-1 block text-xs text-muted-foreground">Paid on <span>(the month it counts in)</span></label><Input id="ub-paidon" type="date" value={paidOn} max={todayISO()} onChange={(e) => setPaidOn(e.target.value)} className="h-12" /></div>
           ) : (
             <div className="mt-2"><label htmlFor="ub-due" className="mb-1 block text-xs text-muted-foreground">Due date <span>(optional)</span></label><Input id="ub-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-12" /></div>
           )}
+        </div>
+
+        <div>
+          <label htmlFor="ub-month" className={label}>This bill is for the month of</label>
+          <Select id="ub-month" value={month} onChange={(e) => { setMonthTouched(true); setMonth(e.target.value); }}>
+            {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+          </Select>
+          <p className="mt-1 text-xs text-muted-foreground" data-testid="ub-month-hint">As printed on the bill.{hasHistory && !editId ? ` ${provider.trim() || kindLabel(kind)} is usually ${lag === 0 ? "the same month" : `${lag} month${lag === 1 ? "" : "s"} back`}.` : ""}</p>
         </div>
 
         <div>

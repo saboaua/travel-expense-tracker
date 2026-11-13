@@ -48,7 +48,10 @@ export function readBudget(r: { id?: string; month?: string | null; amount: numb
 
 export type MonthInputs = {
   groceries: { total: number | string; currency: string }[];
+  /** utility bills PAID in the month */
   utilities: { amount_usd: number | string | null }[];
+  /** utility bills not paid yet: not counted, only mentioned (optional) */
+  utilitiesDue?: { amount_usd: number | string | null }[];
   spends: { amount: number | string; currency: string; amount_usd?: number | string | null; category: string; project_id?: string | null; house_area?: string | null }[];
   /** costs of your home projects this month */
   projects: { amount_usd: number | string | null }[];
@@ -70,6 +73,11 @@ export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): Record<
   for (const x of inp.savings ?? []) add("savings", convert(Number(x.amount), x.currency, currency));
   for (const k of Object.keys(out) as SpentArea[]) out[k] = round2(out[k]);
   return out;
+}
+
+/** Utility bills still unpaid, in the budget's currency: not part of what you spent until you pay them. */
+export function utilitiesDueAmount(inp: MonthInputs, currency: BudgetCurrency): number {
+  return round2((inp.utilitiesDue ?? []).reduce((t, u) => t + (convert(Number(u.amount_usd) || 0, "USD", currency) ?? 0), 0));
 }
 
 /** How many entries could not be converted to the budget's currency (a receipt in euros, say) and so are left out. */

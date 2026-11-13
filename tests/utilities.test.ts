@@ -1,4 +1,4 @@
-import { history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthLines, monthStart, shiftMonth, dueState, type BillRow } from "../src/lib/personal/utilities";
+import { defaultBillMonth, dueBills, history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthStart, paidIn, shiftMonth, dueState, usualLag, type BillRow } from "../src/lib/personal/utilities";
 import { pushMessage } from "../src/lib/push-text";
 
 let failed = 0;
@@ -19,19 +19,21 @@ const rows: BillRow[] = [
   bill("4", "electricity", "2026-10-01", 90),
   bill("5", "phone", "2026-10-01", 15),
 ];
-const lines = monthLines(rows, "2026-11-01");
-eq(lines.map((l) => [l.kind, l.status]), [["water", "paid"], ["electricity", "unpaid"], ["phone", "missing"]], "paid, not paid yet and no bill yet, in a fixed order");
-eq(monthChange(rows, "2026-11-01"), { total: 130, previous: 125, change: 5 }, "this month against last month");
-eq(monthChange(rows, "2026-05-01").change, null, "no change figure when last month has no bills");
+eq(paidIn(rows, "2026-11-01").map((r) => r.id), ["1", "3", "4", "5"], "a month lists the bills paid in it, whatever month they are for");
+eq(dueBills(rows).map((r) => r.id), ["2"], "unpaid bills wait in the due list");
+eq(monthChange(rows, "2026-11-01"), { total: 155, previous: 0, change: null }, "the month total counts what was paid, not unpaid bills");
+eq(monthChange(rows, "2026-05-01").change, null, "no change figure when nothing was paid last month");
+const lagRows: BillRow[] = [bill("e1", "electricity", "2026-09-01", 50, { provider: "Elmar", paid_on: "2026-11-03" }), bill("s1", "phone", "2026-10-01", 20, { provider: "Setar", paid_on: "2026-11-03" })];
+eq([usualLag(lagRows, "electricity", "Elmar"), usualLag(lagRows, "phone", "setar"), usualLag([], "water"), usualLag(lagRows, "electricity", "Other co")], [2, 1, 1, 2], "usual lag follows the company, one month with no history");
+eq([defaultBillMonth("2026-11-03", 2), defaultBillMonth("2026-01-10", 1)], ["2026-09-01", "2025-12-01"], "the bill month is the paid month minus the lag, across years");
+eq(history(lagRows, "electricity", "2026-11-01").bars[3].usd, 50, "history stays by the month on the bill");
 eq(lastProvider(rows, "water"), "WEB Aruba", "the newest company is remembered");
-eq(missingKinds(rows, "2026-11-01"), ["phone"], "the reminder lists utilities you usually pay with no bill yet");
-eq(missingKinds(rows, "2026-10-01"), [], "nothing missing when there is no earlier month");
+const pr = [{ kind: "water", paid_on: "2026-10-05" }, { kind: "phone", paid_on: "2026-10-06" }, { kind: "water", paid_on: "2026-11-03" }, { kind: "trash", paid_on: "2026-10-09" }, { kind: "trash", paid_on: null }];
+eq(missingKinds(pr, "2026-11-01"), ["phone"], "the reminder lists utilities paid before with nothing paid or waiting this month");
+eq(missingKinds(pr, "2026-10-01"), [], "nothing missing when nothing was paid earlier");
 const h = history(rows, "water", "2026-11-01");
 eq([h.bars.length, h.bars[5].usd, h.bars[4].usd, h.bars[0].usd, h.average, h.highest], [6, 30, 20, 0, 25, 30], "six months, average and highest count only months with a bill");
 eq(history(rows, "trash", "2026-11-01").average, 0, "no bills, no average");
-const two = [bill("a", "water", "2026-11-01", 10), bill("b", "water", "2026-11-01", 5, { paid_on: null })];
-eq(monthLines(two, "2026-11-01")[0].status, "unpaid", "two bills in a month: unpaid until all are paid");
-eq(monthLines(two, "2026-11-01")[0].usd, 15, "two bills add up");
 eq([dueState(rows[1], "2026-11-18"), dueState(rows[1], "2026-11-21"), dueState(rows[1], "2026-11-01"), dueState(rows[0], "2026-11-30")], ["soon", "late", null, null], "due soon, late, and never for a paid bill");
 eq(pushMessage("utility", { item: "Water, Phone" }, "details").body, "Add this month's bills: Water, Phone.", "the reminder names the utilities, never an amount");
 eq(pushMessage("utility", { item: "Water" }, "private").body, "Time to add your utility bills for this month.", "private wording is generic");
