@@ -75,5 +75,22 @@ eq("sql rls on", /alter table public\.help_topics enable row level security/.tes
 eq("sql seeds both topics", sql.includes("'add-to-home-screen'") && sql.includes("'share-with-partner'"), true);
 eq("sql seeds are published", !/published\s*=\s*false/.test(sql), true);
 
+// the bill-emails guide: both topics fit the limits, are read as steps and headings, and the screen names it points to exist
+{
+  const g = readFileSync("supabase/migration_help_bill_emails.sql", "utf8");
+  const topics = [...g.matchAll(/\('([a-z-]+)', '([^']*)', 'Personal',\n '([^']*)',\n\$h\$([\s\S]*?)\$h\$, (\d+)\)/g)];
+  eq("bill emails: two topics", topics.map((t) => t[1]), ["bills-from-email", "bills-from-email-problems"]);
+  for (const [, slug, title, summary, body, order] of topics) {
+    const v = validateHelpDraft({ title, category: "Personal", summary, body, sort_order: Number(order), published: true });
+    eq(`bill emails: ${slug} passes the Help limits`, v.ok, true);
+    const blocks = parseHelpBody(body);
+    eq(`bill emails: ${slug} has headings and steps`, blocks.some((b) => b.kind === "heading") && blocks.some((b) => b.kind === "steps" || b.kind === "bullets"), true);
+    eq(`bill emails: ${slug} has no code marks that would show as text`, body.includes("`"), false);
+  }
+  const ui = readFileSync("src/components/personal/BillEmails.tsx", "utf8");
+  for (const phrase of ["Add this account", "Only add account", "Add as a sender", "Copy script", "Make a new key", "Add a sender", "Recent emails", "Allowed senders"]) eq(`bill emails: the screen has "${phrase}"`, ui.includes(phrase), true);
+  eq("bill emails: the old Utilities guide sentence is only replaced when unedited", g.includes("where slug = 'utility-bills'") && g.includes("and body like"), true);
+}
+
 if (fail) process.exit(1);
 console.log("help: all checks passed");

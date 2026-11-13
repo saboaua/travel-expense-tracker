@@ -100,6 +100,13 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_budget_savings.sql'
   from (values ('house-areas'), ('monthly-budget'), ('savings-plans')) as s(slug)
+  union all
+  select 'help topic', s.slug,
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', s.slug), false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_bill_emails.sql'
+  from (values ('bills-from-email'), ('bills-from-email-problems')) as s(slug)
 ),
 all_checks as (
   select * from col_checks
