@@ -1129,6 +1129,10 @@ try {
       assert((await page.getByTestId("budget-area-groceries").getAttribute("href")) === "/personal/groceries", "an area row opens that area");
       const houseTile = page.getByRole("link", { name: /House & repairs/ }).first();
       assert(/90/.test(await houseTile.textContent()) && (await houseTile.getAttribute("href")) === "/personal/house", "the House & repairs tile shows this month's house spending: " + (await houseTile.textContent()));
+      await page.getByTestId("where-pie").waitFor();
+      assert((await page.getByTestId("where-groceries").getAttribute("href")) === "/personal/groceries" && (await page.getByTestId("where-house").getAttribute("href")) === "/personal/house", "Where it goes lists each part and opens it");
+      const wTotal = await page.getByTestId("where-total").textContent(), wList = await page.getByTestId("where-list").textContent();
+      assert(/AWG/.test(wTotal) && /House & repairs/.test(wList) && /%/.test(wList), "Where it goes shows the month total, the parts and their shares: " + wTotal);
       const quickTile = page.getByRole("link", { name: /Quick spend/ }).first();
       assert(!/90/.test(await quickTile.textContent()), "the Quick spend tile does not repeat the house cost: " + (await quickTile.textContent()));
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");

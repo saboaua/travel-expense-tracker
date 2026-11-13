@@ -17,6 +17,7 @@ import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { BudgetCard } from "@/components/personal/BudgetCard";
+import { WhereItGoes } from "@/components/personal/WhereItGoes";
 import { fetchSavings } from "@/lib/personal/savings-data";
 import { savingsSummary } from "@/lib/personal/savings";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
@@ -153,6 +154,7 @@ export default function PersonalHubPage() {
       )}
       <div className="grid gap-4 md:grid-cols-2">
         <BudgetCard />
+        <WhereItGoes currency={stats?.currency ?? null} />
         {/* Groceries leads: the month total is the number, with the two things done most often one tap away */}
         <Card className="flex flex-col justify-between rounded-2xl lg:col-span-2 lg:flex-row lg:items-center lg:gap-6">
           <div className="flex flex-col justify-between gap-1 lg:min-w-0 lg:flex-1">
