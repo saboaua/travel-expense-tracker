@@ -10,7 +10,8 @@ const eq = (got: unknown, want: unknown, msg: string) => {
 const row = (id: string, merchant: string | null, amount: number, date: string, category = "Other", extra: Partial<SpendRow> = {}): SpendRow => ({ id, merchant, amount, currency: "AWG", amount_usd: amount / 2, category, expense_date: date, ...extra });
 
 eq([parseAmount("4.5"), parseAmount("4,50"), parseAmount(""), parseAmount("-2"), parseAmount("abc"), parseAmount("0")], [4.5, 4.5, null, null, null, null], "amounts are read with a comma or a dot, and zero or negative is refused");
-eq(summarizeSpends([{ amount: 4.5, currency: "AWG" }, { amount: "3", currency: "AWG" }, { amount: 10, currency: "USD" }]), { currency: "AWG", total: 7.5, count: 2 }, "the month total is in the most-used currency");
+eq(summarizeSpends([{ amount: 4.5, currency: "AWG" }, { amount: "3", currency: "AWG" }, { amount: 10, currency: "USD" }]), { total: 25.4, currency: "AWG", count: 3, skipped: 0 }, "the month total is in the most-used currency and counts every spend, converted at the peg");
+eq(summarizeSpends([{ amount: 10, currency: "USD" }, { amount: 17.9, currency: "AWG" }, { amount: 5, currency: "EUR", amount_usd: 5.5 }, { amount: 7, currency: "XYZ" }]), { total: 45.65, currency: "AWG", count: 4, skipped: 1 }, "another currency uses its USD amount, and one with none is counted as skipped");
 eq(summarizeSpends([]), null, "no spends, no total");
 
 const rs = [row("1", "Coffee", 4.5, "2026-11-10", "Coffee & snacks"), row("2", "coffee", 5, "2026-11-12", "Street food"), row("3", "Peanuts", 3, "2026-11-09", "Street food"), row("4", null, 9, "2026-11-08")];

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
+import { fetchAll } from "@/lib/personal/fetch-all";
 import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
 import { AREA_PREFIX, filterHouse, houseSpends, houseTotalUsd, type SpendRow } from "@/lib/personal/quick-spend";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
@@ -23,7 +24,12 @@ export function HouseRepairs() {
   useEffect(() => {
     (async () => {
       const supabase = createClient();
-      const { data, error: e } = await withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", `${year}-01-01`).order("expense_date", { ascending: false }).limit(1000), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE);
+      let data: unknown[] = [];
+      let e: { message: string } | null = null;
+      try {
+        // page through every row: the server hands back at most 1000 at a time
+        data = await fetchAll<unknown>((from, to) => withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).gte("expense_date", `${year}-01-01`).order("expense_date", { ascending: false }).order("id").range(from, to), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE) as unknown as PromiseLike<{ data: unknown[] | null; error: { message: string } | null }>);
+      } catch (err) { e = { message: err instanceof Error ? err.message : "" }; }
       if (e) { setRows([]); setError(/relation|schema cache/i.test(e.message) ? "Run supabase/migration_quick_spend.sql in Supabase first." : "Could not load your spending. Check your connection."); return; }
       setRows(houseSpends((data ?? []) as unknown as SpendRow[], year));
       const { data: ps } = await supabase.from("personal_projects").select("id, name").eq("kind", "home_project").limit(200);

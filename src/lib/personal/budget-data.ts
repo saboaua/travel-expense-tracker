@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { BUDGET_COLS, SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { BUDGET_COLS, SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS, SAVINGS_PLAN_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { monthSavings, readEvent, readPlan } from "@/lib/personal/savings";
 import { readBudget, type BudgetSetting, type MonthInputs } from "@/lib/personal/budget";
@@ -34,7 +34,7 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
   }
   // savings plans: what they put aside this month (nothing when the tables are missing)
   const [pl, ev] = await Promise.all([
-    mine(supabase.from("savings_plans").select(SAVINGS_PLAN_COLS).limit(100)),
+    withColumnFallback((cols) => mine(supabase.from("savings_plans").select(cols).limit(100)), SAVINGS_PLAN_COLS, SAVINGS_PLAN_COLS_BASE),
     mine(supabase.from("savings_events").select(SAVINGS_EVENT_COLS).limit(1000)),
   ]);
   const savings = pl.error || ev.error ? [] : monthSavings(((pl.data ?? []) as unknown as Parameters<typeof readPlan>[0][]).map(readPlan), ((ev.data ?? []) as unknown as Parameters<typeof readEvent>[0][]).map(readEvent), monthStart);

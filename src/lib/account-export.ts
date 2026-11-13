@@ -1,9 +1,10 @@
 import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, SAVINGS_PLAN_COLS, SAVINGS_EVENT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, TRIP_COLS, BUDGET_COLS, UTILITY_BILL_COLS, TRIP_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { fetchAll } from "@/lib/personal/fetch-all";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, SAVINGS_PLAN_COLS, SAVINGS_EVENT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, SUBSCRIPTION_COLS, TRIP_COLS, BUDGET_COLS, UTILITY_BILL_COLS, TRIP_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 /** Tables that belong to one person (column holding the owner), and the storage bucket their files sit in. */
-export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; cols: string; base?: string }[] = [
+export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; cols: string; mid?: string; base?: string; /** a column that puts the rows in a fixed order, so paging never skips or repeats one */ order?: string }[] = [
   { table: "profiles", owner: "id", cols: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role, home_country, home_city", base: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role" },
   { table: "trips", owner: "user_id", cols: `${TRIP_COLS}, user_id, created_at`, base: `${TRIP_COLS_BASE}, user_id, created_at` },
   { table: "expenses", owner: "user_id", bucket: "receipts", cols: `${EXPENSE_COLS}, user_id, trip_id, created_at` },
@@ -13,7 +14,9 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "personal_budgets", owner: "user_id", cols: BUDGET_COLS },
   { table: "savings_plans", owner: "user_id", cols: SAVINGS_PLAN_COLS },
   { table: "savings_events", owner: "user_id", cols: SAVINGS_EVENT_COLS },
-  { table: "personal_spends", owner: "user_id", bucket: "receipts", cols: PERSONAL_SPEND_COLS, base: PERSONAL_SPEND_COLS_BASE },
+  { table: "personal_spends", owner: "user_id", bucket: "receipts", cols: PERSONAL_SPEND_COLS, mid: PERSONAL_SPEND_COLS_MID, base: PERSONAL_SPEND_COLS_BASE },
+  { table: "utility_prefs", owner: "user_id", cols: "user_id, remind_day", order: "user_id" },
+  { table: "subscriptions", owner: "user_id", cols: SUBSCRIPTION_COLS },
   { table: "grocery_receipts", owner: "user_id", bucket: "receipts", cols: GROCERY_RECEIPT_COLS, base: GROCERY_RECEIPT_COLS_BASE },
   { table: "price_checks", owner: "user_id", bucket: "receipts", cols: PRICE_CHECK_COLS },
   { table: "grocery_items", owner: "user_id", cols: `${GROCERY_ITEM_COLS}, receipt_id` },
@@ -46,9 +49,14 @@ export async function buildAccountZip(
   for (const [i, t] of EXPORT_TABLES.entries()) {
     onProgress({ step: `Reading ${t.table.replace(/_/g, " ")}`, done: i, total: EXPORT_TABLES.length });
     // Explicit owner filter: an admin's row-level rules may show other people's rows too
-    const { data, error } = await withColumnFallback((cols) => supabase.from(t.table).select(cols).eq(t.owner, userId).limit(100000), t.cols, t.base ?? t.cols);
-    if (error) { counts[t.table] = 0; continue; } // a table this install does not have
-    const rows = (data ?? []) as unknown as Record<string, unknown>[];
+    // Page through every row (the server returns at most 1000 at a time), in a fixed order so none is skipped or repeated
+    let rows: Record<string, unknown>[];
+    try {
+      rows = (await fetchAll<Record<string, unknown>>((from, to) => {
+        const run = (cols: string) => supabase.from(t.table).select(cols).eq(t.owner, userId).order(t.order ?? "id").range(from, to);
+        return (t.mid ? withColumnFallback3(run, t.cols, t.mid, t.base ?? t.cols) : withColumnFallback(run, t.cols, t.base ?? t.cols)) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+      }, 1000, 200000));
+    } catch { counts[t.table] = 0; continue; } // a table this install does not have
     counts[t.table] = rows.length;
     zip.file(`data/${t.table}.json`, JSON.stringify(rows, null, 2));
     if (t.bucket) for (const path of filePathsOf(rows, userId)) jobs.push({ bucket: t.bucket, path });

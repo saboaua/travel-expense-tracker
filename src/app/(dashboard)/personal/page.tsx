@@ -16,10 +16,10 @@ import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { BudgetCard } from "@/components/personal/BudgetCard";
 import { fetchSavings } from "@/lib/personal/savings-data";
-import { savedSoFar } from "@/lib/personal/savings";
+import { savingsSummary } from "@/lib/personal/savings";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; savings: { saved: number; monthly: number; currency: string; plans: number } | null };
+type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -63,13 +63,12 @@ export default function PersonalHubPage() {
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
-        supabase.from("personal_spends").select("amount, currency").gte("expense_date", monthStart).limit(2000),
+        supabase.from("personal_spends").select("amount, currency, amount_usd").gte("expense_date", monthStart).limit(2000),
         fetchLinkedSpends(supabase),
         supabase.from("utility_bills").select("amount_usd").eq("bill_month", monthStart).limit(200),
         fetchSavings(supabase),
       ]);
-      const today = todayISO();
-      const savings = sv.failed || sv.plans.length === 0 ? null : { plans: sv.plans.length, currency: sv.plans[0].currency, saved: Math.round(sv.plans.filter((x) => x.currency === sv.plans[0].currency).reduce((t, x) => t + savedSoFar(x, sv.events, today), 0) * 100) / 100, monthly: sv.plans.filter((x) => x.currency === sv.plans[0].currency && !x.paused_on && (!x.end_date || x.end_date >= today)).reduce((t, x) => t + x.amount, 0) };
+      const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO());
       setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(q.data), utilities: u.error ? null : { total: (u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0), count: (u.data ?? []).length }, savings });
     })();
   }, []);

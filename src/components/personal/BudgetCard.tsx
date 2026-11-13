@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Coins, Home, PiggyBank, Settings, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, type BudgetView, type SpentArea } from "@/lib/personal/budget";
+import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, type BudgetView, type SpentArea } from "@/lib/personal/budget";
 import { fetchBudgets, fetchMonthInputs } from "@/lib/personal/budget-data";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
@@ -77,7 +77,7 @@ export function BudgetCard() {
       const setting = pickBudget(rows, month);
       if (!setting) return setNone(true);
       const inputs = await fetchMonthInputs(supabase, month);
-      if (alive) setView(budgetView(setting, spentByArea(inputs, setting.currency), today));
+      if (alive) setView(budgetView(setting, spentByArea(inputs, setting.currency), today, uncountedEntries(inputs, setting.currency)));
     })().catch(() => { if (alive) setHidden(true); });
     return () => { alive = false; };
   }, []);
@@ -112,6 +112,7 @@ export function BudgetCard() {
       </p>
       {BUDGET_AREAS.map((a) => <AreaRow key={a.key} k={a.key} v={view} />)}
       {view.byArea.savings > 0 && <AreaRow k="savings" v={view} />}
+      {view.uncounted > 0 && <p className="mb-1 text-xs text-muted-foreground" data-testid="budget-uncounted">{view.uncounted} {view.uncounted === 1 ? "entry is" : "entries are"} in another currency and not counted here.</p>}
       <Link href="/personal/budget" className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary" data-testid="budget-set-link"><Settings className="h-4 w-4" aria-hidden="true" /> Set or change budget</Link>
     </Card>
   );

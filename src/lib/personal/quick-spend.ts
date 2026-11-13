@@ -1,3 +1,5 @@
+import { convert, type BudgetCurrency } from "@/lib/personal/money";
+
 /** Quick spend: purchases with no receipt. Personal only; a business expense still needs a receipt or invoice. */
 
 export const QUICK_CATEGORIES = ["Coffee & snacks", "Street food", "Transport", "Personal care", "House", "Other"] as const;
@@ -8,16 +10,21 @@ export type SpendRow = { id: string; merchant: string | null; amount: number | s
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-/** This month's quick spends in the most-used currency (null when there are none). */
-export function summarizeSpends(rows: { amount: number | string; currency: string }[] | null | undefined): { total: number; currency: string; count: number } | null {
+/**
+ * This month's quick spends as one total (null when there are none). The total is in AWG or USD, whichever you use
+ * more, and spends in the other one are converted at the peg, so the figure and the count describe the same spends.
+ * `skipped` counts any that could not be converted (another currency without a USD amount).
+ */
+export function summarizeSpends(rows: { amount: number | string; currency: string; amount_usd?: number | string | null }[] | null | undefined): { total: number; currency: string; count: number; skipped: number } | null {
   if (!rows?.length) return null;
-  const by = new Map<string, { total: number; count: number }>();
+  const awg = rows.filter((r) => r.currency === "AWG").length, usd = rows.filter((r) => r.currency === "USD").length;
+  const currency: BudgetCurrency = usd > awg ? "USD" : "AWG";
+  let total = 0, skipped = 0;
   for (const r of rows) {
-    const cur = by.get(r.currency) || { total: 0, count: 0 };
-    by.set(r.currency, { total: cur.total + num(r.amount), count: cur.count + 1 });
+    const v = convert(num(r.amount), r.currency, currency, r.amount_usd == null ? null : num(r.amount_usd));
+    if (v == null) skipped++; else total += v;
   }
-  const [currency, v] = [...by.entries()].sort((a, b) => b[1].count - a[1].count)[0];
-  return { currency, total: r2(v.total), count: v.count };
+  return { total: r2(total), currency, count: rows.length, skipped };
 }
 
 /** The names you use most, newest-first on ties, with the category and currency you used last, for one-tap chips. */

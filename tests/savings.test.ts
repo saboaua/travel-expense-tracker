@@ -1,4 +1,4 @@
-import { depositDate, deposits, monthlyTotals, monthSavings, plannedDeposits, progressPct, remaining, ruleText, savedSoFar, type SavingsEvent, type SavingsPlan } from "../src/lib/personal/savings";
+import { depositDate, deposits, isPaused, monthlyTotals, pausedToday, readPauses, resumedToday, savingsSummary, monthSavings, plannedDeposits, progressPct, remaining, ruleText, savedSoFar, type SavingsEvent, type SavingsPlan } from "../src/lib/personal/savings";
 
 let failed = 0;
 const eq = (got: unknown, want: unknown, msg: string) => {
@@ -7,7 +7,7 @@ const eq = (got: unknown, want: unknown, msg: string) => {
   if (!ok) failed++;
 };
 const today = "2026-11-12";
-const plan: SavingsPlan = { id: "p1", name: "Emergency fund", amount: 200, currency: "AWG", start_date: "2026-10-01", end_date: "2027-12-01", opening_balance: 3100, goal: 10000, paused_on: null };
+const plan: SavingsPlan = { id: "p1", name: "Emergency fund", amount: 200, currency: "AWG", start_date: "2026-10-01", end_date: "2027-12-01", opening_balance: 3100, goal: 10000, pauses: [] };
 const none: SavingsEvent[] = [];
 
 eq([depositDate({ ...plan, start_date: "2026-01-31" }, "2027-02-01"), depositDate({ ...plan, start_date: "2026-01-31" }, "2028-02-01"), depositDate(plan, "2026-12-01")], ["2027-02-28", "2028-02-29", "2026-12-01"], "a deposit on the 31st falls on the last day of a short month");
@@ -30,9 +30,16 @@ eq([savedSoFar(open, none, today), remaining(open, none, today), deposits(open, 
 eq(monthSavings([open], none, "2026-11-01"), [{ amount: 100, currency: "AWG" }], "this month's deposit counts in the budget even before its day");
 eq(monthSavings([open], none, "2025-12-01"), [], "months before the plan started add nothing");
 
-const paused: SavingsPlan = { ...plan, paused_on: "2026-11-01" };
+const paused: SavingsPlan = { ...plan, pauses: [{ from: "2026-11-01", to: null }] };
 eq([savedSoFar(paused, none, today), monthSavings([paused], none, "2026-11-01"), remaining(paused, none, today)?.count], [3300, [], 0], "a paused plan stops depositing from the pause date");
 
+// resuming does not back-fill the months it was paused
+const stopped: SavingsPlan = { ...open, id: "p3", start_date: "2026-01-15", pauses: [{ from: "2026-04-10", to: "2026-07-10" }] };
+eq([savedSoFar(stopped, none, today), monthSavings([stopped], none, "2026-05-01"), monthSavings([stopped], none, "2026-07-01")], [700, [], [{ amount: 100, currency: "AWG" }]], "months paused and then resumed stay empty: Apr 15 to Jul 9 deposits are missing, Jul 15 on come back");
+eq([isPaused(paused), isPaused(stopped)], [true, false], "paused means an open pause");
+eq([pausedToday(stopped, today).length, resumedToday(paused, "2026-11-12")[0].to, pausedToday(paused, today).length], [2, "2026-11-12", 1], "pausing adds a period, resuming closes the open one");
+eq(readPauses(null, "2026-03-01"), [{ from: "2026-03-01", to: null }], "a plan paused before periods existed keeps its pause");
+eq(savingsSummary([plan, { ...paused, id: "p9", currency: "USD", amount: 100, opening_balance: 50 }], none, today), { currency: "AWG", saved: 3768.5, monthly: 200, plans: 2 }, "one summary for the hub and the page: other currencies converted (50 + one 100 deposit in USD), a paused plan adds no monthly amount");
 eq(monthlyTotals([plan], none, today, "AWG").map((m) => m.total), [3100, 3100, 3100, 3100, 3300, 3500], "the chart: the total at the end of each month");
 eq(monthlyTotals([plan], none, today, "USD", 1)[0].total, Math.round((3500 / 1.79) * 100) / 100, "the chart converts to the chosen currency");
 

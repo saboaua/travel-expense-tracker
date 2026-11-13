@@ -1,11 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS } from "@/lib/columns";
+import { SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS, SAVINGS_PLAN_COLS_BASE, withColumnFallback } from "@/lib/columns";
 import { readEvent, readPlan, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
 
 /** Your savings plans and their skipped months and extra deposits. `missing` is true when the migration has not been run yet. */
 export async function fetchSavings(supabase: SupabaseClient): Promise<{ plans: SavingsPlan[]; events: SavingsEvent[]; missing: boolean; failed: boolean }> {
   const [p, e] = await Promise.all([
-    supabase.from("savings_plans").select(SAVINGS_PLAN_COLS).order("created_at", { ascending: true }).limit(100),
+    withColumnFallback((cols) => supabase.from("savings_plans").select(cols).order("created_at", { ascending: true }).limit(100), SAVINGS_PLAN_COLS, SAVINGS_PLAN_COLS_BASE),
     supabase.from("savings_events").select(SAVINGS_EVENT_COLS).limit(2000),
   ]);
   const err = p.error ?? e.error;

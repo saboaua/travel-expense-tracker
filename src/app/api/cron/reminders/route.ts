@@ -31,6 +31,9 @@ export async function GET(req: Request) {
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
   const today = todayISO();
   try {
+    // These two run on their own: they run first and on their own: a failure in the older reminders below must not lose them, and a failure here must not lose those
+    const utilities = await utilityReminders(db, today).catch((e) => { console.error("[cron] utility reminders", e instanceof Error ? e.message : e); return -1; });
+    const budgets = await budgetAlerts(db, today).catch((e) => { console.error("[cron] budget alerts", e instanceof Error ? e.message : e); return -1; });
     let people = 0;
     const subs = await db.from("subscriptions").select(`user_id, reminded_for, ${SUBSCRIPTION_COLS}`).eq("status", "active").limit(5000);
     if (subs.error && !/does not exist|schema cache/i.test(subs.error.message)) throw new Error(subs.error.message);
@@ -65,8 +68,6 @@ export async function GET(req: Request) {
     const flights = await flightsTomorrow(db, today);
     const ended = await tripsEnded(db, today);
     const documents = await documentsExpiring(db, today);
-    const utilities = await utilityReminders(db, today);
-    const budgets = await budgetAlerts(db, today);
     // Reminder keys older than half a year are not needed any more
     await db.from("push_sent_log").delete().lt("sent_at", new Date(Date.now() - 180 * 86400_000).toISOString());
     return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, documents, utilities, budgets, held });

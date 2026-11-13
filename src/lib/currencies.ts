@@ -35,6 +35,9 @@ const FIXED_USD: Record<string, number> = Object.fromEntries(
   CURRENCIES.filter((c) => c.usd_rate).map((c) => [c.code, c.usd_rate as number])
 );
 
+/** The rate that is built in (USD and the pegged currencies), usable with no connection. */
+export const fixedRate = (code: string): number | null => (code.toUpperCase() === "USD" ? 1 : FIXED_USD[code.toUpperCase()] ?? null);
+
 export function toUsd(amount: number, rate: number) {
   return Math.round(amount * rate * 100) / 100;
 }

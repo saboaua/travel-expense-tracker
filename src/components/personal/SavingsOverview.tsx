@@ -6,8 +6,8 @@ import { ArrowLeft, PiggyBank, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { fetchSavings } from "@/lib/personal/savings-data";
-import { convert, type BudgetCurrency } from "@/lib/personal/budget";
-import { deposits, monthlyTotals, progressPct, remaining, ruleText, savedSoFar, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
+import type { BudgetCurrency } from "@/lib/personal/budget";
+import { deposits, isPaused, monthlyTotals, progressPct, remaining, ruleText, savedSoFar, savingsSummary, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 
 const TEAL = "#0d9488";
@@ -22,7 +22,7 @@ export function PlanCard({ plan, events, today }: { plan: SavingsPlan; events: S
     <Link href={`/personal/savings/plan?id=${plan.id}`} className="block rounded-2xl border bg-card p-4 transition-shadow hover:shadow-md" data-testid="savings-plan">
       <div className="flex items-center gap-2.5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "#ccfbf1", color: TEAL }}><PiggyBank className="h-5 w-5" aria-hidden="true" /></span>
-        <span className="min-w-0 flex-1"><b className="block truncate text-base">{plan.name}</b><span className="block text-[13px] text-muted-foreground">{plan.paused_on ? "Paused" : ruleText(plan)}</span></span>
+        <span className="min-w-0 flex-1"><b className="block truncate text-base">{plan.name}</b><span className="block text-[13px] text-muted-foreground">{isPaused(plan) ? "Paused" : ruleText(plan)}</span></span>
         <span className="text-right"><b className="block text-base tabular-nums">{formatCurrency(plan.amount, plan.currency)}</b><span className="text-xs text-muted-foreground">a month</span></span>
       </div>
       {pct != null ? (
@@ -31,7 +31,7 @@ export function PlanCard({ plan, events, today }: { plan: SavingsPlan; events: S
           <div className="mt-1 flex text-xs text-muted-foreground"><span className="flex-1">{formatCurrency(saved, plan.currency)} of {formatCurrency(plan.goal ?? 0, plan.currency)}</span><span>{pct}%</span></div>
         </div>
       ) : <p className="mt-2 text-[13px] text-muted-foreground">{formatCurrency(saved, plan.currency)} saved so far</p>}
-      <p className="mt-2 text-xs text-muted-foreground">{next ? `Next deposit ${formatDate(next.date)}` : plan.paused_on ? "No deposits while paused" : "No more deposits"}{left && left.count > 0 ? ` · ${left.count} deposits to go` : ""}</p>
+      <p className="mt-2 text-xs text-muted-foreground">{next ? `Next deposit ${formatDate(next.date)}` : isPaused(plan) ? "No deposits while paused" : "No more deposits"}{left && left.count > 0 ? ` · ${left.count} deposits to go` : ""}</p>
     </Link>
   );
 }
@@ -55,10 +55,9 @@ export function SavingsOverview() {
 
   const view = useMemo(() => {
     if (!data) return null;
-    const currency: BudgetCurrency = data.plans[0]?.currency ?? "AWG";
-    const total = data.plans.reduce((t, p) => t + (convert(savedSoFar(p, data.events, today), p.currency, currency) ?? 0), 0);
-    const monthly = data.plans.filter((p) => !p.paused_on && (!p.end_date || p.end_date >= today)).reduce((t, p) => t + (convert(p.amount, p.currency, currency) ?? 0), 0);
-    return { currency, total: Math.round(total * 100) / 100, monthly: Math.round(monthly * 100) / 100, chart: monthlyTotals(data.plans, data.events, today, currency) };
+    const sum = savingsSummary(data.plans, data.events, today);
+    const currency: BudgetCurrency = sum?.currency ?? "AWG";
+    return { currency, total: sum?.saved ?? 0, monthly: sum?.monthly ?? 0, chart: monthlyTotals(data.plans, data.events, today, currency) };
   }, [data, today]);
 
   const max = Math.max(...(view?.chart.map((c) => c.total) ?? [0]), 1);

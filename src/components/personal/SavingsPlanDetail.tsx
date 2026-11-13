@@ -7,8 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { parseBudgetInput } from "@/lib/personal/budget";
-import { deposits, progressPct, remaining, ruleText, savedSoFar, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
+import { deposits, isPaused, pausedToday, progressPct, remaining, resumedToday, ruleText, savedSoFar, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
 import { fetchSavings } from "@/lib/personal/savings-data";
+import { isMissingColumn } from "@/lib/columns";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { monthLabel } from "@/lib/personal/utilities";
 
@@ -44,15 +45,16 @@ export function SavingsPlanDetail() {
     if (q) load(q); else setPlan(null);
   }, [load]);
 
-  const run = async (fn: (db: ReturnType<typeof createClient>, userId: string) => PromiseLike<{ error: { message: string } | null }>) => {
-    if (!id) return;
+  const run = async (fn: (db: ReturnType<typeof createClient>, userId: string) => PromiseLike<{ error: { message: string } | null }>): Promise<boolean> => {
+    if (!id) return false;
     setBusy(true); setError(null);
     const db = createClient();
     const { data: { session } } = await db.auth.getSession();
     const res = session ? await fn(db, session.user.id) : { error: { message: "Sign in again." } };
     setBusy(false);
-    if (res.error) return setError("Could not save that. Check your connection.");
+    if (res.error) { setError("Could not save that. Check your connection."); return false; }
     await load(id);
+    return true;
   };
 
   if (plan === undefined) return <div className="mx-auto max-w-lg p-4 md:p-8"><p className="text-sm text-muted-foreground">&nbsp;</p></div>;
@@ -77,7 +79,7 @@ export function SavingsPlanDetail() {
       <Link href="/personal/savings" className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Savings</Link>
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={{ background: "#ccfbf1", color: TEAL }}><PiggyBank className="h-[22px] w-[22px]" aria-hidden="true" /></span>
-        <div className="min-w-0 flex-1"><h1 className="truncate text-2xl font-bold leading-tight" data-testid="plan-name">{plan.name}</h1><p className="text-[13px] text-muted-foreground">{formatCurrency(plan.amount, plan.currency)} {ruleText(plan).replace("Every month, no end date", "every month, no end date").replace("Every month", "every month")}{plan.paused_on ? " · paused" : ""}</p></div>
+        <div className="min-w-0 flex-1"><h1 className="truncate text-2xl font-bold leading-tight" data-testid="plan-name">{plan.name}</h1><p className="text-[13px] text-muted-foreground">{formatCurrency(plan.amount, plan.currency)} {ruleText(plan).replace("Every month, no end date", "every month, no end date").replace("Every month", "every month")}{isPaused(plan) ? " · paused" : ""}</p></div>
         <Link href={`/personal/savings/add?id=${plan.id}`} aria-label="Change plan" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><Pencil className="h-5 w-5" aria-hidden="true" /></Link>
       </div>
       {error && <Alert className="mt-3">{error}</Alert>}
@@ -94,7 +96,7 @@ export function SavingsPlanDetail() {
       <div className="mt-3 flex gap-2">
         <button type="button" className={action} onClick={() => setExtraOpen(!extraOpen)} data-testid="plan-extra"><Plus className="h-[18px] w-[18px]" aria-hidden="true" />Extra deposit</button>
         <button type="button" className={action} disabled={busy || !next} onClick={() => next && run((db, uid) => db.from("savings_events").insert({ user_id: uid, plan_id: plan.id, kind: "skip", month: next.month }))} data-testid="plan-skip"><SkipForward className="h-[18px] w-[18px]" aria-hidden="true" />Skip a month</button>
-        <button type="button" className={action} disabled={busy} onClick={() => run((db) => db.from("savings_plans").update({ paused_on: plan.paused_on ? null : today }).eq("id", plan.id))} data-testid="plan-pause">{plan.paused_on ? <Play className="h-[18px] w-[18px]" aria-hidden="true" /> : <Pause className="h-[18px] w-[18px]" aria-hidden="true" />}{plan.paused_on ? "Resume plan" : "Pause plan"}</button>
+        <button type="button" className={action} disabled={busy} onClick={() => run(async (db) => { const paused = isPaused(plan); const body = { pauses: paused ? resumedToday(plan, today) : pausedToday(plan, today), paused_on: paused ? null : today }; const r = await db.from("savings_plans").update(body).eq("id", plan.id); return isMissingColumn(r.error) ? db.from("savings_plans").update({ paused_on: body.paused_on }).eq("id", plan.id) : r; })} data-testid="plan-pause">{isPaused(plan) ? <Play className="h-[18px] w-[18px]" aria-hidden="true" /> : <Pause className="h-[18px] w-[18px]" aria-hidden="true" />}{isPaused(plan) ? "Resume plan" : "Pause plan"}</button>
       </div>
 
       {extraOpen && (
@@ -102,7 +104,7 @@ export function SavingsPlanDetail() {
           e.preventDefault();
           const v = parseBudgetInput(extra);
           if (v == null) return setError("Type the amount of the extra deposit.");
-          run((db, uid) => db.from("savings_events").insert({ user_id: uid, plan_id: plan.id, kind: "extra", month: `${today.slice(0, 7)}-01`, amount: v })).then(() => { setExtra(""); setExtraOpen(false); });
+          run((db, uid) => db.from("savings_events").insert({ user_id: uid, plan_id: plan.id, kind: "extra", month: `${today.slice(0, 7)}-01`, amount: v })).then((ok) => { if (ok) { setExtra(""); setExtraOpen(false); } });
         }}>
           <label htmlFor="plan-extra-amount" className="sr-only">Extra deposit amount</label>
           <input id="plan-extra-amount" inputMode="decimal" autoComplete="off" value={extra} onChange={(e) => setExtra(e.target.value)} placeholder={`Amount in ${plan.currency}`} className="h-12 min-w-0 flex-1 rounded-xl border bg-background px-3 text-base tabular-nums" />
@@ -114,13 +116,13 @@ export function SavingsPlanDetail() {
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="plan-deposits">
         {list.map((d, i) => {
           const b = BADGE[d.status];
-          const skipEvent = d.status === "skipped" ? events.find((e) => e.kind === "skip" && e.month === d.month) : null;
+          const skipEvent = d.status === "skipped" ? events.find((e) => e.kind === "skip" && e.month === d.month) : d.status === "extra" ? events.find((e) => e.kind === "extra" && e.month === d.month && Number(e.amount) === d.amount) : null;
           return (
             <div key={`${d.status}-${d.date}-${i}`} className="flex min-h-14 items-center gap-2.5 border-t py-2 first:border-t-0" data-testid="plan-deposit" data-status={d.status}>
               <span className="min-w-0 flex-1"><b className="block text-[15px]">{monthLabel(d.month)}</b><span className="block text-[13px] text-muted-foreground">{d.status === "extra" ? "One-off deposit" : formatDate(d.date)}</span></span>
               <span className="text-right"><b className="block text-[15px] tabular-nums">{d.status === "skipped" ? "—" : formatCurrency(d.amount, plan.currency)}</b>
                 <span className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${b.cls}`}>{d.status === "counted" && <Check className="h-3 w-3" aria-hidden="true" />}{b.text}</span></span>
-              {skipEvent?.id && <button type="button" disabled={busy} onClick={() => run((db) => db.from("savings_events").delete().eq("id", skipEvent.id!))} className="min-h-11 px-1 text-xs font-semibold text-primary" data-testid="plan-unskip">Undo</button>}
+              {skipEvent?.id && <button type="button" disabled={busy} onClick={() => run((db) => db.from("savings_events").delete().eq("id", skipEvent.id!))} className="min-h-11 px-1 text-xs font-semibold text-primary" data-testid="plan-unskip">{d.status === "extra" ? "Remove" : "Undo"}</button>}
             </div>
           );
         })}
@@ -135,7 +137,7 @@ export function SavingsPlanDetail() {
         {confirmDelete ? (
           <div className="flex items-center gap-2 rounded-2xl border border-red-200 p-3"><span className="flex-1 text-sm">Delete this plan and its history?</span>
             <Button variant="outline" onClick={() => setConfirmDelete(false)} className="h-11">Keep</Button>
-            <Button onClick={() => run((db) => db.from("savings_plans").delete().eq("id", plan.id)).then(() => { window.location.href = "/personal/savings"; })} className="h-11 bg-red-600 hover:bg-red-700" data-testid="plan-delete-yes">Delete</Button></div>
+            <Button onClick={() => run((db) => db.from("savings_plans").delete().eq("id", plan.id)).then((ok) => { if (ok) window.location.href = "/personal/savings"; })} className="h-11 bg-red-600 hover:bg-red-700" data-testid="plan-delete-yes">Delete</Button></div>
         ) : <button type="button" onClick={() => setConfirmDelete(true)} className="inline-flex min-h-11 w-full items-center justify-center text-sm font-semibold text-red-600 hover:text-red-700" data-testid="plan-delete">Delete this plan</button>}
       </div>
     </div>

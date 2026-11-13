@@ -77,17 +77,20 @@ export async function documentsExpiring(db: SupabaseClient, today: string): Prom
 /** On the day of the month each person chose: lists the utilities they usually pay that have no bill yet this month. Once per person per month. */
 export async function utilityReminders(db: SupabaseClient, today: string): Promise<number> {
   const day = Number(today.slice(8, 10));
-  const prefs = await db.from("utility_prefs").select("user_id").eq("remind_day", day).limit(5000);
+  // the chosen day, and the day before it, so one failed run does not lose the month's reminder (claimOnce stops a second one)
+  const prefs = await db.from("utility_prefs").select("user_id").in("remind_day", day > 1 ? [day, day - 1] : [day]).limit(5000);
   if (prefs.error) { if (missing(prefs.error.message)) return 0; throw new Error(prefs.error.message); }
   const month = monthStart(today);
   let n = 0;
   for (const p of (prefs.data ?? []) as { user_id: string }[]) {
-    const bills = await db.from("utility_bills").select("kind, bill_month").eq("user_id", p.user_id).limit(2000);
-    if (bills.error) { if (missing(bills.error.message)) return n; throw new Error(bills.error.message); }
-    const kinds = missingKinds((bills.data ?? []) as { kind: string; bill_month: string }[], month);
-    if (!kinds.length) continue;
-    if (!(await claimOnce(p.user_id, `utility:${month}`))) continue;
-    n += await sendPush(p.user_id, "utility", "reminders", { item: kinds.map(utilityLabel).join(", ") }, { today });
+    try {
+      const bills = await db.from("utility_bills").select("kind, bill_month").eq("user_id", p.user_id).order("bill_month", { ascending: false }).limit(2000);
+      if (bills.error) { if (missing(bills.error.message)) return n; throw new Error(bills.error.message); }
+      const kinds = missingKinds((bills.data ?? []) as { kind: string; bill_month: string }[], month);
+      if (!kinds.length) continue;
+      if (!(await claimOnce(p.user_id, `utility:${month}`))) continue;
+      n += await sendPush(p.user_id, "utility", "reminders", { item: kinds.map(utilityLabel).join(", ") }, { today });
+    } catch (e) { console.error("[cron] utility reminder for one person failed", e instanceof Error ? e.message : e); } // the others still get theirs
   }
   return n;
 }
@@ -95,19 +98,27 @@ export async function utilityReminders(db: SupabaseClient, today: string): Promi
 /** Once a month at 80% of the budget, and once more if it goes over, for people who turned the alert on. The words never carry an amount. */
 export async function budgetAlerts(db: SupabaseClient, today: string): Promise<number> {
   const month = monthStart(today);
-  const res = await db.from("personal_budgets").select("user_id, month, amount, currency, limits, alert_at_80").eq("alert_at_80", true).limit(5000);
-  if (res.error) { if (missing(res.error.message)) return 0; throw new Error(res.error.message); }
+  // Everyone with an alert on somewhere, then ALL of their budgets: the one that counts this month may be a month-only budget with the alert off
+  const alerted = await db.from("personal_budgets").select("user_id").eq("alert_at_80", true).limit(5000);
+  if (alerted.error) { if (missing(alerted.error.message)) return 0; throw new Error(alerted.error.message); }
+  const ids = [...new Set(((alerted.data ?? []) as { user_id: string }[]).map((r) => r.user_id))];
   const byUser = new Map<string, ReturnType<typeof readBudget>[]>();
-  for (const r of (res.data ?? []) as (Parameters<typeof readBudget>[0] & { user_id: string })[]) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), readBudget(r)]);
+  for (let i = 0; i < ids.length; i += 200) {
+    const res = await db.from("personal_budgets").select("user_id, month, amount, currency, limits, alert_at_80").in("user_id", ids.slice(i, i + 200)).limit(5000);
+    if (res.error) throw new Error(res.error.message);
+    for (const r of (res.data ?? []) as (Parameters<typeof readBudget>[0] & { user_id: string })[]) byUser.set(r.user_id, [...(byUser.get(r.user_id) ?? []), readBudget(r)]);
+  }
   let n = 0;
   for (const [userId, rows] of byUser) {
-    const setting = pickBudget(rows, month);
-    if (!setting) continue;
-    const view = budgetView(setting, spentByArea(await fetchMonthInputs(db, month, userId), setting.currency), today);
-    const state = budgetState(view.spent, view.budget);
-    if (state === "ok") continue;
-    if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;
-    n += await sendPush(userId, "budget", "reminders", { item: state }, { today });
+    try {
+      const setting = pickBudget(rows, month);
+      if (!setting || !setting.alert_at_80) continue;
+      const view = budgetView(setting, spentByArea(await fetchMonthInputs(db, month, userId), setting.currency), today);
+      const state = budgetState(view.spent, view.budget);
+      if (state === "ok") continue;
+      if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;
+      n += await sendPush(userId, "budget", "reminders", { item: state }, { today });
+    } catch (e) { console.error("[cron] budget alert for one person failed", e instanceof Error ? e.message : e); }
   }
   return n;
 }

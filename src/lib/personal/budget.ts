@@ -4,7 +4,7 @@
  * One budget applies to every month; a budget saved for a single month wins over it for that month. What you spent is
  * added up from groceries, utilities, quick spends and house costs, in the budget's currency (AWG or USD, pegged at 1.79).
  */
-import { AWG_PER_USD } from "@/lib/personal/dashboard";
+import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { HOUSE_CATEGORY } from "@/lib/personal/quick-spend";
 
 export const BUDGET_AREAS = [
@@ -16,7 +16,8 @@ export const BUDGET_AREAS = [
 export type BudgetArea = (typeof BUDGET_AREAS)[number]["key"];
 /** Savings is counted in the budget too, but it has no limit of its own: the plan itself is the limit. */
 export type SpentArea = BudgetArea | "savings";
-export type BudgetCurrency = "AWG" | "USD";
+export type { BudgetCurrency };
+export { convert, round2 };
 export type Limits = Partial<Record<BudgetArea, number>>;
 
 export type BudgetSetting = { id?: string; month: string | null; amount: number; currency: BudgetCurrency; limits: Limits; alert_at_80: boolean };
@@ -24,20 +25,6 @@ export type BudgetState = "ok" | "near" | "over";
 
 /** Near is 80% of the budget or more. */
 export const NEAR_AT = 0.8;
-
-export const round2 = (n: number) => Math.round(n * 100) / 100;
-
-/** Between AWG and USD only; any other currency has to come with its USD amount. */
-export function convert(amount: number, from: string, to: BudgetCurrency, usd?: number | null): number | null {
-  if (!Number.isFinite(amount)) return null;
-  if (from === to) return amount;
-  let inUsd: number | null = null;
-  if (from === "USD") inUsd = amount;
-  else if (from === "AWG") inUsd = amount / AWG_PER_USD;
-  else if (usd != null && Number.isFinite(usd)) inUsd = usd;
-  if (inUsd == null) return null;
-  return to === "USD" ? inUsd : inUsd * AWG_PER_USD;
-}
 
 /** The budget that counts for a month (YYYY-MM-01): its own one, else the "every month" one, else none. */
 export function pickBudget(rows: BudgetSetting[] | null | undefined, month: string): BudgetSetting | null {
@@ -85,6 +72,14 @@ export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): Record<
   return out;
 }
 
+/** How many entries could not be converted to the budget's currency (a receipt in euros, say) and so are left out. */
+export function uncountedEntries(inp: MonthInputs, currency: BudgetCurrency): number {
+  let n = 0;
+  for (const g of inp.groceries) if (convert(Number(g.total), g.currency, currency) == null) n++;
+  for (const s of inp.spends) if (convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)) == null) n++;
+  return n;
+}
+
 export function budgetState(spent: number, budget: number): BudgetState {
   if (budget <= 0) return "ok";
   if (spent > budget) return "over";
@@ -100,6 +95,8 @@ export type BudgetView = {
   perDay: number | null;
   /** how far through the month we are, 0..1 */
   pace: number;
+  /** entries left out because their currency could not be converted */
+  uncounted: number;
 };
 
 export function daysInMonthOf(today: string): number {
@@ -107,7 +104,7 @@ export function daysInMonthOf(today: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-export function budgetView(setting: BudgetSetting, byArea: Record<SpentArea, number>, today: string): BudgetView {
+export function budgetView(setting: BudgetSetting, byArea: Record<SpentArea, number>, today: string, uncounted = 0): BudgetView {
   const spent = round2(BUDGET_AREAS.reduce((t, a) => t + byArea[a.key], 0) + (byArea.savings ?? 0));
   const dim = daysInMonthOf(today), day = Number(today.slice(8, 10));
   const daysLeft = dim - day + 1;
@@ -117,6 +114,7 @@ export function budgetView(setting: BudgetSetting, byArea: Record<SpentArea, num
     state: budgetState(spent, setting.amount), byArea, limits: setting.limits, daysLeft, daysInMonth: dim,
     perDay: left > 0 && daysLeft > 0 ? Math.round(left / daysLeft) : null,
     pace: Math.min(1, Math.max(0, (day - 1) / dim)),
+    uncounted,
   };
 }
 

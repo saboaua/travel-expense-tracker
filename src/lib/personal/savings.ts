@@ -19,9 +19,10 @@ export type SavingsPlan = {
   /** saved before the plan started */
   opening_balance: number;
   goal: number | null;
-  /** deposits stop from this date on */
-  paused_on: string | null;
+  /** Periods with no deposits: from the day it was paused up to (not including) the day it was resumed; `to` is null while still paused. */
+  pauses: Pause[];
 };
+export type Pause = { from: string; to: string | null };
 export type SavingsEvent = { id?: string; plan_id: string; kind: "skip" | "extra"; month: string; amount: number | null };
 export type DepositStatus = "counted" | "coming" | "skipped" | "extra";
 export type Deposit = { month: string; date: string; amount: number; status: DepositStatus };
@@ -29,13 +30,26 @@ export type Deposit = { month: string; date: string; amount: number; status: Dep
 const monthOf = (date: string) => `${date.slice(0, 7)}-01`;
 const dimOf = (month: string) => new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 0)).getUTCDate();
 
-export function readPlan(r: { id: string; name: string; amount: number | string; currency: string; start_date: string; end_date?: string | null; opening_balance?: number | string | null; goal?: number | string | null; paused_on?: string | null }): SavingsPlan {
+export function readPlan(r: { id: string; name: string; amount: number | string; currency: string; start_date: string; end_date?: string | null; opening_balance?: number | string | null; goal?: number | string | null; paused_on?: string | null; pauses?: unknown }): SavingsPlan {
   return {
     id: r.id, name: r.name, amount: Number(r.amount), currency: r.currency === "USD" ? "USD" : "AWG",
     start_date: r.start_date, end_date: r.end_date ?? null, opening_balance: Number(r.opening_balance) || 0,
-    goal: r.goal != null && Number(r.goal) > 0 ? Number(r.goal) : null, paused_on: r.paused_on ?? null,
+    goal: r.goal != null && Number(r.goal) > 0 ? Number(r.goal) : null, pauses: readPauses(r.pauses, r.paused_on),
   };
 }
+/** Pause periods from the saved list; a plan paused before periods existed has only the old single pause date. */
+export function readPauses(raw: unknown, pausedOn?: string | null): Pause[] {
+  const out: Pause[] = [];
+  if (Array.isArray(raw)) for (const p of raw as { from?: unknown; to?: unknown }[]) if (p && typeof p.from === "string") out.push({ from: p.from, to: typeof p.to === "string" ? p.to : null });
+  if (!out.length && pausedOn) out.push({ from: pausedOn, to: null });
+  return out;
+}
+/** Whether the plan is paused right now. */
+export const isPaused = (plan: SavingsPlan) => plan.pauses.some((p) => !p.to);
+/** The pause list after pausing today, or after resuming today (the open pause is closed, so the months in between stay empty). */
+export const pausedToday = (plan: SavingsPlan, today: string): Pause[] => (isPaused(plan) ? plan.pauses : [...plan.pauses, { from: today, to: null }]);
+export const resumedToday = (plan: SavingsPlan, today: string): Pause[] => plan.pauses.map((p) => (p.to ? p : { ...p, to: today }));
+
 export const readEvent = (r: { id?: string; plan_id: string; kind: string; month: string; amount?: number | string | null }): SavingsEvent =>
   ({ id: r.id, plan_id: r.plan_id, kind: r.kind === "skip" ? "skip" : "extra", month: r.month, amount: r.amount == null ? null : Number(r.amount) });
 
@@ -46,7 +60,7 @@ export function depositDate(plan: SavingsPlan, month: string): string {
 }
 
 /** Whether the plan still deposits on that date (not before the start, after the end, or from a pause). */
-const active = (plan: SavingsPlan, date: string) => date >= plan.start_date && (!plan.end_date || date <= plan.end_date) && (!plan.paused_on || date < plan.paused_on);
+const active = (plan: SavingsPlan, date: string) => date >= plan.start_date && (!plan.end_date || date <= plan.end_date) && !plan.pauses.some((p) => date >= p.from && (!p.to || date < p.to));
 
 /** Every month's scheduled deposit from the first one up to `lastMonth` (YYYY-MM-01), skipped ones marked. */
 function scheduled(plan: SavingsPlan, events: SavingsEvent[], lastMonth: string, today: string): Deposit[] {
@@ -129,7 +143,16 @@ export function ruleText(plan: SavingsPlan): string {
 
 /** How many deposits a plan with an end makes from its first to its last, and their total. */
 export function plannedDeposits(startDate: string, endDate: string, amount: number): { count: number; total: number } {
-  const plan: SavingsPlan = { id: "", name: "", amount, currency: "AWG", start_date: startDate, end_date: endDate, opening_balance: 0, goal: null, paused_on: null };
+  const plan: SavingsPlan = { id: "", name: "", amount, currency: "AWG", start_date: startDate, end_date: endDate, opening_balance: 0, goal: null, pauses: [] };
   const count = scheduled(plan, [], monthOf(endDate), "0000-00-00").length;
   return { count, total: round2(count * amount) };
+}
+
+/** The totals shown for all plans together, the same on the Personal tile and on the Savings page. Currency is the first plan's. */
+export function savingsSummary(plans: SavingsPlan[], events: SavingsEvent[], today: string): { currency: BudgetCurrency; saved: number; monthly: number; plans: number } | null {
+  if (!plans.length) return null;
+  const currency = plans[0].currency;
+  const saved = plans.reduce((t, p) => t + (convert(savedSoFar(p, events, today), p.currency, currency) ?? 0), 0);
+  const monthly = plans.filter((p) => !isPaused(p) && p.start_date <= today && (!p.end_date || p.end_date >= today)).reduce((t, p) => t + (convert(p.amount, p.currency, currency) ?? 0), 0);
+  return { currency, saved: round2(saved), monthly: round2(monthly), plans: plans.length };
 }

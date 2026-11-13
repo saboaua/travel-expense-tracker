@@ -16,20 +16,26 @@ function authorized(req: Request) {
   return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
 }
 
-/** Removes every file under <user id>/ in a bucket (one folder level deeper too), a page at a time. */
-async function removeFiles(db: SupabaseClient, bucket: string, userId: string) {
-  for (let round = 0; round < 50; round++) {
-    const { data, error } = await db.storage.from(bucket).list(userId, { limit: 100 });
-    if (error || !data?.length) return;
-    const files = data.filter((f) => f.id).map((f) => `${userId}/${f.name}`);
-    for (const folder of data.filter((f) => !f.id)) {
-      const { data: inner } = await db.storage.from(bucket).list(`${userId}/${folder.name}`, { limit: 100 });
-      const paths = (inner ?? []).filter((x) => x.id).map((x) => `${userId}/${folder.name}/${x.name}`);
-      if (paths.length) await db.storage.from(bucket).remove(paths);
+/** Every file path under a folder, however deep (folders have no id in a listing), a page at a time. */
+async function listFiles(db: SupabaseClient, bucket: string, folder: string, depth = 0): Promise<string[]> {
+  if (depth > 6) return [];
+  const out: string[] = [];
+  for (let offset = 0; offset < 100000; offset += 100) {
+    const { data, error } = await db.storage.from(bucket).list(folder, { limit: 100, offset });
+    if (error || !data?.length) break;
+    for (const f of data) {
+      if (f.id) out.push(`${folder}/${f.name}`);
+      else out.push(...(await listFiles(db, bucket, `${folder}/${f.name}`, depth + 1)));
     }
-    if (files.length) await db.storage.from(bucket).remove(files);
-    if (!files.length || data.length < 100) return;
+    if (data.length < 100) break;
   }
+  return out;
+}
+
+/** Removes every file under <user id>/ in a bucket, in any depth of folders (photos sit in personal/spends/, personal/utilities/ and so on). */
+async function removeFiles(db: SupabaseClient, bucket: string, userId: string) {
+  const paths = await listFiles(db, bucket, userId);
+  for (let i = 0; i < paths.length; i += 100) await db.storage.from(bucket).remove(paths.slice(i, i + 100));
 }
 
 /**
