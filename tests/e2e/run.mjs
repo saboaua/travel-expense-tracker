@@ -1082,9 +1082,12 @@ try {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
     const page = await ctx.newPage();
+    const stash = {};
     try {
       await signIn(page, "pat@example.com", "Correct-Horse-1");
       await page.waitForURL((u) => u.pathname === "/");
+      // the hub shows one currency for the month, so start from an empty month; put it all back afterwards
+      for (const t of ["grocery_receipts", "personal_spends", "utility_bills", "personal_expenses"]) { stash[t] = fake.table(t).splice(0); }
       const first = new Date(); first.setUTCDate(1); first.setUTCMonth(first.getUTCMonth() - 2);
       fake.table("personal_budgets").push({ id: "7d000000-0000-4000-8000-00000000d001", user_id: PAT, month: null, amount: 1000, currency: "AWG", limits: {}, alert_at_80: false });
       await page.goto(`${BASE}/personal/savings`);
@@ -1135,6 +1138,7 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["savings_plans", "savings_events", "personal_budgets"]) fake.table(t).splice(0);
+      for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
     }
   });
 

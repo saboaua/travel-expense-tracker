@@ -117,7 +117,7 @@ export function QuickSpend() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Sign in again to delete.");
       await deleteRow({
-        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_spends", id: r.id, paths: [],
+        api: makeRowApi(supabase), store: browserOutbox, userId: session.user.id, table: "personal_spends", id: r.id, paths: r.receipt_path ? [r.receipt_path] : [],
         waiting: (await browserOutbox.list().catch(() => [])).find((i) => i.id === r.id) ?? null, label: r.merchant || r.category, summary: "Quick spend · delete",
       });
       await load();

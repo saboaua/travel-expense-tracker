@@ -48,6 +48,9 @@ export function UtilityBillForm() {
   const [error, setError] = useState<string | null>(null);
   const [loadedEdit, setLoadedEdit] = useState(false);
   const { rate, setRate } = useUsdRate(currency);
+  // The rate a saved bill was entered with: editing it must not quietly swap in today's rate
+  const [rateTouched, setRateTouched] = useState(false);
+  const [savedRate, setSavedRate] = useState<{ currency: string; rate: number } | null>(null);
 
   // ?kind= presets the utility, ?id= opens an existing bill
   useEffect(() => {
@@ -64,6 +67,7 @@ export function UtilityBillForm() {
     setKind(b.kind); setProvider(b.provider ?? ""); setProviderTouched(true); setMonth(b.bill_month);
     setAmount(String(b.amount)); setCurrency(b.currency); setPaid(!!b.paid_on); setPaidOn(b.paid_on ?? todayISO());
     setDueDate(b.due_date ?? ""); setNotes(b.notes ?? ""); setCurrentPath(b.receipt_path ?? null);
+    if (Number(b.exchange_rate) > 0) setSavedRate({ currency: b.currency, rate: Number(b.exchange_rate) });
   }, [editId, rows, loadedEdit]);
   // The company you used last for this utility is filled in until you type your own
   useEffect(() => {
@@ -81,7 +85,7 @@ export function UtilityBillForm() {
     setError(null);
     const amt = parseAmount(amount);
     if (amt == null) return setError("Enter the amount of the bill.");
-    const rateNum = currency === "USD" ? 1 : Number(rate);
+    const rateNum = currency === "USD" ? 1 : savedRate && savedRate.currency === currency && !rateTouched ? savedRate.rate : Number(rate);
     if (!(rateNum > 0)) return setError("Enter an exchange rate to USD.");
     setSaving(true);
     try {
@@ -135,7 +139,7 @@ export function UtilityBillForm() {
 
         <div>
           <label htmlFor="ub-amount" className={label}>Amount</label>
-          <AmountField id="ub-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={setRate} />
+          <AmountField id="ub-amount" amount={amount} onAmount={setAmount} currency={currency} onCurrency={setCurrency} choices={choices} others={others} rate={rate} onRate={(v) => { setRateTouched(true); setRate(v); }} />
         </div>
 
         <div>

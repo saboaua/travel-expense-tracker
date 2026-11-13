@@ -1,5 +1,6 @@
 "use client";
 
+import { openSigned } from "@/lib/open-signed";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon, Pencil, Trash2 } from "lucide-react";
@@ -24,9 +25,8 @@ export function UtilityHistory() {
   const max = Math.max(1, ...h.bars.map((b) => b.usd));
 
   const openPhoto = async (path: string) => {
-    const { data } = await createClient().storage.from("receipts").createSignedUrl(path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-    else setError("The photo opens when you are online.");
+    const ok = await openSigned(async () => (await createClient().storage.from("receipts").createSignedUrl(path, 3600)).data?.signedUrl);
+    if (!ok) setError("The photo opens when you are online.");
   };
   const remove = async (b: ListedBill) => {
     if (!(await confirm({ title: "Delete this bill?", message: `${kindLabel(b.kind)}, ${monthLabel(b.bill_month)}, ${formatCurrency(Number(b.amount), b.currency)}`, destructive: true }))) return;

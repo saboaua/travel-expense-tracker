@@ -6,6 +6,7 @@ import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
+import { openSigned } from "@/lib/open-signed";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
 import { convert, convertedCount, dominantCurrency, round2 } from "@/lib/personal/money";
@@ -50,9 +51,8 @@ export function HouseRepairs() {
   const hasLoose = (rows ?? []).some((r) => !r.project_id && !r.house_area);
 
   const openInvoice = async (path: string) => {
-    const { data } = await createClient().storage.from("receipts").createSignedUrl(path, 3600);
-    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
-    else setError("The invoice photo opens when you are online.");
+    const ok = await openSigned(async () => (await createClient().storage.from("receipts").createSignedUrl(path, 3600)).data?.signedUrl);
+    if (!ok) setError("The invoice photo opens when you are online.");
   };
 
   return (
