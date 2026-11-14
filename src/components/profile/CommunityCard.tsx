@@ -57,7 +57,13 @@ export function CommunityCard() {
     await load();
   };
 
-  if (!available) return null;
+  if (!available) {
+    return (
+      <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary="Not set up yet" description="Help everyone find cheaper groceries.">
+        <Alert variant="info">Community prices are not set up yet. An admin needs to run supabase/migration_shared_prices.sql.</Alert>
+      </AccordionSection>
+    );
+  }
   return (
     <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
       <div className="space-y-4" data-testid="community-card">

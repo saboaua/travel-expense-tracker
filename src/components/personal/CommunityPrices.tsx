@@ -2,32 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Info, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Info, Search } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
-import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/lib/offline-grocery";
-import { useCachedQuery } from "@/lib/use-cached-query";
-import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare";
-import type { TrackerRow } from "@/lib/personal/grocery";
-import { groupCommunity, syncSharedPrices, type CommunityRow } from "@/lib/personal/community";
+import { groupCommunity, type CommunityRow } from "@/lib/personal/community";
 import { formatCurrency } from "@/lib/utils";
 
 const heading = "text-xs font-bold uppercase tracking-wide text-muted-foreground";
 const NEVER = ["Your name, email or account", "The receipt photo or total", "The date and time you shopped", "What else was in your basket", "Where you were"];
 
 export function CommunityPrices() {
-  const prices = useCachedQuery<TrackerRow[]>((uid) => pricesKey(uid), (sb) => fetchPrices(sb), []);
-  const matches = useCachedQuery<MatchDecision[]>((uid) => priceMatchesKey(uid), (sb) => fetchPriceMatches(sb), []);
-  const { products } = useMemo(() => buildProducts(prices.data ?? [], matches.data ?? []), [prices.data, matches.data]);
   const [on, setOn] = useState<boolean | null>(null);
   const [available, setAvailable] = useState(true);
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const [mine, setMine] = useState<number | null>(null);
   const [q, setQ] = useState("");
   const [rows, setRows] = useState<CommunityRow[] | null>(null);
   const [searching, setSearching] = useState(false);
@@ -39,28 +29,8 @@ export function CommunityPrices() {
     const { data, error } = await sb.from("profiles").select("share_prices").eq("id", session.user.id).single();
     if (error) { setAvailable(false); return; } // migration_shared_prices.sql has not been run
     setOn(data?.share_prices === true);
-    const c = await sb.rpc("my_shared_count");
-    setMine(c.error ? null : Number(c.data) || 0);
   }, []);
   useEffect(() => { load(); }, [load]);
-
-  const toggle = async () => {
-    if (on == null) return;
-    setBusy(true); setErr(null); setMsg(null);
-    const sb = createClient();
-    const { data: { session } } = await sb.auth.getSession();
-    if (!session) { setBusy(false); return; }
-    const next = !on;
-    const { error } = await sb.from("profiles").update({ share_prices: next }).eq("id", session.user.id);
-    if (error) { setBusy(false); return setErr("Could not save that. Please try again."); }
-    setOn(next);
-    if (next) {
-      const n = await syncSharedPrices(sb, session.user.id, products, new Date(), true);
-      setMsg(n > 0 ? `Sharing is on. ${n} price${n === 1 ? "" : "s"} from the last 60 days shared.` : "Sharing is on. New prices are shared when you save receipts.");
-    } else setMsg("Sharing is off. Nothing more will be shared.");
-    await load();
-    setBusy(false);
-  };
 
   const search = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -70,15 +40,6 @@ export function CommunityPrices() {
     setSearching(false);
     if (error) return setErr("Could not look that up right now.");
     setRows((data ?? []) as CommunityRow[]);
-  };
-
-  const withdraw = async () => {
-    setBusy(true); setErr(null);
-    const { data, error } = await createClient().rpc("unshare_my_prices");
-    setBusy(false);
-    if (error) return setErr("Could not delete them. Please try again.");
-    setMsg(`Deleted ${Number(data) || 0} shared price${Number(data) === 1 ? "" : "s"}.`);
-    await load();
   };
 
   const groups = useMemo(() => groupCommunity(rows ?? []), [rows]);
@@ -91,28 +52,20 @@ export function CommunityPrices() {
         <p className="text-sm text-muted-foreground">Share a little, see the best price</p>
       </div>
       {err && <Alert variant="error">{err}</Alert>}
-      {msg && <Alert variant="success">{msg}</Alert>}
 
       {!available ? (
         <Alert variant="info">Community prices are not set up yet. An admin needs to run supabase/migration_shared_prices.sql.</Alert>
       ) : (
         <>
-          <Card data-testid="share-card"><CardContent className="space-y-3 p-4">
-            <div className="flex gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="font-bold">Share prices, get community prices</p><p className="text-sm text-muted-foreground">When you save a receipt, Lifolio can share only <b>store, product and price</b>, so everyone can see the best price. It is off until you turn it on.</p></div></div>
-            <div className="flex items-center justify-between gap-3 border-t pt-3">
-              <label htmlFor="share-toggle" className="text-sm font-semibold">Share my receipt prices</label>
-              <button id="share-toggle" type="button" role="switch" aria-checked={on === true} disabled={busy || on == null} onClick={toggle} data-testid="share-toggle" className={`relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-60 ${on ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-600"}`}>
-                <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${on ? "left-7" : "left-1"}`} />
-                <span className="sr-only">{on ? "On" : "Off"}</span>
-              </button>
-            </div>
+          <Card data-testid="share-card"><CardContent className="flex items-center justify-between gap-3 p-4">
+            <div className="flex gap-3"><Info className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" /><div><p className="font-bold">{on ? "You are sharing your prices" : "You are not sharing your prices"}</p><p className="text-sm text-muted-foreground">Turn sharing on or off, or delete what you shared, in your Profile.</p></div></div>
+            <Link href="/profile" data-testid="profile-link" className="shrink-0 text-sm font-semibold text-primary underline">Open Profile</Link>
           </CardContent></Card>
 
           <Card><CardContent className="space-y-2 p-4">
             <h2 className={heading}>Never shared</h2>
             <ul className="space-y-1 text-sm">{NEVER.map((n) => <li key={n}>✕ {n}</li>)}</ul>
             <p className="text-xs text-muted-foreground">Only the store, item name and price are shared. No name, account, receipt or date. A price is shown to others only when 3 or more different people reported it. You can switch sharing off at any time.</p>
-            {mine != null && mine > 0 && <Button type="button" variant="outline" className="mt-1 h-11 gap-2" disabled={busy} onClick={withdraw} data-testid="share-delete"><Trash2 className="h-4 w-4" aria-hidden="true" />Delete the {mine} price{mine === 1 ? "" : "s"} I shared</Button>}
           </CardContent></Card>
 
           <Card><CardContent className="space-y-3 p-4">
