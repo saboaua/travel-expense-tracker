@@ -53,6 +53,7 @@ need_cols(tbl, col, fix) as (values
   ('fixed_costs','schedule','migration_fixed_costs.sql'),
   ('fixed_costs','end_month','migration_fixed_costs.sql'),
   ('fixed_entries','on_date','migration_fixed_costs.sql'),
+  ('profiles','push_prefs','migration_sharing_safety.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -96,6 +97,9 @@ need_tables(tbl, fix) as (values
   ('invite_links','migration_invites.sql'),
   ('fixed_costs','migration_fixed_costs.sql'),
   ('fixed_entries','migration_fixed_costs.sql'),
+  ('push_subscriptions','migration_sharing_safety.sql'),
+  ('push_sent_log','migration_push_alerts.sql'),
+  ('push_queue','migration_push_alerts.sql'),
   ('loyalty_cards','migration_loyalty.sql'),
   ('travel_documents','migration_documents.sql'),
   ('subscriptions','migration_subscriptions.sql')
@@ -200,6 +204,24 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_best_store.sql'
   from (values ('best-store'), ('search-help')) as s(slug)
+  union all
+  select 'help topic', s.slug,
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', s.slug), false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_fixed_costs.sql'
+  from (values ('fixed-costs')) as s(slug)
+  union all
+  -- the wording updates inside older help topics (migration_help_fixed_costs.sql)
+  select 'help wording', w.label,
+         case when to_regclass('public.help_topics') is null then 'MISSING'
+              when (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L and body like %L', w.slug, w.good), false, true, '')))[1]::text::int > 0 then 'OK'
+              when (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', w.slug), false, true, '')))[1]::text::int = 0 then 'OK'
+              else 'MISSING' end,
+         'migration_help_fixed_costs.sql'
+  from (values ('Best Prices topic', 'best-store', '%Best Prices%'),
+               ('Community prices topic', 'community-prices', '%Best Prices%'),
+               ('Phone alerts topic', 'turn-on-notifications', '%Gambling limit:%')) as w(label, slug, good)
 ),
 all_checks as (
   select * from col_checks
