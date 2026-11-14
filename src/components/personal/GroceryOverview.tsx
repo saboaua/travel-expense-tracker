@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, Map as MapIcon } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
@@ -25,29 +25,6 @@ function shift(m: string, delta: number) {
   const [y, mo] = m.split("-").map(Number);
   const d = new Date(Date.UTC(y, mo - 1 + delta, 1));
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
-}
-
-/** A small map picture with the words Best store, so it is clear this opens a map. */
-function BestStoreTile() {
-  return (
-    <Link href="/personal/groceries/basket" data-testid="best-store-link" className="col-span-2 block overflow-hidden rounded-2xl border bg-card shadow-sm transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-      <svg viewBox="0 0 358 120" preserveAspectRatio="xMidYMid slice" className="block h-28 w-full" aria-hidden="true">
-        <rect width="358" height="120" fill="#e6efe3" />
-        <path d="M0 85 Q90 60 170 80 T358 55 L358 120 L0 120Z" fill="#cfe3f2" />
-        <path d="M20 20 L340 40 M60 110 L120 0 M230 120 L270 0" stroke="#fff" strokeWidth="6" fill="none" />
-        <path d="M0 60 L358 90" stroke="#f6e7b4" strokeWidth="5" fill="none" />
-        <circle cx="180" cy="62" r="46" fill="#1d4ed81a" stroke="#1d4ed8" strokeDasharray="5 4" />
-        <circle cx="150" cy="48" r="13" fill="#059669" stroke="#fff" strokeWidth="2" /><text x="150" y="53" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff">1</text>
-        <circle cx="215" cy="74" r="13" fill="#1d4ed8" stroke="#fff" strokeWidth="2" /><text x="215" y="79" textAnchor="middle" fontSize="13" fontWeight="800" fill="#fff">2</text>
-        <circle cx="198" cy="40" r="5" fill="#94a3b8" stroke="#fff" strokeWidth="2" />
-        <circle cx="168" cy="82" r="7" fill="#2563eb" stroke="#fff" strokeWidth="3" />
-      </svg>
-      <span className="flex items-center gap-3 px-4 py-3">
-        <span className="min-w-0 flex-1"><span className="block text-base font-bold">Best store</span><span className="block text-sm text-muted-foreground">Where your list costs least, near you</span></span>
-        <span className="inline-flex shrink-0 items-center gap-0.5 text-sm font-semibold text-primary">Open map <ChevronRight className="h-4 w-4" aria-hidden="true" /></span>
-      </span>
-    </Link>
-  );
 }
 
 function ReceiptRow({ id, unsent, children }: { id: string; unsent: boolean; children: React.ReactNode }) {
@@ -108,16 +85,16 @@ export function GroceryOverview() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-28 md:p-8">
       <BackLink href="/personal">Personal</BackLink>
 
-      <div className="space-y-4 border-b pb-6">
+      <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Groceries</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Monthly spending, categories and price changes</p>
+          <p className="mt-1 text-sm text-muted-foreground">Monthly spending, categories and item price changes</p>
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <Link href="/personal/groceries/new" className="col-span-2"><Button className="h-12 w-full gap-2 text-base"><Plus className="h-5 w-5" /> Scan receipt</Button></Link>
-          <BestStoreTile />
-          <Link href="/personal/groceries/prices"><Button variant="outline" className="h-12 w-full gap-2"><TrendingUp className="h-4 w-4" /> Price tracker</Button></Link>
-          <Link href="/personal/groceries/price-check"><Button variant="outline" className="h-12 w-full gap-2" data-testid="price-check-link"><Tag className="h-4 w-4" /> Add a price</Button></Link>
+        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-2">
+          <Link href="/personal/groceries/prices" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto"><TrendingUp className="h-4 w-4" /> Price tracker</Button></Link>
+          <Link href="/personal/groceries/basket" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto" data-testid="best-store-link"><MapIcon className="h-4 w-4" /> Best store</Button></Link>
+          <Link href="/personal/groceries/price-check" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto" data-testid="price-check-link"><Tag className="h-4 w-4" /> Add a price</Button></Link>
+          <Link href="/personal/groceries/new" className="block"><Button className="h-12 w-full gap-2 sm:h-10 sm:w-auto"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
         </div>
       </div>
 
@@ -136,9 +113,9 @@ export function GroceryOverview() {
         <>
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setMonth(shift(month, -1))} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => setMonth(shift(month, -1))} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
               <span className="min-w-[10rem] text-center text-sm font-semibold">{monthLabel(month)}</span>
-              <Button variant="outline" size="icon" className="h-11 w-11" onClick={() => setMonth(shift(month, 1))} disabled={month >= monthOf(todayISO())} aria-label="Next month"><ChevronRight className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => setMonth(shift(month, 1))} disabled={month >= monthOf(todayISO())} aria-label="Next month"><ChevronRight className="h-4 w-4" /></Button>
             </div>
             {currencies.length > 1 && (
               <Select className="w-auto min-w-fit px-2" value={cur} onChange={(e) => setCurrency(e.target.value)} aria-label="Currency">
@@ -147,13 +124,13 @@ export function GroceryOverview() {
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4">
-            <Card><CardHeader className="pb-2"><CardDescription>Spent this month</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold sm:text-3xl">{fmt(thisMonth?.total || 0)}</p><p className="text-xs text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</p></CardContent></Card>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card><CardHeader className="pb-2"><CardDescription>Spent this month</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{fmt(thisMonth?.total || 0)}</p><p className="text-xs text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</p></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardDescription>vs last month</CardDescription></CardHeader><CardContent>
-              {change == null ? <p className="text-2xl font-bold sm:text-3xl">—</p> : <p className={`text-2xl font-bold sm:text-3xl ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
+              {change == null ? <p className="text-3xl font-bold">—</p> : <p className={`text-3xl font-bold ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
               <p className="text-xs text-muted-foreground">{prevMonth ? `Last month ${fmt(prevMonth.total)}` : "No data last month"}</p>
             </CardContent></Card>
-            <Card className="col-span-2 sm:col-span-1"><CardHeader className="pb-2"><CardDescription>Average per shop</CardDescription></CardHeader><CardContent><p className="text-2xl font-bold sm:text-3xl">{thisMonth ? fmt(thisMonth.total / thisMonth.count) : "—"}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardDescription>Average per shop</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? fmt(thisMonth.total / thisMonth.count) : "—"}</p></CardContent></Card>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
