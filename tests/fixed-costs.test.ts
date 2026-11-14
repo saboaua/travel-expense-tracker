@@ -1,4 +1,4 @@
-import { paymentFallsOn, yearlyAlert, dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, cleanPlate, costName, PLATE_KINDS, type FixedCost } from "../src/lib/personal/fixed-costs";
+import { paymentFallsOn, yearlyAlert, dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, cleanPlate, costName, PLATE_KINDS, INSURANCE_KINDS, type FixedCost } from "../src/lib/personal/fixed-costs";
 import { budgetView, spentByArea, type BudgetSetting } from "../src/lib/personal/budget";
 
 let fail = 0;
@@ -80,6 +80,14 @@ eq("only plates keep a label", readCost({ kind: "car_loan", schedule: "monthly",
 const pl2 = c({ kind: "license_plate_2", label: "A 98765", schedule: "twice_yearly", amount: 210, amount2: 210, due_month: 3, due_month2: 9, day: 15 });
 eq("plate 2 counts as an insurance in its months", [monthLines([pl2], [], "2026-03-01").map((l) => [l.kind, l.category, l.amount]), monthLines([pl2], [], "2026-04-01").length, monthLines([pl2], [], "2026-09-01").length], [[["license_plate_2", "insurances", 210]], 0, 1]);
 eq("plate 2 next payment", nextYearly(pl2, "2026-04-01"), { date: "2026-09-15", amount: 210 });
+
+// several car insurances
+eq("three insurance kinds", [...INSURANCE_KINDS], ["car_insurance", "car_insurance_2", "car_insurance_3"]);
+eq("insurance names", [costName({ kind: "car_insurance", label: "P-1234" }), costName({ kind: "car_insurance_2", label: null }), costName({ kind: "car_insurance_3", label: "A 98765" }, undefined, true)], ["Car insurance P-1234", "Car insurance 2", "car insurance A 98765"]);
+eq("insurance 2 keeps its name from a row", readCost({ kind: "car_insurance_2", schedule: "yearly", amount: 890, due_month: 8, label: "a 98765" })?.label, "A 98765");
+const in2 = c({ kind: "car_insurance_2", label: "A 98765", schedule: "yearly", amount: 890, due_month: 8, day: 1 });
+eq("insurance 2 counts in its month, as an insurance", [monthLines([in2], [], "2026-08-01").map((l) => [l.kind, l.category, l.amount]), monthLines([in2], [], "2026-09-01").length], [[["car_insurance_2", "insurances", 890]], 0]);
+eq("insurance 2 gets a yearly reminder", yearlyAlert(in2, "2026-07-02")?.days, 30);
 
 if (fail) process.exit(1);
 console.log("ok fixed-costs");

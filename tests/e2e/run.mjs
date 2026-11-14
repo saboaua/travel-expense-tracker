@@ -1234,6 +1234,12 @@ try {
       await page.goto(`${BASE}/personal/fixed/car`);
       await page.locator("#plate-a1").waitFor(); // the saved plate has loaded
       await page.locator("#plate-num").fill("p-1234");
+      await page.getByTestId("ins-add").click();
+      await page.getByTestId("ins-card-2").waitFor();
+      await page.getByTestId("ins-card-2").getByRole("button", { name: "P-1234", exact: true }).waitFor(); // the plate number is offered
+      await page.locator("#car-ins-num-2").fill("a 98765");
+      await page.locator("#car-ins-2").fill("890");
+      await page.locator("#car-ins-m-2").selectOption("11");
       await page.getByTestId("plate-add").click();
       await page.getByTestId("plate-card-2").waitFor();
       await page.locator("#plate-num-2").fill("a 98765");
@@ -1246,11 +1252,21 @@ try {
       assert(plate2 && plate2.label === "A 98765" && plate2.amount === 350 && plate2.schedule === "yearly" && plate2.due_month === 11, "plate 2 is saved with its number: " + JSON.stringify(plate2));
       assert((await page.getByTestId("fixed-row-license_plate").innerText()).includes("License plate P-1234") && (await page.getByTestId("fixed-row-license_plate_2").innerText()).includes("License plate A 98765"), "both plates are listed by number");
       assert((await page.getByTestId("fixed-month").innerText()).includes("License plate A 98765"), "plate 2 is due this month and counts: " + (await page.getByTestId("fixed-month").innerText()));
+      const ins2 = rows().find((r) => r.kind === "car_insurance_2");
+      assert(ins2 && ins2.label === "A 98765" && ins2.amount === 890 && ins2.due_month === 11 && rows().some((r) => r.kind === "car_insurance" && r.amount === 1020), "insurance 2 is saved with its car, insurance 1 is untouched: " + JSON.stringify(ins2));
+      assert((await page.getByTestId("fixed-row-car_insurance_2").innerText()).includes("Car insurance A 98765"), "insurance 2 is listed by its car");
       // the third plate fills the limit, and removing plate 2 stops it counting
       await page.goto(`${BASE}/personal/fixed/car`);
       await page.getByTestId("plate-card-2").waitFor(); // the saved plates have loaded
       await page.getByTestId("plate-add").click();
       await page.getByText("You have 3 license plates, the most you can add.").waitFor();
+      await page.getByTestId("ins-add").click();
+      await page.getByTestId("ins-card-3").waitFor();
+      await page.getByText("You have 3 car insurances, the most you can add.").waitFor();
+      await page.getByTestId("ins-remove-3").click();
+      await page.getByTestId("ins-remove-confirm-3").click();
+      await page.getByTestId("ins-remove-2").click();
+      await page.getByTestId("ins-remove-confirm-2").click();
       await page.getByTestId("plate-remove-3").click();
       await page.getByTestId("plate-remove-confirm-3").click();
       await page.getByTestId("plate-remove-2").click();
@@ -1258,6 +1274,7 @@ try {
       await page.getByTestId("car-save").click();
       await page.waitForURL((u) => u.pathname === "/personal/fixed");
       assert(!rows().some((r) => r.kind === "license_plate_2" || r.kind === "license_plate_3") && rows().some((r) => r.kind === "license_plate"), "removing plates deletes only those");
+      assert(!rows().some((r) => r.kind === "car_insurance_2" || r.kind === "car_insurance_3") && rows().some((r) => r.kind === "car_insurance"), "removing insurances deletes only those");
       assert((await page.getByTestId("fixed-coming").innerText()).includes("Car insurance"), "the yearly bill is listed under Coming up");
       // credit card: enter what was spent
       await page.goto(`${BASE}/personal/fixed/credit-card`);

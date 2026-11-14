@@ -144,6 +144,10 @@ other_checks as (
          case when exists (select 1 from pg_constraint where conname='fixed_costs_kind_check' and pg_get_constraintdef(oid) like '%license_plate_3%') then 'OK' else 'MISSING' end,
          'migration_license_plates.sql'
   union all
+  select 'constraint', 'fixed_costs: up to 3 car insurances',
+         case when exists (select 1 from pg_constraint where conname='fixed_costs_kind_check' and pg_get_constraintdef(oid) like '%car_insurance_3%') then 'OK' else 'MISSING' end,
+         'migration_car_insurances.sql'
+  union all
   select 'index', 'utility_bills: one bill per email',
          case when exists (select 1 from pg_indexes where schemaname='public' and indexname='utility_bills_dedupe_idx') then 'OK' else 'MISSING' end,
          'migration_bill_emails.sql'

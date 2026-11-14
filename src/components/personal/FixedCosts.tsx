@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { setupNeeded } from "@/lib/setup-message";
 import { FIXED_COST_COLS, FIXED_ENTRY_COLS } from "@/lib/columns";
 import {
-  CATEGORY_LABEL, KIND_LABEL, MONTHS, PLATE_KINDS, cleanPlate, costName, gamblingState, monthLabel, monthLines, nextYearly, paymentsLeft, readCost, readEntry,
+  CATEGORY_LABEL, KIND_LABEL, MONTHS, INSURANCE_KINDS, PLATE_KINDS, cleanPlate, costName, hasLabel, gamblingState, monthLabel, monthLines, nextYearly, paymentsLeft, readCost, readEntry,
   type FixedCategory, type FixedCost, type FixedEntry, type FixedKind, type FixedSchedule,
 } from "@/lib/personal/fixed-costs";
 import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
@@ -57,8 +57,7 @@ function useFixed(): Loaded & { reload: () => Promise<void> } {
 async function saveCost(uid: string, c: Omit<FixedCost, "id" | "active" | "label"> & { label?: string | null }) {
   const { label, ...rest } = c;
   // the label column only exists after migration_license_plates.sql: send it only for plates
-  const isPlateKind = (PLATE_KINDS as readonly string[]).includes(c.kind);
-  return createClient().from("fixed_costs").upsert({ user_id: uid, ...rest, ...(label ? { label } : isPlateKind ? { label: null } : {}), active: true }, { onConflict: "user_id,kind" });
+  return createClient().from("fixed_costs").upsert({ user_id: uid, ...rest, ...(label ? { label } : hasLabel(c.kind) ? { label: null } : {}), active: true }, { onConflict: "user_id,kind" });
 }
 const removeCost = (uid: string, kind: FixedKind) => createClient().from("fixed_costs").delete().eq("user_id", uid).eq("kind", kind);
 
@@ -100,7 +99,7 @@ const Note = ({ children, tone = "info" }: { children: React.ReactNode; tone?: "
 
 const SECTIONS: { cat: FixedCategory; title: string; rows: { kind: FixedKind; href: string }[] }[] = [
   { cat: "loans", title: "Loans", rows: [{ kind: "mortgage", href: "/personal/fixed/mortgage" }, { kind: "car_loan", href: "/personal/fixed/car" }] },
-  { cat: "insurances", title: "Insurances and car plate", rows: [{ kind: "home_insurance", href: "/personal/fixed/home-insurance" }, { kind: "car_insurance", href: "/personal/fixed/car" }, { kind: "license_plate", href: "/personal/fixed/car" }] }, // plates 2 and 3 appear once they are added
+  { cat: "insurances", title: "Insurances and car plate", rows: [{ kind: "home_insurance", href: "/personal/fixed/home-insurance" }, { kind: "car_insurance", href: "/personal/fixed/car" }, { kind: "license_plate", href: "/personal/fixed/car" }] }, // insurances and plates 2 and 3 appear once they are added
   { cat: "cards", title: "Credit card", rows: [{ kind: "credit_card", href: "/personal/fixed/credit-card" }] },
   { cat: "gambling", title: "Limits", rows: [{ kind: "gambling", href: "/personal/fixed/gambling" }] },
 ];
@@ -160,7 +159,7 @@ export function FixedCostsHub() {
             <section key={s.cat}>
               <h2 className="mb-1 mt-3 text-sm font-bold text-slate-700 dark:text-slate-200">{s.title}</h2>
               <Card className="rounded-2xl px-4">
-                {s.rows.flatMap((r) => (r.kind === "license_plate" ? PLATE_KINDS.filter((k) => k === "license_plate" || by.get(k)?.active).map((k) => ({ ...r, kind: k as FixedKind })) : [r])).map((r) => (
+                {s.rows.flatMap((r) => { const set = r.kind === "license_plate" ? PLATE_KINDS : r.kind === "car_insurance" ? INSURANCE_KINDS : null; return set ? set.filter((k) => k === r.kind || by.get(k)?.active).map((k) => ({ ...r, kind: k as FixedKind })) : [r]; }).map((r) => (
                   <Link key={r.kind} href={r.href} className="flex min-h-14 items-center gap-3 border-t py-2.5 first:border-0 hover:bg-accent/40" data-testid={`fixed-row-${r.kind}`}>
                     <span className="min-w-0 flex-1"><b className="block text-[15px]">{costName(by.get(r.kind), r.kind)}</b><span className="block text-[13px] text-muted-foreground">{status(by.get(r.kind), today)}</span></span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -230,6 +229,39 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
 
 /* ---------------- my car: loan, insurance, license plate ---------------- */
 
+type InsDraft = { kind: FixedKind; num: string; amount: string; m: number; day: number; cur: BudgetCurrency };
+const newIns = (kind: FixedKind): InsDraft => ({ kind, num: "", amount: "", m: 3, day: 15, cur: "AWG" });
+
+/** One car insurance: which car (optional), the yearly amount, and when it is due */
+function InsuranceCard({ d, i, chips, onChange, onRemove, removing, onKeep, onConfirm }: { d: InsDraft; i: number; chips: string[]; onChange: (p: Partial<InsDraft>) => void; onRemove?: () => void; removing: boolean; onKeep: () => void; onConfirm: () => void }) {
+  const id = (b: string) => (i === 0 ? b : `${b}-${i + 1}`);
+  const title = i === 0 ? "Car insurance" : `Car insurance ${i + 1}`;
+  return (
+    <div className="space-y-3 rounded-2xl border bg-card p-4" data-testid={`ins-card-${i + 1}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div><b className="block text-base">{title}</b><span className="text-[13px] text-muted-foreground">Paid once a year. Leave empty if you have none.</span></div>
+        {onRemove && <button type="button" onClick={onRemove} className="min-h-9 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`ins-remove-${i + 1}`}>Remove</button>}
+      </div>
+      {removing && (
+        <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950" role="alertdialog" aria-label={`Remove ${title}`}>
+          <b className="block text-[15px]">Remove {costName({ kind: d.kind, label: cleanPlate(d.num) })}?</b>
+          <p className="text-[13px] text-muted-foreground">Its payments stop counting in your spending once you save. Months already counted stay as they are.</p>
+          <div className="flex gap-2"><button type="button" onClick={onKeep} className="min-h-11 flex-1 rounded-xl border bg-background text-sm font-bold">Keep it</button><button type="button" onClick={onConfirm} className="min-h-11 flex-1 rounded-xl bg-red-600 text-sm font-bold text-white" data-testid={`ins-remove-confirm-${i + 1}`}>Remove insurance</button></div>
+        </div>
+      )}
+      <div>
+        <label htmlFor={id("car-ins-num")} className={label}>Which car <span className="font-normal text-muted-foreground">(optional)</span></label>
+        <input id={id("car-ins-num")} value={d.num} maxLength={16} autoComplete="off" onChange={(e) => onChange({ num: e.target.value.toUpperCase() })} placeholder="P-1234" className={field} />
+        {chips.length > 0 && <div className="mt-1.5 flex flex-wrap gap-1.5">{chips.map((c) => <button type="button" key={c} onClick={() => onChange({ num: c })} aria-pressed={cleanPlate(d.num) === c} className={`min-h-9 rounded-full px-3 text-[13px] font-bold ${cleanPlate(d.num) === c ? "bg-blue-700 text-white" : "border bg-background"}`}>{c}</button>)}</div>}
+        <p className="mt-1 text-xs text-muted-foreground">Tap a plate or type a name. Only you see it.</p>
+      </div>
+      <div><label htmlFor={id("car-ins")} className={label}>Yearly amount</label><Money id={id("car-ins")} value={d.amount} onChange={(v) => onChange({ amount: v })} currency={d.cur} onCurrency={(c) => onChange({ cur: c })} /></div>
+      <div className="grid grid-cols-2 gap-3"><div><label htmlFor={id("car-ins-m")} className={label}>Due month</label><MonthSelect id={id("car-ins-m")} value={d.m} onChange={(v) => onChange({ m: v })} /></div><div><label htmlFor={id("car-ins-d")} className={label}>Day</label><DaySelect id={id("car-ins-d")} value={d.day} onChange={(v) => onChange({ day: v })} /></div></div>
+      {d.amount.trim() !== "" && <Note tone="good">Added to your spending in <b>{MONTHS[d.m - 1]}</b>, the month it is due.</Note>}
+    </div>
+  );
+}
+
 type PlateDraft = { kind: FixedKind; num: string; mode: "once" | "twice"; a1: string; a2: string; once: string; m1: number; m2: number; day: number; cur: BudgetCurrency };
 const newPlate = (kind: FixedKind): PlateDraft => ({ kind, num: "", mode: "once", a1: "", a2: "", once: "", m1: 6, m2: 12, day: 30, cur: "AWG" });
 
@@ -278,7 +310,9 @@ export function CarForm() {
   const router = useRouter();
   const { costs, missing, ready, uid } = useFixed();
   const [loanOn, setLoanOn] = useState(false), [loan, setLoan] = useState(""), [loanEnd, setLoanEnd] = useState(""), [loanCur, setLoanCur] = useState<BudgetCurrency>("AWG");
-  const [ins, setIns] = useState(""), [insMonth, setInsMonth] = useState(3), [insDay, setInsDay] = useState(15), [insCur, setInsCur] = useState<BudgetCurrency>("AWG");
+  const [insurances, setInsurances] = useState<InsDraft[]>([newIns("car_insurance")]);
+  const [removingIns, setRemovingIns] = useState<number | null>(null);
+  const setIns = (i: number, patch: Partial<InsDraft>) => setInsurances((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const [plates, setPlates] = useState<PlateDraft[]>([newPlate("license_plate")]);
   const [removing, setRemoving] = useState<number | null>(null);
   const setPlate = (i: number, patch: Partial<PlateDraft>) => setPlates((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -287,9 +321,10 @@ export function CarForm() {
   useEffect(() => {
     if (!ready || filled) return;
     setFilled(true);
-    const l = costs.find((c) => c.kind === "car_loan"), i = costs.find((c) => c.kind === "car_insurance");
+    const l = costs.find((c) => c.kind === "car_loan");
     if (l) { setLoanOn(true); setLoan(String(l.amount)); setLoanEnd(l.end_month?.slice(0, 7) ?? ""); setLoanCur(l.currency); }
-    if (i) { setIns(String(i.amount)); setInsMonth(i.due_month ?? 3); setInsDay(i.day ?? 15); setInsCur(i.currency); }
+    const insMine = INSURANCE_KINDS.map((k) => costs.find((c) => c.kind === k && c.active)).filter((x): x is FixedCost => !!x);
+    if (insMine.length) setInsurances(insMine.map((i) => ({ ...newIns(i.kind), num: i.label ?? "", amount: String(i.amount), m: i.due_month ?? 3, day: i.day ?? 15, cur: i.currency })));
     const mine = PLATE_KINDS.map((k) => costs.find((c) => c.kind === k && c.active)).filter((x): x is FixedCost => !!x);
     if (mine.length) setPlates(mine.map((p) => ({
       ...newPlate(p.kind), num: p.label ?? "", cur: p.currency, day: p.day ?? 30, m1: p.due_month ?? 6,
@@ -307,11 +342,16 @@ export function CarForm() {
       if (!(a > 0)) return setErr("Type the monthly loan payment, or switch the loan off.");
       jobs.push(saveCost(uid, { ...base, kind: "car_loan", schedule: "monthly", amount: round2(a), currency: loanCur, day: 1, end_month: loanEnd ? `${loanEnd}-01` : null }));
     } else jobs.push(removeCost(uid, "car_loan"));
-    const ia = toNum(ins);
-    if (ins.trim() !== "") {
-      if (!(ia > 0)) return setErr("Type the yearly insurance amount.");
-      jobs.push(saveCost(uid, { ...base, kind: "car_insurance", schedule: "yearly", amount: round2(ia), currency: insCur, due_month: insMonth, day: insDay }));
-    } else jobs.push(removeCost(uid, "car_insurance"));
+    for (let n = 0; n < INSURANCE_KINDS.length; n++) {
+      const d = insurances.find((x) => x.kind === INSURANCE_KINDS[n]);
+      const name = n === 0 ? "car insurance" : `car insurance ${n + 1}`;
+      if (d && d.amount.trim() !== "") {
+        const ia = toNum(d.amount);
+        if (!(ia > 0)) return setErr(`Type the yearly ${name} amount.`);
+        jobs.push(saveCost(uid, { ...base, kind: d.kind, label: cleanPlate(d.num), schedule: "yearly", amount: round2(ia), currency: d.cur, due_month: d.m, day: d.day }));
+      } else if (d && n > 0) return setErr(`Type the ${name} amount, or remove it.`);
+      else jobs.push(removeCost(uid, INSURANCE_KINDS[n]));
+    }
     for (let n = 0; n < PLATE_KINDS.length; n++) {
       const d = plates.find((x) => x.kind === PLATE_KINDS[n]);
       const name = n === 0 ? "license plate" : `license plate ${n + 1}`;
@@ -335,6 +375,7 @@ export function CarForm() {
     router.push("/personal/fixed");
   };
 
+  const nextInsKind = INSURANCE_KINDS.find((k) => !insurances.some((x) => x.kind === k));
   const nextKind = PLATE_KINDS.find((k) => !plates.some((x) => x.kind === k));
   return (
     <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8 lg:max-w-4xl">
@@ -349,11 +390,14 @@ export function CarForm() {
             <div><label htmlFor="car-loan-end" className={label}>Last payment</label><input id="car-loan-end" type="month" value={loanEnd} onChange={(e) => setLoanEnd(e.target.value)} className={field} /></div>
           </>)}
         </div>
-        <div className="space-y-3 rounded-2xl border bg-card p-4">
-          <div><b className="block text-base">Car insurance</b><span className="text-[13px] text-muted-foreground">Paid once a year. Leave empty if you have none.</span></div>
-          <div><label htmlFor="car-ins" className={label}>Yearly amount</label><Money id="car-ins" value={ins} onChange={setIns} currency={insCur} onCurrency={setInsCur} /></div>
-          <div className="grid grid-cols-2 gap-3"><div><label htmlFor="car-ins-m" className={label}>Due month</label><MonthSelect id="car-ins-m" value={insMonth} onChange={setInsMonth} /></div><div><label htmlFor="car-ins-d" className={label}>Day</label><DaySelect id="car-ins-d" value={insDay} onChange={setInsDay} /></div></div>
-          {ins.trim() !== "" && <Note tone="good">Added to your spending in <b>{MONTHS[insMonth - 1]}</b>, the month it is due.</Note>}
+        {insurances.map((d, i) => <InsuranceCard key={d.kind} d={d} i={i} chips={plates.map((x) => cleanPlate(x.num)).filter((x): x is string => !!x)} onChange={(patch) => setIns(i, patch)} onRemove={i > 0 ? () => setRemovingIns(i) : undefined} removing={removingIns === i} onKeep={() => setRemovingIns(null)} onConfirm={() => { setInsurances((all) => all.filter((_, j) => j !== i)); setRemovingIns(null); }} />)}
+        <div className="lg:col-span-2">
+          {nextInsKind ? (
+            <>
+              <button type="button" onClick={() => setInsurances((all) => [...all, newIns(nextInsKind)])} className="min-h-12 w-full rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 text-[15px] font-extrabold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="ins-add">+ Add another car insurance</button>
+              <p className="mt-1 text-center text-[12.5px] text-muted-foreground">You can add up to 3, one for each car.</p>
+            </>
+          ) : <p className="rounded-xl bg-slate-100 px-3 py-3 text-center text-[13.5px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">You have 3 car insurances, the most you can add. Remove one to add another.</p>}
         </div>
         {plates.map((d, i) => <PlateCard key={d.kind} d={d} i={i} onChange={(patch) => setPlate(i, patch)} onRemove={i > 0 ? () => setRemoving(i) : undefined} removing={removing === i} onKeep={() => setRemoving(null)} onConfirm={() => { setPlates((all) => all.filter((_, j) => j !== i)); setRemoving(null); }} />)}
         <div className="lg:col-span-2">
