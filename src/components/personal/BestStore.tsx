@@ -19,7 +19,7 @@ import type { TrackerRow } from "@/lib/personal/grocery";
 import { RADII, basketTotals, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
 import { formatCurrency } from "@/lib/utils";
 
-const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
+const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-80 w-full animate-pulse sm:h-96 md:h-[30rem] rounded-xl border bg-muted" aria-label="Loading map" /> });
 
 type ListRow = { id: string; product_key: string; name: string; qty: number };
 type Loc = { id: string; name: string; lat: number; lng: number; source: string };
