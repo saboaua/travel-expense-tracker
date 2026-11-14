@@ -107,7 +107,7 @@ export default function LoginPage() {
       <img src={logoUrl} alt={appName} style={{ height: Math.min(logoSize, 72), width: "auto", maxWidth: "100%" }} className="object-contain" />
     ) : (
       <span className="flex items-center gap-3">
-        <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+        <svg className="shrink-0" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
           <defs>
             <linearGradient id="lg-logo" x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stopColor="#0B63CE" />
