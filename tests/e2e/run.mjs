@@ -1342,6 +1342,18 @@ try {
       await page.goto(`${BASE}/profile`);
       await page.getByTestId("level-up").waitFor();
       assert((await page.getByTestId("level-up").innerText()).includes("Scout"), "the level-up message names the badge");
+      // the celebration: the count climbs to the number, and the badge can be shared as a picture
+      await page.waitForFunction(() => getComputedStyle(document.querySelector('[data-testid="level-up-count"]')).getPropertyValue("--lu-n").trim() === "150", null, { timeout: 8000 });
+      await page.getByTestId("level-up-share").click();
+      await page.getByTestId("badge-share").waitFor();
+      const shot = await page.getByTestId("badge-share-preview").getAttribute("src");
+      assert(/^data:image\/png/.test(shot ?? ""), "the share picture is made on the phone");
+      if (process.env.E2E_SHOT) { await (await import("node:fs/promises")).writeFile("/tmp/badge-share-card.png", Buffer.from((shot ?? "").split(",")[1] ?? "", "base64")); await page.screenshot({ path: "/tmp/badge-share-sheet.png" }); }
+      assert(!(await page.getByTestId("badge-share").innerText()).includes("AWG"), "the picture has no prices");
+      const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("badge-share-save").click()]);
+      assert(dl.suggestedFilename() === "lifolio-scout-badge.png", "Save image names the file after the badge");
+      await page.getByRole("button", { name: "Close" }).click();
+      assert((await page.getByTestId("level-up").count()) === 1, "closing the share sheet returns to the celebration");
       await page.getByTestId("level-up-done").click();
       for (let i = 0; i < 50 && badgeSeen !== 2; i++) await page.waitForTimeout(100);
       assert(badgeSeen === 2, "the message is marked as seen");
@@ -1352,6 +1364,10 @@ try {
       await page.getByTestId("badge-shelf").waitFor();
       assert((await page.getByTestId("badge-tier-scout").innerText()).includes("Your level"), "the shelf marks the current level");
       assert((await page.getByTestId("badge-tier-legend").innerText()).includes("4,000"), "the shelf shows what unlocks the next levels");
+      assert((await page.getByTestId("share-scout").count()) === 1 && (await page.getByTestId("share-guardian").count()) === 0, "an earned badge can be shared later, a locked one cannot");
+      await page.getByTestId("share-scout").click();
+      await page.getByTestId("badge-share").waitFor();
+      await page.getByRole("button", { name: "Close" }).click();
       await page.goto(`${BASE}/profile`);
       await page.getByRole("button", { name: /Community prices/ }).click();
       // deleting restarts the count but keeps the earned badge

@@ -2,17 +2,19 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { TIERS, plural, progress, readBadge, type BadgeState } from "@/lib/personal/badges";
 import { BadgeShield } from "@/components/profile/BadgeShield";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
+import { BadgeShare } from "@/components/profile/BadgeShare";
 import { Alert } from "@/components/ui/alert";
 
 /** Profile > Your badges: every level, which are earned and what the next one needs. Only you see it. */
 export default function BadgesPage() {
   const [b, setB] = useState<BadgeState | null>(null);
   const [missing, setMissing] = useState(false);
+  const [sharing, setSharing] = useState<{ level: number; total: number } | null>(null);
   useEffect(() => {
     (async () => {
       const r = await createClient().rpc("my_badge");
@@ -41,6 +43,7 @@ export default function BadgesPage() {
                   <div className="flex items-center justify-between gap-2"><b className="text-base">{t.name}</b>
                     <span className="rounded-lg bg-muted px-2 py-0.5 text-[11px] font-bold">{b.level === t.level ? "Your level" : earned ? "Earned" : `${t.from.toLocaleString("en-US")} prices`}</span></div>
                   <p className="text-sm text-muted-foreground">{sub}</p>
+                  {earned && <button type="button" onClick={() => setSharing({ level: t.level, total: b.level === t.level ? b.total : t.from })} className="mt-1 inline-flex min-h-9 items-center gap-1.5 text-sm font-bold text-primary" data-testid={`share-${t.name.toLowerCase()}`}><Share2 className="h-4 w-4" aria-hidden="true" /> Share</button>}
                 </div>
               </div>
             );
@@ -51,6 +54,7 @@ export default function BadgesPage() {
           </div>
         </div>
       )}
+      {sharing && <BadgeShare level={sharing.level} total={sharing.total} onClose={() => setSharing(null)} />}
     </div>
   );
 }
