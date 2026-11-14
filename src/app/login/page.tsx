@@ -5,8 +5,13 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Turnstile } from "@/components/Turnstile";
-import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { NETWORK_MESSAGE } from "@/lib/password-policy";
+import { Bricolage_Grotesque, Figtree } from "next/font/google";
+import { FEATURES, IconTile, Waves } from "@/components/login/LoginArt";
+
+const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-login-display" });
+const body = Figtree({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-login-body" });
 
 const EXPIRED_MESSAGE =
   "Your temporary password has expired. Please ask an administrator to generate a new one.";
@@ -29,7 +34,7 @@ export default function LoginPage() {
   const onCaptchaToken = useCallback((t: string | null) => setCaptchaToken(t), []);
   const onCaptchaError = useCallback(() => setError("The security check could not load. Please refresh and try again."), []);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [appName, setAppName] = useState("Travel Expense Tracker");
+  const [appName, setAppName] = useState("Lifolio");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
   const [logoSize, setLogoSize] = useState(56);
   const supabase = createClient();
@@ -94,169 +99,151 @@ export default function LoginPage() {
     }
   };
 
+  const inputCls =
+    "w-full h-[50px] pl-11 rounded-[14px] border-[1.5px] border-[#D5E2EE] dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all";
+  const brand = (size: number, light: boolean) =>
+    logoUrl ? (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={logoUrl} alt={appName} style={{ height: Math.min(logoSize, 72), width: "auto", maxWidth: "100%" }} className="object-contain" />
+    ) : (
+      <span className="flex items-center gap-3">
+        <svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
+          <defs>
+            <linearGradient id="lg-logo" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stopColor="#0B63CE" />
+              <stop offset="1" stopColor="#22D3EE" />
+            </linearGradient>
+          </defs>
+          <path d="M14 4 34 12V46L14 56z" fill="url(#lg-logo)" />
+          <path d="M34 30 60 40 34 58 20 52z" fill="#22D3EE" opacity=".9" />
+        </svg>
+        <span className={`font-[family-name:var(--font-login-display)] font-bold tracking-tight ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.62 }}>
+          {appName}
+        </span>
+      </span>
+    );
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100 dark:from-slate-950 dark:via-slate-900 dark:to-indigo-950 p-4">
-      <div className="w-full max-w-[420px]">
-        <div className="bg-white dark:bg-slate-900 rounded-xl shadow-xl shadow-blue-900/5 dark:shadow-black/40 border border-slate-100 dark:border-slate-800 p-8 sm:p-10">
-          <div className="flex justify-center mb-6">
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={logoUrl}
-                alt={appName}
-                style={{ height: logoSize, width: "auto", maxWidth: "100%" }}
-                className="object-contain"
-              />
-            ) : (
-              <div
-                className="rounded-xl flex items-center justify-center shadow-lg"
-                style={{
-                  height: logoSize,
-                  width: logoSize,
-                  backgroundColor: primaryColor,
-                  boxShadow: `0 10px 15px -3px ${primaryColor}40`,
-                }}
-              >
-                <Plane className="text-white" style={{ height: logoSize * 0.5, width: logoSize * 0.5 }} strokeWidth={2} />
+    <div className={`${display.variable} ${body.variable} flex min-h-screen font-[family-name:var(--font-login-body)] text-slate-900 dark:text-slate-100`}>
+      {/* Ocean panel, desktop only */}
+      <aside className="relative hidden w-[46%] max-w-[640px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:block">
+        <Waves />
+        <div className="relative flex h-full flex-col px-12 py-12 xl:px-14">
+          {brand(38, true)}
+          <h2 className="mt-14 max-w-[470px] font-[family-name:var(--font-login-display)] text-[44px] font-extrabold leading-[1.05] tracking-tight text-white xl:text-5xl">
+            Every trip, receipt and bill, in one place.
+          </h2>
+          <p className="mt-4 max-w-[430px] text-[17px] leading-relaxed text-white/85">
+            From the flight to the groceries. {appName} keeps your travel and your household in order.
+          </p>
+          <ul className="mt-8 grid max-w-[520px] grid-cols-2 gap-3">
+            {FEATURES.map((f) => (
+              <li key={f.title} className="flex items-center gap-3 rounded-[18px] border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
+                <IconTile kind={f.kind} size={44} />
+                <span>
+                  <span className="block text-[15px] font-bold text-white">{f.title}</span>
+                  <span className="mt-px block text-[12.5px] leading-snug text-white/80">{f.text}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
+
+      <main className="relative flex flex-1 flex-col bg-[#FFF6EA] dark:bg-slate-950">
+        {/* Sea header, phone and tablet */}
+        <div className="relative h-[330px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
+          <Waves />
+          <div className="absolute left-5 top-12 -rotate-[8deg]"><IconTile kind="trip" size={54} /></div>
+          <div className="absolute right-5 top-11 rotate-[8deg]"><IconTile kind="receipt" size={50} /></div>
+          <div className="absolute left-8 top-[124px] rotate-6"><IconTile kind="basket" size={44} /></div>
+          <div className="absolute right-8 top-[120px] -rotate-6"><IconTile kind="bolt" size={44} /></div>
+          <div className="absolute inset-x-0 top-14 flex justify-center">{brand(40, true)}</div>
+          <h2 className="absolute inset-x-6 top-[184px] text-center font-[family-name:var(--font-login-display)] text-[26px] font-extrabold leading-[1.1] tracking-tight text-white">
+            Every trip, receipt and bill, in one place.
+          </h2>
+        </div>
+
+        <div className="relative z-10 -mt-12 flex flex-1 flex-col items-center px-4 pb-6 lg:mt-0 lg:justify-center lg:px-10">
+          <div className="w-full max-w-[420px] rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(10,37,64,.18)] dark:bg-slate-900 sm:p-6 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none lg:dark:bg-transparent">
+            <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-extrabold tracking-tight lg:text-4xl">Welcome back</h1>
+            <p className="mt-1 hidden text-base text-slate-500 dark:text-slate-400 lg:block">Sign in to pick up where you left off.</p>
+
+            <form onSubmit={handleLogin} className="mt-4 space-y-4 lg:mt-6 lg:space-y-5">
+              <div className="space-y-1.5">
+                <label htmlFor="email" className="block text-sm font-semibold text-slate-800 dark:text-slate-200">Email</label>
+                <div className="relative">
+                  <Mail className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                  <input id="email" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" className={`${inputCls} pr-4`} />
+                </div>
               </div>
-            )}
-          </div>
 
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-              {appName}
-            </h1>
-            <p className="text-slate-500 dark:text-slate-400 mt-2 text-sm">
-              Sign in to manage your business travel expenses
-            </p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-5">
-            <div className="space-y-1.5">
-              <label htmlFor="email" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Email
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  id="email"
-                  type="email"
-                  placeholder="you@company.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  className="w-full h-11 pl-10 pr-4 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                />
+              <div className="space-y-1.5">
+                <label htmlFor="password" className="block text-sm font-semibold text-slate-800 dark:text-slate-200">Password</label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-400" />
+                  <input id="password" type={showPassword ? "text" : "password"} placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required autoComplete="current-password" className={`${inputCls} pr-12`} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
+                    className="absolute right-1.5 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:text-slate-600 dark:hover:text-slate-300"
+                  >
+                    {showPassword ? <EyeOff className="h-[18px] w-[18px]" /> : <Eye className="h-[18px] w-[18px]" />}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <div className="space-y-1.5">
-              <label htmlFor="password" className="block text-sm font-medium text-slate-700 dark:text-slate-200">
-                Password
-              </label>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                  className="w-full h-11 pl-10 pr-11 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
-                  aria-pressed={showPassword}
-                  className="absolute right-1.5 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
+              <div className="flex items-center justify-between">
+                <label className="flex cursor-pointer select-none items-center gap-2.5">
+                  <input type="checkbox" checked={rememberMe} onChange={(e) => setRememberMe(e.target.checked)} className="h-5 w-5 rounded-md border-slate-300" style={{ accentColor: primaryColor }} />
+                  <span className="text-sm text-slate-700 dark:text-slate-300">Remember me</span>
+                </label>
+                <Link href="/forgot-password" className="text-sm font-semibold transition-opacity hover:opacity-80" style={{ color: primaryColor }}>
+                  Forgot password?
+                </Link>
               </div>
-            </div>
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center gap-2 cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300"
-                  style={{ accentColor: primaryColor }}
-                />
-                <span className="text-sm text-slate-600 dark:text-slate-300">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm font-medium hover:opacity-80 transition-opacity"
-                style={{ color: primaryColor }}
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {captchaNeeded && siteKey && (
-              <Turnstile key={captchaRound} siteKey={siteKey} onToken={onCaptchaToken} onError={onCaptchaError} />
-            )}
-
-            {error && (
-              <Alert className="border border-red-100">
-                {error}
-              </Alert>
-            )}
-
-            <button
-              type="submit"
-              disabled={!ready || loading || (captchaNeeded && !captchaToken)}
-              className="w-full h-11 rounded-lg text-white font-medium text-sm flex items-center justify-center gap-2 shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed hover:brightness-110"
-              style={{
-                backgroundColor: primaryColor,
-                boxShadow: `0 10px 15px -3px ${primaryColor}40`,
-              }}
-            >
-              {loading ? (
-                "Signing in..."
-              ) : (
-                <>
-                  Sign In
-                  <ArrowRight className="h-4 w-4" />
-                </>
+              {captchaNeeded && siteKey && (
+                <Turnstile key={captchaRound} siteKey={siteKey} onToken={onCaptchaToken} onError={onCaptchaError} />
               )}
-            </button>
-          </form>
 
-          <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800 text-center">
-            <p className="text-sm text-slate-500 dark:text-slate-400">
-              Need an account? Contact your administrator.
+              {error && <Alert className="border border-red-100">{error}</Alert>}
+
+              <button
+                type="submit"
+                disabled={!ready || loading || (captchaNeeded && !captchaToken)}
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[15px] text-base font-bold text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                style={{ backgroundColor: primaryColor, boxShadow: `0 10px 22px ${primaryColor}52, inset 0 1px 0 rgba(255,255,255,.35)` }}
+              >
+                {loading ? (
+                  "Signing in..."
+                ) : (
+                  <>
+                    Sign In
+                    <ArrowRight className="h-[18px] w-[18px]" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            <p className="mt-6 hidden border-t border-[#EBDDC9] pt-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:block">
+              Need an account? Ask your administrator.
             </p>
           </div>
-        </div>
 
-        <div className="mt-6 flex items-center justify-center gap-3 text-xs text-slate-400">
-          <span className="flex items-center gap-1">
-            <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-              <path
-                fillRule="evenodd"
-                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-            256-bit SSL Encrypted
-          </span>
-          <span>·</span>
-          <Link href="/privacy" className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-            Privacy Policy
-          </Link>
-          <span>·</span>
-          <Link href="/contact" className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors">
-            Contact Support
-          </Link>
+          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400 lg:hidden">Need an account? Ask your administrator.</p>
+
+          <div className="mt-auto flex items-center justify-center gap-3 pt-8 text-[12.5px] text-slate-500 lg:mt-8 lg:pt-0">
+            <span className="flex items-center gap-1"><Lock className="h-3 w-3" />Encrypted</span>
+            <span>·</span>
+            <Link href="/privacy" className="transition-colors hover:text-slate-700 dark:hover:text-slate-300">Privacy Policy</Link>
+            <span>·</span>
+            <Link href="/contact" className="transition-colors hover:text-slate-700 dark:hover:text-slate-300">Contact Support</Link>
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
