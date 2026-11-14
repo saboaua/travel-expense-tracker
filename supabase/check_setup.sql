@@ -255,6 +255,12 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_badges.sql'
   union all
+  select 'function', 'badge levels: Legend at 4,000',
+         case when to_regproc('public._badge_level(integer)') is null then 'MISSING'
+              when public._badge_level(3999) = 4 and public._badge_level(4000) = 5 and public._badge_level(149) = 1 and public._badge_level(150) = 2 then 'OK'
+              else 'MISSING' end,
+         'migration_badge_levels.sql'
+  union all
   -- the wording updates inside older help topics (migration_help_fixed_costs.sql)
   select 'help wording', w.label,
          case when to_regclass('public.help_topics') is null then 'MISSING'
@@ -266,7 +272,8 @@ other_checks as (
                ('Community prices topic', 'community-prices', '%Best Prices%'),
                ('Phone alerts topic', 'turn-on-notifications', '%Gambling limit:%'),
                ('Nightly share in Community prices topic', 'community-prices', '%once a night%'),
-               ('No guessed prices in Best Prices topic', 'best-store', '%No guessed prices%')) as w(label, slug, good)
+               ('No guessed prices in Best Prices topic', 'best-store', '%No guessed prices%'),
+               ('Badge levels in the Community badges topic', 'community-badges', '%**Legend:** 4,000 prices%')) as w(label, slug, good)
 ),
 all_checks as (
   select * from col_checks

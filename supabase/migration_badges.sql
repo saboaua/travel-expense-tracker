@@ -23,7 +23,7 @@ revoke all on table public.price_share_seen from anon, authenticated;
 -- 0 = no badge yet, 1 Helper, 2 Scout, 3 Guardian, 4 Champion, 5 Legend
 create or replace function public._badge_level(total integer) returns smallint
 language sql immutable as $$
-  select (case when total >= 1000 then 5 when total >= 500 then 4 when total >= 200 then 3 when total >= 50 then 2 when total >= 1 then 1 else 0 end)::smallint
+  select (case when total >= 4000 then 5 when total >= 2500 then 4 when total >= 750 then 3 when total >= 150 then 2 when total >= 1 then 1 else 0 end)::smallint
 $$;
 
 -- share_prices now also counts each new product + store once

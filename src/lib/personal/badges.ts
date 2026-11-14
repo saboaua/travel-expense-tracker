@@ -6,10 +6,10 @@ export type Tier = { level: 1 | 2 | 3 | 4 | 5; name: string; from: number; dark:
 
 export const TIERS: Tier[] = [
   { level: 1, name: "Helper", from: 1, dark: "#b45309", light: "#f59e0b", tint: "#fff7ed" },
-  { level: 2, name: "Scout", from: 50, dark: "#475569", light: "#94a3b8", tint: "#f1f5f9" },
-  { level: 3, name: "Guardian", from: 200, dark: "#a16207", light: "#facc15", tint: "#fefce8" },
-  { level: 4, name: "Champion", from: 500, dark: "#047857", light: "#34d399", tint: "#ecfdf5" },
-  { level: 5, name: "Legend", from: 1000, dark: "#1d4ed8", light: "#60a5fa", tint: "#eff6ff" },
+  { level: 2, name: "Scout", from: 150, dark: "#475569", light: "#94a3b8", tint: "#f1f5f9" },
+  { level: 3, name: "Guardian", from: 750, dark: "#a16207", light: "#facc15", tint: "#fefce8" },
+  { level: 4, name: "Champion", from: 2500, dark: "#047857", light: "#34d399", tint: "#ecfdf5" },
+  { level: 5, name: "Legend", from: 4000, dark: "#1d4ed8", light: "#60a5fa", tint: "#eff6ff" },
 ];
 
 /** 0 = no badge yet */
@@ -37,7 +37,7 @@ export function progress(total: number): { current: Tier | null; next: Tier | nu
   const current = tierOf(lvl);
   const next = tierOf(lvl + 1);
   if (!next) return { current, next: null, toGo: 0, pct: 100 };
-  // the bar matches the words: "37 of 50"
+  // the bar matches the words: "37 of 150"
   const pct = Math.max(0, Math.min(100, Math.round((total / next.from) * 100)));
   return { current, next, toGo: next.from - total, pct };
 }

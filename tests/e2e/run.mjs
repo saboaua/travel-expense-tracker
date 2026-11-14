@@ -81,7 +81,7 @@ const sharingDb = await createSharingBackend(fake, SERVICE_KEY);
 const sharedCalls = [];
 let sharedCount = 0;
 let badgeSeen = 0, badgePushed = 0;
-const badgeLevel = (n) => (n >= 1000 ? 5 : n >= 500 ? 4 : n >= 200 ? 3 : n >= 50 ? 2 : n >= 1 ? 1 : 0);
+const badgeLevel = (n) => (n >= 4000 ? 5 : n >= 2500 ? 4 : n >= 750 ? 3 : n >= 150 ? 2 : n >= 1 ? 1 : 0);
 let badgeBest = 0;
 fake.setRpcHook(async (name, body, uid, bearer) => {
   if (name === "share_prices") { sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
@@ -1335,10 +1335,10 @@ try {
       assert(/bg-red-600/.test((await page.getByTestId("profile-share-delete").getAttribute("class")) ?? ""), "Delete what I shared is red");
       assert((await page.getByText(/Nothing to share yet|Shared \d+ price/).first().innerText()).length > 0, "turning sharing on says what was shared right away");
       assert((await page.getByTestId("profile-share-now").count()) === 1, "there is a button to share the latest prices again");
-      // badges: nothing earned yet, then 50 prices shared shows Scout with a one-time message
+      // badges: nothing earned yet, then 150 prices shared shows Scout with a one-time message
       await page.getByTestId("badge-panel").waitFor();
       assert((await page.getByTestId("badge-panel").innerText()).includes("Your first badge is close"), "no badge yet says what to do");
-      sharedCount = 50; badgeBest = 0; badgeSeen = 0;
+      sharedCount = 150; badgeBest = 0; badgeSeen = 0;
       await page.goto(`${BASE}/profile`);
       await page.getByTestId("level-up").waitFor();
       assert((await page.getByTestId("level-up").innerText()).includes("Scout"), "the level-up message names the badge");
@@ -1351,12 +1351,12 @@ try {
       await page.getByTestId("badge-shelf-link").click();
       await page.getByTestId("badge-shelf").waitFor();
       assert((await page.getByTestId("badge-tier-scout").innerText()).includes("Your level"), "the shelf marks the current level");
-      assert((await page.getByTestId("badge-tier-legend").innerText()).includes("1,000"), "the shelf shows what unlocks the next levels");
+      assert((await page.getByTestId("badge-tier-legend").innerText()).includes("4,000"), "the shelf shows what unlocks the next levels");
       await page.goto(`${BASE}/profile`);
       await page.getByRole("button", { name: /Community prices/ }).click();
       // deleting restarts the count but keeps the earned badge
-      sharedCount = 50; await page.getByTestId("profile-share-delete").click();
-      await page.getByText(/Deleted 50 shared prices/).waitFor();
+      sharedCount = 150; await page.getByTestId("profile-share-delete").click();
+      await page.getByText(/Deleted 150 shared prices/).waitFor();
       assert((await page.getByTestId("badge-name").innerText()) === "Scout", "the earned badge stays after deleting");
       await sw.click();
       await page.getByText(/Sharing is off/).first().waitFor();

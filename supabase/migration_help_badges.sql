@@ -8,10 +8,10 @@ $h$When you turn on **Community prices**, you earn a **badge** for the prices yo
 
 ## The levels
 - **Helper:** your first shared price
-- **Scout:** 50 prices
-- **Guardian:** 200 prices
-- **Champion:** 500 prices
-- **Legend:** 1,000 prices
+- **Scout:** 150 prices
+- **Guardian:** 750 prices
+- **Champion:** 2,500 prices
+- **Legend:** 4,000 prices
 
 ## Where to see it
 - Your badge shows next to your name in **Profile**.
