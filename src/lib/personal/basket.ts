@@ -12,12 +12,38 @@ export const RADII = [1, 3, 5, 10] as const;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const round1 = (n: number) => Math.round(n * 10) / 10;
 export const ageDays = (date: string, now: Date) => Math.max(0, Math.round((now.getTime() - Date.parse(`${date}T00:00:00Z`)) / 86400000));
-export const normStore = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]+/g, " ").replace(/\b(supermarket|supermarkt|super market|mini market|minimarket|the|n v|nv|bv|b v)\b/g, " ").replace(/\s+/g, " ").trim();
-/** Same shop under a slightly different name ("Ling & Sons" and "Ling and Sons Supermarket") */
-export function sameStore(a: string, b: string): boolean {
-  const x = normStore(a.replace(/&/g, " and ")), y = normStore(b.replace(/&/g, " and "));
-  if (!x || !y) return false;
-  return x === y || x.includes(y) || y.includes(x);
+export const normStore = (s: string) => s.toLowerCase().replace(/&/g, " and ").replace(/[^a-z0-9 ]+/g, " ").replace(/\b(supermarket|supermarkt|super market|mini market|minimarket|market|the|and|n v|nv|b v|bv|sa|inc|ltd|store|shop)\b/g, " ").replace(/\s+/g, " ").trim();
+
+/** Words that start many shop names, so on their own they say nothing */
+const GENERIC = new Set(["super", "food", "foods", "mini", "plaza", "fresh", "city", "express", "discount", "cash", "carry"]);
+
+/**
+ * How well two store names are the same shop, 0 to 1 (0 = not the same). "LING & SONS SUPERMARKET NV" matches "Ling and Sons",
+ * and "SuperFood Plaza" matches "Super Food Plaza". A lone short word never matches a longer name.
+ */
+export function storeMatch(a: string, b: string): number {
+  const x = normStore(a), y = normStore(b);
+  if (!x || !y) return 0;
+  if (x === y) return 1;
+  const sx = x.replace(/ /g, ""), sy = y.replace(/ /g, "");
+  if (sx === sy) return 0.95;
+  const tx = x.split(" "), ty = y.split(" ");
+  const [short, long] = tx.length <= ty.length ? [tx, ty] : [ty, tx];
+  const shortOk = short.length >= 2 || (short[0].length >= 4 && !GENERIC.has(short[0]));
+  if (shortOk && short.every((t) => long.includes(t))) return 0.8;
+  const [ss, sl] = sx.length <= sy.length ? [sx, sy] : [sy, sx];
+  if (ss.length >= 5 && !GENERIC.has(short.join(" ")) && sl.includes(ss)) return 0.7;
+  const common = tx.filter((t) => ty.includes(t)).length;
+  const jac = common / new Set([...tx, ...ty]).size;
+  return common >= 2 && jac >= 0.6 ? jac * 0.6 : 0;
+}
+/** Same shop under a slightly different name */
+export const sameStore = (a: string, b: string): boolean => storeMatch(a, b) > 0;
+/** The receipt store that best matches a place name, or null */
+export function bestStoreFor(placeName: string, stores: string[]): string | null {
+  let best: string | null = null, score = 0;
+  for (const s of stores) { const m = storeMatch(s, placeName); if (m > score) { score = m; best = s; } }
+  return best;
 }
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 

@@ -42,5 +42,10 @@ export default function StoreMap({ me, km, pins }: { me: { lat: number; lng: num
     m.fitBounds(circle.getBounds(), { padding: [8, 8] });
   }, [me.lat, me.lng, km, pins]);
 
-  return <div ref={el} className="h-64 w-full overflow-hidden rounded-xl border" data-testid="mini-map" role="region" aria-label={`Map of stores within ${km} km of you`} />;
+  return (
+    <div className="relative">
+      <div ref={el} className="h-64 w-full overflow-hidden rounded-xl border" data-testid="mini-map" role="region" aria-label={`Best store map: stores within ${km} km of you`} />
+      <span className="pointer-events-none absolute left-2.5 top-2.5 z-[500] rounded-full border bg-white px-3 py-1 text-sm font-extrabold text-slate-900 shadow">Best store</span>
+    </div>
+  );
 }

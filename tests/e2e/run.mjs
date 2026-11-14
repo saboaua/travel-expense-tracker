@@ -76,7 +76,19 @@ fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", crea
 /* ---------------- start everything ---------------- */
 // The sharing functions run as the real SQL from supabase/migration_sharing.sql on a real Postgres engine (PGlite)
 const sharingDb = await createSharingBackend(fake, SERVICE_KEY);
-fake.setRpcHook(sharingDb.hook);
+// Community prices: the functions the real database has, as stand-ins that also record what the app sent
+const sharedCalls = [];
+let sharedCount = 0;
+fake.setRpcHook(async (name, body, uid, bearer) => {
+  if (name === "share_prices") { sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
+  if (name === "my_shared_count") return { status: 200, body: sharedCount };
+  if (name === "unshare_my_prices") { const n = sharedCount; sharedCount = 0; return { status: 200, body: n }; }
+  if (name === "community_search") return { status: 200, body: /coca/i.test(String(body.q)) ? [
+    { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "New Ten Sing", price: 1.59, reporters: 7, last_month: "2026-11-01" },
+    { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "Ling & Sons", price: 1.45, reporters: 12, last_month: "2026-11-01" },
+  ] : [] };
+  return sharingDb.hook(name, body, uid, bearer);
+});
 await fake.listen(FAKE_PORT);
 // E2E_PROD=1 runs against a production build (made beforehand with tests/e2e/build-prod.sh), which is how phones get the app
 const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", String(APP_PORT), "-H", "localhost"], {
@@ -1080,6 +1092,70 @@ try {
       me().home_lat = null; me().home_lng = null;
       for (const t of ["grocery_receipts", "grocery_items", "store_locations", "shopping_list_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000c") || a[i].user_id === PAT && t === "shopping_list_items") a.splice(i, 1); }
     }
+  });
+
+  await test("community prices: off until turned on, shares only store, product and price, lookup, and delete", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const rid = "9c000000-0000-4000-8000-0000000e0001";
+    fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: "Ling & Sons", purchase_date: today, total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    fake.table("grocery_items").push({ id: "9d000000-0000-4000-8000-0000000e0101", receipt_id: rid, user_id: PAT, name: "Coca Cola 330ML", normalized_name: "coca cola 330ml", category: "Other", quantity: 3, unit_price: 1.45, line_total: 4.35, unit: null, created_at: new Date().toISOString() });
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    try {
+      sharedCalls.length = 0; sharedCount = 0;
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      await page.getByTestId("community-link").waitFor();
+      await page.waitForTimeout(1500);
+      assert(sharedCalls.length === 0, "nothing is shared while sharing is off");
+      await page.getByTestId("community-link").click();
+      await page.getByRole("heading", { name: "Community prices" }).waitFor();
+      const sw = page.getByTestId("share-toggle");
+      assert((await sw.getAttribute("aria-checked")) === "false", "sharing starts off");
+      await sw.click();
+      await page.getByText(/Sharing is on/).waitFor();
+      assert(me().share_prices === true, "the choice is saved");
+      const rows = sharedCalls.flatMap((c) => c.rows);
+      assert(rows.length === 1, `one price is shared (got ${rows.length})`);
+      assert(JSON.stringify(Object.keys(rows[0]).sort()) === JSON.stringify(["currency", "month", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]), "only store, product, price, size, currency and month are sent");
+      assert(rows[0].price === 1.45 && /^\d{4}-\d{2}-01$/.test(rows[0].month), "the price is sent with the month, not the day");
+      const sent = JSON.stringify(sharedCalls);
+      assert(!sent.includes("pat@example.com") && !sent.includes(PAT) && !sent.includes(rid), "no email, account or receipt id is sent");
+      await page.getByRole("search").getByLabel("Product to look up").fill("coca");
+      await page.getByRole("button", { name: "Search" }).click();
+      const res = page.getByTestId("community-results");
+      await res.getByText("Ling & Sons").waitFor();
+      assert((await res.innerText()).includes("12 reports"), "the number of reports is shown, nothing about who");
+      assert((await res.locator("div", { hasText: "Lowest" }).first().innerText()).includes("Ling & Sons"), "the cheapest store is marked Lowest");
+      await page.getByTestId("share-delete").click();
+      await page.getByText(/Deleted 1 shared price/).waitFor();
+      await sw.click();
+      await page.getByText("Sharing is off").waitFor();
+      assert(me().share_prices === false, "turning it off is saved");
+    } finally {
+      await ctx.close();
+      me().share_prices = false;
+      for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e")) a.splice(i, 1); }
+    }
+  });
+
+  await test("create user: the copy block has the app link, user and temp password", async () => {
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ["clipboard-read", "clipboard-write"] });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/users`);
+      await ap.getByPlaceholder("user@company.com").fill("copyme@example.com");
+      await ap.getByRole("button", { name: "Create user" }).click();
+      await ap.getByText("Share these credentials").waitFor();
+      await ap.getByRole("button", { name: "Copy credentials" }).click();
+      const text = await ap.evaluate(() => navigator.clipboard.readText());
+      assert(/^link: https:\/\/lifolio-woad\.vercel\.app\/\nuser: copyme@example\.com\ntemp password: \S+/.test(text), `copied text has link, user and temp password (got ${JSON.stringify(text.slice(0, 120))})`);
+    } finally { await actx.close(); }
   });
 
   await test("supermarket places: only an admin can open the import, and it offers the example file", async () => {

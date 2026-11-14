@@ -1,4 +1,4 @@
-import { basketTotals, distanceKm, normStore, sameStore, splitAdvice, storeIndex, usualItems, MIN_SHARED } from "../src/lib/personal/basket";
+import { bestStoreFor, basketTotals, distanceKm, normStore, sameStore, splitAdvice, storeIndex, usualItems, MIN_SHARED } from "../src/lib/personal/basket";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 
@@ -14,6 +14,16 @@ const row = (name: string, price: number, store: string, date: string): TrackerR
 eq("same shop, other wording", sameStore("Ling & Sons", "Ling and Sons Supermarket"), true);
 eq("different shops", sameStore("Ling & Sons", "Super Food Plaza"), false);
 eq("normalised", normStore("The Save More Supermarket"), "save more");
+
+// closest match by name
+eq("squashed spaces", sameStore("SuperFood Plaza", "Super Food Plaza"), true);
+eq("and left out", sameStore("Ling Sons", "Ling & Sons"), true);
+eq("company suffix", sameStore("LING & SONS SUPERMARKET N.V.", "Ling and Sons"), true);
+eq("a branch word", sameStore("Ling & Sons Noord", "Ling & Sons"), true);
+eq("a lone short word is not a match", sameStore("Super", "Super Food Plaza"), false);
+eq("different shops with a shared word", sameStore("Super Food Plaza", "Super Save"), false);
+eq("best of two", bestStoreFor("Ling and Sons Supermarket", ["Super Food Plaza", "Ling & Sons"]), "Ling & Sons");
+eq("none", bestStoreFor("Random Shop", ["Ling & Sons"]), null);
 
 // distance: about 1.1 km per 0.01 degree of latitude
 const d = distanceKm({ lat: 12.5, lng: -70 }, { lat: 12.51, lng: -70 });

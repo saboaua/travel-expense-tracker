@@ -16,7 +16,7 @@ import { fetchAll } from "@/lib/personal/fetch-all";
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare";
 import type { TrackerRow } from "@/lib/personal/grocery";
-import { RADII, basketTotals, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
+import { RADII, basketTotals, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
 import { formatCurrency } from "@/lib/utils";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -184,7 +184,7 @@ export function BestStore() {
   useEffect(() => {
     if (locQ.loading || placesQ.loading || stores.length === 0 || known.length === 0) return;
     const fresh = known.flatMap((o) => {
-      const s = stores.find((x) => sameStore(x, o.name));
+      const s = bestStoreFor(o.name, stores);
       const k = s ? `${s}|${o.lat.toFixed(5)},${o.lng.toFixed(5)}` : "";
       return s && !savedKeys.current.has(k) && !locs.some((l) => sameStore(l.name, s) && distanceKm(l, o) < 0.05) ? [{ s, o, k }] : [];
     });

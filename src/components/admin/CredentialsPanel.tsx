@@ -8,6 +8,9 @@ import { TEMP_PASSWORD_TTL_HOURS } from "@/lib/temp-password-config";
 import type { Credentials } from "@/components/admin/user-status";
 
 const fmt = formatDateTime;
+/** Where people sign in. Shown and copied with the login so the new person gets everything in one message. */
+export const APP_LINK = "https://lifolio-woad.vercel.app/";
+export const credentialsText = (c: Credentials) => `link: ${APP_LINK}\nuser: ${c.email}\ntemp password: ${c.password}`;
 
 export function CredentialsPanel({ credentials }: { credentials: Credentials }) {
   const [copied, setCopied] = useState(false);
@@ -19,7 +22,10 @@ export function CredentialsPanel({ credentials }: { credentials: Credentials }) 
       </p>
       <div className="bg-white rounded-xl border p-3 font-mono text-sm space-y-1 break-all">
         <p>
-          <span className="text-muted-foreground">Email:</span> {credentials.email}
+          <span className="text-muted-foreground">Link:</span> {APP_LINK}
+        </p>
+        <p>
+          <span className="text-muted-foreground">User:</span> {credentials.email}
         </p>
         <p>
           <span className="text-muted-foreground">Temp password:</span> {credentials.password}
@@ -35,9 +41,7 @@ export function CredentialsPanel({ credentials }: { credentials: Credentials }) 
         size="sm"
         className="gap-2"
         onClick={() => {
-          navigator.clipboard.writeText(
-            `Email: ${credentials.email}\nTemporary password: ${credentials.password}\n\nSign in and set a new password. This temporary password expires on ${fmt(credentials.expiresAt)}.`
-          );
+          navigator.clipboard.writeText(`${credentialsText(credentials)}\n\nSign in and set a new password. This temporary password expires on ${fmt(credentials.expiresAt)}.`);
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }}

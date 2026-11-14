@@ -59,6 +59,7 @@ export async function GET(req: Request) {
       const id = typeof row === "string" ? row : row.user_id;
       try {
         for (const b of BUCKETS) await removeFiles(db, b, id);
+        try { await db.rpc("unshare_prices_of", { uid: id }); } catch { /* community prices are not set up on this install */ }
         const { error: e } = await db.auth.admin.deleteUser(id);
         if (e) throw new Error(e.message);
         await db.from("security_events").insert({ event_type: "account_deleted", severity: "info", details: { user_id: id, reason: "scheduled by the owner" } });

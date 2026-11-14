@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag, Users } from "lucide-react";
 import { Sparkline } from "@/components/personal/Sparkline";
 import { PriceChart, STORE_COLORS } from "@/components/personal/PriceChart";
 import type { TrackerRow } from "@/lib/personal/grocery";
@@ -17,6 +17,7 @@ import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/li
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
+import { syncSharedPrices } from "@/lib/personal/community";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { compareOnline, FILE_STORES, OLD_FILE_DAYS, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
@@ -85,6 +86,17 @@ export function GroceryPrices() {
     return () => { off = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- wantKey is the list of products asked about
   }, [wantKey, online, onlineTick]);
+
+  // If the person has turned on Community prices, the latest prices are shared at most once a day (store, product and price only)
+  useEffect(() => {
+    if (!online || inCur.length === 0) return;
+    (async () => {
+      const sb = createClient();
+      const { data: { session } } = await sb.auth.getSession();
+      if (session) await syncSharedPrices(sb, session.user.id, products, new Date());
+    })().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per load of the products
+  }, [online, products]);
 
   const verdicts = useMemo(() => {
     const m = new Map<string, OnlineVerdict>();
@@ -163,7 +175,10 @@ export function GroceryPrices() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 pb-28 md:p-8">
-      <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
+      <div className="flex items-center justify-between gap-3">
+        <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
+        <Link href="/personal/groceries/community" data-testid="community-link" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary"><Users className="h-4 w-4" aria-hidden="true" />Community prices</Link>
+      </div>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">Price tracker</h1>
