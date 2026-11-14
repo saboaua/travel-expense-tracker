@@ -1,5 +1,5 @@
 import { loginEmail, APP_LINK } from "../src/lib/login-email";
-import { emailConfigured, sendEmail } from "../src/lib/email";
+import { emailConfigured, emailProvider, sendEmail } from "../src/lib/email";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); } };
@@ -19,7 +19,13 @@ eq("not configured", emailConfigured(), false);
 sendEmail({ to: "a@b.co", subject: "s", html: "h", text: "t" }).then((r) => {
   eq("refuses without a key", r.ok, false);
   process.env.RESEND_API_KEY = "k"; process.env.EMAIL_FROM = "Lifolio <l@x.co>";
-  eq("configured", emailConfigured(), true);
+  eq("configured", [emailConfigured(), emailProvider()], [true, "resend"]);
+  process.env.GMAIL_USER = "a@gmail.com"; process.env.GMAIL_APP_PASSWORD = "pw";
+  eq("gmail wins when both are set", emailProvider(), "gmail");
+  delete process.env.RESEND_API_KEY; delete process.env.EMAIL_FROM;
+  eq("gmail alone is enough", [emailConfigured(), emailProvider()], [true, "gmail"]);
+  delete process.env.GMAIL_APP_PASSWORD;
+  eq("half set is off", [emailConfigured(), emailProvider()], [false, null]);
   if (fail) process.exit(1);
   console.log("login-email OK");
 });
