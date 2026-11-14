@@ -12,15 +12,16 @@
 
 alter table public.profiles add column if not exists share_prices boolean not null default false;
 
-create table if not exists public.app_secrets (
-  name text primary key,
-  value text not null
+-- The secret mixed into the one-way contributor id. Its own table: public.app_secrets already exists for Telegram with different columns.
+create table if not exists public.price_share_secret (
+  id integer primary key default 1 check (id = 1),
+  salt text not null
 );
-alter table public.app_secrets enable row level security;
-revoke all on table public.app_secrets from anon, authenticated;
-insert into public.app_secrets (name, value)
-values ('price_share_salt', replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
-on conflict (name) do nothing;
+alter table public.price_share_secret enable row level security;
+revoke all on table public.price_share_secret from anon, authenticated;
+insert into public.price_share_secret (id, salt)
+values (1, replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''))
+on conflict (id) do nothing;
 
 create table if not exists public.shared_prices (
   id bigint generated always as identity primary key,
@@ -42,7 +43,7 @@ revoke all on table public.shared_prices from anon, authenticated;
 -- One-way id of a person, only for counting reporters and deleting their own rows
 create or replace function public._price_contributor_of(uid uuid) returns text
 language sql stable security definer set search_path = public as $$
-  select encode(sha256(convert_to(uid::text || (select value from public.app_secrets where name = 'price_share_salt'), 'UTF8')), 'hex')
+  select encode(sha256(convert_to(uid::text || (select salt from public.price_share_secret where id = 1), 'UTF8')), 'hex')
 $$;
 revoke all on function public._price_contributor_of(uuid) from public, anon, authenticated;
 
@@ -133,3 +134,6 @@ grant execute on function public.unshare_prices_of(uuid) to service_role;
 
 revoke all on function public.share_prices(jsonb), public.community_search(text, text[]), public.unshare_my_prices(), public.my_shared_count() from public, anon;
 grant execute on function public.share_prices(jsonb), public.community_search(text, text[]), public.unshare_my_prices(), public.my_shared_count() to authenticated;
+
+-- Make the app notice the new column and functions straight away
+notify pgrst, 'reload schema';
