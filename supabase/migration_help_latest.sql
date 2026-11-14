@@ -4,7 +4,7 @@
 --
 -- Added: welcome tour, sign in and request an account, forgot password, temporary password, contact support, scan a receipt,
 -- groceries overview, price tracker, add a price, community prices, loyalty cards, home projects, personal trips, reports,
--- sharing activity, waiting to sync, privacy, and eight Admin guides.
+-- sharing activity, waiting to sync, privacy, and seven Admin guides.
 
 -- Only admins can see or change the "Admin" group of Help topics
 create or replace function public.help_is_admin() returns boolean
