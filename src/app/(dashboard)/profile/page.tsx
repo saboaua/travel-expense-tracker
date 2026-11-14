@@ -16,6 +16,7 @@ import { HomePlaceCard } from "@/components/profile/HomePlaceCard";
 import { SharingCard } from "@/components/profile/SharingCard";
 import { NotificationsCard } from "@/components/profile/NotificationsCard";
 import { YourDataCard } from "@/components/profile/YourDataCard";
+import { CommunityCard } from "@/components/profile/CommunityCard";
 
 interface Profile {
   id: string;
@@ -339,6 +340,8 @@ export default function ProfilePage() {
       <SharingCard />
 
       <HomePlaceCard />
+
+      <CommunityCard />
 
       <PasswordCard />
 

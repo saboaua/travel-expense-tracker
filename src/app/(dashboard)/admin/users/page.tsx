@@ -56,6 +56,14 @@ export default function AdminUsersPage() {
     }
   }, []);
 
+  // Arriving from Account requests: fill in the name and email that person gave
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("email")) setEmail(q.get("email")!);
+    if (q.get("first")) setFirstName(q.get("first")!);
+    if (q.get("last")) setLastName(q.get("last")!);
+  }, []);
+
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);

@@ -19,7 +19,7 @@ async function handle(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Public routes that don't need further checks
-  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/auth/login", "/api/csp-report", "/api/version", "/s/"];
+  const publicPaths = ["/login", "/forgot-password", "/reset-password", "/auth", "/privacy", "/contact", "/api/support", "/api/request-account", "/api/auth/login", "/api/csp-report", "/api/version", "/s/"];
   if (publicPaths.some((p) => path.startsWith(p))) {
     return response;
   }

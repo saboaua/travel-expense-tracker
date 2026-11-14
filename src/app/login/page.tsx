@@ -9,6 +9,7 @@ import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
 import { NETWORK_MESSAGE } from "@/lib/password-policy";
 import { Bricolage_Grotesque, Figtree } from "next/font/google";
 import { FEATURES, IconTile, Waves } from "@/components/login/LoginArt";
+import { RequestAccountForm } from "@/components/login/RequestAccountForm";
 
 const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-login-display" });
 const body = Figtree({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-login-body" });
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [ready, setReady] = useState(false);
   useEffect(() => setReady(true), []);
   const [error, setError] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
   // Optional security check, shown only after repeated failures for this email
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
   const [captchaNeeded, setCaptchaNeeded] = useState(false);
@@ -166,6 +168,10 @@ export default function LoginPage() {
 
         <div className="relative z-10 -mt-12 flex flex-1 flex-col items-center px-4 pb-6 lg:mt-0 lg:justify-center lg:px-10">
           <div className="w-full max-w-[420px] rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(10,37,64,.18)] dark:bg-slate-900 sm:p-6 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none lg:dark:bg-transparent">
+            {requesting ? (
+              <RequestAccountForm primaryColor={primaryColor} inputCls={inputCls} onBack={() => setRequesting(false)} />
+            ) : (
+              <>
             <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-extrabold tracking-tight lg:text-4xl">Welcome back</h1>
             <p className="mt-1 hidden text-base text-slate-500 dark:text-slate-400 lg:block">Sign in to pick up where you left off.</p>
 
@@ -229,11 +235,13 @@ export default function LoginPage() {
             </form>
 
             <p className="mt-6 hidden border-t border-slate-200 pt-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:block">
-              Need an account? Ask your administrator.
+              Want an account? <button type="button" onClick={() => setRequesting(true)} className="font-semibold" style={{ color: primaryColor }}>Request one</button>
             </p>
+              </>
+            )}
           </div>
 
-          <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400 lg:hidden">Need an account? Ask your administrator.</p>
+          {!requesting && <p className="mt-6 text-center text-sm text-slate-500 dark:text-slate-400 lg:hidden">Want an account? <button type="button" onClick={() => setRequesting(true)} className="font-semibold" style={{ color: primaryColor }}>Request one</button></p>}
 
           <div className="mt-auto flex items-center justify-center gap-3 pt-8 text-[12.5px] text-slate-500 lg:mt-8 lg:pt-0">
             <span className="flex items-center gap-1"><Lock className="h-3 w-3" />Encrypted</span>

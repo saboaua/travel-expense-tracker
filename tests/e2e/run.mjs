@@ -1141,6 +1141,68 @@ try {
     }
   });
 
+  await test("profile: Community prices can be turned on and off from Profile", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/profile`);
+      await page.getByRole("button", { name: /Community prices/ }).click();
+      const sw = page.getByTestId("profile-share-toggle");
+      await sw.waitFor();
+      assert((await sw.getAttribute("aria-checked")) === "false", "sharing starts off");
+      assert((await page.getByTestId("community-card").innerText()).includes("Never shared: your name, email, receipts, dates, location or totals"), "the promise is shown");
+      await sw.click();
+      await page.getByText(/Sharing is on/).first().waitFor();
+      assert(me().share_prices === true, "the choice is saved from Profile");
+      await sw.click();
+      await page.getByText(/Sharing is off/).first().waitFor();
+      assert(me().share_prices === false, "turning it off is saved");
+    } finally {
+      await ctx.close();
+      me().share_prices = false;
+    }
+  });
+
+  await test("request an account: asked on the sign-in screen, seen and handled by the admin", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await page.goto(`${BASE}/login`);
+      await page.waitForLoadState("networkidle");
+      await page.getByRole("button", { name: "Request one" }).click();
+      await page.getByLabel("Full name").fill("Lisa Boekhoudt");
+      await page.getByRole("button", { name: "Request account" }).click();
+      await page.getByText("Add an email or a phone number so we can reach you.").waitFor();
+      assert(fake.table("account_requests").length === 0, "nothing is saved without an email or phone number");
+      await page.getByLabel("Phone number").fill("+297 593 1234");
+      await page.getByRole("button", { name: "Request account" }).click();
+      await page.getByTestId("request-sent").waitFor();
+      const saved = fake.table("account_requests");
+      assert(saved.length === 1 && saved[0].name === "Lisa Boekhoudt" && saved[0].phone === "+297 593 1234" && saved[0].email == null && saved[0].status === "new", "the request is saved for the admins");
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/account-requests`);
+      const list = ap.getByTestId("request-list");
+      await list.getByText("Lisa Boekhoudt").waitFor();
+      await ap.getByRole("button", { name: "Dismiss" }).click();
+      await list.getByText("Dismissed").waitFor();
+      assert(fake.table("account_requests")[0].status === "dismissed", "dismissing is saved");
+      const anon = await page.evaluate(async () => (await fetch("/api/admin/account-requests")).status);
+      assert(anon === 401 || anon === 403, "someone who is not an admin cannot read the requests");
+    } finally {
+      await ctx.close(); await actx.close();
+      fake.table("account_requests").length = 0;
+    }
+  });
+
   await test("create user: the copy block has the app link, user and temp password", async () => {
     const actx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ["clipboard-read", "clipboard-write"] });
     actx.setDefaultTimeout(60_000);

@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin, UserPlus } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -69,6 +69,13 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Supermarket Places",
     description: "Import supermarket GPS points from Excel so they show on the Best store map.",
     icon: MapPin,
+  },
+  {
+    href: "/admin/account-requests",
+    feature: "admin.only",
+    title: "Account Requests",
+    description: "People who asked for an account on the sign-in screen, with how to reach them.",
+    icon: UserPlus,
   },
   {
     href: "/admin/users",
