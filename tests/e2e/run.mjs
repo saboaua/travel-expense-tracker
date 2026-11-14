@@ -79,6 +79,9 @@ const sharingDb = await createSharingBackend(fake, SERVICE_KEY);
 // Community prices: the functions the real database has, as stand-ins that also record what the app sent
 const sharedCalls = [];
 let sharedCount = 0;
+let badgeSeen = 0, badgePushed = 0;
+const badgeLevel = (n) => (n >= 1000 ? 5 : n >= 500 ? 4 : n >= 200 ? 3 : n >= 50 ? 2 : n >= 1 ? 1 : 0);
+let badgeBest = 0;
 fake.setRpcHook(async (name, body, uid, bearer) => {
   if (name === "share_prices") { sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
   if (name === "my_invite" || name === "reset_my_invite" || name === "set_invite_show_name") {
@@ -89,6 +92,9 @@ fake.setRpcHook(async (name, body, uid, bearer) => {
     if (name === "set_invite_show_name") { l.show_name = body.show === true; return { status: 200, body: null }; }
     return { status: 200, body: [{ code: l.code, show_name: l.show_name, friends: fake.table("account_requests").filter((r) => r.referred_by === uid).length }] };
   }
+  if (name === "my_badge") { badgeBest = Math.max(badgeBest, badgeLevel(sharedCount)); return { status: 200, body: [{ total: sharedCount, level: badgeLevel(sharedCount), best: badgeBest, seen: badgeSeen }] }; }
+  if (name === "ack_badge") { badgeSeen = badgeBest; return { status: 200, body: null }; }
+  if (name === "claim_badge_alert") { if (badgeBest <= badgePushed) return { status: 200, body: 0 }; badgePushed = badgeBest; return { status: 200, body: badgeBest }; }
   if (name === "my_shared_count") return { status: 200, body: sharedCount };
   if (name === "unshare_my_prices") { const n = sharedCount; sharedCount = 0; return { status: 200, body: n }; }
   if (name === "community_search") return { status: 200, body: /coca/i.test(String(body.q)) ? [
@@ -1258,10 +1264,34 @@ try {
       assert(me().share_prices === true, "the choice is saved from Profile");
       assert((await page.getByRole("button", { name: /See community prices/ }).count()) === 0 && (await page.getByRole("link", { name: /See community prices/ }).count()) === 0, "there is no See community prices button");
       assert(/bg-red-600/.test((await page.getByTestId("profile-share-delete").getAttribute("class")) ?? ""), "Delete what I shared is red");
+      // badges: nothing earned yet, then 50 prices shared shows Scout with a one-time message
+      await page.getByTestId("badge-panel").waitFor();
+      assert((await page.getByTestId("badge-panel").innerText()).includes("Your first badge is close"), "no badge yet says what to do");
+      sharedCount = 50; badgeBest = 0; badgeSeen = 0;
+      await page.goto(`${BASE}/profile`);
+      await page.getByTestId("level-up").waitFor();
+      assert((await page.getByTestId("level-up").innerText()).includes("Scout"), "the level-up message names the badge");
+      await page.getByTestId("level-up-done").click();
+      for (let i = 0; i < 50 && badgeSeen !== 2; i++) await page.waitForTimeout(100);
+      assert(badgeSeen === 2, "the message is marked as seen");
+      assert((await page.getByTestId("badge-chip").innerText()).includes("Scout"), "the badge shows beside the name");
+      await page.getByRole("button", { name: /Community prices/ }).click();
+      assert((await page.getByTestId("badge-name").innerText()) === "Scout", "the card shows the badge");
+      await page.getByTestId("badge-shelf-link").click();
+      await page.getByTestId("badge-shelf").waitFor();
+      assert((await page.getByTestId("badge-tier-scout").innerText()).includes("Your level"), "the shelf marks the current level");
+      assert((await page.getByTestId("badge-tier-legend").innerText()).includes("1,000"), "the shelf shows what unlocks the next levels");
+      await page.goto(`${BASE}/profile`);
+      await page.getByRole("button", { name: /Community prices/ }).click();
+      // deleting restarts the count but keeps the earned badge
+      sharedCount = 50; await page.getByTestId("profile-share-delete").click();
+      await page.getByText(/Deleted 50 shared prices/).waitFor();
+      assert((await page.getByTestId("badge-name").innerText()) === "Scout", "the earned badge stays after deleting");
       await sw.click();
       await page.getByText(/Sharing is off/).first().waitFor();
       assert(me().share_prices === false, "turning it off is saved");
     } finally {
+      sharedCount = 0; badgeBest = 0; badgeSeen = 0; badgePushed = 0;
       await ctx.close();
       me().share_prices = false;
     }
@@ -2520,7 +2550,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 11, "device switch, nine kinds of alert and quiet hours (no Support or IPTV for a normal person)");
+    assert((await card.getByRole("switch").count()) === 16, "device switch, fifteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);

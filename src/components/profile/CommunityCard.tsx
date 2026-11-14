@@ -7,12 +7,16 @@ import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AccordionSection } from "@/components/ui/accordion";
+import { TIERS, plural, progress, readBadge, tierOf, type BadgeState } from "@/lib/personal/badges";
+import { BadgeShield } from "@/components/profile/BadgeShield";
+import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 
 /** Profile > Community prices: the switch for sharing receipt prices (store, item name and price only), and a way to delete what was shared. */
 export function CommunityCard() {
   const [on, setOn] = useState<boolean | null>(null);
   const [available, setAvailable] = useState(true);
   const [mine, setMine] = useState<number | null>(null);
+  const [badge, setBadge] = useState<BadgeState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -26,6 +30,8 @@ export function CommunityCard() {
     setOn(data?.share_prices === true);
     const c = await sb.rpc("my_shared_count");
     setMine(c.error ? null : Number(c.data) || 0);
+    const b = await sb.rpc("my_badge"); // null until migration_badges.sql has been run
+    setBadge(b.error ? null : readBadge(b.data));
   }, []);
   useEffect(() => { load(); }, [load]);
 
@@ -65,6 +71,8 @@ export function CommunityCard() {
     );
   }
   return (
+    <>
+    <LevelUpNotice />
     <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
       <div className="space-y-4" data-testid="community-card">
         {err && <Alert variant="error">{err}</Alert>}
@@ -79,6 +87,7 @@ export function CommunityCard() {
             <span className="sr-only">{on ? "On" : "Off"}</span>
           </button>
         </div>
+        {badge && <BadgePanel badge={badge} on={on === true} />}
         <p className="text-sm text-muted-foreground">Your prices join a shared price list that nobody can trace back to you, so others can see when an item is cheaper somewhere else.</p>
         <ul className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/50">
           <li><b className="text-emerald-600">✓</b> Shared: the store name, the item name and the price. Nothing else.</li>
@@ -91,8 +100,48 @@ export function CommunityCard() {
             <Button className="h-11 w-full bg-red-600 text-white hover:bg-red-700" disabled={busy || !mine} onClick={withdraw} data-testid="profile-share-delete">Delete what I shared{mine ? ` (${mine} price${mine === 1 ? "" : "s"})` : ""}</Button>
           </div>
         )}
+        {on && badge && <p className="text-xs text-muted-foreground">Deleting restarts your count at 0. Badges you earned stay on your shelf.</p>}
         <p className="text-center text-xs text-muted-foreground">Read the <Link href="/privacy" className="underline">Privacy Policy</Link></p>
       </div>
     </AccordionSection>
+    </>
+  );
+}
+
+/** Your badge, the way to the next level, and a link to all levels. Only you see it. */
+function BadgePanel({ badge, on }: { badge: BadgeState; on: boolean }) {
+  const p = progress(badge.total);
+  const shown = tierOf(badge.best);
+  return (
+    <div className="space-y-3" data-testid="badge-panel">
+      {shown ? (
+        <div className="flex items-center gap-3.5 rounded-2xl p-3" style={{ background: shown.tint }}>
+          <BadgeShield level={shown.level} size={72} />
+          <div>
+            <p className="text-xs text-muted-foreground">Your badge</p>
+            <p className="text-2xl font-extrabold" style={{ color: shown.dark }} data-testid="badge-name">{shown.name}</p>
+            <p className="text-sm text-muted-foreground">{plural(badge.total)} shared</p>
+          </div>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 rounded-2xl border p-3">
+          <div className="flex">{TIERS.slice(0, 3).map((t) => <BadgeShield key={t.level} level={t.level} size={38} locked />)}</div>
+          <div className="text-sm">
+            <b>{on ? "Your first badge is close" : "Earn badges by sharing prices"}</b>
+            <p className="text-muted-foreground">{on ? "Share 1 price to become a Helper. Open the Price tracker to send your latest prices." : "Turn sharing on to start. Only store, item and price leave your phone."}</p>
+          </div>
+        </div>
+      )}
+      {on && p.next && (
+        <div>
+          <div className="flex justify-between text-sm"><b>Next: {p.next.name}</b><span className="text-muted-foreground">{badge.total.toLocaleString("en-US")} of {p.next.from.toLocaleString("en-US")}</span></div>
+          <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${p.pct}%` }} /></div>
+          <p className="mt-1.5 text-xs text-muted-foreground">{plural(p.toGo)} to go.</p>
+        </div>
+      )}
+      {on && !p.next && <p className="text-sm text-muted-foreground">You reached the top level. Thank you.</p>}
+      <Link href="/profile/badges" data-testid="badge-shelf-link" className="flex min-h-[44px] items-center justify-between text-sm font-bold text-primary"><span>See all badges</span><span aria-hidden>›</span></Link>
+      <p className="border-t pt-2.5 text-xs text-muted-foreground">Only you see your badge. Others never see it, and there is no leaderboard.</p>
+    </div>
   );
 }

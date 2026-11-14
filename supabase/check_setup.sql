@@ -54,6 +54,10 @@ need_cols(tbl, col, fix) as (values
   ('fixed_costs','end_month','migration_fixed_costs.sql'),
   ('fixed_entries','on_date','migration_fixed_costs.sql'),
   ('profiles','push_prefs','migration_sharing_safety.sql'),
+  ('profiles','shared_total','migration_badges.sql'),
+  ('profiles','badge_best','migration_badges.sql'),
+  ('profiles','badge_seen','migration_badges.sql'),
+  ('profiles','badge_pushed','migration_badges.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -100,6 +104,7 @@ need_tables(tbl, fix) as (values
   ('push_subscriptions','migration_sharing_safety.sql'),
   ('push_sent_log','migration_push_alerts.sql'),
   ('push_queue','migration_push_alerts.sql'),
+  ('price_share_seen','migration_badges.sql'),
   ('loyalty_cards','migration_loyalty.sql'),
   ('travel_documents','migration_documents.sql'),
   ('subscriptions','migration_subscriptions.sql')
@@ -155,6 +160,7 @@ other_checks as (
   from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('my_shared_count','migration_shared_prices.sql'),
                ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
                ('sharing_activity_export','migration_sharing_safety.sql'),
+               ('my_badge','migration_badges.sql'), ('ack_badge','migration_badges.sql'), ('claim_badge_alert','migration_badges.sql'), ('_badge_level','migration_badges.sql'),
                ('my_invite','migration_invites.sql'), ('reset_my_invite','migration_invites.sql'), ('set_invite_show_name','migration_invites.sql')) as f(fn, fix)
   union all
   select 'privacy', 'shared_prices: nobody can read it directly',
@@ -174,6 +180,12 @@ other_checks as (
               when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='invite_links' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_invites.sql'
               else 'OK' end,
          'migration_invites.sql'
+  union all
+  select 'privacy', 'price_share_seen: nobody can read it',
+         case when to_regclass('public.price_share_seen') is null then 'MISSING'
+              when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='price_share_seen' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_badges.sql'
+              else 'OK' end,
+         'migration_badges.sql'
   union all
   select 'privacy', 'price_share_secret: nobody can read it',
          case when to_regclass('public.price_share_secret') is null then 'MISSING'
@@ -211,6 +223,12 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_fixed_costs.sql'
   from (values ('fixed-costs')) as s(slug)
+  union all
+  select 'help topic', 'community-badges',
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.help_topics where slug = ''community-badges''', false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_badges.sql'
   union all
   -- the wording updates inside older help topics (migration_help_fixed_costs.sql)
   select 'help wording', w.label,

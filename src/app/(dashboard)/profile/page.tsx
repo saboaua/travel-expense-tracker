@@ -17,6 +17,7 @@ import { SharingCard } from "@/components/profile/SharingCard";
 import { NotificationsCard } from "@/components/profile/NotificationsCard";
 import { YourDataCard } from "@/components/profile/YourDataCard";
 import { CommunityCard } from "@/components/profile/CommunityCard";
+import { BadgeChip } from "@/components/profile/BadgeChip";
 import { RecommendCard } from "@/components/profile/RecommendCard";
 
 interface Profile {
@@ -231,6 +232,7 @@ export default function ProfilePage() {
 
             <div className="text-center sm:text-left flex-1">
               <h2 className="text-xl font-semibold">{displayName}</h2>
+              <BadgeChip />
               {title && (
                 <p className="text-muted-foreground">{title}</p>
               )}

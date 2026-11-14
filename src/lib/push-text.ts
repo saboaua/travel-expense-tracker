@@ -25,6 +25,7 @@ export const PUSH_TEXT = {
   fixedYearly: { title: "Lifolio", body: "A yearly bill is coming up. Open the app to check it." },
   fixedMonthly: { title: "Lifolio", body: "A payment is due tomorrow. Open the app to check it." },
   support: { title: "Lifolio", body: "A new support request arrived." },
+  badge: { title: "Lifolio", body: "You earned a new badge." },
   accountRequest: { title: "Lifolio", body: "A new account request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
@@ -134,6 +135,12 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
     case "support": {
       const subject = clean(d.subject, 60);
       return by ? `Support request from ${by}${subject ? `: “${subject}”` : ""}.` : subject ? `Support request: “${subject}”.` : null;
+    }
+    case "badge": {
+      const name = clean(d.item, 20);
+      if (!name) return null;
+      const n = d.count ?? 0;
+      return `New badge: ${name}.${n > 0 ? ` You have shared ${n.toLocaleString("en-US")} price${n === 1 ? "" : "s"}.` : ""} Thank you.`;
     }
     case "accountRequest": {
       const ref = clean(d.item, 40);

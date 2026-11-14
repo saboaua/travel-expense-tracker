@@ -111,6 +111,7 @@ export function NotificationsCard() {
     { title: "Sharing", rows: [
       { key: "invites", title: "Invites and replies", hint: "Someone invites you, or answers your invite.", example: "\u201cAlice invited you to share.\u201d" },
       { key: "shared", title: "Shared with me changed", hint: "A partner shares, updates or stops sharing.", example: "\u201cAlice shared the trip Winlott Meeting with you.\u201d" },
+      { key: "badges", title: "Community badges", hint: "When you reach a new level for sharing prices. One alert per level.", example: "\u201cNew badge: Scout. You have shared 50 prices. Thank you.\u201d", isNew: true },
       { key: "views", title: "When someone opens what I shared", hint: "Off by default. The history always has it." },
     ] },
     { title: "Budget and fixed costs", rows: [
