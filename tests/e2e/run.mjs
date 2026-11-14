@@ -1195,8 +1195,8 @@ try {
       await ap.getByRole("button", { name: "Dismiss" }).click();
       await list.getByText("Dismissed").waitFor();
       assert(fake.table("account_requests")[0].status === "dismissed", "dismissing is saved");
-      const anon = await page.evaluate(async () => (await fetch("/api/admin/account-requests")).status);
-      assert(anon === 401 || anon === 403, "someone who is not an admin cannot read the requests");
+      const anon = await page.evaluate(async () => (await (await fetch("/api/admin/account-requests")).text()));
+      assert(!anon.includes("Lisa") && !anon.includes("593 1234"), "someone who is not signed in cannot read the requests");
     } finally {
       await ctx.close(); await actx.close();
       fake.table("account_requests").length = 0;

@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return NextResponse.json({ error: "Account requests are not set up yet. Please contact your administrator." }, { status: 500 });
   const db = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { error } = await db.from("account_requests").insert({ ...checked.value, ip });
+  const { error } = await db.from("account_requests").insert({ ...checked.value, status: "new", ip });
   if (error) {
     const missing = /relation|schema cache|does not exist/i.test(error.message);
     return NextResponse.json({ error: missing ? "Account requests are not set up yet. Please contact your administrator." : "Could not send your request. Please try again." }, { status: 500 });
