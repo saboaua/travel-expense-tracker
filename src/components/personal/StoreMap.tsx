@@ -29,7 +29,9 @@ export default function StoreMap({ me, km, pins }: { me: { lat: number; lng: num
     if (!m || !g) return;
     g.clearLayers();
     const circle = L.circle([me.lat, me.lng], { radius: km * 1000, color: "#1d4ed8", weight: 1.5, dashArray: "5 4", fillOpacity: 0.05 }).addTo(g);
-    L.marker([me.lat, me.lng], { icon: L.divIcon({ className: "", html: '<div style="width:14px;height:14px;border-radius:7px;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 1px #2563eb"></div>', iconSize: [14, 14], iconAnchor: [7, 7] }), title: "You" }).addTo(g);
+    // You are a person, never a number: a blue badge with a person on it, above every store pin
+    const person = '<div style="width:34px;height:34px;border-radius:17px;background:#2563eb;border:3px solid #fff;box-shadow:0 0 0 2px #2563eb,0 2px 6px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="#fff" aria-hidden="true"><circle cx="12" cy="7.5" r="4.2"/><path d="M3.5 21c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg></div><div style="position:absolute;left:50%;top:38px;transform:translateX(-50%);background:#fff;border:1px solid #cbd5e1;border-radius:8px;padding:0 6px;font:700 11px system-ui;color:#1d4ed8;white-space:nowrap">You</div>';
+    L.marker([me.lat, me.lng], { icon: L.divIcon({ className: "", html: person, iconSize: [34, 34], iconAnchor: [17, 17] }), title: "You", zIndexOffset: 5000 }).addTo(g);
     for (const p of [...pins].sort((a, b) => (b.n ?? 999) - (a.n ?? 999))) {
       const html = p.n != null
         ? `<div style="width:26px;height:26px;border-radius:13px;background:${p.best ? "#059669" : "#1d4ed8"};color:#fff;font:700 13px system-ui;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4)">${p.n}</div>`
