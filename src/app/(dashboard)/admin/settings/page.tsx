@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
   {
@@ -62,6 +62,13 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Do it Aruba Prices",
     description: "Import the Do it price list from an exported Excel file for the Price tracker.",
     icon: FileSpreadsheet,
+  },
+  {
+    href: "/admin/supermarkets",
+    feature: "admin.only",
+    title: "Supermarket Places",
+    description: "Import supermarket GPS points from Excel so they show on the Best store map.",
+    icon: MapPin,
   },
   {
     href: "/admin/users",

@@ -43,6 +43,7 @@ need_cols(tbl, col, fix) as (values
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
+  ('supermarket_places','name_key','migration_supermarket_places.sql'),
   -- Price tracker
   ('price_checks','product','migration_price_notes.sql'),
   ('price_checks','photo_path','migration_price_notes.sql')

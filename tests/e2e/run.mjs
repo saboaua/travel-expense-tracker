@@ -1030,6 +1030,30 @@ try {
     }
   });
 
+  await test("supermarket places: only an admin can open the import, and it offers the example file", async () => {
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/supermarkets`);
+      await ap.getByRole("heading", { name: "Supermarket places" }).waitFor();
+      await ap.getByTestId("places-template").waitFor();
+      const r = await ap.evaluate(async () => { const x = await fetch("/api/admin/supermarket-import?template=1"); const b = new Uint8Array(await x.arrayBuffer()); return { ok: x.ok, head: String.fromCharCode(b[0], b[1]) }; });
+      assert(r.ok && r.head === "PK", "the example file is a real .xlsx");
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const code = await page.evaluate(async () => (await fetch("/api/admin/supermarket-import")).status);
+      assert(code === 403 || code === 401, `a regular user is refused by the API (got ${code})`);
+      await page.goto(`${BASE}/admin/supermarkets`);
+      await page.waitForURL((u) => !u.pathname.startsWith("/admin"));
+    } finally { await ctx.close(); await actx.close(); }
+  });
+
   await test("online: shop prices sit beside what you paid, an unsure match asks once, and nothing is added to spending", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
