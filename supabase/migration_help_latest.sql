@@ -403,6 +403,33 @@ Tap **New topic**, or tap a topic to change it. Fill in the title, group, summar
 Plain text only: pictures and links are not used.$h$, 106, true)
 on conflict (slug) do nothing;
 
+-- Recommend Lifolio to a friend
+insert into public.help_topics (slug, title, category, summary, body, sort_order, published) values
+('recommend-lifolio', 'Recommend Lifolio to a friend', 'Your account',
+ 'Copy or share your personal link so a friend can see what Lifolio does and ask for an account.',
+$h$Open **Profile**, then **Recommend Lifolio**.
+
+## Send your link
+1. Tap **Copy** to copy your personal link, then paste it in a message.
+2. Or tap **Share with a friend** (on your phone). Choose WhatsApp, Messages, email or any other app.
+3. Your friend opens the link, reads what Lifolio does and taps **Request an account**.
+
+An administrator then reviews the request and creates the account.
+
+## Your name on the invite page
+The page says "**Pat recommends Lifolio**" so your friend knows who sent it. Switch **Show my first name** off if you prefer it not to show. Only your first name is ever shown, never your email or anything else.
+
+## What you can see
+You see **how many friends** asked for an account with your link. You never see their names or contact details. Those go to the administrators only.
+
+## A link you no longer want
+Tap **Make a new link**. The old link stops working at once. Friends who already asked are not affected.
+
+## Good to know
+- Lifolio is by invitation, so a friend cannot sign up alone. An administrator must approve the request.
+- Sharing your link does not share any of your own data.$h$, 14, true)
+on conflict (slug) do nothing;
+
 -- The Home place topic gets the GPS point section (only if it is not there yet)
 update public.help_topics
 set body = body || E'\n\n## Save a GPS point for Best store\nThe **Home place** section also has a **Home GPS point**. Stand at home and tap **Save my home location**. Best store then measures distance from home when your phone location is off. The point is rounded to about 100 m and only you can see it. Tap **Remove** to delete it.'

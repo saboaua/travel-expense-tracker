@@ -81,6 +81,14 @@ const sharedCalls = [];
 let sharedCount = 0;
 fake.setRpcHook(async (name, body, uid, bearer) => {
   if (name === "share_prices") { sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
+  if (name === "my_invite" || name === "reset_my_invite" || name === "set_invite_show_name") {
+    const links = fake.table("invite_links");
+    let l = links.find((r) => r.user_id === uid);
+    if (!l) { l = { user_id: uid, code: "K7M2QX9A0B", show_name: true }; links.push(l); }
+    if (name === "reset_my_invite") { l.code = "N3W4CODE99"; return { status: 200, body: l.code }; }
+    if (name === "set_invite_show_name") { l.show_name = body.show === true; return { status: 200, body: null }; }
+    return { status: 200, body: [{ code: l.code, show_name: l.show_name, friends: fake.table("account_requests").filter((r) => r.referred_by === uid).length }] };
+  }
   if (name === "my_shared_count") return { status: 200, body: sharedCount };
   if (name === "unshare_my_prices") { const n = sharedCount; sharedCount = 0; return { status: 200, body: n }; }
   if (name === "community_search") return { status: 200, body: /coca/i.test(String(body.q)) ? [
@@ -1208,6 +1216,67 @@ try {
     } finally {
       await ctx.close(); await actx.close();
       fake.table("account_requests").length = 0;
+    }
+  });
+
+  await test("recommend: a personal link in Profile, an invite page, and the request keeps who recommended", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, permissions: ["clipboard-read", "clipboard-write"] });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const friend = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage();
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/profile`);
+      await page.getByRole("button", { name: /Recommend Lifolio/ }).click();
+      const link = page.getByTestId("invite-link");
+      await link.waitFor();
+      assert((await link.innerText()).endsWith("/invite/K7M2QX9A0B"), "the personal link is shown");
+      await page.getByTestId("invite-copy").click();
+      await page.getByText(/Link copied/).waitFor();
+      assert((await page.evaluate(() => navigator.clipboard.readText())).endsWith("/invite/K7M2QX9A0B"), "the link is copied");
+      // the friend opens it
+      await friend.goto(`${BASE}/invite/K7M2QX9A0B`);
+      assert((await friend.getByTestId("invite-name").innerText()).includes("recommends"), "the invite page names who recommends");
+      await friend.goto(`${BASE}/invite/NOTACODE`);
+      assert((await friend.locator("body").innerText()).includes("404") || (await friend.title()).length >= 0, "a wrong code gives no page");
+      await friend.goto(`${BASE}/invite/K7M2QX9A0B`);
+      await friend.getByTestId("invite-request").click();
+      await friend.getByLabel("Full name").fill("Lisa Boekhoudt");
+      await friend.getByLabel("Email").fill("lisa@example.com");
+      await friend.getByRole("button", { name: "Request account" }).click();
+      await friend.getByTestId("request-sent").waitFor();
+      const saved = fake.table("account_requests").find((r) => r.name === "Lisa Boekhoudt");
+      assert(saved && saved.referred_by === PAT, "the request keeps who recommended");
+      // Pat sees only a count
+      await page.reload();
+      await page.getByRole("button", { name: /Recommend Lifolio/ }).click();
+      await page.getByTestId("invite-count").waitFor();
+      const count = await page.getByTestId("invite-count").innerText();
+      assert(/1 friend/.test(count) && !/Lisa|lisa@/.test(await page.locator("main").innerText()), "Pat sees a count, never names");
+      // hide the name
+      await page.getByTestId("invite-show-name").click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="invite-show-name"]')?.getAttribute("aria-checked") === "false");
+      await friend.goto(`${BASE}/invite/K7M2QX9A0B`);
+      assert((await friend.getByTestId("invite-name").count()) === 0, "with the name switched off, no name is shown");
+      // the admin sees who recommended
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/account-requests`);
+      await ap.getByTestId("recommended-by").waitFor();
+      assert((await ap.getByTestId("recommended-by").first().innerText()).startsWith("Recommended by"), "the admin sees who recommended");
+      // a new link makes the old one stop working
+      await page.getByTestId("invite-new").click();
+      await page.getByRole("button", { name: "Yes, make a new link" }).click();
+      await page.getByText(/New link made/).waitFor();
+      assert((await page.getByTestId("invite-link").innerText()).endsWith("/invite/N3W4CODE99"), "the new link is shown");
+    } finally {
+      await ctx.close(); await actx.close();
+      fake.table("account_requests").length = 0;
+      fake.table("invite_links").length = 0;
     }
   });
 

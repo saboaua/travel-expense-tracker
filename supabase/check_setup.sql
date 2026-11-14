@@ -48,6 +48,8 @@ need_cols(tbl, col, fix) as (values
   ('price_share_secret','salt','migration_shared_prices.sql'),
   ('account_requests','phone','migration_account_requests.sql'),
   ('account_requests','status','migration_account_requests.sql'),
+  ('account_requests','referred_by','migration_invites.sql'),
+  ('invite_links','code','migration_invites.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -88,6 +90,7 @@ need_tables(tbl, fix) as (values
   ('shared_prices','migration_shared_prices.sql'),
   ('price_share_secret','migration_shared_prices.sql'),
   ('account_requests','migration_account_requests.sql'),
+  ('invite_links','migration_invites.sql'),
   ('loyalty_cards','migration_loyalty.sql'),
   ('travel_documents','migration_documents.sql'),
   ('subscriptions','migration_subscriptions.sql')
@@ -142,7 +145,8 @@ other_checks as (
          f.fix
   from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('my_shared_count','migration_shared_prices.sql'),
                ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
-               ('sharing_activity_export','migration_sharing_safety.sql')) as f(fn, fix)
+               ('sharing_activity_export','migration_sharing_safety.sql'),
+               ('my_invite','migration_invites.sql'), ('reset_my_invite','migration_invites.sql'), ('set_invite_show_name','migration_invites.sql')) as f(fn, fix)
   union all
   select 'privacy', 'shared_prices: nobody can read it directly',
          case when to_regclass('public.shared_prices') is null then 'MISSING'
@@ -155,6 +159,12 @@ other_checks as (
               when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='account_requests' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_account_requests.sql'
               else 'OK' end,
          'migration_account_requests.sql'
+  union all
+  select 'privacy', 'invite_links: nobody can read it directly',
+         case when to_regclass('public.invite_links') is null then 'MISSING'
+              when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='invite_links' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_invites.sql'
+              else 'OK' end,
+         'migration_invites.sql'
   union all
   select 'privacy', 'price_share_secret: nobody can read it',
          case when to_regclass('public.price_share_secret') is null then 'MISSING'

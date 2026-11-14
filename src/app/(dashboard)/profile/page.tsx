@@ -17,6 +17,7 @@ import { SharingCard } from "@/components/profile/SharingCard";
 import { NotificationsCard } from "@/components/profile/NotificationsCard";
 import { YourDataCard } from "@/components/profile/YourDataCard";
 import { CommunityCard } from "@/components/profile/CommunityCard";
+import { RecommendCard } from "@/components/profile/RecommendCard";
 
 interface Profile {
   id: string;
@@ -342,6 +343,8 @@ export default function ProfilePage() {
       <HomePlaceCard />
 
       <CommunityCard />
+
+      <RecommendCard />
 
       <PasswordCard />
 

@@ -20,6 +20,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "grocery_receipts", owner: "user_id", bucket: "receipts", cols: GROCERY_RECEIPT_COLS, base: GROCERY_RECEIPT_COLS_BASE },
   { table: "shopping_list_items", owner: "user_id", cols: "id, product_key, name, qty, created_at" },
   { table: "store_locations", owner: "user_id", cols: "id, name, lat, lng, source, osm_id, created_at" },
+  { table: "invite_links", owner: "user_id", cols: "user_id, code, show_name, created_at", order: "user_id" },
   { table: "price_checks", owner: "user_id", bucket: "receipts", cols: PRICE_CHECK_COLS },
   { table: "grocery_items", owner: "user_id", cols: `${GROCERY_ITEM_COLS}, receipt_id` },
   { table: "loyalty_cards", owner: "user_id", bucket: "loyalty-cards", cols: LOYALTY_CARD_COLS, base: LOYALTY_CARD_COLS_BASE },

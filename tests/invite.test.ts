@@ -1,0 +1,13 @@
+import { firstNameOf, inviteMessage, inviteUrl, isInviteCode } from "../src/lib/invite";
+const eq = (n: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error(`FAIL ${n}: ${JSON.stringify(a)} != ${JSON.stringify(b)}`); process.exit(1); } };
+eq("good code", isInviteCode("K7M2QX9A0B"), true);
+eq("lowercase is not a code", isInviteCode("k7m2qx9a0b"), false);
+eq("too short", isInviteCode("K7M2"), false);
+eq("symbols", isInviteCode("K7M2QX9A0/"), false);
+eq("not a string", isInviteCode(undefined), false);
+eq("url", inviteUrl("https://lifolio-woad.vercel.app/", "K7M2QX9A0B"), "https://lifolio-woad.vercel.app/invite/K7M2QX9A0B");
+eq("message", inviteMessage("https://x.y/invite/AAAAAAAAAA").endsWith("https://x.y/invite/AAAAAAAAAA"), true);
+eq("first name", firstNameOf("Pat", "Pat Fortin"), "Pat");
+eq("from full name", firstNameOf(null, "Maria Croes"), "Maria");
+eq("nothing", firstNameOf(null, null), "");
+console.log("ok invite");

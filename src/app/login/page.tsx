@@ -28,6 +28,7 @@ export default function LoginPage() {
   useEffect(() => setReady(true), []);
   const [error, setError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const [refCode, setRefCode] = useState<string | null>(null);
   // Optional security check, shown only after repeated failures for this email
   const siteKey = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
   const [captchaNeeded, setCaptchaNeeded] = useState(false);
@@ -42,7 +43,12 @@ export default function LoginPage() {
   const supabase = createClient();
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("expired") === "1") setError(EXPIRED_MESSAGE);
+    const q = new URLSearchParams(window.location.search);
+    if (q.get("expired") === "1") setError(EXPIRED_MESSAGE);
+    // Coming from a friend's invite page: open the request form and remember who recommended us
+    if (q.get("request") === "1") setRequesting(true);
+    const ref = q.get("ref");
+    if (ref && /^[A-Z0-9]{10}$/.test(ref)) setRefCode(ref);
   }, []);
 
   useEffect(() => {
@@ -169,7 +175,7 @@ export default function LoginPage() {
         <div className="relative z-10 -mt-12 flex flex-1 flex-col items-center px-4 pb-6 lg:mt-0 lg:justify-center lg:px-10">
           <div className="w-full max-w-[420px] rounded-[26px] bg-white p-5 shadow-[0_18px_44px_rgba(10,37,64,.18)] dark:bg-slate-900 sm:p-6 lg:rounded-none lg:bg-transparent lg:p-0 lg:shadow-none lg:dark:bg-transparent">
             {requesting ? (
-              <RequestAccountForm primaryColor={primaryColor} inputCls={inputCls} onBack={() => setRequesting(false)} />
+              <RequestAccountForm primaryColor={primaryColor} inputCls={inputCls} refCode={refCode} onBack={() => setRequesting(false)} />
             ) : (
               <>
             <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-extrabold tracking-tight lg:text-4xl">Welcome back</h1>

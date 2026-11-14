@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cleanRequest } from "@/lib/account-requests";
+import { isInviteCode } from "@/lib/invite";
 import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
@@ -21,7 +22,16 @@ export async function POST(request: Request) {
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!key) return NextResponse.json({ error: "Account requests are not set up yet. Please contact your administrator." }, { status: 500 });
   const db = createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, key, { auth: { autoRefreshToken: false, persistSession: false } });
-  const { error } = await db.from("account_requests").insert({ ...checked.value, status: "new", ip });
+  // Who recommended this person (only if the link is real; a wrong or old code is simply ignored)
+  let referredBy: string | null = null;
+  if (isInviteCode(body.ref)) {
+    const { data: link } = await db.from("invite_links").select("user_id").eq("code", body.ref).maybeSingle();
+    referredBy = (link?.user_id as string | undefined) ?? null;
+  }
+  const row: Record<string, unknown> = { ...checked.value, status: "new", ip };
+  let { error } = await db.from("account_requests").insert(referredBy ? { ...row, referred_by: referredBy } : row);
+  // referred_by missing (migration_invites.sql not run yet): save the request without it
+  if (error && referredBy && /referred_by|schema cache/i.test(error.message)) ({ error } = await db.from("account_requests").insert(row));
   if (error) {
     const missing = /relation|schema cache|does not exist/i.test(error.message);
     return NextResponse.json({ error: missing ? "Account requests are not set up yet. Please contact your administrator." : "Could not send your request. Please try again." }, { status: 500 });

@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
 import { formatDateTime } from "@/lib/utils";
 
-type Req = { id: string; name: string; email: string | null; phone: string | null; status: "new" | "done" | "dismissed"; created_at: string };
+type Req = { id: string; name: string; email: string | null; phone: string | null; status: "new" | "done" | "dismissed"; created_at: string; recommended_by?: string | null };
 
 export default function AccountRequestsPage() {
   const { role, loaded } = useAccess();
@@ -50,6 +50,7 @@ export default function AccountRequestsPage() {
                 <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${r.status === "new" ? "bg-blue-100 text-blue-800" : "bg-slate-100 text-slate-600"}`}>{r.status === "new" ? "New" : r.status === "done" ? "Handled" : "Dismissed"}</span>
               </div>
               <p className="text-sm">{[r.email, r.phone].filter(Boolean).join(" · ")}</p>
+              {r.recommended_by && <p className="w-fit rounded-md bg-emerald-50 px-2.5 py-1 text-[13px] text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200" data-testid="recommended-by">Recommended by {r.recommended_by}</p>}
               <p className="text-xs text-muted-foreground">{formatDateTime(r.created_at)}</p>
               {r.status === "new" ? (
                 <div className="flex gap-2 pt-1">

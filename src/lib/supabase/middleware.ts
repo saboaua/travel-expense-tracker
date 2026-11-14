@@ -27,6 +27,7 @@ const PUBLIC_PREFIXES = [
   "/contact",
   "/api/support",
   "/api/request-account",
+  "/invite/",
   "/api/csp-report",
   "/reset-password",
   "/auth",

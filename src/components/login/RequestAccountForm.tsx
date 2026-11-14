@@ -7,7 +7,7 @@ import { cleanRequest } from "@/lib/account-requests";
 import { NETWORK_MESSAGE } from "@/lib/password-policy";
 
 /** Sign-in screen > "Request one": name and an email or phone number go to the administrators. */
-export function RequestAccountForm({ primaryColor, inputCls, onBack }: { primaryColor: string; inputCls: string; onBack: () => void }) {
+export function RequestAccountForm({ primaryColor, inputCls, refCode, onBack }: { primaryColor: string; inputCls: string; refCode?: string | null; onBack: () => void }) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -25,7 +25,7 @@ export function RequestAccountForm({ primaryColor, inputCls, onBack }: { primary
     if (!checked.ok) return setError(checked.error);
     setBusy(true);
     try {
-      const res = await fetch("/api/request-account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, email, phone, website }) });
+      const res = await fetch("/api/request-account", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, email, phone, website, ref: refCode || undefined }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) { setError(data.error || "Could not send your request. Please try again."); setBusy(false); return; }
       setSent(checked.value.email || checked.value.phone || "");
