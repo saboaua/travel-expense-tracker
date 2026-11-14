@@ -3,6 +3,7 @@ import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { cleanRequest } from "@/lib/account-requests";
 import { isInviteCode } from "@/lib/invite";
 import { rateLimit } from "@/lib/rate-limit";
+import { pushName, sendPush } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
 
@@ -35,6 +36,15 @@ export async function POST(request: Request) {
   if (error) {
     const missing = /relation|schema cache|does not exist/i.test(error.message);
     return NextResponse.json({ error: missing ? "Account requests are not set up yet. Please contact your administrator." : "Could not send your request. Please try again." }, { status: 500 });
+  }
+  // Phone alert to each admin who has "Account requests" switched on (never blocks or fails the request; no email or phone is sent)
+  try {
+    const { data: admins } = await db.from("profiles").select("id").eq("role", "admin");
+    const name = String((checked.value as Record<string, unknown>).name ?? "").trim().split(/\s+/)[0];
+    const ref = referredBy ? await pushName(referredBy) : "";
+    await Promise.allSettled((admins ?? []).map((a) => sendPush(a.id as string, "accountRequest", "accountRequests", { by: name, item: ref || undefined })));
+  } catch (e) {
+    console.error("account request phone alert failed:", e);
   }
   return NextResponse.json({ ok: true });
 }

@@ -2458,6 +2458,7 @@ try {
     const card = admin.page.getByTestId("notifications-card");
     await card.waitFor();
     await card.getByRole("switch", { name: "Support requests" }).waitFor();
+    await card.getByRole("switch", { name: "Account requests" }).waitFor();
     await card.getByRole("switch", { name: "Trip coming up" }).waitFor();
     await admin.ctx.close();
     const user = await newPage();
@@ -2467,6 +2468,7 @@ try {
     const c2 = user.page.getByTestId("notifications-card");
     await c2.getByRole("switch", { name: "Trip coming up" }).waitFor();
     assert((await c2.getByRole("switch", { name: "Support requests" }).count()) === 0, "a normal person is not offered Support requests");
+    assert((await c2.getByRole("switch", { name: "Account requests" }).count()) === 0, "a normal person is not offered Account requests");
     await user.ctx.close();
   });
 

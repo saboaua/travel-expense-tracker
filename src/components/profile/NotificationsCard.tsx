@@ -121,6 +121,7 @@ export function NotificationsCard() {
     ] },
     ...(role === "admin" ? [{ title: "Admin only", rows: [
       { key: "support" as const, title: "Support requests", hint: "A message from the contact form." },
+      { key: "accountRequests" as const, title: "Account requests", hint: "Someone asks for an account on the sign-in page. Shows who recommended them.", example: "\u201cAccount request from Maria. Recommended by Carlos.\u201d", isNew: true },
       { key: "iptv" as const, title: "IPTV clients expiring", hint: "Within 15 days.", example: "\u201c3 IPTV clients expire within 15 days. First: Nov 20.\u201d" },
     ] }] : []),
   ];

@@ -25,6 +25,7 @@ export const PUSH_TEXT = {
   fixedYearly: { title: "Lifolio", body: "A yearly bill is coming up. Open the app to check it." },
   fixedMonthly: { title: "Lifolio", body: "A payment is due tomorrow. Open the app to check it." },
   support: { title: "Lifolio", body: "A new support request arrived." },
+  accountRequest: { title: "Lifolio", body: "A new account request arrived." },
   test: { title: "Lifolio", body: "Alerts are working on this device." },
 } as const;
 export type PushKind = keyof typeof PUSH_TEXT;
@@ -133,6 +134,10 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
     case "support": {
       const subject = clean(d.subject, 60);
       return by ? `Support request from ${by}${subject ? `: “${subject}”` : ""}.` : subject ? `Support request: “${subject}”.` : null;
+    }
+    case "accountRequest": {
+      const ref = clean(d.item, 40);
+      return by ? `Account request from ${by}.${ref ? ` Recommended by ${ref}.` : ""}` : null;
     }
     default: return null; // flight status and the test alert keep their fixed wording
   }

@@ -43,6 +43,10 @@ eq("document in months", body("document", { label: "Passport", days: 200, date: 
 eq("document today", body("document", { label: "Visa / e-visa", days: 0, date: "2026-11-10" }), "Your visa / e-visa expires today (Nov 10).");
 eq("document expired", body("document", { label: "ID card", days: -3, date: "2026-11-07" }), "Your id card expired 3 days ago (Nov 7).");
 
+// account request
+eq("account request", body("accountRequest", { by: "Maria", item: "Carlos" }), "Account request from Maria. Recommended by Carlos.");
+eq("account request, nobody recommended", body("accountRequest", { by: "Maria" }), "Account request from Maria.");
+eq("account request private", pushMessage("accountRequest", { by: "Maria" }, "private").body, "A new account request arrived.");
 // support
 eq("support", body("support", { by: "Maria", subject: "Cannot add a receipt" }), "Support request from Maria: “Cannot add a receipt”.");
 eq("support without a subject", body("support", { by: "Maria" }), "Support request from Maria.");

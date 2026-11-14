@@ -1,6 +1,6 @@
 /** What a person can choose about phone alerts. Pure (no I/O) so the page, the API and the senders agree, and it can be tested. */
 
-export const PUSH_PREF_KEYS = ["invites", "shared", "views", "reminders", "iptv", "trips", "flights", "flightTomorrow", "afterTrip", "documents", "support", "budget", "gambling", "yearlyBills", "paymentDay"] as const;
+export const PUSH_PREF_KEYS = ["invites", "shared", "views", "reminders", "iptv", "trips", "flights", "flightTomorrow", "afterTrip", "documents", "support", "budget", "gambling", "yearlyBills", "paymentDay", "accountRequests"] as const;
 export type PushPref = (typeof PUSH_PREF_KEYS)[number];
 export type PushPrefs = Record<PushPref, boolean>;
 export type PushDetail = "details" | "private";
@@ -8,7 +8,7 @@ export type QuietHours = { on: boolean; start: number; end: number };
 export type PushSettings = PushPrefs & { detail: PushDetail; quiet: QuietHours };
 
 export const DEFAULT_PUSH_PREFS: PushPrefs = {
-  invites: true, shared: true, views: false, reminders: true, iptv: true, trips: true, flights: true, flightTomorrow: true, afterTrip: true, documents: true, support: true, budget: true, gambling: true, yearlyBills: true, paymentDay: false,
+  invites: true, shared: true, views: false, reminders: true, iptv: true, trips: true, flights: true, flightTomorrow: true, afterTrip: true, documents: true, support: true, budget: true, gambling: true, yearlyBills: true, paymentDay: false, accountRequests: true,
 };
 export const DEFAULT_PUSH_SETTINGS: PushSettings = { ...DEFAULT_PUSH_PREFS, detail: "details", quiet: { on: false, start: 22, end: 7 } };
 
