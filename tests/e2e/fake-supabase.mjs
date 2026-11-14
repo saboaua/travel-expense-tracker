@@ -145,7 +145,8 @@ export function createFakeSupabase() {
       const conflict = url.searchParams.get("on_conflict") || PRIMARY_KEYS[name] || "id";
       for (const it of items) {
         if (/merge-duplicates|ignore-duplicates/.test(prefer)) {
-          const ex = rows.find((r) => r[conflict] != null && r[conflict] === it[conflict]);
+          const keys = conflict.split(",");
+          const ex = rows.find((r) => keys.every((k) => r[k] != null && r[k] === it[k]));
           if (ex) { if (/merge/.test(prefer)) Object.assign(ex, it); made.push(ex); continue; }
         }
         const uk = UNIQUE_KEYS[name];

@@ -50,6 +50,9 @@ need_cols(tbl, col, fix) as (values
   ('account_requests','status','migration_account_requests.sql'),
   ('account_requests','referred_by','migration_invites.sql'),
   ('invite_links','code','migration_invites.sql'),
+  ('fixed_costs','schedule','migration_fixed_costs.sql'),
+  ('fixed_costs','end_month','migration_fixed_costs.sql'),
+  ('fixed_entries','on_date','migration_fixed_costs.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -91,6 +94,8 @@ need_tables(tbl, fix) as (values
   ('price_share_secret','migration_shared_prices.sql'),
   ('account_requests','migration_account_requests.sql'),
   ('invite_links','migration_invites.sql'),
+  ('fixed_costs','migration_fixed_costs.sql'),
+  ('fixed_entries','migration_fixed_costs.sql'),
   ('loyalty_cards','migration_loyalty.sql'),
   ('travel_documents','migration_documents.sql'),
   ('subscriptions','migration_subscriptions.sql')

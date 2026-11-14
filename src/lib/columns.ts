@@ -33,6 +33,8 @@ export const BUDGET_COLS = "id, month, amount, currency, limits, alert_at_80";
 export const SAVINGS_PLAN_COLS_BASE = "id, name, amount, currency, start_date, end_date, opening_balance, goal, paused_on";
 export const SAVINGS_PLAN_COLS = `${SAVINGS_PLAN_COLS_BASE}, pauses`;
 export const SAVINGS_EVENT_COLS = "id, plan_id, kind, month, amount";
+export const FIXED_COST_COLS = "id, kind, schedule, amount, amount2, currency, day, due_month, due_month2, start_month, end_month, active";
+export const FIXED_ENTRY_COLS = "id, kind, on_date, amount, currency";
 export const PRICE_CHECK_COLS = "id, product, store, price, currency, size, seen_on, photo_path, notes";
 export const GROCERY_ITEM_COLS = "id, name, category, quantity, unit_price, unit, line_total";
 

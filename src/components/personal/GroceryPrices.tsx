@@ -8,7 +8,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag, Users } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
 import { Sparkline } from "@/components/personal/Sparkline";
 import { PriceChart, STORE_COLORS } from "@/components/personal/PriceChart";
 import type { TrackerRow } from "@/lib/personal/grocery";
@@ -17,7 +17,7 @@ import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/li
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
-import { syncSharedPrices } from "@/lib/personal/community";
+import { groupCommunity, productKey, syncSharedPrices, type CommunityRow } from "@/lib/personal/community";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { compareOnline, FILE_STORES, OLD_FILE_DAYS, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
@@ -98,6 +98,26 @@ export function GroceryPrices() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- once per load of the products
   }, [online, products]);
 
+  // Community prices (the middle price of 3 or more people) for the same products, beside what you paid. Works whether or not you share.
+  const [commRows, setCommRows] = useState<CommunityRow[]>([]);
+  const commKeys = useMemo(() => inCur.map((p) => productKey(p)).slice(0, 150), [inCur]);
+  useEffect(() => {
+    if (!online || commKeys.length === 0) return;
+    let off = false;
+    createClient().rpc("community_search", { keys: commKeys }).then((r) => { if (!off && !r.error) setCommRows((r.data ?? []) as CommunityRow[]); }, () => {});
+    return () => { off = true; };
+  }, [online, commKeys]);
+  const community = useMemo(() => {
+    const m = new Map<string, { store: string; price: number; reporters: number }>();
+    const by = new Map(groupCommunity(commRows).map((g) => [g.key, g]));
+    for (const p of inCur) {
+      const low = by.get(productKey(p))?.stores[0];
+      const paid = p.stores[0]?.latest.price ?? p.stats.last;
+      if (low && low.price < paid) m.set(p.key, { store: low.store, price: low.price, reporters: low.reporters });
+    }
+    return m;
+  }, [commRows, inCur]);
+
   const verdicts = useMemo(() => {
     const m = new Map<string, OnlineVerdict>();
     if (!onlineData) return m;
@@ -108,7 +128,7 @@ export function GroceryPrices() {
     return m;
   }, [onlineData, inCur]);
   const cheaperOnline = useMemo(() => inCur.filter((p) => verdicts.get(p.key)?.cheaper).length, [inCur, verdicts]);
-  const elsewhereCount = useMemo(() => inCur.filter((p) => p.saving || verdicts.get(p.key)?.cheaper).length, [inCur, verdicts]);
+  const elsewhereCount = useMemo(() => inCur.filter((p) => p.saving || verdicts.get(p.key)?.cheaper || community.has(p.key)).length, [inCur, verdicts, community]);
 
   const list = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -119,8 +139,8 @@ export function GroceryPrices() {
       purchases: (a, b) => b.count - a.count,
       name: (a, b) => a.name.localeCompare(b.name),
     };
-    return inCur.filter((p) => (filter === "elsewhere" ? !!(p.saving || verdicts.get(p.key)?.cheaper) : matchesFilter(p, filter)) && (!q || p.names.some((n) => n.name.toLowerCase().includes(q)) || p.name.toLowerCase().includes(q))).sort(by[sort]);
-  }, [inCur, query, sort, filter, verdicts]);
+    return inCur.filter((p) => (filter === "elsewhere" ? !!(p.saving || verdicts.get(p.key)?.cheaper || community.has(p.key)) : matchesFilter(p, filter)) && (!q || p.names.some((n) => n.name.toLowerCase().includes(q)) || p.name.toLowerCase().includes(q))).sort(by[sort]);
+  }, [inCur, query, sort, filter, verdicts, community]);
 
   const answerOnline = useCallback(async (productKey: string, m: OnlineMatch, same: boolean) => {
     setNote(null);
@@ -177,7 +197,6 @@ export function GroceryPrices() {
     <div className="mx-auto max-w-4xl space-y-4 p-4 pb-28 md:p-8">
       <div className="flex items-center justify-between gap-3">
         <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
-        <Link href="/personal/groceries/community" data-testid="community-link" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary"><Users className="h-4 w-4" aria-hidden="true" />Community prices</Link>
       </div>
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -248,7 +267,7 @@ export function GroceryPrices() {
       <div className="space-y-3">
         {list.map((p) => (
           <ProductCard key={p.key} p={p} fmt={fmt} isOpen={open === p.key} onToggle={() => setOpen(open === p.key ? null : p.key)} online={online}
-            onlineMatches={cur === ONLINE_CURRENCY ? onlineData?.matches[p.key] ?? null : null} verdict={verdicts.get(p.key) ?? null} onlineReady={cur === ONLINE_CURRENCY && !!onlineData && onlineData.enabled.length > 0 && !onlineData.setup}
+            onlineMatches={cur === ONLINE_CURRENCY ? onlineData?.matches[p.key] ?? null : null} verdict={verdicts.get(p.key) ?? null} community={community.get(p.key) ?? null} onlineReady={cur === ONLINE_CURRENCY && !!onlineData && onlineData.enabled.length > 0 && !onlineData.setup}
             onAnswerOnline={(m, same) => answerOnline(p.key, m, same)}
             onSeparate={(atomKey) => answer(p.atomKeys.filter((k) => k !== atomKey).map((k) => [atomKey, k] as [string, string]), false)} />
         ))}
@@ -326,7 +345,7 @@ function StoreRow({ s, i, max, fmt, unit }: { s: StoreSummary; i: number; max: n
   );
 }
 
-function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
+function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
   const multi = p.stores.length > 1;
   const best = p.stores[0];
   const max = Math.max(...p.stores.map((s) => s.latest.price));
@@ -351,6 +370,11 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatch
           </div>
           {/* On a phone the store sits under the green line, so it can never run into the price on the right */}
           {multi && <p className="mt-1.5 text-[13px] text-muted-foreground sm:hidden" data-testid="price-best-store">Best price at {best.store}</p>}
+          {community && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="community-line">
+              <span className={`${chipBase} bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200`}>Community</span><span className="text-sm font-semibold">{community.store} {fmt(community.price)}</span><span className="text-[13px] text-muted-foreground">{community.reporters} people</span>
+            </div>
+          )}
           {onlineReady && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="online-line">
               {verdict?.cheaper ? (

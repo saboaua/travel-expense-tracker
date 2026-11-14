@@ -2,6 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { BUDGET_COLS, SAVINGS_EVENT_COLS, SAVINGS_PLAN_COLS, SAVINGS_PLAN_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { monthSavings, readEvent, readPlan } from "@/lib/personal/savings";
+import { FIXED_COST_COLS, FIXED_ENTRY_COLS } from "@/lib/columns";
+import { monthLines, readCost, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
 import { readBudget, type BudgetSetting, type MonthInputs } from "@/lib/personal/budget";
 
 const monthEnd = (monthStart: string) => {
@@ -14,6 +16,13 @@ export async function fetchBudgets(supabase: SupabaseClient): Promise<{ rows: Bu
   const { data, error } = await supabase.from("personal_budgets").select(BUDGET_COLS).limit(100);
   if (error) return { rows: [], missing: /relation|schema cache|does not exist/i.test(error.message ?? "") };
   return { rows: ((data ?? []) as unknown as Parameters<typeof readBudget>[0][]).map(readBudget), missing: false };
+}
+
+/** Your fixed costs (loans, insurances, credit card, gambling limit). `missing` is true when migration_fixed_costs.sql has not been run. */
+export async function fetchFixedCosts(supabase: SupabaseClient): Promise<{ costs: FixedCost[]; missing: boolean }> {
+  const { data, error } = await supabase.from("fixed_costs").select(FIXED_COST_COLS).limit(50);
+  if (error) return { costs: [], missing: /relation|schema cache|does not exist/i.test(error.message ?? "") };
+  return { costs: ((data ?? []) as unknown as Record<string, unknown>[]).map(readCost).filter((c): c is FixedCost => !!c), missing: false };
 }
 
 /** What you recorded in one month (monthStart is YYYY-MM-01). Any part that cannot be read counts as nothing. */
@@ -40,7 +49,15 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
     mine(supabase.from("savings_events").select(SAVINGS_EVENT_COLS).limit(1000)),
   ]);
   const savings = pl.error || ev.error ? [] : monthSavings(((pl.data ?? []) as unknown as Parameters<typeof readPlan>[0][]).map(readPlan), ((ev.data ?? []) as unknown as Parameters<typeof readEvent>[0][]).map(readEvent), monthStart);
+  // fixed costs: loans, insurances, credit card and gambling that fall in this month (nothing when the table is missing)
+  const [fc, fe] = await Promise.all([
+    mine(supabase.from("fixed_costs").select(FIXED_COST_COLS).limit(50)),
+    mine(supabase.from("fixed_entries").select(FIXED_ENTRY_COLS).gte("on_date", monthStart).lte("on_date", end).limit(2000)),
+  ]);
+  const costs = fc.error ? [] : ((fc.data ?? []) as unknown as Record<string, unknown>[]).map(readCost).filter((c): c is FixedCost => !!c);
+  const entries = fe.error ? [] : ((fe.data ?? []) as unknown as Record<string, unknown>[]).map(readEntry).filter((e): e is NonNullable<ReturnType<typeof readEntry>> => !!e);
   return {
+    fixed: monthLines(costs, entries, monthStart),
     savings,
     groceries: g.error ? [] : (g.data ?? []),
     utilities: u.error ? [] : ((u.data ?? []) as MonthInputs["utilities"]),

@@ -88,8 +88,7 @@ export function CommunityCard() {
         </ul>
         {on && (
           <div className="flex flex-col gap-2">
-            <Link href="/personal/groceries/community"><Button className="h-11 w-full">See community prices</Button></Link>
-            <Button variant="outline" className="h-11 w-full" disabled={busy || !mine} onClick={withdraw} data-testid="profile-share-delete">Delete what I shared{mine ? ` (${mine} price${mine === 1 ? "" : "s"})` : ""}</Button>
+            <Button className="h-11 w-full bg-red-600 text-white hover:bg-red-700" disabled={busy || !mine} onClick={withdraw} data-testid="profile-share-delete">Delete what I shared{mine ? ` (${mine} price${mine === 1 ? "" : "s"})` : ""}</Button>
           </div>
         )}
         <p className="text-center text-xs text-muted-foreground">Read the <Link href="/privacy" className="underline">Privacy Policy</Link></p>

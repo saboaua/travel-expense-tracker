@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { MapPin as Pin } from "@/components/personal/StoreMap";
+import { PriceSearch } from "@/components/personal/PriceSearch";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { createClient } from "@/lib/supabase/client";
 import { fetchPrices, pricesKey, fetchPriceMatches, priceMatchesKey } from "@/lib/offline-grocery";
@@ -17,6 +18,7 @@ import { useCachedQuery } from "@/lib/use-cached-query";
 import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare";
 import type { TrackerRow } from "@/lib/personal/grocery";
 import { RADII, basketTotals, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
+import { ONLINE_CURRENCY } from "@/lib/store-prices";
 import { formatCurrency } from "@/lib/utils";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-80 w-full animate-pulse sm:h-96 md:h-[30rem] rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -207,9 +209,10 @@ export function BestStore() {
     <div className="mx-auto max-w-2xl space-y-4 pb-8">
       <div>
         <Link href="/personal/groceries" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
-        <h1 className="mt-1 text-2xl font-bold">Best store for your list</h1>
-        <p className="text-sm text-muted-foreground">{list.length} item{list.length === 1 ? "" : "s"}{me && ranked.length ? ` · ${ranked.length} store${ranked.length === 1 ? "" : "s"} within ${radius} km` : ""}</p>
+        <h1 className="mt-1 text-2xl font-bold">Best Prices</h1>
+        <p className="text-sm text-muted-foreground">Your receipts, community prices and online price lists</p>
       </div>
+      <PriceSearch products={inCur} currency={products.length ? currency : ONLINE_CURRENCY} />
       <OfflineNotice savedAt={prices.savedAt} />
       {(prices.error || msg) && <Alert variant={msg && !prices.error ? "info" : "error"}>{prices.error || msg}</Alert>}
 
@@ -218,7 +221,8 @@ export function BestStore() {
       ) : (
         <>
           <Card data-testid="shopping-list"><CardContent className="space-y-3 p-4">
-            <div className="flex items-center justify-between"><h2 className={heading}>Your list</h2>{list.length > 0 && <button type="button" onClick={clearList} className="inline-flex min-h-6 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"><Trash2 className="h-3 w-3" aria-hidden="true" /> Clear</button>}</div>
+            <div><h2 className="text-lg font-bold">Best store for your list</h2><p className="text-sm text-muted-foreground">{list.length} item{list.length === 1 ? "" : "s"}{me && ranked.length ? ` · ${ranked.length} store${ranked.length === 1 ? "" : "s"} within ${radius} km` : ""}</p></div>
+            <div className="flex items-center justify-between"><h3 className={heading}>Your list</h3>{list.length > 0 && <button type="button" onClick={clearList} className="inline-flex min-h-6 items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground"><Trash2 className="h-3 w-3" aria-hidden="true" /> Clear</button>}</div>
             {list.length === 0 && <p className="text-sm text-muted-foreground">Add what you usually buy, or search for an item.</p>}
             <ul className="space-y-1.5">
               {list.map((l) => (

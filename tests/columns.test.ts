@@ -50,6 +50,8 @@ check("BUDGET_COLS", "personal_budgets", C.BUDGET_COLS);
 check("SAVINGS_PLAN_COLS", "savings_plans", C.SAVINGS_PLAN_COLS);
 check("SAVINGS_PLAN_COLS_BASE", "savings_plans", C.SAVINGS_PLAN_COLS_BASE);
 check("SAVINGS_EVENT_COLS", "savings_events", C.SAVINGS_EVENT_COLS);
+check("FIXED_COST_COLS", "fixed_costs", C.FIXED_COST_COLS);
+check("FIXED_ENTRY_COLS", "fixed_entries", C.FIXED_ENTRY_COLS);
 check("PERSONAL_SPEND_COLS_MID", "personal_spends", C.PERSONAL_SPEND_COLS_MID);
 check("PERSONAL_SPEND_COLS_BASE", "personal_spends", C.PERSONAL_SPEND_COLS_BASE);
 check("PERSONAL_EXPENSE_COLS", "personal_expenses", C.PERSONAL_EXPENSE_COLS);

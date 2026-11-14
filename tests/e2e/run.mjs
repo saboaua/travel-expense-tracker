@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -338,13 +338,12 @@ try {
         await page.goto(`${BASE}${path}`);
         await page.locator("form").first().waitFor();
         const r = await page.evaluate(() => {
-          const card = document.querySelector("form").closest(".rounded-xl");
-          const outer = card.parentElement.parentElement;
+          // the sign-in card is rounded-xl on the small pages and rounded-[26px] on the sign-in page
+          const card = document.querySelector("form").closest(".rounded-xl, [class*='rounded-[26px]']");
           const bar = [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute("content"));
           return {
             dark: document.documentElement.classList.contains("dark"),
             card: getComputedStyle(card).backgroundColor,
-            outerFrom: getComputedStyle(outer).backgroundImage,
             body: getComputedStyle(document.body).backgroundColor,
             title: getComputedStyle(document.querySelector("h1")).color,
             input: getComputedStyle(document.querySelector("input")).backgroundColor,
@@ -1023,6 +1022,7 @@ try {
       await page.waitForURL((u) => u.pathname === "/");
       await page.goto(`${BASE}/personal/groceries`);
       await page.getByTestId("best-store-link").click();
+      await page.getByRole("heading", { name: "Best Prices" }).waitFor();
       await page.getByRole("heading", { name: "Best store for your list" }).waitFor();
       const usual = page.getByTestId("usual-item");
       await usual.first().waitFor({ timeout: 60000 });
@@ -1115,7 +1115,8 @@ try {
       await signIn(page, "pat@example.com", "Correct-Horse-1");
       await page.waitForURL((u) => u.pathname === "/");
       await page.goto(`${BASE}/personal/groceries/prices`);
-      await page.getByTestId("community-link").waitFor();
+      await page.getByRole("heading", { name: "Price tracker" }).waitFor();
+      assert((await page.getByTestId("community-link").count()) === 0, "the Community prices link is gone from the Price tracker");
       await page.waitForTimeout(1500);
       assert(sharedCalls.length === 0, "nothing is shared while sharing is off");
       await page.goto(`${BASE}/profile`);
@@ -1134,15 +1135,17 @@ try {
       assert(rows[0].price === 1.45 && !("month" in rows[0]), "the price is sent with no date at all");
       const sent = JSON.stringify(sharedCalls);
       assert(!sent.includes("pat@example.com") && !sent.includes(PAT) && !sent.includes(rid), "no email, account or receipt id is sent");
-      await page.getByTestId("community-link").click();
-      await page.getByRole("heading", { name: "Community prices" }).waitFor();
-      await page.getByTestId("profile-link").waitFor();
-      await page.getByRole("search").getByLabel("Product to look up").fill("coca");
-      await page.getByRole("button", { name: "Search" }).click();
-      const res = page.getByTestId("community-results");
-      await res.getByText("Ling & Sons").waitFor();
-      assert((await res.innerText()).includes("12 reports"), "the number of reports is shown, nothing about who");
-      assert((await res.locator("div", { hasText: "Lowest" }).first().innerText()).includes("Ling & Sons"), "the cheapest store is marked Lowest");
+      // The search moved to Best Prices: your receipts and the community, in one list with the cheapest marked
+      await page.goto(`${BASE}/personal/groceries/basket`);
+      await page.getByRole("heading", { name: "Best Prices" }).waitFor();
+      await page.getByTestId("price-search-input").fill("coca");
+      await page.getByRole("search").getByRole("button", { name: "Search" }).click();
+      const offers = page.getByTestId("price-offer");
+      await offers.first().waitFor();
+      const text = await page.getByTestId("price-search-results").innerText();
+      assert(text.includes("Your receipt") && text.includes("Community, 12 people") && text.includes("New Ten Sing"), "own receipt and community prices are listed together: " + text);
+      assert((await offers.first().innerText()).includes("Best price"), "the cheapest price is marked Best price");
+      assert(!text.includes("pat@example.com"), "nobody is named");
       await page.goto(`${BASE}/profile`);
       await page.getByRole("button", { name: /Community prices/ }).click();
       await page.getByTestId("profile-share-delete").click();
@@ -1154,6 +1157,85 @@ try {
       await ctx.close();
       me().share_prices = false;
       for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e")) a.splice(i, 1); }
+    }
+  });
+
+  await test("fixed costs: mortgage, car, credit card and a gambling limit are set up and counted in the budget", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const stash = {};
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      for (const t of ["grocery_receipts", "personal_spends", "utility_bills", "personal_expenses", "personal_budgets"]) { stash[t] = fake.table(t).splice(0); }
+      fake.table("personal_budgets").push({ id: "7d000000-0000-4000-8000-00000000f001", user_id: PAT, month: null, amount: 4000, currency: "AWG", limits: {}, alert_at_80: false });
+      const rows = () => fake.table("fixed_costs").filter((r) => r.user_id === PAT);
+      await page.goto(`${BASE}/personal/fixed`);
+      await page.getByTestId("fixed-hub").waitFor();
+      await page.getByTestId("fixed-row-mortgage").waitFor();
+      // home mortgage: monthly until a month
+      await page.goto(`${BASE}/personal/fixed/mortgage`);
+      await page.locator("#fx-amount").fill("1250");
+      await page.locator("#fx-end").fill("2041-03");
+      assert(/1,250/.test(await page.getByTestId("fixed-preview").innerText()) && /Mar 2041/.test(await page.getByTestId("fixed-preview").innerText()), "the form says what it adds and until when");
+      await page.getByTestId("fixed-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal/fixed");
+      const m = rows().find((r) => r.kind === "mortgage");
+      assert(m && m.amount === 1250 && m.schedule === "monthly" && m.end_month === "2041-03-01", "the mortgage is saved: " + JSON.stringify(m));
+      // car: loan, yearly insurance and a plate paid in two parts
+      await page.goto(`${BASE}/personal/fixed/car`);
+      await page.getByRole("switch", { name: "Car loan" }).click();
+      await page.locator("#car-loan").fill("410");
+      await page.locator("#car-loan-end").fill("2028-08");
+      await page.locator("#car-ins").fill("1020");
+      await page.locator("#car-ins-m").selectOption("3");
+      await page.getByRole("button", { name: "Two payments" }).click();
+      await page.locator("#plate-a1").fill("65");
+      await page.locator("#plate-a2").fill("65");
+      await page.getByTestId("car-save").click();
+      await page.waitForURL((u) => u.pathname === "/personal/fixed");
+      const loan = rows().find((r) => r.kind === "car_loan"), ins = rows().find((r) => r.kind === "car_insurance"), plate = rows().find((r) => r.kind === "license_plate");
+      assert(loan && loan.amount === 410 && loan.end_month === "2028-08-01", "the car loan is saved: " + JSON.stringify(loan));
+      assert(ins && ins.schedule === "yearly" && ins.amount === 1020 && ins.due_month === 3, "the car insurance is yearly, due in March: " + JSON.stringify(ins));
+      assert(plate && plate.schedule === "twice_yearly" && plate.amount === 65 && plate.amount2 === 65 && plate.due_month === 6 && plate.due_month2 === 12, "the plate is two payments: " + JSON.stringify(plate));
+      assert((await page.getByTestId("fixed-month").innerText()).includes("1,660"), "this month: mortgage and car loan make 1,660: " + (await page.getByTestId("fixed-month").innerText()));
+      assert((await page.getByTestId("fixed-coming").innerText()).includes("Car insurance"), "the yearly bill is listed under Coming up");
+      // credit card: enter what was spent
+      await page.goto(`${BASE}/personal/fixed/credit-card`);
+      await page.locator("#ce-amount").fill("312.40");
+      await page.getByTestId("card-add").click();
+      await page.getByTestId("fixed-entry").first().waitFor();
+      assert(fake.table("fixed_entries").some((r) => r.user_id === PAT && r.kind === "card" && r.amount === 312.4), "the card spending is saved");
+      assert(rows().some((r) => r.kind === "credit_card" && r.schedule === "statement"), "the card is set to statements");
+      // gambling: a limit, then spending over it
+      await page.goto(`${BASE}/personal/fixed/gambling`);
+      await page.locator("#gl-limit").fill("200");
+      await page.getByTestId("gambling-save-limit").click();
+      await page.getByTestId("gambling-status").waitFor();
+      await page.locator("#ge-amount").fill("235");
+      await page.getByTestId("gambling-add").click();
+      await page.getByTestId("gambling-over").waitFor();
+      assert(/35/.test(await page.getByTestId("gambling-over").innerText()), "it says by how much the limit is passed");
+      // the budget card counts them, each in its own row
+      await page.goto(`${BASE}/personal`);
+      await page.getByTestId("budget-card").waitFor();
+      const loansRow = await page.getByTestId("budget-area-loans").innerText();
+      assert(loansRow.includes("1,660"), "Loans row: " + loansRow);
+      assert((await page.getByTestId("budget-area-cards").innerText()).includes("312"), "Credit card row shows what was spent");
+      assert(/235/.test(await page.getByTestId("budget-area-gambling").innerText()) && /200/.test(await page.getByTestId("budget-area-gambling").innerText()), "Gambling row shows 235 against the limit of 200");
+      assert(/2,207/.test(await page.getByTestId("budget-line").innerText()), "spent adds up to 2,207.40: " + (await page.getByTestId("budget-line").innerText()));
+      assert(await page.getByTestId("budget-fixed-link").isVisible(), "the card links to Fixed costs");
+      // stopping a payment removes it
+      await page.goto(`${BASE}/personal/fixed/mortgage`);
+      await page.getByTestId("fixed-stop").click();
+      await page.waitForURL((u) => u.pathname === "/personal/fixed");
+      assert(!rows().some((r) => r.kind === "mortgage"), "the mortgage is removed");
+    } finally {
+      await ctx.close();
+      for (const t of ["fixed_costs", "fixed_entries"]) fake.table(t).splice(0);
+      fake.table("personal_budgets").splice(0);
+      for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
     }
   });
 
@@ -1174,6 +1256,8 @@ try {
       await sw.click();
       await page.getByText(/Sharing is on/).first().waitFor();
       assert(me().share_prices === true, "the choice is saved from Profile");
+      assert((await page.getByRole("button", { name: /See community prices/ }).count()) === 0 && (await page.getByRole("link", { name: /See community prices/ }).count()) === 0, "there is no See community prices button");
+      assert(/bg-red-600/.test((await page.getByTestId("profile-share-delete").getAttribute("class")) ?? ""), "Delete what I shared is red");
       await sw.click();
       await page.getByText(/Sharing is off/).first().waitFor();
       assert(me().share_prices === false, "turning it off is saved");
@@ -1478,7 +1562,7 @@ try {
       const list = await page.getByTestId("spend-list").boundingBox();
       assert(form && list && list.x > form.x + form.width - 1 && Math.abs(list.y - form.y) < 160, "Quick spend: the list sits beside the form: " + JSON.stringify({ form, list }));
       assert(form.width < 520, "the form keeps a comfortable width: " + form.width);
-      for (const path of ["/personal/spend", "/personal/house", "/personal/savings", "/personal/savings/add", "/personal/utilities", "/personal/utilities/add", "/personal/groceries/price-check", "/personal/budget"]) {
+      for (const path of ["/personal/spend", "/personal/house", "/personal/savings", "/personal/savings/add", "/personal/utilities", "/personal/utilities/add", "/personal/groceries/price-check", "/personal/budget", "/personal/fixed", "/personal/fixed/car"]) {
         await page.goto(`${BASE}${path}`);
         await page.waitForLoadState("networkidle");
         assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${path}: no sideways scroll on desktop`);

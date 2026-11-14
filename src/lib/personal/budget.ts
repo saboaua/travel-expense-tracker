@@ -6,6 +6,7 @@
  */
 import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { HOUSE_CATEGORY } from "@/lib/personal/quick-spend";
+import { totalsByCategory, type FixedCategory, type FixedLine } from "@/lib/personal/fixed-costs";
 
 export const BUDGET_AREAS = [
   { key: "groceries", label: "Groceries" },
@@ -16,6 +17,9 @@ export const BUDGET_AREAS = [
 export type BudgetArea = (typeof BUDGET_AREAS)[number]["key"];
 /** Savings is counted in the budget too, but it has no limit of its own: the plan itself is the limit. */
 export type SpentArea = BudgetArea | "savings";
+/** What each area added. The fixed-cost areas (loans, insurances, credit card, gambling) are optional so older callers keep working. */
+export type ByArea = Record<SpentArea, number> & Partial<Record<FixedCategory, number>>;
+export const FIXED_AREAS: FixedCategory[] = ["loans", "insurances", "cards", "gambling"];
 export type { BudgetCurrency };
 export { convert, round2 };
 export type Limits = Partial<Record<BudgetArea, number>>;
@@ -57,21 +61,25 @@ export type MonthInputs = {
   projects: { amount_usd: number | string | null }[];
   /** what your savings plans put aside this month (optional: older callers have none) */
   savings?: { amount: number; currency: string }[];
+  /** fixed costs that fall in this month: loans, insurances, credit card, gambling (optional) */
+  fixed?: FixedLine[];
 };
 
 /** A quick spend that belongs to the house: the House category, a home project or an area of the house. */
 export const isHouseSpend = (s: { category: string; project_id?: string | null; house_area?: string | null }) => s.category === HOUSE_CATEGORY || !!s.project_id || !!s.house_area;
 
 /** What each area added this month, in the budget's currency. Amounts that cannot be converted are left out. */
-export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): Record<SpentArea, number> {
-  const out: Record<SpentArea, number> = { groceries: 0, utilities: 0, quick: 0, house: 0, savings: 0 };
+export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): ByArea {
+  const out: ByArea = { groceries: 0, utilities: 0, quick: 0, house: 0, savings: 0 };
   const add = (k: SpentArea, v: number | null) => { if (v != null && Number.isFinite(v)) out[k] += v; };
   for (const g of inp.groceries) add("groceries", convert(Number(g.total), g.currency, currency));
   for (const u of inp.utilities) add("utilities", convert(Number(u.amount_usd) || 0, "USD", currency));
   for (const s of inp.spends) add(isHouseSpend(s) ? "house" : "quick", convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)));
   for (const p of inp.projects) add("house", convert(Number(p.amount_usd) || 0, "USD", currency));
   for (const x of inp.savings ?? []) add("savings", convert(Number(x.amount), x.currency, currency));
-  for (const k of Object.keys(out) as SpentArea[]) out[k] = round2(out[k]);
+  const fx = totalsByCategory(inp.fixed ?? [], currency);
+  if (inp.fixed) for (const k of FIXED_AREAS) out[k] = fx[k];
+  for (const k of Object.keys(out) as (SpentArea | FixedCategory)[]) out[k] = round2(out[k] ?? 0);
   return out;
 }
 
@@ -96,7 +104,7 @@ export function budgetState(spent: number, budget: number): BudgetState {
 
 export type BudgetView = {
   budget: number; currency: BudgetCurrency; spent: number; left: number; over: number;
-  state: BudgetState; byArea: Record<SpentArea, number>; limits: Limits;
+  state: BudgetState; byArea: ByArea; limits: Limits;
   /** days still to go in the month, today included; 0 after the last day */
   daysLeft: number; daysInMonth: number;
   /** how much a day you can still spend; null when nothing is left or the month is over */
@@ -112,8 +120,8 @@ export function daysInMonthOf(today: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-export function budgetView(setting: BudgetSetting, byArea: Record<SpentArea, number>, today: string, uncounted = 0): BudgetView {
-  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + byArea[a.key], 0) + (byArea.savings ?? 0));
+export function budgetView(setting: BudgetSetting, byArea: ByArea, today: string, uncounted = 0): BudgetView {
+  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + byArea[a.key], 0) + (byArea.savings ?? 0) + FIXED_AREAS.reduce((t, k) => t + (byArea[k] ?? 0), 0));
   const dim = daysInMonthOf(today), day = Number(today.slice(8, 10));
   const daysLeft = dim - day + 1;
   const left = round2(Math.max(0, setting.amount - spent));
