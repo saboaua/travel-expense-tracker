@@ -97,6 +97,20 @@ eq("short words must match exactly", wordsClose("cola", "coca"), false);
 eq("different words stay different", wordsClose("peanut", "peach"), false);
 eq("a missing letter in a long word is close", wordsClose("cheddar", "chedar"), true);
 
+// a name with no size joins the same name with its size when that is the only size there is (the Corona Extra case)
+const coronaAll = buildProducts([
+  row("Corona Extra 330 ml", 5.49, "Ling & Sons", "2026-11-07"), row("Corona Extra 330 ml", 5.75, "New Ten Sing Supermarket", "2026-11-03"),
+  row("Corona Extra", 5.95, "My Oreo Supermarket", "2026-11-13"), row("Corona Extra", 6, "FOLIRA Supermarket", "2026-11-10"),
+]);
+eq("corona: 330 ml and no size are one product", coronaAll.products.length, 1);
+eq("corona: four stores together, best price is the lowest", [coronaAll.products[0].stores.length, coronaAll.products[0].stats.min, coronaAll.products[0].size, coronaAll.products[0].name], [4, 5.49, "330 ml", "Corona Extra"]);
+eq("corona: nothing left to suggest", coronaAll.suggestions.length, 0);
+const twoSizes = buildProducts([row("Corona Extra 330 ml", 5.5, "A", "2026-11-07"), row("Corona Extra 710 ml", 9, "B", "2026-11-07"), row("Corona Extra", 5.9, "C", "2026-11-13")]);
+eq("corona: with two sizes the bare name cannot be placed, so it stays apart", twoSizes.products.length, 3);
+eq("corona: a no on a pair keeps them apart", buildProducts([row("Corona Extra 330 ml", 5.49, "A", "2026-11-07"), row("Corona Extra", 5.95, "B", "2026-11-13")], [{ key_a: atomOf("Corona Extra 330 ml", "AWG", null).key, key_b: atomOf("Corona Extra", "AWG", null).key, same: false }]).products.length, 2);
+eq("corona: another currency is never joined", buildProducts([row("Corona Extra 330 ml", 5.49, "A", "2026-11-07"), row("Corona Extra", 5.95, "B", "2026-11-13", { receipt: { store: "B", purchase_date: "2026-11-13", currency: "USD" } })]).products.length, 2);
+eq("a bare name joins a sized one with a count too (eggs)", buildProducts([row("Eggs 12 ct", 6, "A", "2026-11-07"), row("Eggs", 6.3, "B", "2026-11-13")]).products.length, 1);
+
 // looksAlike
 eq("subset of two words", looksAlike(["heinz", "ketchup"], ["heinz", "ketchup", "tomato"]), true);
 eq("single shared word is not enough", looksAlike(["heinz", "ketchup"], ["heinz", "mayo"]), false);

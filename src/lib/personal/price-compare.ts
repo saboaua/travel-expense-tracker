@@ -184,6 +184,22 @@ function cluster(rows: TrackerRow[], decisions: MatchDecision[]) {
     const first = byMatch.get(g.atom.match);
     if (first) tryJoin(first, k); else byMatch.set(g.atom.match, k);
   }
+  // 3) a wording with no size is the same product as the same words with a size, when that size is the only one there is:
+  //    "Corona Extra" is the "Corona Extra 330 ml". With two sizes (330 ml and 710 ml) nobody can say which, so it stays apart.
+  const family = new Map<string, { sized: Map<string, string[]>; bare: string[] }>();
+  for (const [k, g] of atoms) {
+    if (!g.atom.words.length) continue;
+    const fk = `${g.atom.currency}|${[...g.atom.words].sort().join(" ")}|${g.atom.unit ?? ""}`;
+    const f = family.get(fk) ?? { sized: new Map<string, string[]>(), bare: [] };
+    const sk = sizeKey(g.atom.size);
+    if (sk) f.sized.set(sk, [...(f.sized.get(sk) ?? []), k]); else f.bare.push(k);
+    family.set(fk, f);
+  }
+  for (const f of family.values()) {
+    if (f.sized.size !== 1 || f.bare.length === 0) continue;
+    const anchor = [...f.sized.values()][0][0];
+    for (const b of f.bare) tryJoin(anchor, b);
+  }
   const clusters = new Map<string, Cluster>();
   for (const [k, g] of atoms) {
     const root = uf.find(k);
