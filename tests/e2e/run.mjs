@@ -51,7 +51,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -980,6 +980,47 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("00000000e")) a.splice(i, 1); }
+    }
+  });
+
+  await test("best store: a list priced at each store, within a radius, on a map, with a price level", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, geolocation: { latitude: 12.52, longitude: -70.03 }, permissions: ["geolocation"] });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const stores = [["Ling & Sons", 10], ["New Ten Sing", 11], ["Far Mart", 9]];
+    const names = ["Milk", "Bread", "Rice", "Eggs", "Butter", "Juice"];
+    stores.forEach(([st, base], si) => {
+      const rid = `9c000000-0000-4000-8000-0000000b0${si}0`;
+      fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: st, purchase_date: addDays(today, -3 - si), total: 60, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      names.forEach((n, ni) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000b${si}${ni}00`, receipt_id: rid, user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: base, line_total: base, unit: null, created_at: new Date().toISOString() }));
+    });
+    const loc = (id, name, lat, lng) => ({ id: `9e000000-0000-4000-8000-0000000b00${id}`, user_id: PAT, name, lat, lng, source: "pin", created_at: new Date().toISOString() });
+    fake.table("store_locations").push(loc(1, "Ling & Sons", 12.525, -70.03), loc(2, "New Ten Sing", 12.52, -70.04), loc(3, "Far Mart", 12.62, -70.03));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries`);
+      await page.getByTestId("best-store-link").click();
+      await page.getByRole("heading", { name: "Best store for your list" }).waitFor();
+      const usual = page.getByTestId("usual-item");
+      await usual.first().waitFor({ timeout: 60000 });
+      await usual.first().click();
+      await page.getByTestId("list-row").first().waitFor();
+      await page.getByTestId("mini-map").waitFor();
+      const cards = page.getByTestId("store-card");
+      await cards.first().waitFor();
+      assert((await cards.count()) === 2, "only the two stores within 5 km are ranked (the far one is left out)");
+      assert((await cards.first().innerText()).includes("Ling & Sons"), "the cheapest store is first");
+      assert((await cards.first().innerText()).includes("Best price"), "the first store is marked best price");
+      await page.getByRole("button", { name: "10 km" }).click();
+      await page.getByRole("button", { name: "10 km" }).waitFor();
+      await cards.first().click();
+      await page.getByTestId("store-detail").waitFor();
+      await page.getByTestId("price-level").getByText("Cheapest").first().waitFor();
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items", "store_locations", "shopping_list_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000b") || a[i].user_id === PAT && t === "shopping_list_items") a.splice(i, 1); }
     }
   });
 

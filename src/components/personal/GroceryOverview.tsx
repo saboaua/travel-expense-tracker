@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBasket } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
@@ -92,6 +92,7 @@ export function GroceryOverview() {
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href="/personal/groceries/prices"><Button variant="outline" className="gap-2"><TrendingUp className="h-4 w-4" /> Price tracker</Button></Link>
+          <Link href="/personal/groceries/basket"><Button variant="outline" className="gap-2" data-testid="best-store-link"><ShoppingBasket className="h-4 w-4" /> Best store</Button></Link>
           <Link href="/personal/groceries/price-check"><Button variant="outline" className="gap-2" data-testid="price-check-link"><Tag className="h-4 w-4" /> Add a price</Button></Link>
           <Link href="/personal/groceries/new"><Button className="gap-2"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
         </div>
