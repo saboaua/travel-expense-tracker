@@ -27,6 +27,16 @@ function shift(m: string, delta: number) {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 }
 
+/** A white tile: the icon on a tinted square, the label under it on a phone and beside it on a computer. */
+function ActionTile({ href, label, tint, testid, children }: { href: string; label: string; tint: string; testid?: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} data-testid={testid} className="flex min-h-[5.5rem] flex-col items-center justify-center gap-2 rounded-2xl border bg-card px-2 py-3 text-center shadow-sm transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-[4.5rem] md:flex-row md:justify-start md:gap-3 md:px-4 md:text-left">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${tint}`}>{children}</span>
+      <span className="text-sm font-semibold leading-tight md:text-base">{label}</span>
+    </Link>
+  );
+}
+
 function ReceiptRow({ id, unsent, children }: { id: string; unsent: boolean; children: React.ReactNode }) {
   return unsent
     ? <div className="flex items-center justify-between rounded-xl border p-3">{children}</div>
@@ -85,16 +95,18 @@ export function GroceryOverview() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-28 md:p-8">
       <BackLink href="/personal">Personal</BackLink>
 
-      <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold md:text-3xl">Groceries</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Monthly spending, categories and item price changes</p>
+      <div className="space-y-4 border-b pb-6">
+        <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold md:text-3xl">Groceries</h1>
+            <p className="mt-1 text-sm text-muted-foreground">Monthly spending, categories and item price changes</p>
+          </div>
+          <Link href="/personal/groceries/new" className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> Scan receipt</Button></Link>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-wrap sm:gap-2">
-          <Link href="/personal/groceries/prices" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto"><TrendingUp className="h-4 w-4" /> Price tracker</Button></Link>
-          <Link href="/personal/groceries/basket" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto" data-testid="best-store-link"><MapIcon className="h-4 w-4" /> Best store</Button></Link>
-          <Link href="/personal/groceries/price-check" className="block"><Button variant="outline" className="h-12 w-full gap-2 sm:h-10 sm:w-auto" data-testid="price-check-link"><Tag className="h-4 w-4" /> Add a price</Button></Link>
-          <Link href="/personal/groceries/new" className="block"><Button className="h-12 w-full gap-2 sm:h-10 sm:w-auto"><Plus className="h-4 w-4" /> Scan receipt</Button></Link>
+        <div className="grid grid-cols-3 gap-3 md:gap-4">
+          <ActionTile href="/personal/groceries/prices" label="Price tracker" tint="bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"><TrendingUp className="h-5 w-5" aria-hidden="true" /></ActionTile>
+          <ActionTile href="/personal/groceries/basket" label="Best store" testid="best-store-link" tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><MapIcon className="h-5 w-5" aria-hidden="true" /></ActionTile>
+          <ActionTile href="/personal/groceries/price-check" label="Add a price" testid="price-check-link" tint="bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"><Tag className="h-5 w-5" aria-hidden="true" /></ActionTile>
         </div>
       </div>
 
