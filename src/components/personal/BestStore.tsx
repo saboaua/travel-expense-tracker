@@ -17,8 +17,11 @@ import { fetchAll } from "@/lib/personal/fetch-all";
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare";
 import type { TrackerRow } from "@/lib/personal/grocery";
-import { RADII, basketTotals, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
-import { ONLINE_CURRENCY } from "@/lib/store-prices";
+import { externalPrices } from "@/lib/personal/best-prices";
+import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
+import type { CommunityRow } from "@/lib/personal/community";
+import { RADII, basketTotals, type ExternalPrice, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
+import { useOnline } from "@/lib/use-online";
 import { formatCurrency } from "@/lib/utils";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-80 w-full animate-pulse sm:h-96 md:h-[30rem] rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -83,9 +86,35 @@ export function BestStore() {
   const list = useMemo<ListRow[]>(() => (listQ.data ?? []).filter((l) => inCur.some((p) => p.key === l.product_key)), [listQ.data, inCur]);
   const items: ListItem[] = useMemo(() => list.map((l) => ({ key: l.product_key, qty: l.qty })), [list]);
   const usual = useMemo(() => usualItems(inCur, currency, now).filter((u) => !list.some((l) => l.product_key === u.key)), [inCur, currency, now, list]);
-  const stores = useMemo(() => [...new Set(inCur.flatMap((p) => p.stores.map((s) => s.store)))], [inCur]);
+  // Real prices from outside your receipts (community and online price lists) for what is on the list
+  const [external, setExternal] = useState<ExternalPrice[]>([]);
+  const online = useOnline();
+  const listKey = items.map((i) => i.key).sort().join("|");
+  useEffect(() => {
+    if (!online || !listKey) { setExternal([]); return; }
+    let off = false;
+    (async () => {
+      const keys = listKey.split("|");
+      const [c, o] = await Promise.all([
+        (async () => { try { const r = await createClient().rpc("community_search", { keys }); return r.error ? [] : ((r.data ?? []) as CommunityRow[]); } catch { return [] as CommunityRow[]; } })(),
+        currency === ONLINE_CURRENCY
+          ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: inCur.filter((p) => keys.includes(p.key)).map((p) => ({ key: p.key, names: p.names.map((n) => n.name) })) }) })
+              .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches ?? {}) : {}))
+              .catch(() => ({}) as Record<string, OnlineMatch[]>)
+          : Promise.resolve({} as Record<string, OnlineMatch[]>),
+      ]);
+      if (!off) setExternal(externalPrices(c, o, currency));
+    })();
+    return () => { off = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- listKey is the list of products asked about
+  }, [online, listKey, currency]);
+  const stores = useMemo(() => {
+    const out = new Map<string, string>();
+    for (const n of [...inCur.flatMap((p) => p.stores.map((s) => s.store)), ...external.filter((e) => listKey.split("|").includes(e.key)).map((e) => e.store)]) if (![...out.values()].some((x) => sameStore(x, n))) out.set(n.toLowerCase(), n);
+    return [...out.values()];
+  }, [inCur, external, listKey]);
   const index = useMemo(() => storeIndex(inCur, currency, now), [inCur, currency, now]);
-  const baskets = useMemo(() => basketTotals(items, inCur, stores, index, now), [items, inCur, stores, index, now]);
+  const baskets = useMemo(() => basketTotals(items, inCur, stores, index, now, external), [items, inCur, stores, index, now, external]);
 
   const locs = useMemo(() => locQ.data ?? [], [locQ.data]);
   const nearest = useCallback((store: string): { km: number; loc: Loc } | null => {
@@ -286,7 +315,7 @@ export function BestStore() {
                             <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                               {d && <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" aria-hidden="true" />{d.km.toFixed(1)} km</span>}
                               <Level level={b.level} pct={b.levelPct} />
-                              {b.estimated > 0 || b.unknown > 0 ? <span className={`${chip} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{b.priced} of {items.length} priced{b.estimated ? ` · ${b.estimated} estimated` : ""}</span> : <span className={`${chip} bg-muted`}>All items priced</span>}
+                              {b.unknown > 0 ? <span className={`${chip} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{b.priced} of {items.length} priced · {b.unknown} not counted</span> : <span className={`${chip} bg-muted`}>All items priced</span>}
                               {b.old > 0 && <span className={`${chip} bg-muted`}>{b.old} old price{b.old === 1 ? "" : "s"}</span>}
                             </span>
                           </span>
@@ -296,7 +325,7 @@ export function BestStore() {
                         {open === b.store && (
                           <div className="space-y-1 border-t px-3 py-2 text-sm" data-testid="store-detail">
                             {b.lines.map((l) => (
-                              <div key={l.key} className="flex justify-between gap-2"><span className="min-w-0 truncate">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}{l.status === "estimated" && <span className="ml-1 text-xs text-amber-700 dark:text-amber-300">estimated</span>}{l.status === "old" && l.date && <span className="ml-1 text-xs text-muted-foreground">price from {l.date}</span>}</span><span className="shrink-0 tabular-nums">{l.total != null ? fmt(l.total) : "no price"}</span></div>
+                              <div key={l.key} className="flex justify-between gap-2"><span className="min-w-0 truncate">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}{l.source === "community" && <span className="ml-1 text-xs text-amber-700 dark:text-amber-300">community</span>}{l.source === "online" && <span className="ml-1 text-xs text-sky-700 dark:text-sky-300">online</span>}{l.status === "old" && l.date && <span className="ml-1 text-xs text-muted-foreground">price from {l.date}</span>}</span><span className="shrink-0 tabular-nums">{l.total != null ? fmt(l.total) : "not counted"}</span></div>
                             ))}
                             {d && <a href={`https://www.google.com/maps/dir/?api=1&destination=${d.loc.lat},${d.loc.lng}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 pt-1 text-xs font-medium text-primary">Directions <ExternalLink className="h-3 w-3" aria-hidden="true" /></a>}
                           </div>

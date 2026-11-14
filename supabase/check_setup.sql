@@ -185,6 +185,10 @@ other_checks as (
               else 'OK' end,
          'migration_invites.sql'
   union all
+  select 'trigger', 'email stays in step when a person changes it',
+         case when exists (select 1 from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace where n.nspname = 'auth' and c.relname = 'users' and t.tgname = 'on_auth_user_email_changed') then 'OK' else 'MISSING' end,
+         'migration_email_sync.sql'
+  union all
   select 'privacy', 'price_share_seen: nobody can read it',
          case when to_regclass('public.price_share_seen') is null then 'MISSING'
               when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='price_share_seen' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_badges.sql'
@@ -228,6 +232,12 @@ other_checks as (
          'migration_help_fixed_costs.sql'
   from (values ('fixed-costs')) as s(slug)
   union all
+  select 'help topic', 'change-email',
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.help_topics where slug = ''change-email''', false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_accounts.sql'
+  union all
   select 'help topic', 'community-badges',
          case when to_regclass('public.help_topics') is not null
               and (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.help_topics where slug = ''community-badges''', false, true, '')))[1]::text::int > 0
@@ -244,7 +254,8 @@ other_checks as (
   from (values ('Best Prices topic', 'best-store', '%Best Prices%'),
                ('Community prices topic', 'community-prices', '%Best Prices%'),
                ('Phone alerts topic', 'turn-on-notifications', '%Gambling limit:%'),
-               ('Nightly share in Community prices topic', 'community-prices', '%once a night%')) as w(label, slug, good)
+               ('Nightly share in Community prices topic', 'community-prices', '%once a night%'),
+               ('No guessed prices in Best Prices topic', 'best-store', '%No guessed prices%')) as w(label, slug, good)
 ),
 all_checks as (
   select * from col_checks

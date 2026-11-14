@@ -9,6 +9,8 @@ export interface ManagedUser {
   temp_password_expires_at: string | null;
   created_at: string;
   last_sign_in_at: string | null;
+  /** Cannot sign in; nothing is deleted */
+  suspended?: boolean;
 }
 
 export type Credentials = { email: string; password: string; expiresAt: string };

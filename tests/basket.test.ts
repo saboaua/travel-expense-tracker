@@ -63,12 +63,21 @@ eq("A total", b[0].total, 30);
 eq("extra at C", b[2].extra, 6);
 eq("all priced", b[0].priced, 2);
 
-// an item never bought at a store is estimated and labelled
+// an item never bought at a store is NOT estimated: it is left out and counted as "no price"
 const withSoap = buildProducts([...rows, row("Soap", 5, "A", "2026-11-01"), row("Soap", 6, "B", "2026-11-01")]).products;
 const soap = withSoap.find((p) => p.name === "Soap")!;
-const est = basketTotals([{ key: soap.key, qty: 1 }], withSoap, ["A", "B", "C"], storeIndex(withSoap, "AWG", NOW), NOW).find((x) => x.store === "C")!;
-eq("estimated line", [est.estimated, est.lines[0].status], [1, "estimated"]);
-eq("estimate is near the middle price", est.lines[0].price! > 5 && est.lines[0].price! < 7, true);
+const none = basketTotals([{ key: soap.key, qty: 1 }], withSoap, ["A", "B", "C"], storeIndex(withSoap, "AWG", NOW), NOW).find((x) => x.store === "C")!;
+eq("no price here: not guessed", [none.unknown, none.priced, none.total, none.lines[0].status, none.lines[0].price], [1, 0, 0, "unknown", null]);
+// a real community or online price fills the gap, and says where it came from
+const ext = basketTotals([{ key: soap.key, qty: 2 }], withSoap, ["A", "B", "C"], storeIndex(withSoap, "AWG", NOW), NOW, [{ store: "C Supermarket", key: soap.key, price: 4.5, source: "community" }, { store: "C", key: soap.key, price: 4, source: "online" }]).find((x) => x.store === "C")!;
+eq("community price is used", [ext.priced, ext.total, ext.lines[0].source], [1, 9, "community"]);
+const onlineOnly = basketTotals([{ key: soap.key, qty: 1 }], withSoap, ["A", "C"], [], NOW, [{ store: "C", key: soap.key, price: 4, source: "online" }]).find((x) => x.store === "C")!;
+eq("online price is used when nothing else", [onlineOnly.total, onlineOnly.lines[0].source], [4, "online"]);
+eq("your own receipt wins over an outside price", basketTotals([{ key: soap.key, qty: 1 }], withSoap, ["A"], [], NOW, [{ store: "A", key: soap.key, price: 1, source: "community" }])[0].lines[0].source, "own");
+// a store that prices more of the list comes first, even when its total is higher
+const two2 = basketTotals([{ key: soap.key, qty: 1 }, { key: withSoap.find((p) => p.name !== "Soap")!.key, qty: 1 }], withSoap, ["A", "B", "C"], [], NOW, [{ store: "C", key: soap.key, price: 0.5, source: "online" }]);
+eq("more priced items rank first", two2.every((x, i) => i === 0 || two2[i - 1].priced >= x.priced), true);
+eq("extra only compares stores that price the same number", two2.every((s) => s.priced !== two2[0].priced ? s.extra === 0 : true), true);
 
 // a price older than 60 days is used but flagged
 const stale = buildProducts([...rows.filter((r) => r.receipt.store !== "A"), row("Milk", 9, "A", "2026-06-01")]).products;

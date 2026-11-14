@@ -118,6 +118,45 @@ export default function AdminUsersPage() {
     }
   };
 
+  const canManage = (u: ManagedUser) => u.id !== meId && (canAssignRole(myRole) || u.role === "user");
+  const nameOf = (u: ManagedUser) => [u.first_name, u.last_name].filter(Boolean).join(" ") || u.full_name || u.email || "this person";
+  const toggleSuspend = async (u: ManagedUser) => {
+    const suspend = !u.suspended;
+    const ok = await confirm(suspend
+      ? { title: `Suspend ${nameOf(u)}?`, message: "They are signed out and cannot sign in. Nothing is deleted, and their phone alerts stop. You can restore them any time.", confirmLabel: "Suspend" }
+      : { title: `Restore ${nameOf(u)}?`, message: "They can sign in again. They turn their phone alerts back on themselves.", confirmLabel: "Restore" });
+    if (!ok) return;
+    setBusyId(u.id); setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}/suspend`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ suspend }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not change that");
+      await loadUsers();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not change that");
+    } finally {
+      setBusyId(null);
+    }
+  };
+  const [deleting, setDeleting] = useState<ManagedUser | null>(null);
+  const [typed, setTyped] = useState("");
+  const doDelete = async () => {
+    if (!deleting) return;
+    setBusyId(deleting.id); setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${deleting.id}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ confirmEmail: typed }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Could not delete the person");
+      setDeleting(null); setTyped("");
+      await loadUsers();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Could not delete the person");
+      setDeleting(null); setTyped("");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const showCredentials = (c: Credentials) => {
     setCredentials(c);
     scrollAreaOrWindow().scrollTo({ top: 0, behavior: "smooth" });
@@ -300,7 +339,7 @@ export default function AdminUsersPage() {
                 const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.full_name || "—";
                 const status = statusOf(u);
                 return (
-                  <div key={u.id} className="p-3 rounded-xl border space-y-2">
+                  <div key={u.id} className={`p-3 rounded-xl border space-y-2 ${u.suspended ? "border-red-200 bg-red-50/60 dark:border-red-900 dark:bg-red-950/20" : ""}`} data-testid={`user-row-${u.email}`}>
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-3 min-w-0">
                         <div className="h-9 w-9 rounded-full bg-muted flex items-center justify-center shrink-0">
@@ -333,12 +372,22 @@ export default function AdminUsersPage() {
 
                     <div className="flex flex-wrap items-center justify-between gap-2 pl-12">
                       <div className="space-y-1">
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
+                        <span className="flex flex-wrap gap-1.5">
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${status.cls}`}>{status.label}</span>
+                          {u.suspended && <span className="text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-200" data-testid="suspended-badge">Suspended</span>}
+                        </span>
                         <p className="text-xs text-muted-foreground">
                           Last login: {u.last_sign_in_at ? `${timeAgo(u.last_sign_in_at)} (${fmt(u.last_sign_in_at)})` : "never"}
                           {" · "}Created {fmt(u.created_at)}
                         </p>
                       </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                      {canManage(u) && (
+                        <>
+                          <Button size="sm" variant="outline" disabled={busyId === u.id} onClick={() => toggleSuspend(u)} data-testid={`suspend-${u.email}`}>{u.suspended ? "Restore" : "Suspend"}</Button>
+                          <Button size="sm" variant="outline" className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-900 dark:text-red-300" disabled={busyId === u.id} onClick={() => { setTyped(""); setDeleting(u); }} data-testid={`delete-${u.email}`}>Delete</Button>
+                        </>
+                      )}
                       {canReset(u) && (
                         <Button
                           size="sm"
@@ -351,6 +400,7 @@ export default function AdminUsersPage() {
                           {busyId === u.id ? "Working..." : status.needsNewPassword ? "Generate new password" : "Reset password"}
                         </Button>
                       )}
+                      </div>
                     </div>
                   </div>
                 );
@@ -360,6 +410,24 @@ export default function AdminUsersPage() {
         </CardContent>
       </Card>
       </>
+      )}
+      {deleting && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/55 p-4" role="dialog" aria-modal="true" aria-label={`Delete ${nameOf(deleting)}`} data-testid="delete-dialog">
+          <div className="w-full max-w-md space-y-3 rounded-2xl bg-white p-5 shadow-2xl dark:bg-slate-900">
+            <h2 className="text-lg font-bold text-red-700 dark:text-red-300">Delete {nameOf(deleting)}?</h2>
+            <p className="text-sm text-muted-foreground">This cannot be undone.</p>
+            <p className="rounded-xl bg-red-50 p-3 text-sm text-red-950 dark:bg-red-950/30 dark:text-red-100"><b>Removed:</b> the account, profile, receipts, trips, documents, cards, budgets, photos and files, sharing and alerts.</p>
+            <p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-950 dark:bg-emerald-950/30 dark:text-emerald-100"><b>Kept:</b> the prices they shared with the community (store, item and price only). Nothing links them to the person any more.</p>
+            <div className="space-y-1">
+              <label htmlFor="delete-confirm" className="text-sm">Type their email to confirm</label>
+              <Input id="delete-confirm" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={deleting.email ?? ""} autoComplete="off" data-testid="delete-confirm-input" />
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" className="h-11 flex-1" onClick={() => { setDeleting(null); setTyped(""); }}>Cancel</Button>
+              <Button className="h-11 flex-1 bg-red-600 text-white hover:bg-red-700" disabled={busyId === deleting.id || typed.trim().toLowerCase() !== (deleting.email ?? "").toLowerCase()} onClick={doDelete} data-testid="delete-confirm">Delete for good</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

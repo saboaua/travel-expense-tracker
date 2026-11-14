@@ -98,6 +98,12 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
+  // A suspended account: said plainly (the password was right, so nothing is revealed to a guesser)
+  if (error && (error.code === "user_banned" || /banned/i.test(error.message))) {
+    await writeSecurityEvent(meta, { eventType: "login_suspended", severity: "warning", emailAttempted: email, details: { reason: "account suspended" } });
+    return NextResponse.json({ error: "This account is suspended. Please contact your administrator.", suspended: true }, { status: 403 });
+  }
+
   if (error || !data.user) {
     const { captchaNext } = await recordFailure(store, keys, captchaOn);
     await writeSecurityEvent(meta, {

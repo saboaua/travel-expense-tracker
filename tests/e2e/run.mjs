@@ -1424,6 +1424,76 @@ try {
     } finally { await actx.close(); }
   });
 
+  await test("admin: suspend and restore a person, delete one for good (typed email), and a suspended person is told at sign-in", async () => {
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 }, permissions: ["clipboard-read", "clipboard-write"] });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    const nctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    nctx.setDefaultTimeout(60_000);
+    const np = await nctx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/users`);
+      await ap.getByPlaceholder("user@company.com").fill("gone@example.com");
+      await ap.getByRole("button", { name: "Create user" }).click();
+      await ap.getByText("Share these credentials").waitFor();
+      await ap.getByRole("button", { name: "Copy credentials" }).click();
+      const copied = await ap.evaluate(() => navigator.clipboard.readText());
+      const pw = (copied.match(/temp password: (\S+)/) ?? [])[1];
+      assert(!!pw, "the temporary password is known");
+      const row = ap.getByTestId("user-row-gone@example.com");
+      await row.waitFor();
+      assert((await ap.getByTestId("suspend-admin@example.com").count()) === 0 && (await ap.getByTestId("delete-admin@example.com").count()) === 0, "you cannot suspend or delete yourself");
+      // suspend
+      await ap.getByTestId("suspend-gone@example.com").click();
+      await ap.getByRole("button", { name: "Suspend", exact: true }).last().click();
+      await row.getByTestId("suspended-badge").waitFor();
+      // a suspended person is told, and is not signed in
+      await np.goto(`${BASE}/login`);
+      const r = await np.evaluate(async ([e, p2]) => { const x = await fetch("/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: e, password: p2 }) }); return { status: x.status, body: await x.json() }; }, ["gone@example.com", pw]);
+      assert(r.status === 403 && /suspended/i.test(String(r.body.error)), `sign-in says the account is suspended (got ${r.status} ${JSON.stringify(r.body)})`);
+      // restore
+      await ap.getByTestId("suspend-gone@example.com").click();
+      await ap.getByRole("button", { name: "Restore", exact: true }).last().click();
+      await row.getByTestId("suspended-badge").waitFor({ state: "detached" });
+      // delete needs the email typed
+      await ap.getByTestId("delete-gone@example.com").click();
+      await ap.getByTestId("delete-dialog").waitFor();
+      assert(await ap.getByTestId("delete-confirm").isDisabled(), "Delete for good is off until the email is typed");
+      assert((await ap.getByTestId("delete-dialog").innerText()).includes("Kept:") && (await ap.getByTestId("delete-dialog").innerText()).includes("prices they shared"), "the dialog says shared prices stay");
+      await ap.getByTestId("delete-confirm-input").fill("gone@example.com");
+      await ap.getByTestId("delete-confirm").click();
+      await row.waitFor({ state: "detached" });
+      assert(fake.log.some((l) => l.table === "auth" && l.op === "delete-user"), "the sign-in was deleted");
+    } finally { await actx.close(); await nctx.close(); }
+  });
+
+  await test("profile: change the sign-in email (needs a link), with the problems said in plain words", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/profile#email`);
+      await page.getByTestId("email-card").waitFor();
+      assert((await page.getByTestId("email-current").innerText()).includes("pat@example.com"), "the current email is shown");
+      await page.getByTestId("email-new").fill("not an email");
+      await page.getByTestId("email-change").click();
+      await page.getByText(/Type a full email address/).waitFor();
+      await page.getByTestId("email-new").fill("admin@example.com");
+      await page.getByTestId("email-change").click();
+      await page.getByText(/That email is already used/).waitFor();
+      await page.getByTestId("email-new").fill("pat.new@example.com");
+      await page.getByTestId("email-change").click();
+      await page.getByText(/Check pat\.new@example\.com/).waitFor();
+      await page.getByTestId("email-pending").waitFor();
+      assert((await page.getByTestId("email-current").innerText()).includes("pat@example.com"), "the old email stays until the link is tapped");
+      assert(fake.log.some((l) => l.table === "auth" && l.op === "email-change" && l.to === "pat.new@example.com"), "the change was requested");
+    } finally { await ctx.close(); }
+  });
+
   await test("supermarket places: only an admin can open the import, and it offers the example file", async () => {
     const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     actx.setDefaultTimeout(60_000);

@@ -54,7 +54,7 @@ export function createFakeSupabase() {
     return id;
   }
 
-  const userJson = (u) => ({ id: u.id, aud: "authenticated", role: "authenticated", email: u.email, app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z" });
+  const userJson = (u) => ({ id: u.id, aud: "authenticated", role: "authenticated", email: u.email, app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", ...(u.new_email ? { new_email: u.new_email } : {}), ...(u.banned_until ? { banned_until: u.banned_until } : {}) });
 
   function session(u) {
     const exp = now() + 3600;
@@ -181,6 +181,7 @@ export function createFakeSupabase() {
       if (grant === "password") {
         const u = [...users.values()].find((x) => x.email === String(body.email).toLowerCase() && x.password === body.password);
         if (!u) return send(res, 400, { code: "invalid_credentials", error_code: "invalid_credentials", msg: "Invalid login credentials" });
+        if (u.banned_until && Date.parse(u.banned_until) > Date.now()) return send(res, 400, { code: "user_banned", error_code: "user_banned", msg: "User is banned" });
         return send(res, 200, session(u));
       }
       if (grant === "refresh_token") {
@@ -194,6 +195,10 @@ export function createFakeSupabase() {
       const id = tokens.get(String(req.headers.authorization || "").replace(/^Bearer /, ""));
       if (!id) return send(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
       if (body.password) { users.get(id).password = body.password; log.push({ table: "auth", op: "password-update" }); }
+      if (body.email) {
+        if ([...users.values()].some((x) => x.email === String(body.email).toLowerCase())) return send(res, 422, { code: 422, error_code: "email_exists", msg: "A user with this email address has already been registered" });
+        users.get(id).new_email = String(body.email).toLowerCase(); log.push({ table: "auth", op: "email-change", to: users.get(id).new_email });
+      }
       return send(res, 200, userJson(users.get(id)));
     }
     if (p === "/user") {
@@ -201,6 +206,17 @@ export function createFakeSupabase() {
       return id ? send(res, 200, userJson(users.get(id))) : send(res, 401, { code: 401, error_code: "bad_jwt", msg: "invalid JWT" });
     }
     if (p === "/logout") return send(res, 204);
+    const one = p.match(/^\/admin\/users\/([0-9a-f-]{36})$/);
+    if (one) {
+      const u = users.get(one[1]);
+      if (!u) return send(res, 404, { code: 404, error_code: "user_not_found", msg: "User not found" });
+      if (req.method === "GET") return send(res, 200, userJson(u));
+      if (req.method === "PUT") {
+        if (body.ban_duration) { u.banned_until = body.ban_duration === "none" ? null : new Date(Date.now() + 100 * 365 * 86400000).toISOString(); log.push({ table: "auth", op: body.ban_duration === "none" ? "restore" : "suspend", id: u.id }); }
+        return send(res, 200, userJson(u));
+      }
+      if (req.method === "DELETE") { users.delete(u.id); log.push({ table: "auth", op: "delete-user", id: u.id }); return send(res, 200, {}); }
+    }
     if (p === "/admin/users" && req.method === "POST") {
       const email = String(body.email || "").toLowerCase();
       if ([...users.values()].some((x) => x.email === email)) return send(res, 422, { code: 422, error_code: "email_exists", msg: "A user with this email address has already been registered" });
@@ -208,7 +224,7 @@ export function createFakeSupabase() {
       users.set(id, { id, email, password: body.password, user_metadata: body.user_metadata || {} });
       return send(res, 200, userJson(users.get(id)));
     }
-    if (p === "/admin/users" && req.method === "GET") return send(res, 200, { users: [...users.values()].map((u) => ({ ...userJson(u), last_sign_in_at: null, email_confirmed_at: "2026-01-01T00:00:00Z", banned_until: null })), aud: "authenticated" });
+    if (p === "/admin/users" && req.method === "GET") return send(res, 200, { users: [...users.values()].map((u) => ({ ...userJson(u), last_sign_in_at: null, email_confirmed_at: "2026-01-01T00:00:00Z", banned_until: u.banned_until ?? null })), aud: "authenticated" });
     return send(res, 404, { msg: "not found" });
   }
 

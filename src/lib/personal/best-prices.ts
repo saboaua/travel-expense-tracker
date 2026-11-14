@@ -8,6 +8,7 @@
 import { groupCommunity, productKey, type CommunityRow } from "@/lib/personal/community";
 import { productWords, type Product } from "@/lib/personal/price-compare";
 import type { OnlineMatch } from "@/lib/store-prices";
+import type { ExternalPrice } from "@/lib/personal/basket";
 
 export type OfferSource = "own" | "community" | "online";
 export type Offer = { store: string; price: number; source: OfferSource; note: string; best: boolean };
@@ -69,4 +70,15 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
     out.push({ ...g, offers: offers.map((o, i) => ({ ...o, best: i === 0 })) });
   }
   return out.sort((a, b) => b.offers.length - a.offers.length || a.name.localeCompare(b.name)).slice(0, 8);
+}
+
+/**
+ * Community and online prices for the products on a list, as real prices to fill the gaps in the basket totals. Community rows are only
+ * ones 3 or more people reported (the database already filters those); online matches only when the shop item is the same product.
+ */
+export function externalPrices(community: CommunityRow[], online: Record<string, OnlineMatch[]>, currency: string): ExternalPrice[] {
+  const out: ExternalPrice[] = [];
+  for (const r of community) if (r.currency === currency && Number(r.price) > 0) out.push({ store: r.store_name, key: r.product_key, price: Number(r.price), source: "community" });
+  for (const [key, list] of Object.entries(online)) for (const m of list) if (m.status === "same" && m.price > 0) out.push({ store: m.storeName, key, price: m.price, source: "online" });
+  return out;
 }

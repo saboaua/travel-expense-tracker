@@ -17,6 +17,7 @@ import { SharingCard } from "@/components/profile/SharingCard";
 import { NotificationsCard } from "@/components/profile/NotificationsCard";
 import { YourDataCard } from "@/components/profile/YourDataCard";
 import { CommunityCard } from "@/components/profile/CommunityCard";
+import { EmailCard } from "@/components/profile/EmailCard";
 import { BadgeChip } from "@/components/profile/BadgeChip";
 import { RecommendCard } from "@/components/profile/RecommendCard";
 
@@ -170,7 +171,6 @@ export default function ProfilePage() {
         full_name: fullName,
         title: title || null,
         company_name: companyName || null,
-        email: email || null,
         updated_at: new Date().toISOString(),
       });
 
@@ -310,18 +310,10 @@ export default function ProfilePage() {
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium">
-                Email
-              </label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-              />
+              <p className="text-sm font-medium">Email</p>
+              <p className="break-all text-base">{email || "…"}</p>
               <p className="text-xs text-muted-foreground">
-                This is for display only. Changing login email requires account settings.
+                This is the email you sign in with. To change it, open Sign-in email below.
               </p>
             </div>
 
@@ -347,6 +339,8 @@ export default function ProfilePage() {
       <CommunityCard />
 
       <RecommendCard />
+
+      <EmailCard />
 
       <PasswordCard />
 

@@ -123,26 +123,32 @@ export const LEVEL_LABEL: Record<Level, string> = { cheapest: "Cheapest", below:
 /* ---------------- basket ---------------- */
 
 export type ListItem = { key: string; qty: number };
-export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "estimated" | "unknown"; date: string | null };
+export type PriceSource = "own" | "community" | "online";
+export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null };
 export type StoreBasket = {
   store: string;
+  /** The total of the items that have a real price here (items with no price are left out, never guessed) */
   total: number;
   lines: BasketLine[];
   priced: number;
-  estimated: number;
   old: number;
+  /** Items with no real price at this store */
   unknown: number;
-  /** Extra against the cheapest store (0 for the cheapest) */
+  /** Extra against the cheapest store that prices as many items (0 for the cheapest, and when the stores price different numbers of items) */
   extra: number;
   level: Level;
   levelPct: number | null;
 };
 
+/** Real prices from outside your receipts: community and online price lists, by store and product key. */
+export type ExternalPrice = { store: string; key: string; price: number; source: "community" | "online" };
+
 /**
- * The list at each store: the latest price you paid there (flagged when older than 60 days); an item never bought there is
- * estimated as the middle price across stores, moved by that store's price level, and says so.
+ * The list at each store, from real prices only: the latest price you paid there (flagged when older than 60 days), otherwise a
+ * community or online price list price for the same product. An item with none of these is left out of that store and counted as
+ * "no price"; it is never estimated.
  */
-export function basketTotals(list: ListItem[], products: Product[], stores: string[], index: StoreIndex[], now: Date): StoreBasket[] {
+export function basketTotals(list: ListItem[], products: Product[], stores: string[], index: StoreIndex[], now: Date, external: ExternalPrice[] = []): StoreBasket[] {
   const byKey = new Map(products.map((p) => [p.key, p]));
   const idx = new Map(index.map((i) => [i.store, i]));
   const out: StoreBasket[] = stores.map((store) => {
@@ -152,28 +158,27 @@ export function basketTotals(list: ListItem[], products: Product[], stores: stri
       const here = p.stores.find((s) => s.store === store);
       if (here) {
         const old = !fresh(here.latest.date, now);
-        return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date } as BasketLine];
+        return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: "own" } as BasketLine];
       }
-      const ref = median(p.stores.map((s) => s.latest.price));
-      const pct = idx.get(store)?.pct ?? 0;
-      if (!(ref > 0)) return [{ key: p.key, name: p.name, qty: it.qty, price: null, total: null, status: "unknown", date: null } as BasketLine];
-      const est = round2(ref * (1 + pct / 100));
-      return [{ key: p.key, name: p.name, qty: it.qty, price: est, total: round2(est * it.qty), status: "estimated", date: null } as BasketLine];
+      // community first (people paid it), then the online list; the cheapest of the two sources is not assumed, the community one wins
+      const ext = external.filter((e) => e.key === it.key && sameStore(e.store, store) && e.price > 0).sort((a, b) => (a.source === b.source ? a.price - b.price : a.source === "community" ? -1 : 1))[0];
+      if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: null, source: ext.source } as BasketLine];
+      return [{ key: p.key, name: p.name, qty: it.qty, price: null, total: null, status: "unknown", date: null, source: null } as BasketLine];
     });
     const total = round2(lines.reduce((s, l) => s + (l.total ?? 0), 0));
     const i = idx.get(store);
     return {
       store, total, lines,
       priced: lines.filter((l) => l.status === "priced" || l.status === "old").length,
-      estimated: lines.filter((l) => l.status === "estimated").length,
       old: lines.filter((l) => l.status === "old").length,
       unknown: lines.filter((l) => l.status === "unknown").length,
       extra: 0, level: i?.level ?? "nodata", levelPct: i?.pct ?? null,
     };
   });
-  out.sort((a, b) => a.total - b.total);
-  const best = out[0]?.total ?? 0;
-  for (const s of out) s.extra = round2(s.total - best);
+  // A store that prices more of your list comes first; then the lower total
+  out.sort((a, b) => b.priced - a.priced || a.total - b.total);
+  const top = out[0];
+  if (top) for (const s of out) s.extra = s.priced === top.priced ? round2(s.total - top.total) : 0;
   return out;
 }
 
@@ -188,7 +193,7 @@ export function splitAdvice(list: ListItem[], baskets: StoreBasket[], distKm: Ma
     let s = 0;
     for (const l of best.lines) {
       const o = alt.lines.find((x) => x.key === l.key);
-      if (l.total != null && o?.status === "priced" && o.total != null && l.status !== "estimated" && o.total < l.total) s += l.total - o.total;
+      if (l.total != null && o?.status === "priced" && o.total != null && o.total < l.total) s += l.total - o.total;
     }
     if (s > save) { save = s; second = alt.store; }
   }

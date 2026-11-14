@@ -70,6 +70,7 @@ export async function GET() {
         temp_password_expires_at: (p?.temp_password_expires_at as string) ?? null,
         created_at: u.created_at,
         last_sign_in_at: u.last_sign_in_at ?? null,
+        suspended: !!u.banned_until && Date.parse(u.banned_until) > Date.now(),
         repaired: missing.some((m) => m.id === u.id),
       };
     })
