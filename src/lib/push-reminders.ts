@@ -7,7 +7,7 @@ import { kindLabel } from "@/lib/documents";
 import { addDaysISO } from "@/lib/utils";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
-import { gamblingState, KIND_LABEL, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
+import { gamblingState, KIND_LABEL, costName, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
 import { convert, round2 } from "@/lib/personal/money";
 import { FIXED_COST_COLS } from "@/lib/columns";
 import { kindLabel as utilityLabel, missingKinds, monthStart } from "@/lib/personal/utilities";
@@ -160,7 +160,7 @@ export async function yearlyBillAlerts(db: SupabaseClient, today: string): Promi
     const y = yearlyAlert(c, today);
     if (!y) continue;
     if (!(await claimOnce(c.user_id, `fixedYearly:${c.kind}:${y.date}:${y.step}`))) continue;
-    n += await sendPush(c.user_id, "fixedYearly", "yearlyBills", { item: KIND_LABEL[c.kind], days: y.days, date: y.date }, { today });
+    n += await sendPush(c.user_id, "fixedYearly", "yearlyBills", { item: costName(c), days: y.days, date: y.date }, { today });
   }
   return n;
 }

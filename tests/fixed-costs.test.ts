@@ -1,4 +1,4 @@
-import { paymentFallsOn, yearlyAlert, dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, type FixedCost } from "../src/lib/personal/fixed-costs";
+import { paymentFallsOn, yearlyAlert, dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, cleanPlate, costName, PLATE_KINDS, type FixedCost } from "../src/lib/personal/fixed-costs";
 import { budgetView, spentByArea, type BudgetSetting } from "../src/lib/personal/budget";
 
 let fail = 0;
@@ -67,6 +67,19 @@ eq("payment day: another day", paymentFallsOn(mort1, "2026-12-02"), false);
 eq("payment day: after the end", paymentFallsOn(mort1, "2041-04-01"), false);
 eq("payment day: no day set means the 1st", paymentFallsOn({ ...mortgage, day: null }, "2026-12-01"), true);
 eq("payment day: yearly bills are not monthly", paymentFallsOn({ ...ins, day: 15 }, "2027-03-15"), false);
+
+// several license plates
+eq("three plate kinds", [...PLATE_KINDS], ["license_plate", "license_plate_2", "license_plate_3"]);
+eq("plate numbers are tidied", [cleanPlate("  p-1234 "), cleanPlate("a   98765"), cleanPlate("   "), cleanPlate(null), cleanPlate("x".repeat(30))], ["P-1234", "A 98765", null, null, "X".repeat(16)]);
+eq("plate name with a number", [costName({ kind: "license_plate", label: "P-1234" }), costName({ kind: "license_plate_2", label: "A 98765" })], ["License plate P-1234", "License plate A 98765"]);
+eq("plate name without a number", [costName({ kind: "license_plate", label: null }), costName({ kind: "license_plate_2", label: null }), costName({ kind: "license_plate_3", label: "" })], ["License plate", "License plate 2", "License plate 3"]);
+eq("other costs keep their name", [costName({ kind: "car_loan", label: "ignored" }), costName(undefined, "mortgage")], ["Car loan", "Home mortgage"]);
+eq("lowercase for a sentence keeps the number", costName({ kind: "license_plate", label: "P-1234" }, undefined, true), "license plate P-1234");
+eq("plate 2 read from a row", readCost({ kind: "license_plate_2", schedule: "yearly", amount: 100, due_month: 3, day: 5, label: " a 98765 " })?.label, "A 98765");
+eq("only plates keep a label", readCost({ kind: "car_loan", schedule: "monthly", amount: 100, label: "P-1" })?.label, null);
+const pl2 = c({ kind: "license_plate_2", label: "A 98765", schedule: "twice_yearly", amount: 210, amount2: 210, due_month: 3, due_month2: 9, day: 15 });
+eq("plate 2 counts as an insurance in its months", [monthLines([pl2], [], "2026-03-01").map((l) => [l.kind, l.category, l.amount]), monthLines([pl2], [], "2026-04-01").length, monthLines([pl2], [], "2026-09-01").length], [[["license_plate_2", "insurances", 210]], 0, 1]);
+eq("plate 2 next payment", nextYearly(pl2, "2026-04-01"), { date: "2026-09-15", amount: 210 });
 
 if (fail) process.exit(1);
 console.log("ok fixed-costs");

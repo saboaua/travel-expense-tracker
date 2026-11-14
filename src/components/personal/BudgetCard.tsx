@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
 import { fetchBudgets, fetchFixedCosts, fetchMonthInputs } from "@/lib/personal/budget-data";
-import { CATEGORY_LABEL, configuredCategories, nextYearly, KIND_LABEL, MONTHS, type FixedCategory, type FixedCost } from "@/lib/personal/fixed-costs";
+import { CATEGORY_LABEL, configuredCategories, nextYearly, costName, MONTHS, type FixedCategory, type FixedCost } from "@/lib/personal/fixed-costs";
 import { convert } from "@/lib/personal/money";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
@@ -179,7 +179,7 @@ function comingUpNote(costs: FixedCost[], today: string, currency: BudgetView["c
     if (!n) continue;
     const days = Math.round((Date.parse(`${n.date}T12:00:00Z`) - t) / 86400000);
     if (days > 45) continue;
-    parts.push(`${formatCurrency(convert(n.amount, c.currency, currency) ?? n.amount, currency)} ${KIND_LABEL[c.kind].toLowerCase()} is due ${Number(n.date.slice(8, 10))} ${MONTHS[Number(n.date.slice(5, 7)) - 1]}`);
+    parts.push(`${formatCurrency(convert(n.amount, c.currency, currency) ?? n.amount, currency)} ${costName(c, undefined, true)} is due ${Number(n.date.slice(8, 10))} ${MONTHS[Number(n.date.slice(5, 7)) - 1]}`);
   }
   return parts.length ? `${parts.join(". ")}. It counts in the month it is due.` : null;
 }

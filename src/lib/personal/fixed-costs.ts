@@ -9,22 +9,39 @@
  */
 import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
 
-export const FIXED_KINDS = ["mortgage", "home_insurance", "car_loan", "car_insurance", "license_plate", "credit_card", "gambling"] as const;
+export const FIXED_KINDS = ["mortgage", "home_insurance", "car_loan", "car_insurance", "license_plate", "license_plate_2", "license_plate_3", "credit_card", "gambling"] as const;
+/** A person can keep up to three license plates (one per car) */
+export const PLATE_KINDS = ["license_plate", "license_plate_2", "license_plate_3"] as const satisfies readonly (typeof FIXED_KINDS)[number][];
 export type FixedKind = (typeof FIXED_KINDS)[number];
 export type FixedSchedule = "monthly" | "yearly" | "twice_yearly" | "statement" | "limit";
 export type FixedCategory = "loans" | "insurances" | "cards" | "gambling";
 
-export const KIND_LABEL: Record<FixedKind, string> = { mortgage: "Home mortgage", home_insurance: "Home insurance", car_loan: "Car loan", car_insurance: "Car insurance", license_plate: "License plate", credit_card: "Credit card", gambling: "Gambling limit" };
+export const KIND_LABEL: Record<FixedKind, string> = { mortgage: "Home mortgage", home_insurance: "Home insurance", car_loan: "Car loan", car_insurance: "Car insurance", license_plate: "License plate", license_plate_2: "License plate 2", license_plate_3: "License plate 3", credit_card: "Credit card", gambling: "Gambling limit" };
 export const CATEGORY_LABEL: Record<FixedCategory, string> = { loans: "Loans", insurances: "Insurances", cards: "Credit card", gambling: "Gambling" };
-export const KIND_CATEGORY: Record<FixedKind, FixedCategory> = { mortgage: "loans", car_loan: "loans", home_insurance: "insurances", car_insurance: "insurances", license_plate: "insurances", credit_card: "cards", gambling: "gambling" };
+export const KIND_CATEGORY: Record<FixedKind, FixedCategory> = { mortgage: "loans", car_loan: "loans", home_insurance: "insurances", car_insurance: "insurances", license_plate: "insurances", license_plate_2: "insurances", license_plate_3: "insurances", credit_card: "cards", gambling: "gambling" };
 export const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export type FixedCost = {
   id?: string; kind: FixedKind; schedule: FixedSchedule; amount: number; amount2: number | null; currency: BudgetCurrency;
-  day: number | null; due_month: number | null; due_month2: number | null; start_month: string | null; end_month: string | null; active: boolean;
+  label?: string | null; day: number | null; due_month: number | null; due_month2: number | null; start_month: string | null; end_month: string | null; active: boolean;
 };
 export type FixedEntry = { id?: string; kind: "card" | "gambling"; on_date: string; amount: number; currency: BudgetCurrency };
 export type FixedLine = { kind: FixedKind; category: FixedCategory; amount: number; currency: BudgetCurrency };
+
+/** A plate number as typed: spaces tidied, capitals, at most 16 characters. Empty becomes null. */
+export function cleanPlate(v: unknown): string | null {
+  const t = typeof v === "string" ? v.replace(/\s+/g, " ").trim().toUpperCase().slice(0, 16).trim() : "";
+  return t || null;
+}
+export const isPlate = (k: FixedKind) => (PLATE_KINDS as readonly string[]).includes(k);
+
+/** What to call a cost: a plate with a number is "License plate P-1234", otherwise its plain name. lower: for use inside a sentence. */
+export function costName(c: Pick<FixedCost, "kind" | "label"> | undefined, kind?: FixedKind, lower = false): string {
+  const k = c?.kind ?? kind;
+  if (!k) return "";
+  const base = lower ? KIND_LABEL[k].toLowerCase() : KIND_LABEL[k];
+  return isPlate(k) && c?.label ? `${base.replace(/ \d$/, "")} ${c.label}` : base;
+}
 
 const isKind = (k: unknown): k is FixedKind => (FIXED_KINDS as readonly string[]).includes(k as string);
 const SCHEDULES: FixedSchedule[] = ["monthly", "yearly", "twice_yearly", "statement", "limit"];
@@ -38,6 +55,7 @@ export function readCost(r: Record<string, unknown>): FixedCost | null {
   return {
     id: typeof r.id === "string" ? r.id : undefined, kind: r.kind, schedule: r.schedule as FixedSchedule,
     amount: round2(num(r.amount)), amount2: r.amount2 == null ? null : round2(num(r.amount2)), currency: r.currency === "USD" ? "USD" : "AWG",
+    label: isPlate(r.kind) ? cleanPlate(r.label) : null,
     day: r.day == null ? null : Math.min(28, Math.max(1, Math.round(num(r.day)))), due_month: monthOrNull(r.due_month), due_month2: monthOrNull(r.due_month2),
     start_month: firstOfMonth(r.start_month), end_month: firstOfMonth(r.end_month), active: r.active !== false,
   };

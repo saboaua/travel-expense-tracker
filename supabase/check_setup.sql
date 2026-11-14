@@ -52,6 +52,7 @@ need_cols(tbl, col, fix) as (values
   ('invite_links','code','migration_invites.sql'),
   ('fixed_costs','schedule','migration_fixed_costs.sql'),
   ('fixed_costs','end_month','migration_fixed_costs.sql'),
+  ('fixed_costs','label','migration_license_plates.sql'),
   ('fixed_entries','on_date','migration_fixed_costs.sql'),
   ('profiles','push_prefs','migration_sharing_safety.sql'),
   ('profiles','shared_total','migration_badges.sql'),
@@ -138,6 +139,10 @@ other_checks as (
   select 'constraint', 'personal_budgets: limits is an object',
          case when exists (select 1 from pg_constraint where conname='personal_budgets_limits_object') then 'OK' else 'MISSING' end,
          'migration_audit_fixes.sql'
+  union all
+  select 'constraint', 'fixed_costs: up to 3 license plates',
+         case when exists (select 1 from pg_constraint where conname='fixed_costs_kind_check' and pg_get_constraintdef(oid) like '%license_plate_3%') then 'OK' else 'MISSING' end,
+         'migration_license_plates.sql'
   union all
   select 'index', 'utility_bills: one bill per email',
          case when exists (select 1 from pg_indexes where schemaname='public' and indexname='utility_bills_dedupe_idx') then 'OK' else 'MISSING' end,

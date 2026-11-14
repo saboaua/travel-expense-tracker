@@ -12,7 +12,7 @@ import { Select } from "@/components/ui/select";
 import { setupNeeded } from "@/lib/setup-message";
 import { FIXED_COST_COLS, FIXED_ENTRY_COLS } from "@/lib/columns";
 import {
-  CATEGORY_LABEL, KIND_LABEL, MONTHS, gamblingState, monthLabel, monthLines, nextYearly, paymentsLeft, readCost, readEntry,
+  CATEGORY_LABEL, KIND_LABEL, MONTHS, PLATE_KINDS, cleanPlate, costName, gamblingState, monthLabel, monthLines, nextYearly, paymentsLeft, readCost, readEntry,
   type FixedCategory, type FixedCost, type FixedEntry, type FixedKind, type FixedSchedule,
 } from "@/lib/personal/fixed-costs";
 import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
@@ -37,10 +37,12 @@ function useFixed(): Loaded & { reload: () => Promise<void> } {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return setState((s) => ({ ...s, ready: true }));
     const since = `${Number(todayISO().slice(0, 4)) - 1}-${todayISO().slice(5, 7)}-01`;
-    const [c, e] = await Promise.all([
+    const [c0, e] = await Promise.all([
       sb.from("fixed_costs").select(FIXED_COST_COLS).limit(50),
       sb.from("fixed_entries").select(FIXED_ENTRY_COLS).gte("on_date", since).order("on_date", { ascending: false }).limit(500),
     ]);
+    // until migration_license_plates.sql is run there is no label column: read without it
+    const c = c0.error && /label/i.test(c0.error.message) ? await sb.from("fixed_costs").select(FIXED_COST_COLS.replace(" label,", "")).limit(50) : c0;
     if (c.error || e.error) return setState({ costs: [], entries: [], missing: isMissing(c.error?.message ?? e.error?.message), ready: true, uid: session.user.id });
     setState({
       costs: ((c.data ?? []) as unknown as Record<string, unknown>[]).map(readCost).filter((x): x is FixedCost => !!x),
@@ -52,8 +54,11 @@ function useFixed(): Loaded & { reload: () => Promise<void> } {
   return { ...state, reload };
 }
 
-async function saveCost(uid: string, c: Omit<FixedCost, "id" | "active">) {
-  return createClient().from("fixed_costs").upsert({ user_id: uid, ...c, active: true }, { onConflict: "user_id,kind" });
+async function saveCost(uid: string, c: Omit<FixedCost, "id" | "active" | "label"> & { label?: string | null }) {
+  const { label, ...rest } = c;
+  // the label column only exists after migration_license_plates.sql: send it only for plates
+  const isPlateKind = (PLATE_KINDS as readonly string[]).includes(c.kind);
+  return createClient().from("fixed_costs").upsert({ user_id: uid, ...rest, ...(label ? { label } : isPlateKind ? { label: null } : {}), active: true }, { onConflict: "user_id,kind" });
 }
 const removeCost = (uid: string, kind: FixedKind) => createClient().from("fixed_costs").delete().eq("user_id", uid).eq("kind", kind);
 
@@ -95,7 +100,7 @@ const Note = ({ children, tone = "info" }: { children: React.ReactNode; tone?: "
 
 const SECTIONS: { cat: FixedCategory; title: string; rows: { kind: FixedKind; href: string }[] }[] = [
   { cat: "loans", title: "Loans", rows: [{ kind: "mortgage", href: "/personal/fixed/mortgage" }, { kind: "car_loan", href: "/personal/fixed/car" }] },
-  { cat: "insurances", title: "Insurances and car plate", rows: [{ kind: "home_insurance", href: "/personal/fixed/home-insurance" }, { kind: "car_insurance", href: "/personal/fixed/car" }, { kind: "license_plate", href: "/personal/fixed/car" }] },
+  { cat: "insurances", title: "Insurances and car plate", rows: [{ kind: "home_insurance", href: "/personal/fixed/home-insurance" }, { kind: "car_insurance", href: "/personal/fixed/car" }, { kind: "license_plate", href: "/personal/fixed/car" }] }, // plates 2 and 3 appear once they are added
   { cat: "cards", title: "Credit card", rows: [{ kind: "credit_card", href: "/personal/fixed/credit-card" }] },
   { cat: "gambling", title: "Limits", rows: [{ kind: "gambling", href: "/personal/fixed/gambling" }] },
 ];
@@ -139,7 +144,7 @@ export function FixedCostsHub() {
               return (
                 <div key={cat} className="mt-2 border-t pt-2">
                   <div className="flex justify-between text-sm font-bold"><span>{CATEGORY_LABEL[cat]}</span><span className="tabular-nums">{formatCurrency(round2(rows.reduce((t, l) => t + of(l), 0)), cur)}</span></div>
-                  {rows.map((l) => <div key={`${l.kind}${l.currency}`} className="flex justify-between py-1 text-sm text-muted-foreground"><span>{KIND_LABEL[l.kind]}</span><span className="tabular-nums">{formatCurrency(of(l), cur)}</span></div>)}
+                  {rows.map((l) => <div key={`${l.kind}${l.currency}`} className="flex justify-between py-1 text-sm text-muted-foreground"><span>{costName(by.get(l.kind), l.kind)}</span><span className="tabular-nums">{formatCurrency(of(l), cur)}</span></div>)}
                 </div>
               );
             })}
@@ -147,7 +152,7 @@ export function FixedCostsHub() {
           {coming.length > 0 && (
             <Card className="rounded-2xl p-4" data-testid="fixed-coming">
               <p className="mb-1 text-sm font-bold">Coming up</p>
-              {coming.map(({ c, n }) => <div key={c.kind} className="flex justify-between border-t py-2 text-sm first:border-0"><span>{KIND_LABEL[c.kind]}<span className="block text-xs text-muted-foreground">Due {Number(n!.date.slice(8, 10))} {MONTHS[Number(n!.date.slice(5, 7)) - 1]}</span></span><b className="tabular-nums">{formatCurrency(n!.amount, c.currency)}</b></div>)}
+              {coming.map(({ c, n }) => <div key={c.kind} className="flex justify-between border-t py-2 text-sm first:border-0"><span>{costName(c)}<span className="block text-xs text-muted-foreground">Due {Number(n!.date.slice(8, 10))} {MONTHS[Number(n!.date.slice(5, 7)) - 1]}</span></span><b className="tabular-nums">{formatCurrency(n!.amount, c.currency)}</b></div>)}
             </Card>
           )}
           <div className="lg:grid lg:grid-cols-2 lg:gap-x-6">
@@ -155,9 +160,9 @@ export function FixedCostsHub() {
             <section key={s.cat}>
               <h2 className="mb-1 mt-3 text-sm font-bold text-slate-700 dark:text-slate-200">{s.title}</h2>
               <Card className="rounded-2xl px-4">
-                {s.rows.map((r) => (
+                {s.rows.flatMap((r) => (r.kind === "license_plate" ? PLATE_KINDS.filter((k) => k === "license_plate" || by.get(k)?.active).map((k) => ({ ...r, kind: k as FixedKind })) : [r])).map((r) => (
                   <Link key={r.kind} href={r.href} className="flex min-h-14 items-center gap-3 border-t py-2.5 first:border-0 hover:bg-accent/40" data-testid={`fixed-row-${r.kind}`}>
-                    <span className="min-w-0 flex-1"><b className="block text-[15px]">{KIND_LABEL[r.kind]}</b><span className="block text-[13px] text-muted-foreground">{status(by.get(r.kind), today)}</span></span>
+                    <span className="min-w-0 flex-1"><b className="block text-[15px]">{costName(by.get(r.kind), r.kind)}</b><span className="block text-[13px] text-muted-foreground">{status(by.get(r.kind), today)}</span></span>
                     <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                   </Link>
                 ))}
@@ -188,7 +193,7 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
   }, [ready, filled, mine]);
 
   const n = toNum(amount);
-  const draft: FixedCost = { kind, schedule: "monthly", amount: n > 0 ? n : 0, amount2: null, currency: cur, day, due_month: null, due_month2: null, start_month: start ? `${start}-01` : null, end_month: end ? `${end}-01` : null, active: true };
+  const draft: FixedCost = { kind, label: null, schedule: "monthly", amount: n > 0 ? n : 0, amount2: null, currency: cur, day, due_month: null, due_month2: null, start_month: start ? `${start}-01` : null, end_month: end ? `${end}-01` : null, active: true };
   const left = paymentsLeft(draft, todayISO());
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(null);
@@ -196,7 +201,7 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
     if (start && end && end < start) return setErr("The last payment cannot be before the start.");
     if (!uid) return setErr("Sign in again to save.");
     setBusy(true);
-    const { error } = await saveCost(uid, { kind, schedule: "monthly", amount: round2(n), amount2: null, currency: cur, day, due_month: null, due_month2: null, start_month: draft.start_month, end_month: draft.end_month });
+    const { error } = await saveCost(uid, { kind, schedule: "monthly", amount: round2(n), amount2: null, label: null, currency: cur, day, due_month: null, due_month2: null, start_month: draft.start_month, end_month: draft.end_month });
     setBusy(false);
     if (error) return setErr(isMissing(error.message) ? SETUP : "Could not save. Check your connection.");
     router.push("/personal/fixed");
@@ -225,32 +230,77 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
 
 /* ---------------- my car: loan, insurance, license plate ---------------- */
 
+type PlateDraft = { kind: FixedKind; num: string; mode: "once" | "twice"; a1: string; a2: string; once: string; m1: number; m2: number; day: number; cur: BudgetCurrency };
+const newPlate = (kind: FixedKind): PlateDraft => ({ kind, num: "", mode: "once", a1: "", a2: "", once: "", m1: 6, m2: 12, day: 30, cur: "AWG" });
+
+/** One license plate: its number (optional), how it is paid, and when */
+function PlateCard({ d, i, onChange, onRemove, removing, onKeep, onConfirm }: { d: PlateDraft; i: number; onChange: (p: Partial<PlateDraft>) => void; onRemove?: () => void; removing: boolean; onKeep: () => void; onConfirm: () => void }) {
+  const id = (b: string) => (i === 0 ? b : `${b}-${i + 1}`);
+  const title = i === 0 ? "License plate" : `License plate ${i + 1}`;
+  const extra = d.mode === "twice" && toNum(d.a1) > 0 && toNum(d.a2) > 0 && toNum(d.once) > 0 ? round2(toNum(d.a1) + toNum(d.a2) - toNum(d.once)) : null;
+  return (
+    <div className="space-y-3 rounded-2xl border bg-card p-4" data-testid={`plate-card-${i + 1}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div><b className="block text-base">{title}</b><span className="text-[13px] text-muted-foreground">Paid every year. Two payments cost a little more.</span></div>
+        {onRemove && <button type="button" onClick={onRemove} className="min-h-9 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`plate-remove-${i + 1}`}>Remove</button>}
+      </div>
+      {removing && (
+        <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950" role="alertdialog" aria-label={`Remove ${title}`}>
+          <b className="block text-[15px]">Remove {costName({ kind: d.kind, label: cleanPlate(d.num) })}?</b>
+          <p className="text-[13px] text-muted-foreground">Its payments stop counting in your spending once you save. Months already counted stay as they are.</p>
+          <div className="flex gap-2"><button type="button" onClick={onKeep} className="min-h-11 flex-1 rounded-xl border bg-background text-sm font-bold">Keep it</button><button type="button" onClick={onConfirm} className="min-h-11 flex-1 rounded-xl bg-red-600 text-sm font-bold text-white" data-testid={`plate-remove-confirm-${i + 1}`}>Remove plate</button></div>
+        </div>
+      )}
+      <div>
+        <label htmlFor={id("plate-num")} className={label}>Plate number <span className="font-normal text-muted-foreground">(optional)</span></label>
+        <input id={id("plate-num")} value={d.num} maxLength={16} autoCapitalize="characters" autoComplete="off" onChange={(e) => onChange({ num: e.target.value.toUpperCase() })} placeholder="P-1234" className={`${field} font-bold tracking-wide`} />
+        <p className="mt-1 text-xs text-muted-foreground">So you know which car this payment is for. Only you see it.</p>
+      </div>
+      <Seg value={d.mode} onChange={(v) => onChange({ mode: v as "once" | "twice" })} options={[{ v: "once", t: "Once a year" }, { v: "twice", t: "Two payments" }]} />
+      {d.mode === "once" ? (
+        <div className="grid grid-cols-2 gap-3"><div className="col-span-2"><label htmlFor={id("plate-once")} className={label}>Yearly amount</label><Money id={id("plate-once")} value={d.once} onChange={(v) => onChange({ once: v })} currency={d.cur} onCurrency={(c) => onChange({ cur: c })} /></div><div><label htmlFor={id("plate-m1")} className={label}>Due month</label><MonthSelect id={id("plate-m1")} value={d.m1} onChange={(v) => onChange({ m1: v })} /></div><div><label htmlFor={id("plate-d")} className={label}>Day</label><DaySelect id={id("plate-d")} value={d.day} onChange={(v) => onChange({ day: v })} /></div></div>
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2"><label htmlFor={id("plate-a1")} className={label}>First payment</label><Money id={id("plate-a1")} value={d.a1} onChange={(v) => onChange({ a1: v })} currency={d.cur} onCurrency={(c) => onChange({ cur: c })} /></div>
+          <div><label htmlFor={id("plate-m1")} className={label}>Due month</label><MonthSelect id={id("plate-m1")} value={d.m1} onChange={(v) => onChange({ m1: v })} /></div><div><label htmlFor={id("plate-d")} className={label}>Day</label><DaySelect id={id("plate-d")} value={d.day} onChange={(v) => onChange({ day: v })} /></div>
+          <div className="col-span-2"><label htmlFor={id("plate-a2")} className={label}>Second payment</label><input id={id("plate-a2")} inputMode="decimal" value={d.a2} onChange={(e) => onChange({ a2: e.target.value })} placeholder="0.00" className={field} /></div>
+          <div className="col-span-2"><label htmlFor={id("plate-m2")} className={label}>Second payment month</label><MonthSelect id={id("plate-m2")} value={d.m2} onChange={(v) => onChange({ m2: v })} /></div>
+          <div className="col-span-2"><label htmlFor={id("plate-once2")} className={label}>Price if paid once a year (optional)</label><input id={id("plate-once2")} inputMode="decimal" value={d.once} onChange={(e) => onChange({ once: e.target.value })} placeholder="0.00" className={field} /></div>
+          {extra != null && extra > 0 && <p className="col-span-2 text-[13px] text-amber-800 dark:text-amber-200">Two payments cost {formatCurrency(extra, d.cur)} more a year.</p>}
+        </div>
+      )}
+      <Note tone="good">Added to your spending in the months each payment is due.</Note>
+    </div>
+  );
+}
+
 export function CarForm() {
   const router = useRouter();
   const { costs, missing, ready, uid } = useFixed();
   const [loanOn, setLoanOn] = useState(false), [loan, setLoan] = useState(""), [loanEnd, setLoanEnd] = useState(""), [loanCur, setLoanCur] = useState<BudgetCurrency>("AWG");
   const [ins, setIns] = useState(""), [insMonth, setInsMonth] = useState(3), [insDay, setInsDay] = useState(15), [insCur, setInsCur] = useState<BudgetCurrency>("AWG");
-  const [plateMode, setPlateMode] = useState<"once" | "twice">("once");
-  const [plate, setPlate] = useState(""), [plate2, setPlate2] = useState(""), [pm1, setPm1] = useState(6), [pm2, setPm2] = useState(12), [pDay, setPDay] = useState(30), [plateCur, setPlateCur] = useState<BudgetCurrency>("AWG");
-  const [onceAmount, setOnceAmount] = useState("");
+  const [plates, setPlates] = useState<PlateDraft[]>([newPlate("license_plate")]);
+  const [removing, setRemoving] = useState<number | null>(null);
+  const setPlate = (i: number, patch: Partial<PlateDraft>) => setPlates((all) => all.map((x, j) => (j === i ? { ...x, ...patch } : x)));
   const [err, setErr] = useState<string | null>(null), [busy, setBusy] = useState(false), [filled, setFilled] = useState(false);
 
   useEffect(() => {
     if (!ready || filled) return;
     setFilled(true);
-    const l = costs.find((c) => c.kind === "car_loan"), i = costs.find((c) => c.kind === "car_insurance"), p = costs.find((c) => c.kind === "license_plate");
+    const l = costs.find((c) => c.kind === "car_loan"), i = costs.find((c) => c.kind === "car_insurance");
     if (l) { setLoanOn(true); setLoan(String(l.amount)); setLoanEnd(l.end_month?.slice(0, 7) ?? ""); setLoanCur(l.currency); }
     if (i) { setIns(String(i.amount)); setInsMonth(i.due_month ?? 3); setInsDay(i.day ?? 15); setInsCur(i.currency); }
-    if (p) {
-      setPlateCur(p.currency); setPDay(p.day ?? 30); setPm1(p.due_month ?? 6);
-      if (p.schedule === "twice_yearly") { setPlateMode("twice"); setPlate(String(p.amount)); setPlate2(String(p.amount2 ?? p.amount)); setPm2(p.due_month2 ?? 12); } else setOnceAmount(String(p.amount));
-    }
+    const mine = PLATE_KINDS.map((k) => costs.find((c) => c.kind === k && c.active)).filter((x): x is FixedCost => !!x);
+    if (mine.length) setPlates(mine.map((p) => ({
+      ...newPlate(p.kind), num: p.label ?? "", cur: p.currency, day: p.day ?? 30, m1: p.due_month ?? 6,
+      ...(p.schedule === "twice_yearly" ? { mode: "twice" as const, a1: String(p.amount), a2: String(p.amount2 ?? p.amount), m2: p.due_month2 ?? 12 } : { once: String(p.amount) }),
+    })));
   }, [ready, filled, costs]);
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault(); setErr(null);
     if (!uid) return setErr("Sign in again to save.");
-    const base = { amount2: null, due_month: null, due_month2: null, day: null, start_month: null, end_month: null };
+    const base = { label: null as string | null, amount2: null, due_month: null, due_month2: null, day: null, start_month: null, end_month: null };
     const jobs: PromiseLike<{ error: { message: string } | null }>[] = [];
     if (loanOn) {
       const a = toNum(loan);
@@ -262,14 +312,21 @@ export function CarForm() {
       if (!(ia > 0)) return setErr("Type the yearly insurance amount.");
       jobs.push(saveCost(uid, { ...base, kind: "car_insurance", schedule: "yearly", amount: round2(ia), currency: insCur, due_month: insMonth, day: insDay }));
     } else jobs.push(removeCost(uid, "car_insurance"));
-    const once = toNum(onceAmount), a1 = toNum(plate), a2 = toNum(plate2);
-    if (plateMode === "once" && onceAmount.trim() !== "") {
-      if (!(once > 0)) return setErr("Type the license plate amount.");
-      jobs.push(saveCost(uid, { ...base, kind: "license_plate", schedule: "yearly", amount: round2(once), currency: plateCur, due_month: pm1, day: pDay }));
-    } else if (plateMode === "twice" && plate.trim() !== "") {
-      if (!(a1 > 0) || !(a2 > 0)) return setErr("Type both license plate payments.");
-      jobs.push(saveCost(uid, { ...base, kind: "license_plate", schedule: "twice_yearly", amount: round2(a1), amount2: round2(a2), currency: plateCur, due_month: pm1, due_month2: pm2, day: pDay }));
-    } else jobs.push(removeCost(uid, "license_plate"));
+    for (let n = 0; n < PLATE_KINDS.length; n++) {
+      const d = plates.find((x) => x.kind === PLATE_KINDS[n]);
+      const name = n === 0 ? "license plate" : `license plate ${n + 1}`;
+      const num = d ? cleanPlate(d.num) : null;
+      if (d && d.mode === "once" && d.once.trim() !== "") {
+        const once = toNum(d.once);
+        if (!(once > 0)) return setErr(`Type the ${name} amount.`);
+        jobs.push(saveCost(uid, { ...base, kind: d.kind, label: num, schedule: "yearly", amount: round2(once), currency: d.cur, due_month: d.m1, day: d.day }));
+      } else if (d && d.mode === "twice" && d.a1.trim() !== "") {
+        const a1 = toNum(d.a1), a2 = toNum(d.a2);
+        if (!(a1 > 0) || !(a2 > 0)) return setErr(`Type both ${name} payments.`);
+        jobs.push(saveCost(uid, { ...base, kind: d.kind, label: num, schedule: "twice_yearly", amount: round2(a1), amount2: round2(a2), currency: d.cur, due_month: d.m1, due_month2: d.m2, day: d.day }));
+      } else if (d && n > 0) return setErr(`Type the ${name} amount, or remove it.`);
+      else jobs.push(removeCost(uid, PLATE_KINDS[n]));
+    }
     setBusy(true);
     const res = await Promise.all(jobs);
     setBusy(false);
@@ -278,7 +335,7 @@ export function CarForm() {
     router.push("/personal/fixed");
   };
 
-  const extra = plateMode === "twice" && toNum(plate) > 0 && toNum(plate2) > 0 && toNum(onceAmount) > 0 ? round2(toNum(plate) + toNum(plate2) - toNum(onceAmount)) : null;
+  const nextKind = PLATE_KINDS.find((k) => !plates.some((x) => x.kind === k));
   return (
     <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Back href="/personal/fixed" text="Fixed costs" />
@@ -298,22 +355,14 @@ export function CarForm() {
           <div className="grid grid-cols-2 gap-3"><div><label htmlFor="car-ins-m" className={label}>Due month</label><MonthSelect id="car-ins-m" value={insMonth} onChange={setInsMonth} /></div><div><label htmlFor="car-ins-d" className={label}>Day</label><DaySelect id="car-ins-d" value={insDay} onChange={setInsDay} /></div></div>
           {ins.trim() !== "" && <Note tone="good">Added to your spending in <b>{MONTHS[insMonth - 1]}</b>, the month it is due.</Note>}
         </div>
-        <div className="space-y-3 rounded-2xl border bg-card p-4">
-          <div><b className="block text-base">License plate</b><span className="text-[13px] text-muted-foreground">Paid every year. Two payments cost a little more.</span></div>
-          <Seg value={plateMode} onChange={(v) => setPlateMode(v as "once" | "twice")} options={[{ v: "once", t: "Once a year" }, { v: "twice", t: "Two payments" }]} />
-          {plateMode === "once" ? (
-            <div className="grid grid-cols-2 gap-3"><div className="col-span-2"><label htmlFor="plate-once" className={label}>Yearly amount</label><Money id="plate-once" value={onceAmount} onChange={setOnceAmount} currency={plateCur} onCurrency={setPlateCur} /></div><div><label htmlFor="plate-m1" className={label}>Due month</label><MonthSelect id="plate-m1" value={pm1} onChange={setPm1} /></div><div><label htmlFor="plate-d" className={label}>Day</label><DaySelect id="plate-d" value={pDay} onChange={setPDay} /></div></div>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2"><label htmlFor="plate-a1" className={label}>First payment</label><Money id="plate-a1" value={plate} onChange={setPlate} currency={plateCur} onCurrency={setPlateCur} /></div>
-              <div><label htmlFor="plate-m1" className={label}>Due month</label><MonthSelect id="plate-m1" value={pm1} onChange={setPm1} /></div><div><label htmlFor="plate-d" className={label}>Day</label><DaySelect id="plate-d" value={pDay} onChange={setPDay} /></div>
-              <div className="col-span-2"><label htmlFor="plate-a2" className={label}>Second payment</label><input id="plate-a2" inputMode="decimal" value={plate2} onChange={(e) => setPlate2(e.target.value)} placeholder="0.00" className={field} /></div>
-              <div className="col-span-2"><label htmlFor="plate-m2" className={label}>Second payment month</label><MonthSelect id="plate-m2" value={pm2} onChange={setPm2} /></div>
-              <div className="col-span-2"><label htmlFor="plate-once2" className={label}>Price if paid once a year (optional)</label><input id="plate-once2" inputMode="decimal" value={onceAmount} onChange={(e) => setOnceAmount(e.target.value)} placeholder="0.00" className={field} /></div>
-              {extra != null && extra > 0 && <p className="col-span-2 text-[13px] text-amber-800 dark:text-amber-200">Two payments cost {formatCurrency(extra, plateCur)} more a year.</p>}
-            </div>
-          )}
-          <Note tone="good">Added to your spending in the months each payment is due.</Note>
+        {plates.map((d, i) => <PlateCard key={d.kind} d={d} i={i} onChange={(patch) => setPlate(i, patch)} onRemove={i > 0 ? () => setRemoving(i) : undefined} removing={removing === i} onKeep={() => setRemoving(null)} onConfirm={() => { setPlates((all) => all.filter((_, j) => j !== i)); setRemoving(null); }} />)}
+        <div className="lg:col-span-2">
+          {nextKind ? (
+            <>
+              <button type="button" onClick={() => setPlates((all) => [...all, newPlate(nextKind)])} className="min-h-12 w-full rounded-2xl border-2 border-dashed border-blue-300 bg-blue-50 text-[15px] font-extrabold text-blue-700 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="plate-add">+ Add another license plate</button>
+              <p className="mt-1 text-center text-[12.5px] text-muted-foreground">You can add up to 3.</p>
+            </>
+          ) : <p className="rounded-xl bg-slate-100 px-3 py-3 text-center text-[13.5px] text-slate-700 dark:bg-slate-800 dark:text-slate-200">You have 3 license plates, the most you can add. Remove one to add another.</p>}
         </div>
         <div className="lg:col-span-2"><Note>The loan shows under <b>Loans</b>. The insurance and license plate show under <b>Insurances</b>.</Note></div>
         <Button type="submit" className="h-12 w-full text-base lg:col-span-2" disabled={busy || !ready || missing} data-testid="car-save">Save</Button>
@@ -379,7 +428,7 @@ export function CreditCardForm() {
     if (kind === "monthly") {
       const n = toNum(amount);
       if (!(n > 0)) return setErr("Type the amount that is deducted each month.");
-      body = { kind: "credit_card", schedule: "monthly", amount: round2(n), amount2: null, currency: cur, day, due_month: null, due_month2: null, start_month: null, end_month: null };
+      body = { kind: "credit_card", schedule: "monthly", amount: round2(n), amount2: null, label: null, currency: cur, day, due_month: null, due_month2: null, start_month: null, end_month: null };
     } else body = { kind: "credit_card", schedule: "statement", amount: 0, amount2: null, currency: "AWG", day: null, due_month: null, due_month2: null, start_month: null, end_month: null };
     setBusy(true);
     const { error } = await saveCost(uid, body);
@@ -446,7 +495,7 @@ export function GamblingForm() {
     if (!(n > 0)) return setErr("Type the most you can afford each month.");
     if (!uid) return setErr("Sign in again to save.");
     setBusy(true);
-    const { error } = await saveCost(uid, { kind: "gambling", schedule: "limit", amount: round2(n), amount2: null, currency: cur, day: null, due_month: null, due_month2: null, start_month: null, end_month: null });
+    const { error } = await saveCost(uid, { kind: "gambling", schedule: "limit", amount: round2(n), amount2: null, label: null, currency: cur, day: null, due_month: null, due_month2: null, start_month: null, end_month: null });
     setBusy(false);
     if (error) return setErr(isMissing(error.message) ? SETUP : "Could not save. Check your connection.");
     setMsg("Limit saved."); await reload();
