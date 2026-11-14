@@ -1,10 +1,35 @@
 -- Help topics for the latest features, plus admin guides. Run in the Supabase SQL Editor (safe to run more than once). Needs migration_help.sql first.
 -- Topics are added only the first time: after that, edit them in Admin > Help (a re-run never overwrites your edits).
--- Topics in the "Admin" group are saved as DRAFTS: only admins and people who can manage Help see them, other users never do.
+-- Topics in the "Admin" group are visible to ADMINS ONLY (a rule below hides that group from every other role, assistants included).
 --
 -- Added: welcome tour, sign in and request an account, forgot password, temporary password, contact support, scan a receipt,
 -- groceries overview, price tracker, add a price, community prices, loyalty cards, home projects, personal trips, reports,
 -- sharing activity, waiting to sync, privacy, and eight Admin guides.
+
+-- Only admins can see or change the "Admin" group of Help topics
+create or replace function public.help_is_admin() returns boolean
+language sql stable security definer set search_path = public as $$
+  select exists (select 1 from public.profiles where id = auth.uid() and role = 'admin')
+$$;
+revoke all on function public.help_is_admin() from public, anon;
+grant execute on function public.help_is_admin() to authenticated;
+
+drop policy if exists "Read help topics" on public.help_topics;
+create policy "Read help topics" on public.help_topics for select to authenticated
+  using ((published or public.has_permission('help.manage')) and (category <> 'Admin' or public.help_is_admin()));
+
+drop policy if exists "Add help topics" on public.help_topics;
+create policy "Add help topics" on public.help_topics for insert to authenticated
+  with check (public.has_permission('help.manage') and (category <> 'Admin' or public.help_is_admin()));
+
+drop policy if exists "Change help topics" on public.help_topics;
+create policy "Change help topics" on public.help_topics for update to authenticated
+  using (public.has_permission('help.manage') and (category <> 'Admin' or public.help_is_admin()))
+  with check (public.has_permission('help.manage') and (category <> 'Admin' or public.help_is_admin()));
+
+drop policy if exists "Delete help topics" on public.help_topics;
+create policy "Delete help topics" on public.help_topics for delete to authenticated
+  using (public.has_permission('help.manage') and (category <> 'Admin' or public.help_is_admin()));
 
 insert into public.help_topics (slug, title, category, summary, body, sort_order, published) values
 ('welcome-to-lifolio', 'Welcome to Lifolio: what you can do here', 'Getting started',
@@ -304,7 +329,7 @@ $h$Open **Settings**, then **User Roles & Users**.
 
 ## Good to know
 - The password expires. If it does, create a new one for the person.
-- If a person asked for an account on the sign-in screen, use **Account Requests** first. **Create account** opens this page with their name and email filled in.$h$, 100, false),
+- If a person asked for an account on the sign-in screen, use **Account Requests** first. **Create account** opens this page with their name and email filled in.$h$, 100, true),
 
 ('admin-account-requests', 'Admin: handle account requests', 'Admin',
  'See who asked for an account on the sign-in screen and how to reach them.',
@@ -315,7 +340,7 @@ $h$Open **Settings**, then **Account Requests**.
 - Tap **Dismiss** for requests you do not want. Use **Move back to New** to undo.
 - If they gave only a phone number, contact them and ask for an email before you create the account.
 
-Needs **migration_account_requests.sql** to have been run.$h$, 101, false),
+Needs **migration_account_requests.sql** to have been run.$h$, 101, true),
 
 ('admin-supermarket-places', 'Admin: load supermarket places for the Best store map', 'Admin',
  'Import shops with their GPS points from Excel so they show on the Best store map.',
@@ -327,7 +352,7 @@ $h$Open **Settings**, then **Supermarket Places**.
 4. Tap **Import**. It **replaces** the whole saved list, so keep every shop in the file.
 
 ## Where to get the numbers
-On openstreetmap.org right-click the shop, or read your phone's GPS at the shop. Do **not** copy coordinates from Google Maps. Its terms do not allow keeping them.$h$, 102, false),
+On openstreetmap.org right-click the shop, or read your phone's GPS at the shop. Do **not** copy coordinates from Google Maps. Its terms do not allow keeping them.$h$, 102, true),
 
 ('admin-doit-prices', 'Admin: import the Do it price list', 'Admin',
  'Load the Do it price list from an exported Excel file for the Price tracker.',
@@ -337,7 +362,7 @@ $h$Open **Settings**, then **Do it Aruba Prices**.
 2. Choose the file on this page and check the preview.
 3. Tap **Import**.
 
-The prices then show next to your own in the **Price tracker**. Run it again to refresh them. Never share the Do it login with the app.$h$, 103, false),
+The prices then show next to your own in the **Price tracker**. Run it again to refresh them. Never share the Do it login with the app.$h$, 103, true),
 
 ('admin-branding-and-privacy-policy', 'Admin: branding and the privacy policy', 'Admin',
  'Change the app name, logo and colour, and write the privacy policy, including the line about shared prices.',
@@ -348,7 +373,7 @@ $h$Open **Settings**, then **Branding**.
 - **Privacy policy:** the text people read from the sign-in screen.
 
 ## Add a line about Community prices
-If people can turn on Community prices, add something like: *If you turn on Community prices, the store name, item name and price from your receipts are shared without your name or account, and you can turn it off and delete them at any time.*$h$, 104, false),
+If people can turn on Community prices, add something like: *If you turn on Community prices, the store name, item name and price from your receipts are shared without your name or account, and you can turn it off and delete them at any time.*$h$, 104, true),
 
 ('admin-setup-check', 'Admin: check that everything is set up', 'Admin',
  'Run the setup check in Supabase to see which migrations are missing.',
@@ -359,7 +384,7 @@ $h$1. Open the **Supabase SQL Editor**.
 
 ## Good to know
 - If a migration stops on an error, nothing from it is saved. Send the exact error message to whoever maintains the app.
-- After adding columns or functions, run **notify pgrst, 'reload schema';** so the app sees them straight away.$h$, 105, false),
+- After adding columns or functions, run **notify pgrst, 'reload schema';** so the app sees them straight away.$h$, 105, true),
 
 ('admin-write-help', 'Admin: write and edit Help topics', 'Admin',
  'Add, change and hide Help topics, and the simple marks you can use.',
@@ -375,7 +400,7 @@ Tap **New topic**, or tap a topic to change it. Fill in the title, group, summar
 - **> Tip** for a highlighted tip
 - **\*\*bold\*\*** for bold text
 
-Plain text only: pictures and links are not used.$h$, 106, false)
+Plain text only: pictures and links are not used.$h$, 106, true)
 on conflict (slug) do nothing;
 
 -- The Home place topic gets the GPS point section (only if it is not there yet)
