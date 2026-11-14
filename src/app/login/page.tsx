@@ -150,7 +150,7 @@ export default function LoginPage() {
         </div>
       </aside>
 
-      <main className="relative flex flex-1 flex-col bg-[#FFF6EA] dark:bg-slate-950">
+      <main className="relative flex flex-1 flex-col bg-white dark:bg-slate-950">
         {/* Sea header, phone and tablet */}
         <div className="relative h-[330px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
           <Waves />
@@ -228,7 +228,7 @@ export default function LoginPage() {
               </button>
             </form>
 
-            <p className="mt-6 hidden border-t border-[#EBDDC9] pt-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:block">
+            <p className="mt-6 hidden border-t border-slate-200 pt-4 text-center text-sm text-slate-500 dark:border-slate-800 dark:text-slate-400 lg:block">
               Need an account? Ask your administrator.
             </p>
           </div>
