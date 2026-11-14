@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { ArrowLeft, ChevronDown, ChevronUp, Crosshair, ExternalLink, Info, MapPin, Minus, Plus, Search, ShoppingBasket, Trash2 } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import type { MapPin as Pin } from "@/components/personal/StoreMap";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { createClient } from "@/lib/supabase/client";
 import { fetchPrices, pricesKey, fetchPriceMatches, priceMatchesKey } from "@/lib/offline-grocery";
@@ -15,6 +17,8 @@ import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare"
 import type { TrackerRow } from "@/lib/personal/grocery";
 import { RADII, basketTotals, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
 import { formatCurrency } from "@/lib/utils";
+
+const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
 
 type ListRow = { id: string; product_key: string; name: string; qty: number };
 type Loc = { id: string; name: string; lat: number; lng: number; source: string };
@@ -34,30 +38,6 @@ const heading = "text-xs font-bold uppercase tracking-wide text-muted-foreground
 
 function Level({ level, pct }: { level: Level; pct: number | null }) {
   return <span className={`${chip} ${LEVEL_CLS[level]}`}>{LEVEL_LABEL[level]}{pct != null && level !== "nodata" ? ` ${signed(pct)}` : ""}</span>;
-}
-
-/** A plain picture of the area: you in the middle, the chosen radius as a circle, each store where it is. No map tiles, so it works offline. */
-function MiniMap({ me, km, pins }: { me: LatLng; km: number; pins: { n: number; lat: number; lng: number; name: string; best: boolean }[] }) {
-  const R = 80, pxKm = R / km;
-  const at = (p: LatLng) => ({ x: 160 + (p.lng - me.lng) * Math.cos((me.lat * Math.PI) / 180) * 111.32 * pxKm, y: 100 - (p.lat - me.lat) * 110.57 * pxKm });
-  return (
-    <svg viewBox="0 0 320 200" className="w-full rounded-xl border bg-muted/40" role="img" aria-label={`Stores within ${km} km of you`} data-testid="mini-map">
-      <circle cx="160" cy="100" r={R} className="fill-primary/5 stroke-primary" strokeDasharray="4 3" />
-      {[...pins].sort((a, b) => a.lat - b.lat).map((p) => {
-        const { x, y } = at(p);
-        return (
-          <g key={p.n} transform={`translate(${x.toFixed(1)} ${y.toFixed(1)})`}>
-            <title>{p.name}</title>
-            <circle r="10" className={p.best ? "fill-emerald-600" : "fill-primary"} stroke="white" strokeWidth="2" />
-            <text y="4" textAnchor="middle" fontSize="11" fontWeight="700" fill="white">{p.n}</text>
-          </g>
-        );
-      })}
-      <circle cx="160" cy="100" r="5" className="fill-blue-600" stroke="white" strokeWidth="2" />
-      <text x="160" y="119" textAnchor="middle" fontSize="10" fontWeight="700" className="fill-foreground">You</text>
-      <text x="314" y="194" textAnchor="end" fontSize="8" className="fill-muted-foreground">Schematic, north is up</text>
-    </svg>
-  );
 }
 
 export function BestStore() {
@@ -105,7 +85,19 @@ export function BestStore() {
   const unplaced = baskets.filter((b) => !locs.some((l) => sameStore(l.name, b.store)));
   const far = baskets.filter((b) => { const d = nearest(b.store); return d && d.km > radius; });
   const distMap = useMemo(() => new Map(baskets.flatMap((b) => { const d = nearest(b.store); return d ? [[b.store, d.km] as [string, number]] : []; })), [baskets, nearest]);
+  const priced = useMemo(() => ranked.filter((b) => b.priced > 0), [ranked]);
   const split = useMemo(() => splitAdvice(items, ranked, distMap), [items, inCur, ranked, distMap]);
+
+  const mapPins = useMemo(() => {
+    const pins: Pin[] = [];
+    priced.forEach((b, i) => { for (const l of locs) if (sameStore(l.name, b.store) && me && distanceKm(me, l) <= radius) pins.push({ lat: l.lat, lng: l.lng, name: b.store, n: i + 1, best: i === 0, label: `${fmt(b.total)} for your list` }); });
+    for (const o of osm ?? []) {
+      if (me && distanceKm(me, o) > radius) continue;
+      if (pins.some((p) => p.n != null && distanceKm(p, o) < 0.05)) continue;
+      pins.push({ lat: o.lat, lng: o.lng, name: o.name, n: null, label: stores.some((x) => sameStore(x, o.name)) ? "On your receipts" : "No receipts from here yet" });
+    }
+    return pins;
+  }, [priced, locs, osm, me, radius, stores, fmt]);
 
   const locate = useCallback(() => {
     if (!navigator.geolocation) { setGeo("denied"); return; }
@@ -141,29 +133,38 @@ export function BestStore() {
     if (error) setMsg(/relation|schema cache/i.test(error.message) ? "Run supabase/migration_basket.sql in Supabase first." : error.message);
     else await locQ.reload();
   }
-  async function findOsm() {
+  // Supermarkets around you load by themselves from OpenStreetMap. The ones that match a store on your receipts are saved as that store's places.
+  const asked = useRef<string>("");
+  useEffect(() => {
     if (!me) return;
-    setBusy(true); setMsg(null);
-    try {
-      const r = await fetch(`/api/stores-nearby?lat=${me.lat}&lon=${me.lng}&km=${Math.max(radius, 3)}`);
-      const j = await r.json();
-      if (!r.ok) setMsg(j.error || "Could not look up stores."); else setOsm(j.stores as Osm[]);
-    } catch { setMsg("No connection. Try again when you are online."); }
-    setBusy(false);
-  }
-  async function addAllMatching() {
-    const hits = (osm ?? []).flatMap((o) => { const s = stores.find((x) => sameStore(x, o.name)); return s ? [{ o, s }] : []; });
-    for (const h of hits) await addLoc(h.s, { lat: h.o.lat, lng: h.o.lng }, "osm", h.o.osmId);
-    setMsg(hits.length ? `Added ${hits.length} store place${hits.length === 1 ? "" : "s"} from OpenStreetMap.` : "None of the stores found match the stores on your receipts.");
-    setOsm(null);
-  }
+    const k = `${me.lat.toFixed(2)},${me.lng.toFixed(2)}`;
+    if (asked.current === k) return;
+    asked.current = k;
+    setBusy(true);
+    fetch(`/api/stores-nearby?lat=${me.lat}&lon=${me.lng}&km=10`)
+      .then(async (r) => { const j = await r.json(); if (!r.ok) setMsg(j.error || "Could not load the stores around you."); else setOsm(j.stores as Osm[]); })
+      .catch(() => setMsg("Could not load the stores around you. You are offline, or the map data is busy."))
+      .finally(() => setBusy(false));
+  }, [me]);
+  const saved = useRef(false);
+  useEffect(() => {
+    if (!osm || saved.current || locQ.loading || stores.length === 0) return;
+    const fresh = osm.flatMap((o) => { const s = stores.find((x) => sameStore(x, o.name)); return s && !locs.some((l) => sameStore(l.name, s) && distanceKm(l, o) < 0.05) ? [{ s, o }] : []; });
+    saved.current = true;
+    if (!fresh.length) return;
+    (async () => {
+      const u = await uid(); if (!u) return;
+      const { error } = await createClient().from("store_locations").insert(fresh.map(({ s, o }) => ({ user_id: u, name: s, lat: o.lat, lng: o.lng, source: "osm", osm_id: o.osmId })));
+      if (!error) await locQ.reload();
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once when the stores arrive
+  }, [osm, locQ.loading, stores.length]);
 
   const q = find.trim().toLowerCase();
   const results = q ? inCur.filter((p) => p.name.toLowerCase().includes(q) && !list.some((l) => l.product_key === p.key)).slice(0, 6) : [];
   const loading = prices.loading || listQ.loading || locQ.loading;
   const noReceipts = !loading && inCur.length === 0;
-  const priced = ranked.filter((b) => b.priced > 0);
-
+  
   return (
     <div className="mx-auto max-w-2xl space-y-4 pb-8">
       <div>
@@ -212,7 +213,7 @@ export function BestStore() {
                   <Button type="button" onClick={locate} disabled={geo === "asking"} className="gap-2"><Crosshair className="h-4 w-4" aria-hidden="true" />{geo === "asking" ? "Finding you…" : "Use my location"}</Button>
                 </CardContent></Card>
               ) : (
-                <MiniMap me={me} km={radius} pins={priced.map((b, i) => { const l = nearest(b.store)!.loc; return { n: i + 1, name: b.store, best: i === 0, lat: l.lat, lng: l.lng }; })} />
+                <StoreMap me={me} km={radius} pins={mapPins} />
               )}
 
               <div className="space-y-2" data-testid="store-ranking">
@@ -260,8 +261,8 @@ export function BestStore() {
                   <h2 className={heading}>Store places</h2>
                   {unplaced.length > 0 && <p className="text-sm text-muted-foreground">{me ? "Standing at one of these? Pin it, and it joins the map." : "These stores have no place yet. Turn on your location to pin them."}</p>}
                   {unplaced.map((b) => <div key={b.store} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{b.store}</span>{me && <Button type="button" variant="outline" size="sm" onClick={() => addLoc(b.store, me, "pin")}>Pin here</Button>}</div>)}
-                  {me && !osm && <Button type="button" variant="outline" className="w-full gap-2" onClick={findOsm} disabled={busy}><Search className="h-4 w-4" aria-hidden="true" />{busy ? "Looking…" : "Find supermarkets near me"}</Button>}
-                  {osm && <div className="space-y-2" data-testid="osm-results"><p className="text-sm">{osm.length} found. {osm.filter((o) => stores.some((s) => sameStore(s, o.name))).length} match your receipts.</p><Button type="button" className="w-full" onClick={addAllMatching}>Add the matching ones</Button><p className="text-[11px] text-muted-foreground">Map data © OpenStreetMap contributors.</p></div>}
+                  {busy && <p className="text-xs text-muted-foreground">Loading supermarkets around you…</p>}
+                  {osm && <p className="text-[11px] text-muted-foreground" data-testid="osm-results">{osm.length} supermarkets on the map. Map data © OpenStreetMap contributors.</p>}
                 </CardContent></Card>
               )}
 

@@ -25,7 +25,7 @@ export function buildCsp({ nonce, dev = false, supabaseUrl, turnstile = false }:
     "script-src": ["'self'", `'nonce-${nonce}'`, "'strict-dynamic'", "'wasm-unsafe-eval'", ...(dev ? ["'unsafe-eval'"] : [])],
     // React and Tailwind use inline style attributes; styles cannot run code, so this stays relaxed.
     "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "blob:", ...(supabase ? [supabase] : ["https://*.supabase.co"]), "https://upload.wikimedia.org", "https://thumb.wikimedia.org"],
+    "img-src": ["'self'", "data:", "blob:", ...(supabase ? [supabase] : ["https://*.supabase.co"]), "https://upload.wikimedia.org", "https://thumb.wikimedia.org", "https://tile.openstreetmap.org"],
     "font-src": ["'self'", "data:"],
     "connect-src": ["'self'", "blob:", ...(supabase ? [supabase, ...(supabaseWs ? [supabaseWs] : [])] : ["https://*.supabase.co", "wss://*.supabase.co"]), ...(turnstile ? ["https://challenges.cloudflare.com"] : []), ...(dev ? ["ws:", "wss:"] : [])],
     // On-device OCR runs in a worker served from /tesseract

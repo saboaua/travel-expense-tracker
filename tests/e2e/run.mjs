@@ -996,6 +996,8 @@ try {
     });
     const loc = (id, name, lat, lng) => ({ id: `9e000000-0000-4000-8000-0000000b00${id}`, user_id: PAT, name, lat, lng, source: "pin", created_at: new Date().toISOString() });
     fake.table("store_locations").push(loc(1, "Ling & Sons", 12.525, -70.03), loc(2, "New Ten Sing", 12.52, -70.04), loc(3, "Far Mart", 12.62, -70.03));
+    await page.route("**/api/stores-nearby**", (r) => r.fulfill({ json: { stores: [{ osmId: "node/1", name: "Ling and Sons Supermarket", lat: 12.525, lng: -70.03 }, { osmId: "node/2", name: "Random Shop", lat: 12.53, lng: -70.03 }], attribution: "x" } }));
+    await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
     try {
       await signIn(page, "pat@example.com", "Correct-Horse-1");
       await page.waitForURL((u) => u.pathname === "/");
@@ -1007,6 +1009,10 @@ try {
       await usual.first().click();
       await page.getByTestId("list-row").first().waitFor();
       await page.getByTestId("mini-map").waitFor();
+      await page.getByTestId("osm-results").waitFor();
+      await page.locator(".leaflet-marker-icon").first().waitFor();
+      assert((await page.locator(".leaflet-marker-icon").count()) === 4, "the map shows you, the two ranked stores and the other supermarket found on OpenStreetMap");
+      assert((await page.getByText("OpenStreetMap").count()) > 0, "the map credits OpenStreetMap");
       const cards = page.getByTestId("store-card");
       await cards.first().waitFor();
       assert((await cards.count()) === 2, "only the two stores within 5 km are ranked (the far one is left out)");

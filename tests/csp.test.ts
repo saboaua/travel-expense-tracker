@@ -9,7 +9,7 @@ eq("scripts never allow unsafe-inline", dir(prod, "script-src").includes("unsafe
 eq("no unsafe-eval in production", prod.includes("'unsafe-eval'"), false);
 eq("no CDN hosts", /jsdelivr|unpkg|cdnjs|projectnaptha/.test(prod), false);
 eq("supabase origin only for connect", dir(prod, "connect-src"), "connect-src 'self' blob: https://xyz.supabase.co wss://xyz.supabase.co");
-eq("images: supabase + wikimedia", dir(prod, "img-src"), "img-src 'self' data: blob: https://xyz.supabase.co https://upload.wikimedia.org https://thumb.wikimedia.org");
+eq("images: supabase, wikimedia and OpenStreetMap map tiles", dir(prod, "img-src"), "img-src 'self' data: blob: https://xyz.supabase.co https://upload.wikimedia.org https://thumb.wikimedia.org https://tile.openstreetmap.org");
 eq("pdf frames from supabase", dir(prod, "frame-src"), "frame-src https://xyz.supabase.co");
 eq("worker from self/blob", dir(prod, "worker-src"), "worker-src 'self' blob:");
 eq("no plugins", dir(prod, "object-src"), "object-src 'none'");
