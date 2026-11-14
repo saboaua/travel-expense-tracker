@@ -32,6 +32,13 @@ export function sharedRows(products: Product[], now: Date): SharedRow[] {
   return out;
 }
 
+/** How many product-and-store prices were left out for being older than 60 days (they stay on the phone). */
+export function oldPriceCount(products: Product[], now: Date): number {
+  let n = 0;
+  for (const p of products) for (const s of p.stores) if (ageDays(s.latest.date, now) > 60) n++;
+  return n;
+}
+
 export type CommunityRow = { product_key: string; product_name: string; size_label: string | null; currency: string; store_name: string; price: number; reporters: number; last_month: string };
 export type CommunityProduct = { key: string; name: string; size: string | null; currency: string; stores: { store: string; price: number; reporters: number; lowest: boolean }[] };
 
@@ -57,19 +64,28 @@ export async function sharingOn(supabase: SupabaseClient, uid: string): Promise<
   return !error && data?.share_prices === true;
 }
 
+export type ShareResult = { sent: number; ready: number; old: number; error: boolean };
+
+/** Sends the latest prices now. Used when sharing is turned on and by the "Share my prices now" button. */
+export async function shareNow(supabase: SupabaseClient, uid: string, products: Product[], now: Date): Promise<ShareResult> {
+  const rows = sharedRows(products, now);
+  const old = oldPriceCount(products, now);
+  let sent = 0;
+  for (let i = 0; i < rows.length; i += 300) {
+    const { data, error } = await supabase.rpc("share_prices", { rows: rows.slice(i, i + 300) });
+    if (error) return { sent, ready: rows.length, old, error: true };
+    sent += Number(data) || 0;
+  }
+  try { localStorage.setItem(`price-share-sync:${uid}`, now.toISOString().slice(0, 10)); } catch { /* fine */ }
+  return { sent, ready: rows.length, old, error: false };
+}
+
 /** Sends the latest prices (once a day at most, unless forced). Returns how many rows were accepted. */
 export async function syncSharedPrices(supabase: SupabaseClient, uid: string, products: Product[], now: Date, force = false): Promise<number> {
   const stamp = `price-share-sync:${uid}`;
   const today = now.toISOString().slice(0, 10);
   try { if (!force && localStorage.getItem(stamp) === today) return 0; } catch { /* storage can be blocked */ }
   if (!(await sharingOn(supabase, uid))) return 0;
-  const rows = sharedRows(products, now);
-  let n = 0;
-  for (let i = 0; i < rows.length; i += 300) {
-    const { data, error } = await supabase.rpc("share_prices", { rows: rows.slice(i, i + 300) });
-    if (error) return n;
-    n += Number(data) || 0;
-  }
-  try { localStorage.setItem(stamp, today); } catch { /* fine */ }
-  return n;
+  const r = await shareNow(supabase, uid, products, now);
+  return r.sent;
 }

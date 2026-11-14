@@ -1,4 +1,4 @@
-import { groupCommunity, productKey, sharedRows, SHARED_FIELDS, storeKey } from "../src/lib/personal/community";
+import { groupCommunity, oldPriceCount, productKey, sharedRows, SHARED_FIELDS, storeKey } from "../src/lib/personal/community";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 
@@ -17,6 +17,7 @@ const { products } = buildProducts([
 ]);
 const rows = sharedRows(products, NOW);
 
+eq("old prices are counted so the person can be told", oldPriceCount(products, NOW), 1);
 eq("old prices are not shared", rows.some((r) => r.product_name.startsWith("Old")), false);
 eq("one row per product and store", rows.length, 2);
 // privacy: nothing but the allowed fields leaves the phone

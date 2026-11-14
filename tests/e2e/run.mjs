@@ -1153,6 +1153,8 @@ try {
       assert((await offers.first().innerText()).includes("Best price"), "the cheapest price is marked Best price");
       assert(!text.includes("pat@example.com"), "nobody is named");
       await page.goto(`${BASE}/profile`);
+      // sharing the logged prices earned a first badge: the message is closed first
+      if (await page.getByTestId("level-up").waitFor({ timeout: 8000 }).then(() => true).catch(() => false)) await page.getByTestId("level-up-done").click();
       await page.getByRole("button", { name: /Community prices/ }).click();
       await page.getByTestId("profile-share-delete").click();
       await page.getByText(/Deleted 1 shared price/).waitFor();
@@ -1162,6 +1164,7 @@ try {
     } finally {
       await ctx.close();
       me().share_prices = false;
+      sharedCount = 0; badgeBest = 0; badgeSeen = 0; badgePushed = 0;
       for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e")) a.splice(i, 1); }
     }
   });
@@ -1264,6 +1267,8 @@ try {
       assert(me().share_prices === true, "the choice is saved from Profile");
       assert((await page.getByRole("button", { name: /See community prices/ }).count()) === 0 && (await page.getByRole("link", { name: /See community prices/ }).count()) === 0, "there is no See community prices button");
       assert(/bg-red-600/.test((await page.getByTestId("profile-share-delete").getAttribute("class")) ?? ""), "Delete what I shared is red");
+      assert((await page.getByText(/Nothing to share yet|Shared \d+ price/).first().innerText()).length > 0, "turning sharing on says what was shared right away");
+      assert((await page.getByTestId("profile-share-now").count()) === 1, "there is a button to share the latest prices again");
       // badges: nothing earned yet, then 50 prices shared shows Scout with a one-time message
       await page.getByTestId("badge-panel").waitFor();
       assert((await page.getByTestId("badge-panel").innerText()).includes("Your first badge is close"), "no badge yet says what to do");

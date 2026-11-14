@@ -6,6 +6,9 @@ import { Share2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { fetchPriceMatches, fetchPrices } from "@/lib/offline-grocery";
+import { buildProducts } from "@/lib/personal/price-compare";
+import { shareNow } from "@/lib/personal/community";
 import { AccordionSection } from "@/components/ui/accordion";
 import { TIERS, plural, progress, readBadge, tierOf, type BadgeState } from "@/lib/personal/badges";
 import { BadgeShield } from "@/components/profile/BadgeShield";
@@ -16,6 +19,7 @@ export function CommunityCard() {
   const [on, setOn] = useState<boolean | null>(null);
   const [available, setAvailable] = useState(true);
   const [mine, setMine] = useState<number | null>(null);
+  const [check, setCheck] = useState(0);
   const [badge, setBadge] = useState<BadgeState | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
@@ -48,9 +52,37 @@ export function CommunityCard() {
     if (next) {
       // The Price tracker sends the prices the next time it is opened
       try { localStorage.removeItem(`price-share-sync:${session.user.id}`); } catch { /* storage can be blocked */ }
-      setMsg("Sharing is on. Your prices are shared the next time you open the Price tracker.");
+      await sendNow(session.user.id, true);
+      setBusy(false);
+      return;
     } else setMsg("Sharing is off. Nothing more will be shared.");
     await load();
+    setBusy(false);
+  };
+
+  /** Shares the prices already logged, right away (when sharing is turned on, or from the button). */
+  const sendNow = async (uid: string, justOn: boolean) => {
+    const sb = createClient();
+    try {
+      const [p, m] = await Promise.all([fetchPrices(sb), fetchPriceMatches(sb)]);
+      if (p.error || !p.data) throw new Error("prices");
+      const { products } = buildProducts(p.data, m.data ?? []);
+      const r = await shareNow(sb, uid, products, new Date());
+      if (r.error) { setErr("Could not share your prices. Check your connection and try again."); }
+      else {
+        const base = justOn ? "Sharing is on. " : "";
+        if (r.sent > 0) setMsg(`${base}Shared ${r.sent} price${r.sent === 1 ? "" : "s"} from your receipts.${r.old ? ` ${r.old} older than 60 days stay on your phone.` : ""}`);
+        else if (r.old > 0) setMsg(`${base}Nothing to share yet: your prices are older than 60 days. Scan a receipt and they are shared.`);
+        else setMsg(`${base}Nothing to share yet. Scan a receipt or add a price and it is shared on its own.`);
+        if (r.sent > 0) { try { await fetch("/api/badge", { method: "POST" }); } catch { /* the alert is optional */ } setCheck((n) => n + 1); }
+      }
+    } catch { setErr("Could not read your prices. Please try again."); }
+    await load();
+  };
+  const shareAgain = async () => {
+    setBusy(true); setErr(null); setMsg(null);
+    const { data: { session } } = await createClient().auth.getSession();
+    if (session) await sendNow(session.user.id, false);
     setBusy(false);
   };
 
@@ -72,7 +104,7 @@ export function CommunityCard() {
   }
   return (
     <>
-    <LevelUpNotice />
+    <LevelUpNotice check={check} />
     <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
       <div className="space-y-4" data-testid="community-card">
         {err && <Alert variant="error">{err}</Alert>}
@@ -92,11 +124,13 @@ export function CommunityCard() {
         <ul className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/50">
           <li><b className="text-emerald-600">✓</b> Shared: the store name, the item name and the price. Nothing else.</li>
           <li><b className="text-red-600">✕</b> Never shared: your name, email, receipts, dates, location or totals.</li>
+          <li><b className="text-emerald-600">✓</b> Only prices from the last 60 days are shared, and your receipts are read on your phone.</li>
           <li><b className="text-emerald-600">✓</b> A price shows to others only after 3 or more people report it.</li>
           <li><b className="text-emerald-600">✓</b> Turn it off any time and delete what you shared.</li>
         </ul>
         {on && (
           <div className="flex flex-col gap-2">
+            <Button variant="outline" className="h-11 w-full" disabled={busy} onClick={shareAgain} data-testid="profile-share-now">Share my latest prices now</Button>
             <Button className="h-11 w-full bg-red-600 text-white hover:bg-red-700" disabled={busy || !mine} onClick={withdraw} data-testid="profile-share-delete">Delete what I shared{mine ? ` (${mine} price${mine === 1 ? "" : "s"})` : ""}</Button>
           </div>
         )}
