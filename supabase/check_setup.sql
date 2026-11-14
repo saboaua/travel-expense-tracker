@@ -42,6 +42,12 @@ need_cols(tbl, col, fix) as (values
   ('savings_events','month','migration_savings.sql'),
   ('profiles','home_lat','migration_home_gps.sql'),
   ('profiles','home_lng','migration_home_gps.sql'),
+  ('profiles','share_prices','migration_shared_prices.sql'),
+  ('shared_prices','price','migration_shared_prices.sql'),
+  ('shared_prices','contributor','migration_shared_prices.sql'),
+  ('price_share_secret','salt','migration_shared_prices.sql'),
+  ('account_requests','phone','migration_account_requests.sql'),
+  ('account_requests','status','migration_account_requests.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -69,7 +75,22 @@ need_tables(tbl, fix) as (values
   ('savings_plans','migration_savings.sql'),
   ('savings_events','migration_savings.sql'),
   ('price_checks','migration_price_notes.sql'),
-  ('help_topics','migration_help.sql')
+  ('help_topics','migration_help.sql'),
+  ('profiles','the base setup (schema.sql)'),
+  ('trips','the base setup (schema.sql)'),
+  ('expenses','the base setup (schema.sql)'),
+  ('personal_spends','migration_quick_spend.sql'),
+  ('grocery_receipts','migration_personal.sql'),
+  ('grocery_items','migration_personal.sql'),
+  ('shopping_list_items','migration_basket.sql'),
+  ('store_locations','migration_basket.sql'),
+  ('supermarket_places','migration_supermarket_places.sql'),
+  ('shared_prices','migration_shared_prices.sql'),
+  ('price_share_secret','migration_shared_prices.sql'),
+  ('account_requests','migration_account_requests.sql'),
+  ('loyalty_cards','migration_loyalty.sql'),
+  ('travel_documents','migration_documents.sql'),
+  ('subscriptions','migration_subscriptions.sql')
 ),
 table_checks as (
   select 'table', n.tbl,
@@ -115,6 +136,55 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_bill_emails.sql'
   from (values ('bills-from-email'), ('bills-from-email-problems')) as s(slug)
+  union all
+  select 'function', f.fn,
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = f.fn) then 'OK' else 'MISSING' end,
+         f.fix
+  from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('my_shared_count','migration_shared_prices.sql'),
+               ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
+               ('sharing_activity_export','migration_sharing_safety.sql')) as f(fn, fix)
+  union all
+  select 'privacy', 'shared_prices: nobody can read it directly',
+         case when to_regclass('public.shared_prices') is null then 'MISSING'
+              when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='shared_prices' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_shared_prices.sql'
+              else 'OK' end,
+         'migration_shared_prices.sql'
+  union all
+  select 'privacy', 'account_requests: only the server can read it',
+         case when to_regclass('public.account_requests') is null then 'MISSING'
+              when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='account_requests' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_account_requests.sql'
+              else 'OK' end,
+         'migration_account_requests.sql'
+  union all
+  select 'privacy', 'price_share_secret: nobody can read it',
+         case when to_regclass('public.price_share_secret') is null then 'MISSING'
+              when exists (select 1 from information_schema.role_table_grants where table_schema='public' and table_name='price_share_secret' and grantee in ('anon','authenticated','PUBLIC')) then 'OPEN: re-run migration_shared_prices.sql'
+              else 'OK' end,
+         'migration_shared_prices.sql'
+  union all
+  select 'privacy', 'shared_prices: holds no receipt date column',
+         case when to_regclass('public.shared_prices') is null then 'MISSING'
+              when exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_prices' and column_name in ('date','purchase_date','created_at','user_id','email')) then 'REVIEW: unexpected column'
+              else 'OK' end,
+         'migration_shared_prices.sql'
+  union all
+  select 'data', 'price_share_secret has its one row',
+         case when to_regclass('public.price_share_secret') is not null
+              and (xpath('/row/c/text()', query_to_xml('select count(*) as c from public.price_share_secret', false, true, '')))[1]::text::int = 1
+              then 'OK' else 'MISSING' end,
+         'migration_shared_prices.sql'
+  union all
+  select 'storage', b.id,
+         case when exists (select 1 from storage.buckets sb where sb.id = b.id) then 'OK' else 'MISSING' end,
+         'migration_storage_policies.sql / the base setup'
+  from (values ('receipts'), ('loyalty-cards'), ('documents')) as b(id)
+  union all
+  select 'help topic', s.slug,
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', s.slug), false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_best_store.sql'
+  from (values ('best-store'), ('search-help')) as s(slug)
 ),
 all_checks as (
   select * from col_checks
