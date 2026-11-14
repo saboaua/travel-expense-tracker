@@ -269,7 +269,7 @@ Open **Waiting to sync** (shown as a small notice when something is waiting). Ea
 ## Send them
 1. Check your connection.
 2. Open the app. Items are sent by themselves.
-3. If one stays, open it and tap **Try again**.
+3. Or tap **Sync now** on the item. If it says it failed, tap **Try again**.
 
 ## Good to know
 - Do not clear your browser data while items are waiting. They would be lost.
