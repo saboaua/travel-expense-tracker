@@ -1,19 +1,19 @@
 /**
- * Community prices: what leaves the phone when someone opts in. Only store, product, price (and the size, currency and month the
- * price was seen). No name, account, receipt, total, date or time, and nothing about the rest of the basket. Pure, so it is unit-tested.
+ * Community prices: what leaves the phone when someone opts in. Only store, item name and price (plus the pack size and currency, so
+ * like is compared with like). No name, account, receipt, total, date or time, and nothing about the rest of the basket. The receipt
+ * date stays on the phone: it is used only here, to skip old prices. Pure, so it is unit-tested.
  */
 import { normStore } from "@/lib/personal/basket";
 import { productWords, type Product } from "@/lib/personal/price-compare";
 
-export type SharedRow = { store_key: string; store_name: string; product_key: string; product_name: string; size_label: string | null; currency: string; price: number; month: string };
+export type SharedRow = { store_key: string; store_name: string; product_key: string; product_name: string; size_label: string | null; currency: string; price: number };
 /** The only fields that may ever be sent. A test checks every row against this list. */
-export const SHARED_FIELDS = ["store_key", "store_name", "product_key", "product_name", "size_label", "currency", "price", "month"] as const;
+export const SHARED_FIELDS = ["store_key", "store_name", "product_key", "product_name", "size_label", "currency", "price"] as const;
 
 /** Same key for the same product however it is printed: "Coca-Cola 33CL" and "COCA COLA 330ML" */
 export const productKey = (p: Pick<Product, "name" | "size" | "currency" | "unit">) => `${p.currency}|${[...productWords(p.name)].sort().join(" ")}|${p.size ?? ""}|${p.unit ?? ""}`;
 export const storeKey = (store: string) => normStore(store).replace(/ /g, "");
 
-const monthOf = (date: string) => `${date.slice(0, 7)}-01`;
 const ageDays = (date: string, now: Date) => Math.round((now.getTime() - Date.parse(`${date}T00:00:00Z`)) / 86400000);
 
 /** One row per product and store: the latest price seen in the last 60 days. */
@@ -26,7 +26,7 @@ export function sharedRows(products: Product[], now: Date): SharedRow[] {
       if (age < 0 || age > 60 || !(s.latest.price > 0) || s.latest.price >= 100000) continue;
       const sk = storeKey(s.store);
       if (!sk) continue;
-      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100, month: monthOf(s.latest.date) });
+      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100 });
     }
   }
   return out;

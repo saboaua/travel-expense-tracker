@@ -3,7 +3,7 @@
 --
 -- Privacy by design:
 --  * Nothing is shared until the person turns "Share my receipt prices" on (profiles.share_prices, off by default).
---  * shared_prices holds no name, email, account id, receipt, total, date or time (the date is rounded to the month).
+--  * shared_prices holds no name, email, account id, receipt, total, or receipt date (only the month a price arrived is kept, to expire old prices).
 --  * Each row carries a one-way hash of the contributor (the account id mixed with a secret only the database knows). It is only
 --    used to count how many different people reported a price and to let a person delete their own. Nobody can read this table:
 --    it has no policies and no grants. The app can only call the functions below.
@@ -46,14 +46,15 @@ language sql stable security definer set search_path = public as $$
 $$;
 revoke all on function public._price_contributor_of(uuid) from public, anon, authenticated;
 
--- Share rows of { store_key, store_name, product_key, product_name, size_label, currency, price, month }. Does nothing unless the person opted in.
+-- Share rows of { store_key, store_name, product_key, product_name, size_label, currency, price }. No receipt date is sent: the database
+-- stamps the month the row arrived, so old prices can expire. Does nothing unless the person opted in.
 create or replace function public.share_prices(rows jsonb) returns integer
 language plpgsql security definer set search_path = public as $$
 declare
   me text;
   n integer := 0;
   r jsonb;
-  m date;
+  m date := date_trunc('month', current_date)::date;
 begin
   if auth.uid() is null then raise exception 'Sign in first'; end if;
   if not coalesce((select share_prices from public.profiles where id = auth.uid()), false) then return 0; end if;
@@ -61,8 +62,6 @@ begin
   me := public._price_contributor_of(auth.uid());
   for r in select * from jsonb_array_elements(rows) loop
     begin
-      m := date_trunc('month', (r->>'month')::date)::date;
-      if m > current_date or m < (date_trunc('month', current_date) - interval '6 months')::date then continue; end if;
       insert into public.shared_prices (contributor, store_key, store_name, product_key, product_name, size_label, currency, price, month)
       values (me, left(lower(r->>'store_key'), 120), left(r->>'store_name', 120), left(lower(r->>'product_key'), 200), left(r->>'product_name', 160),
               nullif(left(r->>'size_label', 40), ''), upper(left(r->>'currency', 3)), (r->>'price')::numeric, m)

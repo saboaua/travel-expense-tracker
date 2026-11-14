@@ -1119,8 +1119,8 @@ try {
       assert(me().share_prices === true, "the choice is saved");
       const rows = sharedCalls.flatMap((c) => c.rows);
       assert(rows.length === 1, `one price is shared (got ${rows.length})`);
-      assert(JSON.stringify(Object.keys(rows[0]).sort()) === JSON.stringify(["currency", "month", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]), "only store, product, price, size, currency and month are sent");
-      assert(rows[0].price === 1.45 && /^\d{4}-\d{2}-01$/.test(rows[0].month), "the price is sent with the month, not the day");
+      assert(JSON.stringify(Object.keys(rows[0]).sort()) === JSON.stringify(["currency", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]), "only store, item, price, size and currency are sent");
+      assert(rows[0].price === 1.45 && !("month" in rows[0]), "the price is sent with no date at all");
       const sent = JSON.stringify(sharedCalls);
       assert(!sent.includes("pat@example.com") && !sent.includes(PAT) && !sent.includes(rid), "no email, account or receipt id is sent");
       await page.getByRole("search").getByLabel("Product to look up").fill("coca");

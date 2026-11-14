@@ -111,7 +111,7 @@ export function CommunityPrices() {
           <Card><CardContent className="space-y-2 p-4">
             <h2 className={heading}>Never shared</h2>
             <ul className="space-y-1 text-sm">{NEVER.map((n) => <li key={n}>✕ {n}</li>)}</ul>
-            <p className="text-xs text-muted-foreground">Shared prices carry no name or account, and the date is rounded to the month. A price is shown to others only when 3 or more different people reported it. You can switch sharing off at any time.</p>
+            <p className="text-xs text-muted-foreground">Only the store, item name and price are shared. No name, account, receipt or date. A price is shown to others only when 3 or more different people reported it. You can switch sharing off at any time.</p>
             {mine != null && mine > 0 && <Button type="button" variant="outline" className="mt-1 h-11 gap-2" disabled={busy} onClick={withdraw} data-testid="share-delete"><Trash2 className="h-4 w-4" aria-hidden="true" />Delete the {mine} price{mine === 1 ? "" : "s"} I shared</Button>}
           </CardContent></Card>
 

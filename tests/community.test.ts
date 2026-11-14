@@ -21,7 +21,7 @@ eq("old prices are not shared", rows.some((r) => r.product_name.startsWith("Old"
 eq("one row per product and store", rows.length, 2);
 // privacy: nothing but the allowed fields leaves the phone
 for (const r of rows) eq("only the allowed fields", Object.keys(r).sort(), [...SHARED_FIELDS].sort());
-eq("the date is rounded to the month", rows.map((r) => r.month).sort(), ["2026-10-01", "2026-11-01"]);
+eq("no date is sent", rows.every((r) => !("month" in r) && !("date" in r)), true);
 eq("no time or day in the data", JSON.stringify(rows).includes("T12:00"), false);
 eq("no receipt or account fields", /receipt|user|email|total|quantity|id"/.test(JSON.stringify(rows)), false);
 eq("the same product has one key however it is printed", new Set(rows.map((r) => r.product_key)).size, 1);
