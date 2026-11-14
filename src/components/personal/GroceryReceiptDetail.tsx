@@ -16,6 +16,8 @@ import { applyRows, deleteRow, makeRowApi } from "@/lib/row-outbox";
 import { browserBlobs } from "@/lib/offline-store";
 import { browserOutbox } from "@/lib/outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
+import { fetchShoppingNames } from "@/lib/personal/item-rules";
 
 export function GroceryReceiptDetail({ id }: { id: string }) {
   const router = useRouter();
@@ -23,6 +25,8 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
   const { items: pending } = useOutbox(userId);
   const [image, setImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [shop, setShop] = useState<Set<string>>(() => shoppingSet());
+  useEffect(() => { fetchShoppingNames(createClient()).then(setShop); }, []);
   const receipt = useMemo(() => (bundle ? applyRows([bundle.receipt], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) }))[0] ?? null : null), [bundle, pending]);
   const items = useMemo(() => itemsWithWaiting(id, bundle?.items ?? [], pending).map((x) => ({ ...x, quantity: Number(x.quantity), unit_price: Number(x.unit_price), line_total: Number(x.line_total) })), [bundle, pending, id]);
   const waiting = pending.some((i) => i.id === id);
@@ -85,6 +89,28 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
           <Button variant="outline" size="icon" className="text-red-600" onClick={remove} aria-label="Delete"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
+
+      {items.length > 0 && (() => {
+        const sp = splitReceipt(items, shop);
+        // a receipt that is all groceries needs no split
+        if (sp.shopping === 0 && sp.needs === 0) return null;
+        return (
+          <Card data-testid="receipt-split">
+            <CardContent className="space-y-1.5 pt-6 text-sm">
+              <b className="block text-[13px] tracking-wide text-muted-foreground">Where this receipt goes</b>
+              <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b>{fmt(sp.groceries)}</b></div>
+              {sp.shopping > 0 && <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b>{fmt(sp.shopping)}</b></div>}
+              {sp.needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b>{fmt(sp.needs)}</b></div>}
+              {sp.needs > 0 && (
+                <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+                  {sp.needsCount === 1 ? "1 line is" : `${sp.needsCount} lines are`} still in Other. Until you sort {sp.needsCount === 1 ? "it" : "them"}, {sp.needsCount === 1 ? "it counts" : "they count"} as Groceries.{" "}
+                  <Link href={`/personal/groceries/${id}/edit`} className="font-semibold underline" data-testid="sort-lines">Sort the lines</Link>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Items ({items.length})</CardTitle></CardHeader>

@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { ICON_KEYS, iconFor } from "@/lib/category-icons";
 
-type Row = { id: string; name: string; icon: string | null; enabled: boolean; sort_order: number };
+type Row = { id: string; name: string; icon: string | null; enabled: boolean; sort_order: number; area?: string };
 
 /**
  * One editable list of categories (travel receipts, trip types or grocery items), shown inside a section of Admin > Categories.
@@ -46,13 +46,14 @@ export function CategoryManager({
   const [icon, setIcon] = useState(defaultIcon);
 
   const load = async () => {
-    const { data, error } = await supabase
-      .from(table)
-      .select("id, name, icon, enabled, sort_order")
-      .order("sort_order");
+    const base = "id, name, icon, enabled, sort_order";
+    const run = (cols: string) => supabase.from(table).select(cols).order("sort_order") as unknown as PromiseLike<{ data: Row[] | null; error: { message: string } | null }>;
+    let { data, error } = await run(table === "grocery_categories" ? `${base}, area` : base);
+    // before migration_shopping_categories.sql there is no area column: the list still loads
+    if (error && table === "grocery_categories" && /area/i.test(error.message)) ({ data, error } = await run(base));
     if (error) setError(error.message);
     else {
-      const list = (data as Row[]) || [];
+      const list = data || [];
       setRows(list);
       onCount?.(list.length);
     }
@@ -73,7 +74,7 @@ export function CategoryManager({
     if (!row.name.trim()) { await load(); return; }
     const { error } = await supabase
       .from(table)
-      .update({ name: row.name.trim(), icon: row.icon || defaultIcon, enabled: row.enabled, sort_order: row.sort_order })
+      .update({ name: row.name.trim(), icon: row.icon || defaultIcon, enabled: row.enabled, sort_order: row.sort_order, ...(table === "grocery_categories" && row.area ? { area: row.area } : {}) })
       .eq("id", row.id);
     if (error) setError(error.message);
     else await load();
@@ -191,6 +192,18 @@ export function CategoryManager({
                     />
                     Enabled
                   </label>
+                  {table === "grocery_categories" && row.area !== undefined && (
+                    <label className="flex min-h-11 items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={row.area === "shopping"}
+                        onChange={(e) => { const area = e.target.checked ? "shopping" : "groceries"; const next = { ...row, area }; patch(row.id, { area }); void save(next); }}
+                        className="h-5 w-5 accent-[hsl(var(--primary))]"
+                        aria-label={`${row.name} counts as Shopping`}
+                      />
+                      Shopping
+                    </label>
+                  )}
                   <span className="flex-1 md:w-4 md:flex-none" />
                   <button type="button" className={iconBtn} disabled={i === 0} onClick={() => void move(i, -1)} aria-label={`Move ${row.name} up`}>
                     <ArrowUp className="h-[18px] w-[18px]" aria-hidden="true" />

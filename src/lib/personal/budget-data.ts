@@ -4,6 +4,7 @@ import { onlySpending } from "@/lib/personal/price-notes";
 import { monthSavings, readEvent, readPlan } from "@/lib/personal/savings";
 import { FIXED_COST_COLS, FIXED_ENTRY_COLS } from "@/lib/columns";
 import { monthLines, readCost, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
+import { fetchShoppingList } from "@/lib/personal/item-rules";
 import { readBudget, type BudgetSetting, type MonthInputs } from "@/lib/personal/budget";
 
 const monthEnd = (monthStart: string) => {
@@ -37,6 +38,13 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
     withColumnFallback3((cols) => mine(supabase.from("personal_spends").select(cols).gte("expense_date", monthStart).lte("expense_date", end).limit(2000)), "amount, currency, amount_usd, category, project_id, house_area", "amount, currency, amount_usd, category, project_id", "amount, currency, amount_usd, category"),
     mine(supabase.from("personal_projects").select("id").eq("kind", "home_project").limit(500)),
   ]);
+  // receipt lines in a shopping category (notebooks, clothes...) count under Shopping, not Groceries
+  const shopNames = await fetchShoppingList(supabase);
+  const sh = await mine(supabase.from("grocery_items").select("category, line_total, grocery_receipts!inner(purchase_date, currency, prices_only)").in("category", shopNames).gte("grocery_receipts.purchase_date", monthStart).lte("grocery_receipts.purchase_date", end).limit(2000));
+  const shopping = sh.error ? [] : ((sh.data ?? []) as unknown as { line_total: number | string; grocery_receipts: { currency: string; prices_only?: boolean | null } | { currency: string; prices_only?: boolean | null }[] }[])
+    .map((r) => ({ amount: r.line_total, rc: Array.isArray(r.grocery_receipts) ? r.grocery_receipts[0] : r.grocery_receipts }))
+    .filter((r) => r.rc && !r.rc.prices_only)
+    .map((r) => ({ amount: r.amount, currency: r.rc.currency }));
   const homeIds = new Set(((pr.data ?? []) as { id: string }[]).map((p) => p.id));
   let projects: MonthInputs["projects"] = [];
   if (homeIds.size) {
@@ -58,6 +66,7 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
   const entries = fe.error ? [] : ((fe.data ?? []) as unknown as Record<string, unknown>[]).map(readEntry).filter((e): e is NonNullable<ReturnType<typeof readEntry>> => !!e);
   return {
     fixed: monthLines(costs, entries, monthStart),
+    shopping,
     savings,
     groceries: g.error ? [] : (g.data ?? []),
     utilities: u.error ? [] : ((u.data ?? []) as MonthInputs["utilities"]),

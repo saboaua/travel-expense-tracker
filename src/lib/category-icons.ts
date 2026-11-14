@@ -113,5 +113,12 @@ export const FALLBACK_GROCERY_CATEGORIES: CategoryOption[] = [
   { name: "Frozen", icon: "snowflake" },
   { name: "Household", icon: "spray-can" },
   { name: "Personal Care", icon: "droplets" },
+  { name: "Pet", icon: "tag" },
+  { name: "Stationery & art", icon: "paperclip" },
+  { name: "Clothing", icon: "shopping" },
+  { name: "Electronics", icon: "plug" },
+  { name: "Toys & games", icon: "gift" },
+  { name: "Garden & hardware", icon: "hammer" },
+  { name: "Shopping", icon: "shopping" },
   { name: "Other", icon: "tag" },
 ];

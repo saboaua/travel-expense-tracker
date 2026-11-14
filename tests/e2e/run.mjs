@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1523,6 +1523,51 @@ try {
       await ap.getByText("Share these credentials").waitFor();
       mailbox.refuse = false;
     } finally { mailbox.refuse = false; await actx.close(); }
+  });
+
+  await test("receipt lines are sorted one by one: shopping splits off, unknown lines ask, choices are remembered", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/new?manual=1`);
+      await page.getByPlaceholder("Where did you shop?").fill("Interoriental Asian Market");
+      const addRow = async (i, name, price) => {
+        if (i > 0) await page.getByRole("button", { name: /Add item/ }).click();
+        await page.getByLabel(`Item ${i + 1} name`).fill(name);
+        await page.getByLabel(`Item ${i + 1} name`).press("Tab");
+        await page.locator("div:has(> label:text-is('Price each')) input").nth(i).fill(price);
+      };
+      await addRow(0, "Languo Painting Notebook", "5.00");
+      await addRow(1, "Royal Family Red Bean Mochi 210g", "6.95");
+      await addRow(2, "Miscellaneous Charge", "6.95");
+      assert((await page.getByLabel("Item 1 category").inputValue()) === "Stationery & art" && (await page.getByLabel("Item 2 category").inputValue()) === "Snacks", "lines are sorted from their names");
+      const split = await page.getByTestId("receipt-split").innerText();
+      assert(/Shopping[\s\S]*5\.00/.test(split) && /Needs a category[\s\S]*6\.95/.test(split) && /Groceries[\s\S]*6\.95/.test(split), "the split shows groceries, shopping and what needs a category: " + split);
+      assert((await page.locator("[data-needs-category]").count()) === 1, "only the nameless charge asks for a category");
+      await page.locator("[data-needs-category]").getByTestId("pick-Shopping").click();
+      assert((await page.getByTestId("split-needs").count()) === 0 && /11\.95/.test(await page.getByTestId("split-shopping").innerText()), "picking a category clears the question and moves the money");
+      await page.getByRole("button", { name: "Save receipt" }).click();
+      await page.waitForURL((u) => /\/personal\/groceries\//.test(u.pathname) && !/new/.test(u.pathname), { timeout: 30000 });
+      const rec = fake.table("grocery_receipts").find((r) => r.store === "Interoriental Asian Market");
+      const cats = fake.table("grocery_items").filter((i) => i.receipt_id === rec.id).map((i) => i.category);
+      assert(JSON.stringify(cats) === JSON.stringify(["Stationery & art", "Snacks", "Shopping"]), "categories are saved per line: " + JSON.stringify(cats));
+      assert((await page.getByTestId("receipt-split").innerText()).includes("Shopping"), "the saved receipt shows the split");
+      const rule = fake.table("grocery_item_rules").find((r) => r.normalized_name === "charge miscellaneous");
+      assert(rule && rule.category === "Shopping" && rule.user_id === PAT, "the hand-picked category is remembered: " + JSON.stringify(rule) + JSON.stringify(fake.table("grocery_item_rules")));
+      assert(!fake.table("grocery_item_rules").some((r) => r.normalized_name.includes("notebook")), "guessed lines are not saved as choices");
+      // next receipt: the remembered choice is used straight away
+      await page.goto(`${BASE}/personal/groceries/new?manual=1`);
+      await page.waitForTimeout(800);
+      await page.getByLabel("Item 1 name").fill("Miscellaneous Charge");
+      await page.getByLabel("Item 1 name").press("Tab");
+      await page.waitForFunction(() => document.querySelector('select[aria-label="Item 1 category"]')?.value === "Shopping");
+      assert((await page.locator("[data-needs-category]").count()) === 0, "a remembered product does not ask again");
+    } finally {
+      await ctx.close();
+    }
   });
 
   await test("admin: suspend and restore a person, delete one for good (typed email), and a suspended person is told at sign-in", async () => {

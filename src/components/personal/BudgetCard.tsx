@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Coins, Dices, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingCart, Zap, Check } from "lucide-react";
+import { ChevronRight, Coins, Dices, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingBag, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
@@ -17,9 +17,10 @@ export const AREA_STYLE: Record<SpentArea, { color: string; icon: typeof Zap }> 
   quick: { color: "#16a34a", icon: Coins },
   house: { color: "#7c3aed", icon: Home },
   savings: { color: "#0d9488", icon: PiggyBank },
+  shopping: { color: "#c026d3", icon: ShoppingBag },
 };
-const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", house: "/personal/house", savings: "/personal/savings" };
-const BAR_AREAS: SpentArea[] = [...BUDGET_AREAS.map((a) => a.key), "savings"];
+const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", house: "/personal/house", savings: "/personal/savings" };
+const BAR_AREAS: SpentArea[] = [...BUDGET_AREAS.map((a) => a.key), "shopping", "savings"];
 /** Fixed costs: loans, insurances, credit card and gambling each get a row and a colour in the bar */
 const FIXED_STYLE: Record<FixedCategory, { color: string; icon: typeof Zap; href: string }> = {
   loans: { color: "#0d9488", icon: Landmark, href: "/personal/fixed" },
@@ -52,9 +53,9 @@ function TotalBar({ v }: { v: BudgetView }) {
 }
 
 function AreaRow({ k, v }: { k: SpentArea; v: BudgetView }) {
-  const area = k === "savings" ? { label: "Savings" } : BUDGET_AREAS.find((a) => a.key === k)!;
+  const area = k === "savings" ? { label: "Savings" } : k === "shopping" ? { label: "Shopping" } : BUDGET_AREAS.find((a) => a.key === k)!;
   const { color, icon: Icon } = AREA_STYLE[k];
-  const amount = v.byArea[k], limit = k === "savings" ? undefined : v.limits[k];
+  const amount = v.byArea[k], limit = k === "savings" || k === "shopping" ? undefined : v.limits[k];
   const over = !!limit && amount > limit;
   return (
     <Link href={AREA_HREF[k]} className="block min-h-12 border-t py-2.5 hover:bg-accent/40" data-testid={`budget-area-${k}`} aria-label={`${area.label}: open`}>
@@ -150,6 +151,7 @@ export function BudgetCard() {
         {formatCurrency(view.spent, view.currency)} spent · {view.daysLeft} {view.daysLeft === 1 ? "day" : "days"} left{view.perDay ? ` · about ${formatCurrency(view.perDay, view.currency)} a day` : ""}
       </p>
       {BUDGET_AREAS.map((a) => <AreaRow key={a.key} k={a.key} v={view} />)}
+      {view.byArea.shopping > 0 && <AreaRow k="shopping" v={view} />}
       {view.byArea.savings > 0 && <AreaRow k="savings" v={view} />}
       {FIXED_ORDER.filter((k) => (view.byArea[k] ?? 0) > 0 || configuredCategories(costs).includes(k)).map((k) => <FixedRow key={k} k={k} v={view} limit={k === "gambling" ? gamblingLimit(costs, view.currency) : null} />)}
       {view.byArea.savings > 0 && <p className="mt-1 rounded-lg bg-teal-50 px-3 py-2 text-xs leading-snug text-teal-900 dark:bg-teal-950 dark:text-teal-100" data-testid="budget-savings-note">Savings counts as spending: that money is already set aside for your plans.</p>}

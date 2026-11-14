@@ -1,3 +1,4 @@
+import { fetchShoppingNames } from "@/lib/personal/item-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, isMissingColumn, withColumnFallback } from "@/lib/columns";
 import { checkToTracker, type PriceCheck } from "@/lib/personal/price-notes";
@@ -59,7 +60,9 @@ export async function fetchPrices(supabase: SupabaseClient, forUser?: string): R
     const data = await fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
       (forUser ? supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").eq("user_id", forUser) : supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)")).order("created_at", { ascending: false }).range(a, b)
     );
-    const lines = data.map((d) => ({
+    // notebooks, clothes and other shopping lines are not grocery prices: they stay out of Best prices and what the community shares
+    const shop = await fetchShoppingNames(supabase);
+    const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase())).map((d) => ({
       name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
       unit: d.unit ?? null, line_total: Number(d.line_total),
       receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,

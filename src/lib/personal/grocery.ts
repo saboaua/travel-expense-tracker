@@ -53,9 +53,15 @@ const GROCERY_RULES: [string, RegExp][] = [
   ["Bakery", /\b(brood|bread|bun|buns|bagel|croissant|tortilla|cake|muffin|baguette|roll|rolls|bakery|pastry|donut)\b/i],
   ["Frozen", /\b(frozen|ice\s*cream|pizza|fries|popsicle|gelato)\b/i],
   ["Beverages", /\b(water|juice|soda|cola|coke|pepsi|sprite|beer|wine|rum|vodka|whisky|coffee|tea|drink|energy|lemonade|smoothie)\b/i],
-  ["Snacks", /\b(chips|cracker|cookie|cookies|candy|chocolate|snack|popcorn|nuts|pretzel|biscuit|granola|bar)\b/i],
+  ["Snacks", /\b(mochi|daifuku|chips|cracker|cookie|cookies|candy|chocolate|snack|popcorn|nuts|pretzel|biscuit|granola|bar)\b/i],
   ["Household", /\b(detergent|soap|bleach|cleaner|tissue|toilet|paper\s*towel|foil|trash|garbage|bag|sponge|dish|laundry|napkin|battery|light\s*bulb)\b/i],
   ["Personal Care", /\b(shampoo|conditioner|toothpaste|toothbrush|deodorant|lotion|razor|sunscreen|shaving|diaper|wipes|tampon|pad|vitamin|medicine)\b/i],
+  ["Stationery & art", /\b(notebook|sketch\s*book|sketchbook|pencil|pencils|pen|pens|marker|markers|crayon|crayons|paint|painting|watercolou?r|palette|brush|brushes|canvas|stationery|eraser|glue|scissors|stapler|folder|envelope|highlighter)\b/i],
+  ["Clothing", /\b(shirt|t-shirt|tee|dress|pants|jeans|shorts|socks|underwear|jacket|hoodie|shoes|sandals|slippers|swimsuit)\b/i],
+  ["Electronics", /\b(charger|usb|earphones|headphones|earbuds|speaker|adapter|power\s*bank|sd\s*card|keyboard|phone\s*case)\b/i],
+  ["Toys & games", /\b(toy|toys|lego|puzzle|doll|board\s*game|playing\s*cards)\b/i],
+  ["Garden & hardware", /\b(screw|screws|nails|hammer|drill|wrench|seeds|soil|fertili[sz]er|hose|padlock|extension\s*cord)\b/i],
+  ["Pet", /\b(dog|cat|puppy|kitten|pet|kibble|litter)\b/i],
   ["Pantry", /\b(rice|pasta|spaghetti|noodle|flour|sugar|salt|oil|vinegar|sauce|ketchup|mayo|mustard|cereal|oats|beans|lentil|canned|can|soup|honey|jam|peanut\s*butter|spice|seasoning|stock|broth|corn)\b/i],
 ];
 

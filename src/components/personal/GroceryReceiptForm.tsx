@@ -2,6 +2,7 @@
 
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
+import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -15,6 +16,8 @@ import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
 import { guessGroceryCategory, normalizeItemName } from "@/lib/personal/grocery";
+import { needsCategory, pickCategory, shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
+import { fetchItemRules, fetchShoppingNames, saveItemRules } from "@/lib/personal/item-rules";
 import { extractGroceryReceipt, GLARE_NOTE, howRead, scanNote, type LateUpdate } from "@/lib/receipt-extract";
 import { useCurrencies } from "@/lib/use-currencies";
 import { formatCurrency, todayISO } from "@/lib/utils";
@@ -30,7 +33,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
 
-type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean };
+type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean; sorted?: boolean };
 const uid = () => Math.random().toString(36).slice(2);
 const money = (s: string) => {
   const n = parseFloat(s);
@@ -45,6 +48,17 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const categoryNames = useMemo(() => groceryCategories.map((c) => c.name), [groceryCategories]);
   /** Map a guessed/scanned category onto the admin-managed list (falls back to Other, then the first). */
   const allowed = (c: string) => categoryNames.find((n) => n.toLowerCase() === c.toLowerCase()) ?? categoryNames.find((n) => n.toLowerCase() === "other") ?? categoryNames[0] ?? c;
+  // Your own category choices (this product is always this category) and which categories count as shopping
+  const rulesRef = useRef<Map<string, string>>(new Map());
+  const [shop, setShop] = useState<Set<string>>(() => shoppingSet());
+  const [remember, setRemember] = useState(true);
+  useEffect(() => {
+    const sb = createClient();
+    fetchItemRules(sb).then((m) => { rulesRef.current = m; });
+    fetchShoppingNames(sb).then(setShop);
+  }, []);
+  /** A line's category: your own choice for this product, else the guess */
+  const sortLine = (name: string, guess: string) => allowed(pickCategory(normalizeItemName(name), guess, rulesRef.current));
   const [store, setStore] = useState("");
   const [date, setDate] = useState(todayISO());
   const [currency, setCurrency] = useState("USD");
@@ -214,7 +228,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
         quantity: String(it.quantity),
         unit_price: it.unit_price.toFixed(2),
         line_total: it.line_total.toFixed(2),
-        category: allowed(it.category),
+        category: sortLine(it.name, it.category),
         unit: it.unit || "",
         flag: it.flag,
         alt: it.alt,
@@ -296,6 +310,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
         keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
         label: head.store, summary: `Grocery receipt · ${receiptId ? "changed" : "new"}`,
       });
+      // Lines the person sorted by hand are remembered for next time
+      if (remember) await saveItemRules(supabase, owner, clean.filter((r) => r.sorted && r.category !== "Other").map((r) => ({ normalized_name: normalizeItemName(r.name), category: r.category })));
       // A receipt that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
       router.push(saved.queued && !receiptId ? BACK : `${BACK}/${saved.id}`);
       router.refresh();
@@ -431,8 +447,29 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 </div>
               )}
 
+              {rows.length > 0 && (() => {
+                const sp = splitReceipt(rows.map((r) => ({ category: r.category, line_total: money(r.line_total) })), shop);
+                // lines still in Other that the person has confirmed are groceries, not "needs a category"
+                const confirmedOther = rows.filter((r) => r.category === "Other" && r.sorted).reduce((t, r) => t + money(r.line_total), 0);
+                const needs = r2(sp.needs - confirmedOther), groceries = r2(sp.groceries + confirmedOther);
+                const needCount = rows.filter((r) => needsCategory(r.category, r.sorted) && r.name.trim()).length;
+                return (
+                  <div className="space-y-2 rounded-2xl border bg-card p-3 text-sm" data-testid="receipt-split">
+                    <b className="block text-[13px] tracking-wide text-muted-foreground">Where this receipt goes</b>
+                    <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b>{formatCurrency(groceries, currency)}</b></div>
+                    {sp.shopping > 0 && <div className="flex justify-between" data-testid="split-shopping"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b>{formatCurrency(sp.shopping, currency)}</b></div>}
+                    {needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b>{formatCurrency(needs, currency)}</b></div>}
+                    {needCount > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-100">{needCount === 1 ? "1 line needs" : `${needCount} lines need`} a category. Until you pick one, {needCount === 1 ? "it counts" : "they count"} as Groceries.</p>}
+                    <div className="flex items-center gap-3 border-t pt-1">
+                      <span className="flex-1"><b className="block text-[14px]">Remember my choices</b><span className="text-xs text-muted-foreground">Next time, a product you sorted is sorted for you.</span></span>
+                      <Switch label="Remember my choices" checked={remember} onChange={setRemember} />
+                    </div>
+                  </div>
+                );
+              })()}
+
               {rows.filter((r) => !onlyCheck || r.flag).map((r) => (
-                <div key={r.key} className={`space-y-2 rounded-xl border p-3 ${r.flag ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/40" : ""}`} data-flagged={r.flag ? "true" : undefined}>
+                <div key={r.key} className={`space-y-2 rounded-xl border p-3 ${r.flag ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/40" : needsCategory(r.category, r.sorted) && r.name.trim() ? "border-amber-300 bg-amber-50/40" : ""}`} data-flagged={r.flag ? "true" : undefined} data-needs-category={needsCategory(r.category, r.sorted) && r.name.trim() ? "true" : undefined}>
                   {r.flag && (
                     <div className="space-y-2" data-testid="row-check">
                       <div className="flex items-center gap-2"><span className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-amber-100 px-2.5 text-xs font-semibold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Check</span></div>
@@ -450,7 +487,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     </div>
                   )}
                   <div className="flex gap-2">
-                    <Input aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} name`} value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && r.name && update(r.key, { category: allowed(guessGroceryCategory(r.name)) })} placeholder={`Item name (blank saves as Item ${rows.findIndex((x) => x.key === r.key) + 1})`} maxLength={160} />
+                    <Input aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} name`} value={r.name} onChange={(e) => update(r.key, { name: e.target.value })} onBlur={() => r.category === "Other" && !r.sorted && r.name && update(r.key, { category: sortLine(r.name, guessGroceryCategory(r.name)) })} placeholder={`Item name (blank saves as Item ${rows.findIndex((x) => x.key === r.key) + 1})`} maxLength={160} />
                     {r.confirmed && <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-800" title="Both readers agree" aria-label="Both readers agree"><Check className="h-4 w-4" /></span>}
                     <Button type="button" variant="ghost" size="icon" className="shrink-0 text-red-600" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} aria-label="Remove item">
                       <Trash2 className="h-4 w-4" />
@@ -462,9 +499,19 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                     <div><label htmlFor={`gr-${r.key}-price`} className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input id={`gr-${r.key}-price`} type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
                     <div><label htmlFor={`gr-${r.key}-line`} className="text-xs text-muted-foreground">Line total</label><Input id={`gr-${r.key}-line`} type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
-                  <Select aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} category`} className="h-11 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value })}>
+                  <Select aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} category`} className="h-11 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value, sorted: true })}>
                     {(categoryNames.includes(r.category) ? categoryNames : [r.category, ...categoryNames]).map((c) => <option key={c} value={c}>{c}</option>)}
                   </Select>
+                  {needsCategory(r.category, r.sorted) && r.name.trim() && (
+                    <div className="space-y-1.5" data-testid="needs-category">
+                      <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">Needs a category</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {["Pantry", "Snacks", "Shopping", "Other"].filter((c) => categoryNames.includes(c)).map((c) => (
+                          <button key={c} type="button" onClick={() => update(r.key, { category: c, sorted: true })} className="min-h-9 rounded-full border bg-background px-3 text-[13px] font-bold" data-testid={`pick-${c}`}>{c}</button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               ))}
 

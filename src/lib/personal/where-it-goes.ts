@@ -4,7 +4,7 @@ import type { SpentArea } from "./budget";
 export type Slice = { key: SpentArea; value: number; percent: number };
 export type PieSlice = { key: SpentArea; percent: number; d: string; label: { x: number; y: number } | null };
 
-const AREAS: SpentArea[] = ["groceries", "utilities", "quick", "house", "savings"];
+const AREAS: SpentArea[] = ["groceries", "shopping", "utilities", "quick", "house", "savings"];
 
 /** The parts that have money, biggest first. Percentages are whole numbers that add up to 100 (largest remainder). */
 export function slices(by: Record<SpentArea, number>): Slice[] {
