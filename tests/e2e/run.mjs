@@ -1030,6 +1030,58 @@ try {
     }
   });
 
+  await test("home gps: saved from the Home place card, and Best store measures from it when location is off", async () => {
+    const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, geolocation: { latitude: 12.52049, longitude: -70.03051 }, permissions: ["geolocation"] });
+    gctx.setDefaultTimeout(60_000);
+    const gp = await gctx.newPage();
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    try {
+      await signIn(gp, "pat@example.com", "Correct-Horse-1");
+      await gp.waitForURL((u) => u.pathname === "/");
+      await gp.goto(`${BASE}/profile`);
+      await gp.getByRole("button", { name: /^Home place/ }).click();
+      await gp.getByTestId("home-gps-save").click();
+      await gp.getByText(/accurate to about 100 m/).waitFor();
+      assert(me().home_lat === 12.52 && me().home_lng === -70.031, `saved rounded to about 100 m (got ${me().home_lat}, ${me().home_lng})`);
+      await gp.getByTestId("home-gps-remove").click();
+      await gp.getByText("Not saved").waitFor();
+      assert(me().home_lat === null && me().home_lng === null, "removing clears the point");
+    } finally { await gctx.close(); }
+
+    // Best store with location refused: the saved home point is the starting point
+    me().home_lat = 12.52; me().home_lng = -70.03;
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const names = ["Milk", "Bread", "Rice", "Eggs", "Butter", "Juice"];
+    [["Ling & Sons", 10], ["New Ten Sing", 11]].forEach(([st, base], si) => {
+      const rid = `9c000000-0000-4000-8000-0000000c0${si}0`;
+      fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: st, purchase_date: addDays(today, -3 - si), total: 60, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      names.forEach((n, ni) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000c${si}${ni}00`, receipt_id: rid, user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: base, line_total: base, unit: null, created_at: new Date().toISOString() }));
+    });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000c0001", user_id: PAT, name: "Ling & Sons", lat: 12.525, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    await page.route("**/api/stores-nearby**", (r) => r.fulfill({ json: { stores: [], attribution: "x" } }));
+    await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/basket`);
+      const usual = page.getByTestId("usual-item");
+      await usual.first().waitFor({ timeout: 60000 });
+      await usual.first().click();
+      await page.getByTestId("origin").getByText(/Using your saved home point/).waitFor();
+      await page.getByTestId("mini-map").waitFor();
+      assert((await page.getByTestId("no-location").count()) === 0, "no 'use your location' prompt when a home point is saved");
+      const card = page.getByTestId("store-card").first();
+      await card.waitFor();
+      assert((await card.innerText()).includes("Ling & Sons") && /0\.6 km/.test(await card.innerText()), "the distance is measured from home");
+    } finally {
+      await ctx.close();
+      me().home_lat = null; me().home_lng = null;
+      for (const t of ["grocery_receipts", "grocery_items", "store_locations", "shopping_list_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000c") || a[i].user_id === PAT && t === "shopping_list_items") a.splice(i, 1); }
+    }
+  });
+
   await test("supermarket places: only an admin can open the import, and it offers the example file", async () => {
     const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     actx.setDefaultTimeout(60_000);

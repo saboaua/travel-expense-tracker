@@ -55,7 +55,11 @@ export function BestStore() {
   }, []);
 
   const [radius, setRadius] = useState<number>(5);
-  const [me, setMe] = useState<LatLng | null>(null);
+  const [here, setHere] = useState<LatLng | null>(null);
+  const [home, setHome] = useState<LatLng | null>(null);
+  const [from, setFrom] = useState<"home" | "here">("home");
+  const origin = from === "home" && home ? home : here ?? home;
+  const me = origin;
   const [geo, setGeo] = useState<"idle" | "asking" | "denied">("idle");
   const [find, setFind] = useState("");
   const [open, setOpen] = useState<string | null>(null);
@@ -118,7 +122,7 @@ export function BestStore() {
     if (!navigator.geolocation) { setGeo("denied"); return; }
     setGeo("asking");
     navigator.geolocation.getCurrentPosition(
-      (p) => { setMe({ lat: p.coords.latitude, lng: p.coords.longitude }); setGeo("idle"); },
+      (p) => { setHere({ lat: p.coords.latitude, lng: p.coords.longitude }); setGeo("idle"); },
       () => setGeo("denied"),
       { timeout: 8000, maximumAge: 5 * 60 * 1000 }
     );
@@ -128,6 +132,21 @@ export function BestStore() {
     navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {});
   }, [locate]);
 
+  useEffect(() => {
+    (async () => {
+      const sb = createClient();
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) return;
+      const { data, error } = await sb.from("profiles").select("home_lat, home_lng").eq("id", session.user.id).single();
+      if (!error && data?.home_lat != null && data?.home_lng != null) setHome({ lat: Number(data.home_lat), lng: Number(data.home_lng) });
+    })();
+  }, []);
+  async function saveHome(at: LatLng) {
+    const u = await uid(); if (!u) return;
+    const p = { lat: Math.round(at.lat * 1000) / 1000, lng: Math.round(at.lng * 1000) / 1000 };
+    const { error } = await createClient().from("profiles").update({ home_lat: p.lat, home_lng: p.lng }).eq("id", u);
+    if (error) setMsg(/home_lat|schema cache|column/i.test(error.message) ? "Run supabase/migration_home_gps.sql in Supabase first." : "Could not save your home point."); else { setHome(p); setFrom("home"); setMsg("Saved as your home point."); }
+  }
   async function uid() { const { data: { session } } = await createClient().auth.getSession(); return session?.user.id ?? null; }
   async function addItem(key: string, name: string) {
     const u = await uid(); if (!u) return;
@@ -224,6 +243,19 @@ export function BestStore() {
                 {RADII.map((r) => <Button key={r} type="button" variant={radius === r ? "default" : "outline"} className="h-11 rounded-full" aria-pressed={radius === r} onClick={() => setRadius(r)}>{r} km</Button>)}
               </div>
 
+              {(home || here) && (
+                <div className="space-y-1.5" data-testid="origin">
+                  <p className={heading}>Measure distance from</p>
+                  {home ? (
+                    <div className="grid grid-cols-2 gap-2" role="group" aria-label="Measure distance from">
+                      <Button type="button" variant={from === "home" ? "default" : "outline"} className="h-11 gap-2" aria-pressed={from === "home"} onClick={() => setFrom("home")}><MapPin className="h-4 w-4" aria-hidden="true" />Home</Button>
+                      <Button type="button" variant={from === "here" ? "default" : "outline"} className="h-11" aria-pressed={from === "here"} onClick={() => { setFrom("here"); if (!here) locate(); }}>{geo === "asking" ? "Finding you…" : "Where I am now"}</Button>
+                    </div>
+                  ) : null}
+                  {home ? <p className="text-xs text-muted-foreground">{from === "home" ? "Using your saved home point. Nothing is asked of your phone." : here ? "Using where you are now." : "Allow location to use where you are now."}</p> : here && <div className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm"><span>No home point yet. Use here as your home place?</span><Button type="button" variant="outline" size="sm" onClick={() => saveHome(here)} data-testid="save-home">Save as home place</Button></div>}
+                </div>
+              )}
+
               {!me ? (
                 <Card data-testid="no-location"><CardContent className="space-y-2 p-4 text-center">
                   <MapPin className="mx-auto h-7 w-7 text-muted-foreground" aria-hidden="true" />
@@ -278,8 +310,8 @@ export function BestStore() {
               {(unplaced.length > 0 || me) && (
                 <Card data-testid="store-places"><CardContent className="space-y-3 p-4">
                   <h2 className={heading}>Store places</h2>
-                  {unplaced.length > 0 && <p className="text-sm text-muted-foreground">{me ? "Standing at one of these? Pin it, and it joins the map." : "These stores have no place yet. Turn on your location to pin them."}</p>}
-                  {unplaced.map((b) => <div key={b.store} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{b.store}</span>{me && <Button type="button" variant="outline" size="sm" onClick={() => addLoc(b.store, me, "pin")}>Pin here</Button>}</div>)}
+                  {unplaced.length > 0 && <p className="text-sm text-muted-foreground">{here ? "Standing at one of these? Pin it, and it joins the map." : "These stores have no place yet. Turn on your location while you are there to pin them."}</p>}
+                  {unplaced.map((b) => <div key={b.store} className="flex items-center justify-between gap-2 text-sm"><span className="truncate">{b.store}</span>{here && <Button type="button" variant="outline" size="sm" onClick={() => addLoc(b.store, here, "pin")}>Pin here</Button>}</div>)}
                   {busy && <p className="text-xs text-muted-foreground">Loading supermarkets around you…</p>}
                   {known.length > 0 && <p className="text-[11px] text-muted-foreground" data-testid="osm-results">{known.length} supermarkets known. Map data © OpenStreetMap contributors.</p>}
                 </CardContent></Card>

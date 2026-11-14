@@ -40,6 +40,8 @@ need_cols(tbl, col, fix) as (values
   ('savings_events','plan_id','migration_savings.sql'),
   ('savings_events','kind','migration_savings.sql'),
   ('savings_events','month','migration_savings.sql'),
+  ('profiles','home_lat','migration_home_gps.sql'),
+  ('profiles','home_lng','migration_home_gps.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),

@@ -5,7 +5,7 @@ import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GRO
 
 /** Tables that belong to one person (column holding the owner), and the storage bucket their files sit in. */
 export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; cols: string; mid?: string; base?: string; /** a column that puts the rows in a fixed order, so paging never skips or repeats one */ order?: string }[] = [
-  { table: "profiles", owner: "id", cols: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role, home_country, home_city", base: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role" },
+  { table: "profiles", owner: "id", cols: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role, home_country, home_city, home_lat, home_lng", base: "id, email, first_name, last_name, full_name, title, company_name, avatar_url, role" },
   { table: "trips", owner: "user_id", cols: `${TRIP_COLS}, user_id, created_at`, base: `${TRIP_COLS_BASE}, user_id, created_at` },
   { table: "expenses", owner: "user_id", bucket: "receipts", cols: `${EXPENSE_COLS}, user_id, trip_id, created_at` },
   { table: "personal_projects", owner: "user_id", cols: PERSONAL_PROJECT_COLS },
