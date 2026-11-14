@@ -53,10 +53,11 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
   }
 }
 
-export async function fetchPrices(supabase: SupabaseClient): Result<TrackerRow[]> {
+/** Your prices. The nightly community share passes `forUser` (it reads with the service key, which has no row security of its own). */
+export async function fetchPrices(supabase: SupabaseClient, forUser?: string): Result<TrackerRow[]> {
   try {
     const data = await fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
-      supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").order("created_at", { ascending: false }).range(a, b)
+      (forUser ? supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").eq("user_id", forUser) : supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)")).order("created_at", { ascending: false }).range(a, b)
     );
     const lines = data.map((d) => ({
       name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
@@ -64,7 +65,8 @@ export async function fetchPrices(supabase: SupabaseClient): Result<TrackerRow[]
       receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
     }));
     // Prices seen in a shop sit beside the receipt lines. Before the price-notes migration there is no table: that just means none yet.
-    const seen = await supabase.from("price_checks").select(PRICE_CHECK_COLS).order("seen_on", { ascending: false }).limit(2000);
+    const seenQ = supabase.from("price_checks").select(PRICE_CHECK_COLS);
+    const seen = await (forUser ? seenQ.eq("user_id", forUser) : seenQ).order("seen_on", { ascending: false }).limit(2000);
     const checks = seen.error ? [] : ((seen.data ?? []) as unknown as PriceCheck[]).map(checkToTracker);
     return { data: [...lines, ...checks], error: null };
   } catch (error) {
@@ -73,9 +75,10 @@ export async function fetchPrices(supabase: SupabaseClient): Result<TrackerRow[]
 }
 
 /** Your Yes / No answers on "same product?". Before the migration is run there is no table: that simply means no answers yet. */
-export async function fetchPriceMatches(supabase: SupabaseClient): Result<MatchDecision[]> {
+export async function fetchPriceMatches(supabase: SupabaseClient, forUser?: string): Result<MatchDecision[]> {
   try {
-    const { data, error } = await supabase.from("grocery_price_matches").select("key_a, key_b, same").limit(2000);
+    const q = supabase.from("grocery_price_matches").select("key_a, key_b, same");
+    const { data, error } = await (forUser ? q.eq("user_id", forUser) : q).limit(2000);
     if (error) return { data: [], error: null };
     return { data: (data ?? []).map((d) => ({ key_a: String(d.key_a), key_b: String(d.key_b), same: d.same === true })), error: null };
   } catch {

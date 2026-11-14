@@ -1133,7 +1133,15 @@ try {
       await sw.click();
       await page.getByText(/Sharing is on/).first().waitFor();
       assert(me().share_prices === true, "the choice is saved");
+      // prices are shared once a night, so nothing is sent now: the card says what tonight's run will send
+      await page.getByText(/Your prices are shared tonight\. 1 price from your receipts/).first().waitFor({ timeout: 15000 });
+      assert(sharedCalls.length === 0, "nothing is sent the moment sharing is turned on");
       await page.goto(`${BASE}/personal/groceries/prices`);
+      await page.waitForTimeout(1500);
+      assert(sharedCalls.length === 0, "opening the Price tracker does not send either");
+      await page.goto(`${BASE}/profile`);
+      await page.getByRole("button", { name: /Community prices/ }).click();
+      await page.getByTestId("profile-share-now").click();
       for (let i = 0; i < 40 && !sharedCalls.length; i++) await page.waitForTimeout(250);
       const rows = sharedCalls.flatMap((c) => c.rows);
       assert(rows.length === 1, `one price is shared (got ${rows.length})`);

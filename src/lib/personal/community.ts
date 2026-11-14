@@ -64,6 +64,18 @@ export async function sharingOn(supabase: SupabaseClient, uid: string): Promise<
   return !error && data?.share_prices === true;
 }
 
+/** "today", "yesterday" or "Nov 12": when the last nightly share ran, for the Profile card. Empty when it has not run yet. */
+export function lastSharedLabel(at: string | null | undefined, now: Date): string {
+  if (!at) return "";
+  const t = Date.parse(at);
+  if (!Number.isFinite(t)) return "";
+  const day = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const diff = Math.round((day(now) - day(new Date(t))) / 86400000);
+  if (diff <= 0) return "today";
+  if (diff === 1) return "yesterday";
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export type ShareResult = { sent: number; ready: number; old: number; error: boolean };
 
 /** Sends the latest prices now. Used when sharing is turned on and by the "Share my prices now" button. */

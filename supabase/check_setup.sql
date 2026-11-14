@@ -58,6 +58,9 @@ need_cols(tbl, col, fix) as (values
   ('profiles','badge_best','migration_badges.sql'),
   ('profiles','badge_seen','migration_badges.sql'),
   ('profiles','badge_pushed','migration_badges.sql'),
+  ('profiles','share_last_at','migration_nightly_share.sql'),
+  ('profiles','share_last_count','migration_nightly_share.sql'),
+  ('profiles','share_last_error','migration_nightly_share.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -160,6 +163,7 @@ other_checks as (
   from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('my_shared_count','migration_shared_prices.sql'),
                ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
                ('sharing_activity_export','migration_sharing_safety.sql'),
+               ('share_prices_for','migration_nightly_share.sql'), ('share_failed_for','migration_nightly_share.sql'), ('claim_badge_alert_for','migration_nightly_share.sql'), ('my_badge_for','migration_nightly_share.sql'),
                ('my_badge','migration_badges.sql'), ('ack_badge','migration_badges.sql'), ('claim_badge_alert','migration_badges.sql'), ('_badge_level','migration_badges.sql'),
                ('my_invite','migration_invites.sql'), ('reset_my_invite','migration_invites.sql'), ('set_invite_show_name','migration_invites.sql')) as f(fn, fix)
   union all
@@ -236,10 +240,11 @@ other_checks as (
               when (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L and body like %L', w.slug, w.good), false, true, '')))[1]::text::int > 0 then 'OK'
               when (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', w.slug), false, true, '')))[1]::text::int = 0 then 'OK'
               else 'MISSING' end,
-         'migration_help_fixed_costs.sql'
+         'migration_help_fixed_costs.sql / migration_help_nightly.sql'
   from (values ('Best Prices topic', 'best-store', '%Best Prices%'),
                ('Community prices topic', 'community-prices', '%Best Prices%'),
-               ('Phone alerts topic', 'turn-on-notifications', '%Gambling limit:%')) as w(label, slug, good)
+               ('Phone alerts topic', 'turn-on-notifications', '%Gambling limit:%'),
+               ('Nightly share in Community prices topic', 'community-prices', '%once a night%')) as w(label, slug, good)
 ),
 all_checks as (
   select * from col_checks

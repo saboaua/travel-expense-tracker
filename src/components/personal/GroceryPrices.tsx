@@ -17,7 +17,7 @@ import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/li
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
-import { groupCommunity, productKey, syncSharedPrices, type CommunityRow } from "@/lib/personal/community";
+import { groupCommunity, productKey, type CommunityRow } from "@/lib/personal/community";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -59,7 +59,6 @@ export function GroceryPrices() {
   const [note, setNote] = useState<string | null>(null);
   const [onlineData, setOnlineData] = useState<OnlineData | null>(null);
   const [onlineTick, setOnlineTick] = useState(0);
-  const [badgeCheck, setBadgeCheck] = useState(0);
 
   const { products, suggestions } = useMemo(() => buildProducts(rows, decisions), [rows, decisions]);
   const currencies = useMemo(() => [...new Set(products.map((p) => p.currency))], [products]);
@@ -89,22 +88,6 @@ export function GroceryPrices() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- wantKey is the list of products asked about
   }, [wantKey, online, onlineTick]);
 
-  // If the person has turned on Community prices, the latest prices are shared at most once a day (store, product and price only)
-  useEffect(() => {
-    if (!online || inCur.length === 0) return;
-    (async () => {
-      const sb = createClient();
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) return;
-      const sent = await syncSharedPrices(sb, session.user.id, products, new Date());
-      if (sent > 0) {
-        // a new badge level (if any) is announced once: on the phone, and as a message here
-        try { await fetch("/api/badge", { method: "POST" }); } catch { /* the alert is optional */ }
-        setBadgeCheck((n) => n + 1);
-      }
-    })().catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- once per load of the products
-  }, [online, products]);
 
   // Community prices (the middle price of 3 or more people) for the same products, beside what you paid. Works whether or not you share.
   const [commRows, setCommRows] = useState<CommunityRow[]>([]);
@@ -203,7 +186,7 @@ export function GroceryPrices() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 pb-28 md:p-8">
-      <LevelUpNotice check={badgeCheck} />
+      <LevelUpNotice />
       <div className="flex items-center justify-between gap-3">
         <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
       </div>
