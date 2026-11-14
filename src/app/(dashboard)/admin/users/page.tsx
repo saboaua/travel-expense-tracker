@@ -16,6 +16,7 @@ import type { UserRole } from "@/lib/roles";
 import { canAssignRole } from "@/lib/roles";
 import { TEMP_PASSWORD_TTL_HOURS } from "@/lib/temp-password-config";
 import { RolesManager, type RoleSummary } from "@/components/admin/RolesManager";
+import { Switch } from "@/components/ui/switch";
 import { CredentialsPanel } from "@/components/admin/CredentialsPanel";
 import { statusOf, timeAgo, type Credentials, type ManagedUser } from "@/components/admin/user-status";
 
@@ -39,6 +40,12 @@ export default function AdminUsersPage() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState<UserRole>("user");
   const [credentials, setCredentials] = useState<Credentials | null>(null);
+  // How the new person gets the temporary login: emailed, shown here, or both
+  const [emailIt, setEmailIt] = useState(false);
+  const [showIt, setShowIt] = useState(true);
+  const [emailReady, setEmailReady] = useState<boolean | null>(null);
+  const [emailNote, setEmailNote] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
+  const [testing, setTesting] = useState(false);
 
   const loadUsers = useCallback(async () => {
     setLoading(true);
@@ -67,6 +74,24 @@ export default function AdminUsersPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  useEffect(() => {
+    fetch("/api/admin/email", { cache: "no-store" }).then((r) => r.json()).then((d) => setEmailReady(!!d.configured)).catch(() => setEmailReady(false));
+  }, []);
+
+  const sendTest = async () => {
+    setTesting(true);
+    setEmailNote(null);
+    try {
+      const res = await fetch("/api/admin/email", { method: "POST" });
+      const d = await res.json();
+      setEmailNote(res.ok ? { tone: "ok", text: `Test email sent to ${d.to}.` } : { tone: "bad", text: d.error || "The test email was not sent." });
+    } catch {
+      setEmailNote({ tone: "bad", text: "The test email was not sent." });
+    } finally {
+      setTesting(false);
+    }
+  };
 
   // Roles list (admin only) feeds the Role pickers; falls back to the 3 built-in roles before the roles migration
   const loadRoles = useCallback(async () => {
@@ -168,6 +193,7 @@ export default function AdminUsersPage() {
     setError(null);
     setWarning(null);
     setCredentials(null);
+    setEmailNote(null);
 
     try {
       const res = await fetch("/api/admin/create-user", {
@@ -178,12 +204,16 @@ export default function AdminUsersPage() {
           firstName,
           lastName,
           role: canAssignRole(myRole) ? role : "user",
+          delivery: { email: emailIt, show: showIt },
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create user");
 
-      showCredentials({ email: data.email, password: data.tempPassword, expiresAt: data.expiresAt });
+      if (emailIt && data.emailed) setEmailNote({ tone: "ok", text: `Login emailed to ${data.email}. It works for ${TEMP_PASSWORD_TTL_HOURS} hours.` });
+      if (emailIt && !data.emailed) setEmailNote({ tone: "bad", text: `Email not sent: ${data.emailError || "the email service refused the message"}. The account was created. Copy the login below and send it yourself.` });
+      if (data.tempPassword) showCredentials({ email: data.email, password: data.tempPassword, expiresAt: data.expiresAt });
+      else scrollAreaOrWindow().scrollTo({ top: 0, behavior: "smooth" });
       if (data.warning) setWarning(data.warning);
       setEmail("");
       setFirstName("");
@@ -242,6 +272,7 @@ export default function AdminUsersPage() {
       ) : (
       <>
 
+      {emailNote && <Alert variant={emailNote.tone === "ok" ? "success" : undefined} data-testid="email-note">{emailNote.text}</Alert>}
       {credentials && <CredentialsPanel key={credentials.password} credentials={credentials} />}
 
       {warning && <Alert variant="warning">{warning}</Alert>}
@@ -308,9 +339,34 @@ export default function AdminUsersPage() {
               </p>
             )}
 
+            <fieldset className="rounded-xl border p-3 space-y-1" data-testid="delivery">
+              <legend className="px-1 text-sm font-medium">How does the person get the login?</legend>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Email it to them</p>
+                  <p className="text-xs text-muted-foreground">
+                    {emailReady === false ? "Email sending is not set up. Ask whoever manages Vercel to add the email key." : "Sent to the email above. The password is not shown on screen."}
+                  </p>
+                </div>
+                <Switch label="Email it to them" checked={emailIt && emailReady === true} disabled={emailReady !== true} onChange={(v) => { setEmailIt(v); if (!v) setShowIt(true); }} />
+              </div>
+              <div className="flex items-center gap-3 border-t pt-1">
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Show it here</p>
+                  <p className="text-xs text-muted-foreground">You copy it and send it yourself.</p>
+                </div>
+                <Switch label="Show it here" checked={showIt} onChange={(v) => { setShowIt(v); if (!v && !emailIt) setEmailIt(emailReady === true); }} />
+              </div>
+              {canAssignRole(myRole) && emailReady && (
+                <button type="button" onClick={sendTest} disabled={testing} className="text-xs font-semibold text-primary underline-offset-2 hover:underline disabled:opacity-50">
+                  {testing ? "Sending..." : "Send me a test email"}
+                </button>
+              )}
+            </fieldset>
+
             <Button type="submit" disabled={creating} className="gap-2">
               <UserPlus className="h-4 w-4" />
-              {creating ? "Creating..." : "Create user"}
+              {creating ? "Creating..." : emailIt && showIt ? "Create, email and show" : emailIt ? "Create and email login" : "Create user"}
             </Button>
           </form>
         </CardContent>

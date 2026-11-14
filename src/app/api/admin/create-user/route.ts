@@ -5,6 +5,8 @@ import { logAudit } from "@/lib/audit";
 import { canAssignRole, type UserRole } from "@/lib/roles";
 import { loadPermissions } from "@/lib/access-server";
 import { createUserAccount } from "@/lib/user-admin";
+import { emailConfigured, sendEmail } from "@/lib/email";
+import { loginEmail } from "@/lib/login-email";
 
 export async function POST(request: Request) {
   try {
@@ -44,6 +46,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Enter a valid email address" }, { status: 400 });
     }
 
+    // How the person gets the login: emailed, shown here, or both. At least one.
+    const delivery = body.delivery && typeof body.delivery === "object" ? body.delivery : { show: true };
+    const wantEmail = delivery.email === true;
+    const wantShow = delivery.show !== false || !wantEmail;
+    if (wantEmail && !emailConfigured()) {
+      return NextResponse.json({ error: "Email sending is not set up. Turn on \"Show it here\" instead." }, { status: 400 });
+    }
+
     // Only an admin chooses the role; everyone else with the "create users" feature creates regular users
     if (!canAssignRole(myRole)) role = "user";
 
@@ -58,21 +68,32 @@ export async function POST(request: Request) {
     if (!result.ok) return NextResponse.json({ error: result.error }, { status: result.status });
     const { userId, tempPassword: password, expiresAt, warning } = result;
 
+    let emailed = false;
+    let emailError: string | undefined;
+    if (wantEmail) {
+      const mail = await sendEmail({ to: email, ...loginEmail({ email, firstName, password, expiresAt }) });
+      emailed = mail.ok;
+      if (!mail.ok) emailError = mail.error;
+    }
+
     await logAudit({
       actorId: user.id,
       actorEmail: profile?.email || user.email,
       action: "user.created",
       entityType: "user",
       entityId: userId,
-      details: { email, role, first_name: firstName, last_name: lastName, created_by_role: myRole, temp_password_expires_at: expiresAt },
+      details: { email, role, first_name: firstName, last_name: lastName, created_by_role: myRole, temp_password_expires_at: expiresAt, login_emailed: emailed, ...(wantEmail && !emailed ? { login_email_failed: emailError } : {}) },
     }).catch((e) => console.error("Audit log failed:", e));
 
     return NextResponse.json({
       success: true,
       userId,
       email,
-      tempPassword: password,
+      // The password goes back to the screen when it is meant to be shown, or when the email did not go out
+      tempPassword: wantShow || !emailed ? password : null,
       expiresAt,
+      emailed,
+      emailError,
       warning,
     });
   } catch (err: unknown) {

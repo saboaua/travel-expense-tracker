@@ -6,6 +6,7 @@
  * Needs Chromium for Playwright (`npx playwright install chromium`, already present in CI images that ship it).
  */
 import { spawn } from "node:child_process";
+import http from "node:http";
 import { chromium } from "playwright";
 import { createFakeSupabase, SERVICE_KEY, ANON_KEY } from "./fake-supabase.mjs";
 import { createSharingBackend } from "./sharing-backend.mjs";
@@ -104,6 +105,15 @@ fake.setRpcHook(async (name, body, uid, bearer) => {
   return sharingDb.hook(name, body, uid, bearer);
 });
 await fake.listen(FAKE_PORT);
+// A stand-in for the email service (Resend): records each message, and refuses when the subject is "FAIL" mode
+const mailbox = { sent: [], refuse: false };
+const MAIL_PORT = Number(process.env.E2E_MAIL_PORT || 54398);
+await new Promise((ok) => http.createServer((req, res) => {
+  let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
+    if (mailbox.refuse) { res.writeHead(422, { "Content-Type": "application/json" }); return res.end(JSON.stringify({ message: "The domain is not verified" })); }
+    mailbox.sent.push({ auth: req.headers.authorization, ...JSON.parse(b || "{}") }); res.writeHead(200, { "Content-Type": "application/json" }); res.end('{"id":"1"}');
+  });
+}).listen(MAIL_PORT, ok));
 // E2E_PROD=1 runs against a production build (made beforehand with tests/e2e/build-prod.sh), which is how phones get the app
 const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", String(APP_PORT), "-H", "localhost"], {
   env: {
@@ -117,6 +127,9 @@ const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", 
     INBOUND_EMAIL_BASE: "@in.example.com",
     INBOUND_EMAIL_SECRET: "e2e-inbound-secret-long",
     INBOUND_EMAIL_AUTH: "off",
+    RESEND_API_KEY: "re_test_key",
+    EMAIL_FROM: "Lifolio <login@example.com>",
+    RESEND_API_URL: `http://127.0.0.1:${MAIL_PORT}/emails`,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -1422,6 +1435,49 @@ try {
       const text = await ap.evaluate(() => navigator.clipboard.readText());
       assert(/^link: https:\/\/lifolio-woad\.vercel\.app\/\nuser: copyme@example\.com\ntemp password: \S+/.test(text), `copied text has link, user and temp password (got ${JSON.stringify(text.slice(0, 120))})`);
     } finally { await actx.close(); }
+  });
+
+  await test("create user: email the login, show it, both, and a failed email still shows it", async () => {
+    const actx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/users`);
+      const emailSw = ap.getByRole("switch", { name: "Email it to them" });
+      const showSw = ap.getByRole("switch", { name: "Show it here" });
+      await emailSw.waitFor();
+      await ap.waitForFunction(() => !document.querySelector('[role="switch"][aria-label="Email it to them"]')?.hasAttribute("disabled"));
+      assert((await showSw.getAttribute("aria-checked")) === "true" && (await emailSw.getAttribute("aria-checked")) === "false", "starts with show on, email off");
+      // email only
+      mailbox.sent.length = 0;
+      await emailSw.click(); await showSw.click();
+      assert((await ap.getByRole("button", { name: "Create and email login" }).count()) === 1, "button says create and email login");
+      await ap.getByPlaceholder("user@company.com").fill("mailonly@example.com");
+      await ap.getByRole("button", { name: "Create and email login" }).click();
+      await ap.getByTestId("email-note").getByText("Login emailed to mailonly@example.com").waitFor();
+      assert((await ap.getByText("Share these credentials").count()) === 0, "email only: the password is not shown");
+      assert(mailbox.sent.length === 1 && mailbox.sent[0].to[0] === "mailonly@example.com" && /Temp password: \S+/.test(mailbox.sent[0].text) && mailbox.sent[0].auth === "Bearer re_test_key", "one email with the login went out");
+      const pw = (mailbox.sent[0].text.match(/Temp password: (\S+)/) ?? [])[1];
+      const audit = JSON.stringify(fake.table("audit_logs"));
+      assert(!audit.includes(pw) && audit.includes("login_emailed"), "the audit log says it was emailed and never holds the password");
+      // both
+      await showSw.click();
+      assert((await ap.getByRole("button", { name: "Create, email and show" }).count()) === 1, "button says create, email and show");
+      await ap.getByPlaceholder("user@company.com").fill("both@example.com");
+      await ap.getByRole("button", { name: "Create, email and show" }).click();
+      await ap.getByText("Share these credentials").waitFor();
+      assert(mailbox.sent.length === 2, "both: emailed too");
+      // the email fails: the account exists and the login is shown
+      mailbox.refuse = true;
+      await showSw.click(); // show off while email stays on is allowed
+      await ap.getByPlaceholder("user@company.com").fill("refused@example.com");
+      await ap.getByRole("button", { name: /^Create/ }).click();
+      await ap.getByTestId("email-note").getByText("Email not sent: The domain is not verified").waitFor();
+      await ap.getByText("Share these credentials").waitFor();
+      mailbox.refuse = false;
+    } finally { mailbox.refuse = false; await actx.close(); }
   });
 
   await test("admin: suspend and restore a person, delete one for good (typed email), and a suspended person is told at sign-in", async () => {
