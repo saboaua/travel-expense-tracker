@@ -57,6 +57,21 @@ eq("title", pushMessage("trip", { trip: "X", days: 1 }, "details").title, "Lifol
 const every = ["invite", "accepted", "shared", "view", "subscription", "iptv", "trip", "flightTomorrow", "afterTrip", "document", "support"] as const;
 eq("no digits-only codes are added by the wording", every.every((k) => !/\b[A-Z0-9]{6,}\b/.test(body(k, { by: "Alice", item: "Trip", subscriptions: [{ name: "Netflix", due: "2026-11-13" }], days: 3, count: 2, trip: "Trip", flight: { number: "CM 312", from: "AUA", to: "PTY", time: "9:45 AM" }, label: "Passport", subject: "Hello" }))), true);
 
+// fixed costs
+eq("gambling near", body("gambling", { item: "near" }), "You have used 80% of your gambling limit this month.");
+eq("gambling over", body("gambling", { item: "over" }), "You are over your gambling limit this month.");
+eq("gambling private", body("gambling", { item: "over" }, "private"), PUSH_TEXT.gambling.body);
+eq("yearly bill names it and the date", pushMessage("fixedYearly", { item: "License plate", days: 7, date: "2027-06-30" }, "details", "2027-06-23").body, "License plate is due in 7 days (Jun 30).");
+eq("yearly bill without facts", body("fixedYearly", {}), PUSH_TEXT.fixedYearly.body);
+eq("payment tomorrow", pushMessage("fixedMonthly", { item: "Home mortgage", count: 1, date: "2026-12-01" }, "details", "2026-11-30").body, "Home mortgage is due tomorrow (Dec 1).");
+eq("payment tomorrow with more", pushMessage("fixedMonthly", { item: "Home mortgage", count: 3, date: "2026-12-01" }, "details", "2026-11-30").body, "Home mortgage is due tomorrow (Dec 1), and 2 more.");
+eq("no amounts in fixed cost alerts", ["gambling", "fixedYearly", "fixedMonthly"].every((k) => !/\d{3,}/.test(body(k as "gambling", { item: "Car insurance", days: 7, count: 1 }))), true);
+// switches
+eq("new switches: budget, gambling and yearly bills on, payment day off", [normalizePushSettings(null).budget, normalizePushSettings(null).gambling, normalizePushSettings(null).yearlyBills, normalizePushSettings(null).paymentDay], [true, true, true, false]);
+eq("budget alerts keep what the person had for reminders", normalizePushSettings({ reminders: false }).budget, false);
+eq("a saved budget switch wins", normalizePushSettings({ reminders: false, budget: true }).budget, true);
+eq("patch: payment day", parsePushPatch({ paymentDay: true }), { paymentDay: true });
+
 // settings
 eq("defaults", normalizePushSettings(null), DEFAULT_PUSH_SETTINGS);
 eq("old saved prefs: flight changes follow trips", normalizePushSettings({ invites: true, shared: true, views: false, reminders: true, trips: false }).flights, false);

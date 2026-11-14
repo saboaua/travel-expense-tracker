@@ -113,6 +113,12 @@ export function NotificationsCard() {
       { key: "shared", title: "Shared with me changed", hint: "A partner shares, updates or stops sharing.", example: "\u201cAlice shared the trip Winlott Meeting with you.\u201d" },
       { key: "views", title: "When someone opens what I shared", hint: "Off by default. The history always has it." },
     ] },
+    { title: "Budget and fixed costs", rows: [
+      { key: "budget", title: "Budget alerts", hint: "At 80% of your monthly budget, and again if you go over.", example: "\u201cYou have used most of this month's budget.\u201d", isNew: true },
+      { key: "gambling", title: "Gambling limit", hint: "At 80% of your limit, and again when you pass it. Once a month each.", example: "\u201cYou have used 80% of your gambling limit this month.\u201d", isNew: true },
+      { key: "yearlyBills", title: "Yearly bills coming up", hint: "30 days and 7 days before car insurance or the license plate is due.", example: "\u201cLicense plate is due in 7 days (Jun 30).\u201d", isNew: true },
+      { key: "paymentDay", title: "Monthly payment day", hint: "The day before a mortgage, loan, insurance or card payment. Off until you turn it on.", example: "\u201cHome mortgage is due tomorrow (Dec 1).\u201d", isNew: true },
+    ] },
     ...(role === "admin" ? [{ title: "Admin only", rows: [
       { key: "support" as const, title: "Support requests", hint: "A message from the contact form." },
       { key: "iptv" as const, title: "IPTV clients expiring", hint: "Within 15 days.", example: "\u201c3 IPTV clients expire within 15 days. First: Nov 20.\u201d" },

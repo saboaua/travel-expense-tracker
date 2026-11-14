@@ -2478,10 +2478,13 @@ try {
       await user.page.goto(`${BASE}/profile#notifications`);
       const card = user.page.getByTestId("notifications-card");
       await card.waitFor();
-      for (const g of ["trips-and-travel", "money-and-papers", "sharing"]) await card.getByTestId(`push-group-${g}`).waitFor();
+      for (const g of ["trips-and-travel", "money-and-papers", "budget-and-fixed-costs", "sharing"]) await card.getByTestId(`push-group-${g}`).waitFor();
       assert((await card.getByTestId("push-group-admin-only").count()) === 0, "a normal person has no admin group");
       for (const name of ["Trip coming up", "Flight changes", "Flight tomorrow", "After the trip", "Subscription payments", "Document expiry", "Invites and replies", "Shared with me changed"]) await card.getByRole("switch", { name }).waitFor();
       assert((await card.getByRole("switch", { name: "Flight tomorrow" }).getAttribute("aria-checked")) === "true", "new kinds start on");
+      for (const name of ["Budget alerts", "Gambling limit", "Yearly bills coming up", "Monthly payment day"]) await card.getByRole("switch", { name }).waitFor();
+      assert((await card.getByRole("switch", { name: "Gambling limit" }).getAttribute("aria-checked")) === "true" && (await card.getByRole("switch", { name: "Monthly payment day" }).getAttribute("aria-checked")) === "false", "gambling and yearly bills start on, the payment day starts off");
+      await card.getByRole("switch", { name: "Gambling limit" }).click();
       assert((await card.getByRole("radio", { name: /Show details/ }).getAttribute("aria-checked")) === "true", "details is the default style");
       await card.getByRole("radio", { name: /Keep it private/ }).click();
       await card.getByRole("switch", { name: "Document expiry" }).click();
@@ -2490,7 +2493,7 @@ try {
       await user.page.waitForFunction(() => document.querySelector('[data-testid="push-quiet"] select') !== null);
       await user.page.waitForTimeout(800);
       const saved = fake.table("profiles").find((p) => p.id === PAT)?.push_prefs;
-      assert(saved && saved.detail === "private" && saved.documents === false && saved.quiet?.on === true && saved.quiet?.start === 21, "saved: " + JSON.stringify(saved));
+      assert(saved && saved.detail === "private" && saved.documents === false && saved.gambling === false && saved.quiet?.on === true && saved.quiet?.start === 21, "saved: " + JSON.stringify(saved));
       assert(saved.flightTomorrow === true || saved.flightTomorrow === undefined, "other switches keep their value");
       await user.page.reload();
       await card.waitFor();

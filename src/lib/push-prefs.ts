@@ -1,6 +1,6 @@
 /** What a person can choose about phone alerts. Pure (no I/O) so the page, the API and the senders agree, and it can be tested. */
 
-export const PUSH_PREF_KEYS = ["invites", "shared", "views", "reminders", "iptv", "trips", "flights", "flightTomorrow", "afterTrip", "documents", "support"] as const;
+export const PUSH_PREF_KEYS = ["invites", "shared", "views", "reminders", "iptv", "trips", "flights", "flightTomorrow", "afterTrip", "documents", "support", "budget", "gambling", "yearlyBills", "paymentDay"] as const;
 export type PushPref = (typeof PUSH_PREF_KEYS)[number];
 export type PushPrefs = Record<PushPref, boolean>;
 export type PushDetail = "details" | "private";
@@ -8,7 +8,7 @@ export type QuietHours = { on: boolean; start: number; end: number };
 export type PushSettings = PushPrefs & { detail: PushDetail; quiet: QuietHours };
 
 export const DEFAULT_PUSH_PREFS: PushPrefs = {
-  invites: true, shared: true, views: false, reminders: true, iptv: true, trips: true, flights: true, flightTomorrow: true, afterTrip: true, documents: true, support: true,
+  invites: true, shared: true, views: false, reminders: true, iptv: true, trips: true, flights: true, flightTomorrow: true, afterTrip: true, documents: true, support: true, budget: true, gambling: true, yearlyBills: true, paymentDay: false,
 };
 export const DEFAULT_PUSH_SETTINGS: PushSettings = { ...DEFAULT_PUSH_PREFS, detail: "details", quiet: { on: false, start: 22, end: 7 } };
 
@@ -27,6 +27,8 @@ export function normalizePushSettings(saved: unknown): PushSettings {
   for (const k of PUSH_PREF_KEYS) if (typeof s[k] === "boolean") out[k] = s[k] as boolean;
   if (typeof s.flights !== "boolean" && typeof s.trips === "boolean") out.flights = s.trips;
   if (typeof s.iptv !== "boolean" && typeof s.reminders === "boolean") out.iptv = s.reminders;
+  // Budget alerts used to follow the Subscription payments switch; keep what the person had
+  if (typeof s.budget !== "boolean" && typeof s.reminders === "boolean") out.budget = s.reminders;
   if (s.detail === "private" || s.detail === "details") out.detail = s.detail;
   const q = s.quiet as Partial<QuietHours> | undefined;
   if (q && typeof q === "object") out.quiet = { on: q.on === true, start: hour(q.start, 22), end: hour(q.end, 7) };

@@ -135,3 +135,20 @@ export function nextYearly(c: FixedCost, today: string): { date: string; amount:
 
 /** "Mar 2041" */
 export const monthLabel = (m: string | null) => (m ? `${MONTHS[Number(m.slice(5, 7)) - 1]} ${m.slice(0, 4)}` : "");
+
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+
+/** A yearly bill within 30 days: step 30 while it is more than 7 days away, step 7 in the last 7 days (each step is alerted once). */
+export function yearlyAlert(c: FixedCost, today: string): { step: 7 | 30; days: number; date: string } | null {
+  const next = nextYearly(c, today);
+  if (!next) return null;
+  const days = daysBetween(today, next.date);
+  if (days >= 0 && days <= 7) return { step: 7, days, date: next.date };
+  if (days > 7 && days <= 30) return { step: 30, days, date: next.date };
+  return null;
+}
+
+/** Does a monthly payment fall on this date? (its day of the month, inside its start and end) */
+export function paymentFallsOn(c: FixedCost, date: string): boolean {
+  return c.schedule === "monthly" && dueAmount(c, `${date.slice(0, 7)}-01`) > 0 && (c.day ?? 1) === Number(date.slice(8, 10));
+}

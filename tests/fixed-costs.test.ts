@@ -1,4 +1,4 @@
-import { dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, type FixedCost } from "../src/lib/personal/fixed-costs";
+import { paymentFallsOn, yearlyAlert, dueAmount, gamblingState, monthLines, nextYearly, paymentsLeft, readCost, readEntry, totalsByCategory, configuredCategories, type FixedCost } from "../src/lib/personal/fixed-costs";
 import { budgetView, spentByArea, type BudgetSetting } from "../src/lib/personal/budget";
 
 let fail = 0;
@@ -52,6 +52,21 @@ eq("fixed areas are added by area", [by.loans, by.cards, by.gambling, by.insuran
 const v = budgetView(setting, by, "2026-11-14");
 eq("spent includes the fixed costs", v.spent, 2168.4);
 eq("old callers without fixed costs still work", budgetView(setting, spentByArea({ groceries: [], utilities: [], spends: [], projects: [] }, "AWG"), "2026-11-14").spent, 0);
+
+// alert timing
+eq("yearly: 30 days out is step 30", yearlyAlert(plate, "2026-11-30"), { step: 30, days: 30, date: "2026-12-30" });
+eq("yearly: 29 days out is still step 30", yearlyAlert(plate, "2026-12-01")?.step, 30);
+eq("yearly: 8 days out has no new step beyond 30", yearlyAlert(plate, "2026-12-22")?.step, 30);
+eq("yearly: 7 days out is step 7", yearlyAlert(plate, "2026-12-23"), { step: 7, days: 7, date: "2026-12-30" });
+eq("yearly: on the day is step 7", yearlyAlert(plate, "2026-12-30")?.step, 7);
+eq("yearly: far away is quiet", yearlyAlert(plate, "2026-11-14"), null);
+eq("yearly: a monthly payment is never a yearly alert", yearlyAlert(mortgage, "2026-11-14"), null);
+const mort1 = { ...mortgage, day: 1 };
+eq("payment day: the 1st", paymentFallsOn(mort1, "2026-12-01"), true);
+eq("payment day: another day", paymentFallsOn(mort1, "2026-12-02"), false);
+eq("payment day: after the end", paymentFallsOn(mort1, "2041-04-01"), false);
+eq("payment day: no day set means the 1st", paymentFallsOn({ ...mortgage, day: null }, "2026-12-01"), true);
+eq("payment day: yearly bills are not monthly", paymentFallsOn({ ...ins, day: 15 }, "2027-03-15"), false);
 
 if (fail) process.exit(1);
 console.log("ok fixed-costs");

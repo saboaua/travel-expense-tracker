@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { flushHeldPushes, sendPush } from "@/lib/push";
-import { budgetAlerts, utilityReminders, documentsExpiring, flightsTomorrow, tripStartingSoon, tripsEnded } from "@/lib/push-reminders";
+import { budgetAlerts, gamblingAlerts, paymentDayAlerts, yearlyBillAlerts, utilityReminders, documentsExpiring, flightsTomorrow, tripStartingSoon, tripsEnded } from "@/lib/push-reminders";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { dueForReminder as dueSubs, nextDue, type Sub } from "@/lib/subscriptions";
 import { dueForReminder as dueClients } from "@/lib/iptv";
@@ -34,6 +34,9 @@ export async function GET(req: Request) {
     // These two run on their own: they run first and on their own: a failure in the older reminders below must not lose them, and a failure here must not lose those
     const utilities = await utilityReminders(db, today).catch((e) => { console.error("[cron] utility reminders", e instanceof Error ? e.message : e); return -1; });
     const budgets = await budgetAlerts(db, today).catch((e) => { console.error("[cron] budget alerts", e instanceof Error ? e.message : e); return -1; });
+    const gambling = await gamblingAlerts(db, today).catch((e) => { console.error("[cron] gambling alerts", e instanceof Error ? e.message : e); return -1; });
+    const yearly = await yearlyBillAlerts(db, today).catch((e) => { console.error("[cron] yearly bill alerts", e instanceof Error ? e.message : e); return -1; });
+    const payments = await paymentDayAlerts(db, today).catch((e) => { console.error("[cron] payment day alerts", e instanceof Error ? e.message : e); return -1; });
     let people = 0;
     const subs = await db.from("subscriptions").select(`user_id, reminded_for, ${SUBSCRIPTION_COLS}`).eq("status", "active").limit(5000);
     if (subs.error && !/does not exist|schema cache/i.test(subs.error.message)) throw new Error(subs.error.message);
@@ -70,7 +73,7 @@ export async function GET(req: Request) {
     const documents = await documentsExpiring(db, today);
     // Reminder keys older than half a year are not needed any more
     await db.from("push_sent_log").delete().lt("sent_at", new Date(Date.now() - 180 * 86400_000).toISOString());
-    return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, documents, utilities, budgets, held });
+    return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, documents, utilities, budgets, gambling, yearly, payments, held });
   } catch (e) {
     console.error("[cron] reminders", e instanceof Error ? e.message : e);
     await notifyJobFailure(db, "Subscription and IPTV reminders");

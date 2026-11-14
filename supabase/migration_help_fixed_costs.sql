@@ -83,4 +83,11 @@ update public.help_topics set
     E'In **Profile**, **Community prices**, tap the red **Delete what I shared** button.')
 where slug = 'community-prices' and body like '%Price tracker**, **Community prices**%';
 
+-- Phone alerts: the new switches (only while the topic still has the original text)
+update public.help_topics set
+  body = replace(body,
+    E'- **Trips coming up:** a reminder three days and one day before a trip starts.',
+    E'- **Trips coming up:** a reminder three days and one day before a trip starts.\n- **Budget alerts:** at 80% of your monthly budget, and again if you go over.\n- **Gambling limit:** at 80% of your limit, and again when you pass it.\n- **Yearly bills coming up:** 30 days and 7 days before car insurance or the license plate is due.\n- **Monthly payment day:** the day before a mortgage, loan, insurance or card payment. Off until you turn it on.')
+where slug = 'turn-on-notifications' and body like '%Trips coming up:%' and body not like '%Gambling limit:%';
+
 notify pgrst, 'reload schema';

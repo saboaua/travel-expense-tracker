@@ -7,6 +7,9 @@ import { kindLabel } from "@/lib/documents";
 import { addDaysISO } from "@/lib/utils";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
+import { gamblingState, KIND_LABEL, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
+import { convert, round2 } from "@/lib/personal/money";
+import { FIXED_COST_COLS } from "@/lib/columns";
 import { kindLabel as utilityLabel, missingKinds, monthStart } from "@/lib/personal/utilities";
 
 const missing = (m: string) => /does not exist|schema cache/i.test(m);
@@ -117,8 +120,63 @@ export async function budgetAlerts(db: SupabaseClient, today: string): Promise<n
       const state = budgetState(view.spent, view.budget);
       if (state === "ok") continue;
       if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;
-      n += await sendPush(userId, "budget", "reminders", { item: state }, { today });
+      n += await sendPush(userId, "budget", "budget", { item: state }, { today });
     } catch (e) { console.error("[cron] budget alert for one person failed", e instanceof Error ? e.message : e); }
+  }
+  return n;
+}
+
+const readCosts = (rows: unknown) => ((rows ?? []) as Record<string, unknown>[]).flatMap((r) => { const c = readCost(r); return c ? [{ ...c, user_id: String(r.user_id) }] : []; });
+
+/** Everyone's active fixed costs, or nothing when the table is not there yet. */
+async function allFixedCosts(db: SupabaseClient): Promise<(FixedCost & { user_id: string })[]> {
+  const r = await db.from("fixed_costs").select(`user_id, ${FIXED_COST_COLS}`).eq("active", true).limit(10000);
+  if (r.error) { if (missing(r.error.message)) return []; throw new Error(r.error.message); }
+  return readCosts(r.data);
+}
+
+/** Gambling: once a month at 80% of the limit and once more when it is passed. The words never carry an amount. */
+export async function gamblingAlerts(db: SupabaseClient, today: string): Promise<number> {
+  const month = monthStart(today);
+  let n = 0;
+  for (const c of (await allFixedCosts(db)).filter((x) => x.kind === "gambling" && x.amount > 0)) {
+    try {
+      const e = await db.from("fixed_entries").select("kind, on_date, amount, currency").eq("user_id", c.user_id).eq("kind", "gambling").gte("on_date", month).lte("on_date", today).limit(2000);
+      if (e.error) continue;
+      const spent = round2(((e.data ?? []) as Record<string, unknown>[]).flatMap((r) => { const x = readEntry(r); return x ? [x] : []; }).reduce((t, x) => t + (convert(x.amount, x.currency, c.currency) ?? 0), 0));
+      const state = gamblingState(spent, c.amount);
+      if (state !== "near" && state !== "over") continue;
+      if (!(await claimOnce(c.user_id, `gambling:${month}:${state}`))) continue;
+      n += await sendPush(c.user_id, "gambling", "gambling", { item: state }, { today });
+    } catch (err) { console.error("[cron] gambling alert for one person failed", err instanceof Error ? err.message : err); }
+  }
+  return n;
+}
+
+/** Yearly bills (car insurance, license plate): one alert about 30 days before and one about 7 days before. Names the bill, never the amount. */
+export async function yearlyBillAlerts(db: SupabaseClient, today: string): Promise<number> {
+  let n = 0;
+  for (const c of await allFixedCosts(db)) {
+    const y = yearlyAlert(c, today);
+    if (!y) continue;
+    if (!(await claimOnce(c.user_id, `fixedYearly:${c.kind}:${y.date}:${y.step}`))) continue;
+    n += await sendPush(c.user_id, "fixedYearly", "yearlyBills", { item: KIND_LABEL[c.kind], days: y.days, date: y.date }, { today });
+  }
+  return n;
+}
+
+/** The day before a monthly payment (mortgage, loan, insurance, card). One alert per person, even when several fall on the same day. */
+export async function paymentDayAlerts(db: SupabaseClient, today: string): Promise<number> {
+  const tomorrow = addDaysISO(today, 1);
+  const by = new Map<string, FixedCost[]>();
+  for (const c of await allFixedCosts(db)) {
+    if (!paymentFallsOn(c, tomorrow)) continue;
+    by.set(c.user_id, [...(by.get(c.user_id) ?? []), c]);
+  }
+  let n = 0;
+  for (const [userId, list] of by) {
+    if (!(await claimOnce(userId, `fixedMonthly:${tomorrow}`))) continue;
+    n += await sendPush(userId, "fixedMonthly", "paymentDay", { item: KIND_LABEL[list[0].kind], count: list.length, date: tomorrow }, { today });
   }
   return n;
 }
