@@ -5,7 +5,7 @@
 export type ItemArea = "groceries" | "shopping";
 
 /** The shopping categories from the start. Admin > Receipt Categories can mark others (the table's area column); this list is the fallback. */
-export const DEFAULT_SHOPPING_NAMES = ["Stationery & art", "Clothing", "Electronics", "Toys & games", "Garden & hardware", "Shopping"];
+export const DEFAULT_SHOPPING_NAMES = ["Stationery & art", "Clothing", "Electronics", "Toys & games", "Garden & hardware", "Pharmacy", "Shopping"];
 
 export const NEEDS_CATEGORY = "Other";
 

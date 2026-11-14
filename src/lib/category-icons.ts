@@ -2,7 +2,7 @@ import {
   Briefcase, Building2, Car, BedDouble, FileText, Fuel, GraduationCap, MapPin, Paperclip,
   Plane, Presentation, ShoppingBag, Coffee, Tag, Ticket, Train, Users, Utensils, Wrench, Phone, Gift,
   Apple, Beef, Milk, Croissant, Wheat, CupSoda, Cookie, Snowflake, SprayCan, Droplets, ShoppingBasket, Home,
-  CookingPot, Bath, ShowerHead, Toilet, Sofa, Armchair, Lamp, Lightbulb, Zap, Plug, Flower2, Trees, Sprout, Shovel, PaintRoller, Paintbrush, Hammer, Drill, Fence, DoorOpen, Warehouse, Refrigerator, WashingMachine, AirVent, Fan, Key, Bug, Waves, Droplet, Blinds, Lock, Wifi, Sun, Flame, Trash2,
+  CookingPot, Bath, ShowerHead, Toilet, Sofa, Armchair, Lamp, Lightbulb, Zap, Plug, Flower2, Trees, Sprout, Shovel, PaintRoller, Paintbrush, Hammer, Pill, Drill, Fence, DoorOpen, Warehouse, Refrigerator, WashingMachine, AirVent, Fan, Key, Bug, Waves, Droplet, Blinds, Lock, Wifi, Sun, Flame, Trash2,
   type LucideIcon,
 } from "lucide-react";
 
@@ -57,6 +57,7 @@ const ICONS: Record<string, LucideIcon> = {
   "paint-roller": PaintRoller,
   paintbrush: Paintbrush,
   hammer: Hammer,
+  pill: Pill,
   drill: Drill,
   fence: Fence,
   door: DoorOpen,
@@ -119,6 +120,7 @@ export const FALLBACK_GROCERY_CATEGORIES: CategoryOption[] = [
   { name: "Electronics", icon: "plug" },
   { name: "Toys & games", icon: "gift" },
   { name: "Garden & hardware", icon: "hammer" },
+  { name: "Pharmacy", icon: "pill" },
   { name: "Shopping", icon: "shopping" },
   { name: "Other", icon: "tag" },
 ];

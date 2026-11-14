@@ -12,6 +12,7 @@ eq("mochi is a snack, beer a beverage", [guess("Royal Family Sesame Mochi 210g")
 eq("a nameless charge stays Other", guess("Miscellaneous Charge"), "Other");
 eq("food is not caught by the new rules", [guess("Whole milk"), guess("Spaghetti"), guess("Paper towels"), guess("Toothbrush"), guess("Penne rigate")], ["Dairy & Eggs", "Pantry", "Household", "Personal Care", "Other"]);
 eq("pet and clothing", [guess("Dog food 5kg"), guess("Cotton socks 3 pack")], ["Pet", "Clothing"]);
+eq("pharmacy", [guess("Ibuprofen 200mg"), guess("Band-Aid strips")], ["Pharmacy", "Pharmacy"]);
 
 const shop = shoppingSet();
 const items = [

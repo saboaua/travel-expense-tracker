@@ -3,7 +3,7 @@ export type PersonalKind = "home_project" | "personal_trip";
 const PROJECT_CATEGORIES = ["Materials", "Tools", "Labor", "Permits & Fees", "Delivery", "Appliances", "Furniture", "Decor", "Other"];
 const TRAVEL_CATEGORIES = ["Flights", "Lodging", "Food", "Transport", "Activities", "Shopping", "Other"];
 export const GROCERY_CATEGORIES = [
-  "Produce", "Meat & Seafood", "Dairy & Eggs", "Bakery", "Pantry", "Beverages", "Snacks", "Frozen", "Household", "Personal Care", "Pet", "Stationery & art", "Clothing", "Electronics", "Toys & games", "Garden & hardware", "Shopping", "Other",
+  "Produce", "Meat & Seafood", "Dairy & Eggs", "Bakery", "Pantry", "Beverages", "Snacks", "Frozen", "Household", "Personal Care", "Pet", "Stationery & art", "Clothing", "Electronics", "Toys & games", "Garden & hardware", "Pharmacy", "Shopping", "Other",
 ];
 
 export const KIND_META: Record<
