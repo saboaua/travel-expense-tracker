@@ -256,7 +256,7 @@ other_checks as (
          'migration_help_badges.sql'
   union all
   select 'function', 'badge levels: Legend at 4,000',
-         case when to_regproc('public._badge_level(integer)') is null then 'MISSING'
+         case when to_regprocedure('public._badge_level(integer)') is null then 'MISSING'
               when public._badge_level(3999) = 4 and public._badge_level(4000) = 5 and public._badge_level(149) = 1 and public._badge_level(150) = 2 then 'OK'
               else 'MISSING' end,
          'migration_badge_levels.sql'
