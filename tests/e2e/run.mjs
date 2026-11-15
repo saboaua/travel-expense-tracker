@@ -1352,7 +1352,7 @@ try {
       assert(!(await page.getByTestId("badge-share").innerText()).includes("AWG"), "the picture has no prices");
       const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("badge-share-save").click()]);
       assert(dl.suggestedFilename() === "lifolio-scout-badge.png", "Save image names the file after the badge");
-      await page.getByRole("button", { name: "Close" }).click();
+      await page.getByTestId("badge-share").getByRole("button", { name: "Close" }).click();
       assert((await page.getByTestId("level-up").count()) === 1, "closing the share sheet returns to the celebration");
       await page.getByTestId("level-up-done").click();
       for (let i = 0; i < 50 && badgeSeen !== 2; i++) await page.waitForTimeout(100);
@@ -1367,7 +1367,7 @@ try {
       assert((await page.getByTestId("share-scout").count()) === 1 && (await page.getByTestId("share-guardian").count()) === 0, "an earned badge can be shared later, a locked one cannot");
       await page.getByTestId("share-scout").click();
       await page.getByTestId("badge-share").waitFor();
-      await page.getByRole("button", { name: "Close" }).click();
+      await page.getByTestId("badge-share").getByRole("button", { name: "Close" }).click();
       await page.goto(`${BASE}/profile`);
       await page.getByRole("button", { name: /Community prices/ }).click();
       // deleting restarts the count but keeps the earned badge
