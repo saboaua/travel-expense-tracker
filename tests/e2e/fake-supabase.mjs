@@ -255,7 +255,7 @@ export function createFakeSupabase() {
       return send(res, 200, { Key: p.replace(/^\//, ""), Id: randomUUID() });
     }
     if (req.method === "DELETE") return send(res, 200, []);
-    const data = storage.get(p.replace(/^\/(authenticated|public|sign)\//, "").replace(/^\//, ""));
+    const data = storage.get(p.replace(/^\/(authenticated|public)\//, "").replace(/^\//, ""));
     if (data) { res.writeHead(200, { "content-type": "image/jpeg" }); return res.end(data); }
     return send(res, 404, { message: "Object not found", statusCode: "404" });
   }
