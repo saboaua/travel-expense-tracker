@@ -20,6 +20,7 @@ need_cols(tbl, col, fix) as (values
   ('utility_bills','source','migration_bill_emails.sql'),
   ('utility_bills','dedupe_key','migration_bill_emails.sql'),
   ('utility_bills','needs_check','migration_bill_emails.sql'),
+  ('utility_bills','payment_ref','migration_utility_payment_ref.sql'),
   ('bill_email_log','status','migration_bill_emails.sql'),
   ('bill_email_senders','accounts','migration_bill_email_accounts.sql'),
   ('profiles','welcome_seen_at','migration_welcome_tour.sql'),

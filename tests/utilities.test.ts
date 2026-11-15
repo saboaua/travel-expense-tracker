@@ -1,4 +1,4 @@
-import { toAwg, defaultBillMonth, dueBills, history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthStart, paidIn, shiftMonth, dueState, usualLag, type BillRow } from "../src/lib/personal/utilities";
+import { toAwg, defaultBillMonth, dueBills, history, kindLabel, lastProvider, missingKinds, monthChange, monthLabel, monthStart, paidIn, shiftMonth, dueState, usualLag, cleanRef, trend, splitByKind, dueLabel, percentChange, type BillRow } from "../src/lib/personal/utilities";
 import { pushMessage } from "../src/lib/push-text";
 
 let failed = 0;
@@ -38,4 +38,13 @@ eq(history(rows, "trash", "2026-11-01").average, 0, "no bills, no average");
 eq([dueState(rows[1], "2026-11-18"), dueState(rows[1], "2026-11-21"), dueState(rows[1], "2026-11-01"), dueState(rows[0], "2026-11-30")], ["soon", "late", null, null], "due soon, late, and never for a paid bill");
 eq(pushMessage("utility", { item: "Water, Phone" }, "details").body, "Add this month's bills: Water, Phone.", "the reminder names the utilities, never an amount");
 eq(pushMessage("utility", { item: "Water" }, "private").body, "Time to add your utility bills for this month.", "private wording is generic");
+
+eq([cleanRef("  SET-48210937 "), cleanRef("a   b"), cleanRef("   "), cleanRef(null), cleanRef("x".repeat(100))?.length], ["SET-48210937", "a b", null, null, 80], "a payment reference is trimmed, tidied, limited to 80 characters, and empty means none");
+eq(trend(rows, "2026-11-01", 4).map((t) => [t.month, t.usd]), [["2026-08-01", 0], ["2026-09-01", 0], ["2026-10-01", 0], ["2026-11-01", 155]], "the trend is what was paid in each of the last four months, oldest first");
+const split = splitByKind(paidIn(rows, "2026-11-01"));
+eq([split.map((x) => x.kind), split.reduce((a, x) => a + x.pct, 0), split[0].usd], [["electricity", "water", "phone"], 100, 90], "the split by utility is biggest first and adds up to 100");
+eq(splitByKind([]), [], "nothing paid gives no split");
+eq([dueLabel({ due_date: "2026-11-09" }, "2026-11-15"), dueLabel({ due_date: "2026-11-14" }, "2026-11-15"), dueLabel({ due_date: "2026-11-15" }, "2026-11-15"), dueLabel({ due_date: "2026-11-16" }, "2026-11-15"), dueLabel({ due_date: "2026-12-09" }, "2026-11-15"), dueLabel({}, "2026-11-15")],
+  [{ text: "6 days late", state: "late" }, { text: "1 day late", state: "late" }, { text: "Due today", state: "soon" }, { text: "Due tomorrow", state: "soon" }, { text: "Due in 24 days", state: "later" }, { text: "No due date", state: "none" }], "a bill that is not paid says how late or how soon it is");
+eq([percentChange(104.2, 100), percentChange(90, 100), percentChange(5, 0), percentChange(100, 100)], [4, -10, null, 0], "the change against last month is a whole percent, or nothing when last month had no payments");
 process.exit(failed ? 1 : 0);

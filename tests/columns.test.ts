@@ -46,6 +46,7 @@ check("EXPENSE_COLS", "expenses", C.EXPENSE_COLS);
 check("PERSONAL_PROJECT_COLS", "personal_projects", C.PERSONAL_PROJECT_COLS);
 check("PERSONAL_SPEND_COLS", "personal_spends", C.PERSONAL_SPEND_COLS);
 check("UTILITY_BILL_COLS", "utility_bills", C.UTILITY_BILL_COLS);
+check("UTILITY_BILL_COLS_REF", "utility_bills", C.UTILITY_BILL_COLS_REF);
 check("BUDGET_COLS", "personal_budgets", C.BUDGET_COLS);
 check("SAVINGS_PLAN_COLS", "savings_plans", C.SAVINGS_PLAN_COLS);
 check("SAVINGS_PLAN_COLS_BASE", "savings_plans", C.SAVINGS_PLAN_COLS_BASE);

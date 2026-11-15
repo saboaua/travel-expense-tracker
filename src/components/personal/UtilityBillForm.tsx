@@ -16,7 +16,7 @@ import { AmountField } from "@/components/personal/AmountField";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { parseAmount, QUICK_DEFAULT_CURRENCY } from "@/lib/personal/quick-spend";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
-import { isKind, kindLabel, lastProvider, defaultBillMonth, usualLag, monthLabel, monthStart, shiftMonth, UTILITY_KINDS } from "@/lib/personal/utilities";
+import { cleanRef, isKind, kindLabel, lastProvider, defaultBillMonth, usualLag, monthLabel, monthStart, shiftMonth, UTILITY_KINDS } from "@/lib/personal/utilities";
 import { todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
@@ -44,6 +44,8 @@ export function UtilityBillForm() {
   const [paidOn, setPaidOn] = useState(todayISO());
   const [dueDate, setDueDate] = useState("");
   const [notes, setNotes] = useState("");
+  const [payRef, setPayRef] = useState("");
+  const [hadRef, setHadRef] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [currentPath, setCurrentPath] = useState<string | null>(null);
@@ -74,7 +76,7 @@ export function UtilityBillForm() {
     const emailDue = b.source === "email" && !b.paid_on;
     if (b.source === "email") setFromEmail({ check: !!b.needs_check });
     setPaid(emailDue ? true : !!b.paid_on); setPaidOn(b.paid_on ?? todayISO());
-    setDueDate(b.due_date ?? ""); setNotes(b.notes ?? ""); setCurrentPath(b.receipt_path ?? null);
+    setDueDate(b.due_date ?? ""); setNotes(b.notes ?? ""); setPayRef(b.payment_ref ?? ""); setHadRef(!!b.payment_ref); setCurrentPath(b.receipt_path ?? null);
     if (Number(b.exchange_rate) > 0) setSavedRate({ currency: b.currency, rate: Number(b.exchange_rate) });
   }, [editId, rows, loadedEdit]);
   // The company you used last for this utility is filled in until you type your own
@@ -112,6 +114,8 @@ export function UtilityBillForm() {
       const row = {
         kind, provider: provider.trim() || null, bill_month: month, amount: amt, currency, exchange_rate: rateNum, amount_usd: toUsd(amt, rateNum),
         paid_on: paid ? paidOn || todayISO() : null, due_date: !paid && dueDate ? dueDate : null, notes: notes.trim() || null,
+        // only sent when there is a reference (or one is being cleared), so a database without the new column keeps working
+        ...(paid && cleanRef(payRef) ? { payment_ref: cleanRef(payRef) } : hadRef ? { payment_ref: paid ? cleanRef(payRef) : null } : {}),
         ...(fromEmail ? { needs_check: false } : {}),
       };
       const waiting = (await browserOutbox.list().catch(() => [])).find((i) => i.id === editId) ?? null;
@@ -181,7 +185,8 @@ export function UtilityBillForm() {
             <button type="button" aria-pressed={!paid} onClick={() => setPaid(false)} className={chip(!paid)}>Not paid yet</button>
           </div>
           {paid ? (
-            <div className="mt-2"><label htmlFor="ub-paidon" className="mb-1 block text-xs text-muted-foreground">Paid on <span>(the month it counts in)</span></label><Input id="ub-paidon" type="date" value={paidOn} max={todayISO()} onChange={(e) => setPaidOn(e.target.value)} className="h-12" /></div>
+            <div className="mt-2"><label htmlFor="ub-paidon" className="mb-1 block text-xs text-muted-foreground">Paid on <span>(the month it counts in)</span></label><Input id="ub-paidon" type="date" value={paidOn} max={todayISO()} onChange={(e) => setPaidOn(e.target.value)} className="h-12" />
+              <label htmlFor="ub-ref" className="mb-1 mt-3 block text-xs text-muted-foreground">Payment reference <span>(optional, from your online payment)</span></label><Input id="ub-ref" value={payRef} onChange={(e) => setPayRef(e.target.value)} maxLength={80} autoComplete="off" className="h-12" /></div>
           ) : (
             <div className="mt-2"><label htmlFor="ub-due" className="mb-1 block text-xs text-muted-foreground">Due date <span>(optional)</span></label><Input id="ub-due" type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} className="h-12" /></div>
           )}

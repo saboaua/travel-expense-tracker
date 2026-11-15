@@ -151,3 +151,5 @@ textarea,
 .tone-ink { color: var(--tone); }
 .dark .tone-tile { background: color-mix(in srgb, var(--tone-dk) 22%, transparent); color: var(--tone-dk); }
 .dark .tone-ink { color: var(--tone-dk); }
+.tone-bg { background: var(--tone); }
+.dark .tone-bg { background: var(--tone-dk); }

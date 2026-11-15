@@ -2082,6 +2082,48 @@ try {
     }
   });
 
+  await test("utilities: a late bill is paid from a sheet with a payment reference, which shows on the paid bill, and the page shows the trend and the split", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const day = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
+      const thisMonth = new Date(); thisMonth.setUTCDate(1);
+      const lastMonth = new Date(thisMonth); lastMonth.setUTCMonth(lastMonth.getUTCMonth() - 1);
+      const base = { user_id: PAT, currency: "AWG", exchange_rate: 0.558659, receipt_path: null, notes: null, created_at: new Date().toISOString() };
+      fake.table("utility_bills").push({ ...base, id: "7b000000-0000-4000-8000-00000000c001", kind: "phone", provider: "Setar", bill_month: lastMonth.toISOString().slice(0, 10), amount: 120.96, amount_usd: 67.57, paid_on: null, due_date: day(-6) });
+      fake.table("utility_bills").push({ ...base, id: "7b000000-0000-4000-8000-00000000c002", kind: "water", provider: "WEB Aruba", bill_month: lastMonth.toISOString().slice(0, 10), amount: 82.9, amount_usd: 46.31, paid_on: day(0) , due_date: null });
+      await page.goto(`${BASE}/personal/utilities`);
+      await page.getByTestId("util-due").first().waitFor();
+      assert(/6 days late/.test(await page.getByTestId("util-late").textContent()), "a bill past its due date says how many days late, in words");
+      assert(await page.getByTestId("util-trend").isVisible() && await page.getByTestId("util-split").isVisible(), "the trend bars and the split by utility are shown");
+      assert(/Water/.test(await page.getByTestId("util-split").textContent()), "the split names the utility");
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/util-live1.png", fullPage: true });
+      await page.getByTestId("util-pay").first().click();
+      await page.getByTestId("mark-paid").waitFor();
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/util-live2.png" });
+      assert(await page.locator("#mp-amount").inputValue() === "120.96", "the sheet starts with the bill's amount");
+      await page.locator("#mp-ref").fill("  SET-48210937 ");
+      await page.getByTestId("mark-paid-save").click();
+      await page.waitForFunction(() => !document.querySelector("[data-testid=mark-paid]"));
+      const saved = fake.table("utility_bills").find((r) => r.id.endsWith("c001"));
+      assert(saved && saved.paid_on === day(0) && saved.payment_ref === "SET-48210937" && saved.due_date == null, "the bill is paid today with the reference tidied: " + JSON.stringify(saved));
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=util-row]").length === 2);
+      assert(/Ref SET-48210937/.test(await page.getByTestId("util-ref").first().textContent()), "the paid bill shows its reference");
+      assert(await page.getByTestId("util-due").count() === 0, "nothing is left in Due");
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/util-live3.png", fullPage: true });
+      // the full form carries the reference too
+      await page.goto(`${BASE}/personal/utilities/add?id=7b000000-0000-4000-8000-00000000c001`);
+      await page.waitForFunction(() => document.querySelector("#ub-ref")?.value === "SET-48210937");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      for (const t of ["utility_bills", "utility_prefs"]) fake.table(t).splice(0);
+    }
+  });
+
   await test("bill emails: your Gmail script and key are shown, a sender is allowed, the script's calls are checked, and an emailed bill waits in the Due list marked from email", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);

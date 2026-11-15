@@ -20,6 +20,8 @@ export type BillRow = {
   paid_on?: string | null; due_date?: string | null; receipt_path?: string | null; notes?: string | null; waiting?: boolean;
   /** "email" when the bill came in by forwarded email; needs_check when its month was guessed or its amount was missing */
   source?: string | null; needs_check?: boolean | null;
+  /** The number from your online payment confirmation, when you typed one */
+  payment_ref?: string | null;
 };
 
 const num = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
@@ -117,3 +119,42 @@ export function dueState(bill: BillRow, today: string): "late" | "soon" | null {
 
 /** A USD amount in florins (AWG, shown as Afl.), at the fixed peg of 1.79 florins to the dollar. */
 export const toAwg = (usd: number) => Math.round((Number(usd) || 0) * AWG_PER_USD * 100) / 100;
+
+/** A payment reference as saved: spaces trimmed and collapsed, at most 80 characters, empty means none. */
+export function cleanRef(v: string | null | undefined): string | null {
+  const t = (v ?? "").replace(/\s+/g, " ").trim().slice(0, 80);
+  return t || null;
+}
+
+/** The last `n` months ending at `month` with what was paid in each (in USD, like the rest), oldest first. */
+export function trend(rows: BillRow[], month: string, n = 4): { month: string; usd: number }[] {
+  return Array.from({ length: n }, (_, i) => {
+    const m = shiftMonth(month, i - (n - 1));
+    return { month: m, usd: totalUsd(paidIn(rows, m)) };
+  });
+}
+
+/** What was paid in a month split by utility, biggest first, with whole-number shares that add up to 100. */
+export function splitByKind(paid: BillRow[]): { kind: string; usd: number; pct: number }[] {
+  const by = new Map<string, number>();
+  for (const b of paid) by.set(b.kind, (by.get(b.kind) ?? 0) + num(b.amount_usd));
+  const sum = [...by.values()].reduce((s, v) => s + v, 0);
+  const list = [...by.entries()].map(([kind, usd]) => ({ kind, usd: r2(usd), pct: sum > 0 ? Math.floor((usd / sum) * 100) : 0 })).sort((a, b) => b.usd - a.usd);
+  if (sum > 0 && list.length) list[0].pct += 100 - list.reduce((s, x) => s + x.pct, 0);
+  return list;
+}
+
+/** How a bill that is not paid yet stands: "6 days late", "Due in 24 days", "Due today", or no due date at all. */
+export function dueLabel(bill: { due_date?: string | null }, today: string): { text: string; state: "late" | "soon" | "later" | "none" } {
+  if (!bill.due_date) return { text: "No due date", state: "none" };
+  const d = Math.round((Date.parse(bill.due_date) - Date.parse(today)) / 86400000);
+  if (d < 0) return { text: `${-d} ${-d === 1 ? "day" : "days"} late`, state: "late" };
+  if (d === 0) return { text: "Due today", state: "soon" };
+  if (d === 1) return { text: "Due tomorrow", state: "soon" };
+  return { text: `Due in ${d} days`, state: d <= 7 ? "soon" : "later" };
+}
+
+/** This month against last month as a whole percent; null when nothing was paid last month. */
+export function percentChange(total: number, previous: number): number | null {
+  return previous > 0 ? Math.round(((total - previous) / previous) * 100) : null;
+}

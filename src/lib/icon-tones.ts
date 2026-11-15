@@ -38,6 +38,13 @@ export const ICON_TONES = {
   shop: ["#2563eb", "#60a5fa"],
   reports: ["#4f46e5", "#818cf8"],
   profile: ["#0284c7", "#38bdf8"],
+  water: ["#0891b2", "#22d3ee"],
+  electricity: ["#d97706", "#fbbf24"],
+  phone: ["#4f46e5", "#818cf8"],
+  internet: ["#0284c7", "#38bdf8"],
+  septic: ["#92400e", "#d6a06b"],
+  trash: ["#64748b", "#94a3b8"],
+  otherBill: ["#475569", "#94a3b8"],
 } as const satisfies Record<string, readonly [string, string]>;
 
 export type IconTone = keyof typeof ICON_TONES;

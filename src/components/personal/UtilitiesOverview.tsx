@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
+import { ArrowLeft, BellRing, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
-import { dueBills, dueState, kindLabel, monthChange, monthLabel, monthStart, paidIn, shiftMonth } from "@/lib/personal/utilities";
+import { dueBills, dueLabel, kindLabel, monthChange, monthLabel, monthStart, paidIn, percentChange, shiftMonth, splitByKind, trend, type BillRow } from "@/lib/personal/utilities";
+import { EmailChip, LateChip, MissingChip, PaidChip, RefChip, SoonChip, SplitBar, TrendBars, UtilityIcon } from "@/components/personal/utility-ui";
+import { MarkPaidSheet } from "@/components/personal/MarkPaidSheet";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { toAwg } from "@/lib/personal/utilities";
 
@@ -15,7 +17,8 @@ import { toAwg } from "@/lib/personal/utilities";
 export function UtilitiesOverview() {
   const today = todayISO();
   const [month, setMonth] = useState(monthStart(today));
-  const { rows, error } = useUtilityBills();
+  const { rows, error, reload } = useUtilityBills();
+  const [paying, setPaying] = useState<BillRow | null>(null);
   const [day, setDay] = useState<string>("");
   const [askDay, setAskDay] = useState(false);
   const [saved, setSaved] = useState<string | null>(null);
@@ -30,8 +33,16 @@ export function UtilitiesOverview() {
   const all = rows ?? [];
   const paid = useMemo(() => paidIn(all, month), [all, month]);
   const due = useMemo(() => dueBills(all), [all]);
-  const { total, change } = useMemo(() => monthChange(all, month), [all, month]);
+  const { total } = useMemo(() => monthChange(all, month), [all, month]);
   const isNow = month === monthStart(today);
+  const months = useMemo(() => trend(all, month, 4), [all, month]);
+  const split = useMemo(() => splitByKind(paid), [paid]);
+  const pct = percentChange(total, monthChange(all, shiftMonth(month, -1)).total);
+  const awg = (usd: number) => formatCurrency(toAwg(usd), "AWG");
+  const mName = monthLabel(month).split(" ")[0];
+  const prevName = monthLabel(shiftMonth(month, -1)).split(" ")[0];
+  const forMonth = (b: BillRow) => `for ${monthLabel(b.bill_month).split(" ")[0]}${b.bill_month.slice(0, 4) !== month.slice(0, 4) ? ` ${b.bill_month.slice(0, 4)}` : ""}`;
+  const lateCount = due.filter((b) => dueLabel(b, today).state === "late").length;
 
   const saveDay = async (value: string) => {
     setDay(value); setSaved(null);
@@ -42,91 +53,132 @@ export function UtilitiesOverview() {
     setSaved(e ? "Could not save the day. Check your connection." : value ? `We will remind you on day ${value} of each month.` : "Reminder turned off.");
   };
 
+  const card = "rounded-2xl border bg-card";
+  const secLabel = "text-xs font-bold uppercase tracking-wider text-muted-foreground";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
+    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-6xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="text-[26px] font-bold leading-tight">Utilities</h1>
-      <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself. Money counts in the month you paid it; each bill says which month it is for.</p>
+      <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself or send it from email. Money counts in the month you paid it; each bill says which month it is for.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 
-      <div className="lg:grid lg:grid-cols-2 lg:items-center lg:gap-4">
-      <div className="mt-4 flex items-center justify-between rounded-2xl border bg-card px-2 lg:mt-3">
+      <div className={`mt-4 flex items-center justify-between px-2 lg:max-w-md ${card}`}>
         <button type="button" onClick={() => setMonth(shiftMonth(month, -1))} aria-label="Previous month" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><ChevronLeft className="h-5 w-5" aria-hidden="true" /></button>
         <span className="text-[15px] font-bold" data-testid="util-month">{monthLabel(month)}</span>
         <button type="button" onClick={() => setMonth(shiftMonth(month, 1))} disabled={isNow} aria-label="Next month" className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
       </div>
 
-      <div className="mt-3 rounded-2xl border bg-card p-4 lg:mt-3">
-        <p className="text-[28px] font-bold tabular-nums leading-none" data-testid="util-total">{formatCurrency(toAwg(total), "AWG")} <span className="text-sm font-semibold text-muted-foreground">in {monthLabel(month).split(" ")[0]}</span></p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {change == null ? "Shown in florins (AWG, the same as Afl.). Other currencies are converted." : change === 0 ? "The same as last month." : `${formatCurrency(toAwg(Math.abs(change)), "AWG")} ${change > 0 ? "more" : "less"} than last month.`}
-        </p>
-      </div>
-
-      </div>
-      <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Paid in {monthLabel(month).split(" ")[0]}</h2>
-      <div className="mt-2 rounded-2xl border bg-card px-4 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-list">
-        {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : paid.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground lg:rounded-2xl lg:border lg:bg-card lg:px-4">{all.length === 0 ? "No bills yet. Tap Add bill to start with water or electricity." : `Nothing paid in ${monthLabel(month).split(" ")[0]}.`}</p>
-        ) : (
-          <ul className="divide-y lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0">
-            {paid.map((b) => (
-              <li key={b.id} data-testid="util-row" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
-                <Link href={`/personal/utilities/history?kind=${b.kind}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-semibold">{kindLabel(b.kind)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
-                    <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]}{b.bill_month.slice(0, 4) !== month.slice(0, 4) ? ` ${b.bill_month.slice(0, 4)}` : ""} · paid {b.paid_on ? formatDate(b.paid_on) : ""}{b.waiting ? " · waiting to send" : ""}</span>
-                  </span>
-                  <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {due.length > 0 && (
-        <>
-          <h2 className="mt-5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Due, not paid yet</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground">These count in your total and budget when you pay them.</p>
-          <ul className="mt-2 divide-y rounded-2xl border bg-card px-4 lg:grid lg:grid-cols-3 lg:gap-3 lg:divide-y-0 lg:border-0 lg:bg-transparent lg:px-0" data-testid="util-due-list">
-            {due.map((b) => {
-              const st = dueState(b, today);
-              return (
-                <li key={b.id} data-testid="util-due" className="lg:rounded-2xl lg:border lg:bg-card lg:px-4">
-                  <Link href={`/personal/utilities/add?id=${b.id}`} className="flex min-h-14 items-center gap-3 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-[15px] font-semibold">{kindLabel(b.kind)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
-                      <span className="block text-[13px] text-muted-foreground">for {monthLabel(b.bill_month).split(" ")[0]}{b.needs_check && b.source === "email" && Number(b.amount) > 0 ? " (check)" : ""} · {b.due_date ? `due ${formatDate(b.due_date)}${st === "late" ? " · late" : ""}` : "no due date"}{b.waiting ? " · waiting to send" : ""}</span>
-                      {b.source === "email" && <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-semibold text-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="util-from-email"><Mail className="h-3 w-3" aria-hidden="true" />From email</span>}
-                    </span>
-                    {Number(b.amount) > 0 ? <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span> : <span className="text-[13px] font-bold text-amber-800 dark:text-amber-200" data-testid="util-amount-missing">Amount missing</span>}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </>
-      )}
-
-      <Link href="/personal/utilities/add" className="mt-4 inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground lg:w-64 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
-
-      <Link href="/personal/utilities/emails" className="mt-2 inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-emails-link"><Mail className="h-4 w-4" aria-hidden="true" />Add bills from email</Link>
-
-      <div className="mt-2">
-        <button type="button" onClick={() => setAskDay((v) => !v)} aria-expanded={askDay} className="inline-flex min-h-11 items-center text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-remind">{day ? `Reminder: day ${day} of the month` : "Remind me to add bills"}</button>
-        {askDay && (
-          <div className="mt-1 rounded-2xl border bg-card p-4">
-            <label htmlFor="util-day" className="mb-1.5 block text-[13px] font-bold text-foreground/80">Remind me on day</label>
-            <Select id="util-day" value={day} onChange={(e) => saveDay(e.target.value)}>
-              <option value="">No reminder</option>
-              {Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}
-            </Select>
-            <p className="mt-2 text-xs text-muted-foreground">You get a phone alert that day if a utility you usually pay has no bill yet. Needs phone alerts turned on, with Payment reminders on.</p>
-            {saved && <p className="mt-2 text-xs font-semibold" role="status" data-testid="util-remind-saved">{saved}</p>}
+      <div className="mt-3 flex flex-col gap-3 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-6">
+        {/* Summary: first on a phone, on the right of the lists on a desktop */}
+        <aside className="order-1 space-y-3 lg:order-2" aria-label="This month">
+          <div className={`${card} p-4`}>
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className={secLabel}>Paid in {mName}</p>
+                <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-none tabular-nums" data-testid="util-total">{awg(total)}</p>
+                {pct != null && (
+                  <p className="mt-2"><span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-bold" data-testid="util-change">{pct === 0 ? `Same as ${prevName}` : `${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${prevName}`}</span></p>
+                )}
+              </div>
+              <div className="w-32 shrink-0"><TrendBars data={months} fmt={awg} /></div>
+            </div>
+            <p className="mt-3 text-xs text-muted-foreground">Florins (AWG, the same as Afl.). Other currencies are converted.</p>
           </div>
-        )}
+          {split.length > 0 && (
+            <div className={`${card} p-4`}>
+              <div className="mb-2.5 flex justify-between text-[13px]"><span className="font-bold">Where it went</span><span className="text-muted-foreground">{paid.length} {paid.length === 1 ? "bill" : "bills"}</span></div>
+              <SplitBar parts={split} label={kindLabel} />
+            </div>
+          )}
+        </aside>
+
+        <div className="order-2 min-w-0 space-y-3 lg:order-1">
+          <div className="flex gap-2.5">
+            <Link href="/personal/utilities/add" className="inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
+            <Link href="/personal/utilities/emails" className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-emails-link"><Mail className="h-4 w-4" aria-hidden="true" />From email</Link>
+          </div>
+
+          {due.length > 0 && (
+            <section aria-labelledby="util-due-h">
+              <div className="mt-2 flex items-end justify-between gap-2">
+                <div><h2 id="util-due-h" className={secLabel}>Due and upcoming</h2><p className="mt-0.5 text-xs text-muted-foreground">These count in your total and budget once you pay them.</p></div>
+                {lateCount > 0 && <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-[11.5px] font-bold text-red-800 dark:bg-red-950 dark:text-red-200">{lateCount} late</span>}
+              </div>
+              <ul className={`mt-2 divide-y px-4 ${card}`} data-testid="util-due-list">
+                {due.map((b) => {
+                  const dl = dueLabel(b, today);
+                  const known = Number(b.amount) > 0;
+                  return (
+                    <li key={b.id} data-testid="util-due" className="flex items-center gap-3 py-3">
+                      <Link href={`/personal/utilities/add?id=${b.id}`} className="flex min-w-0 flex-1 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                        <UtilityIcon kind={b.kind} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-bold">{kindLabel(b.kind)}{b.provider ? <span className="font-medium text-muted-foreground"> · {b.provider}</span> : null}</span>
+                          <span className="block text-[12.5px] text-muted-foreground">{forMonth(b)}{b.needs_check && b.source === "email" && known ? " (check)" : ""}{b.due_date ? ` · due ${formatDate(b.due_date)}` : " · no due date"}{b.waiting ? " · waiting to send" : ""}</span>
+                          <span className="mt-1 flex flex-wrap gap-1.5">
+                            {dl.state === "late" ? <LateChip text={dl.text} /> : dl.state !== "none" ? <SoonChip text={dl.text} /> : null}
+                            {!known && <span data-testid="util-amount-missing"><MissingChip /></span>}
+                            {b.source === "email" && <EmailChip />}
+                          </span>
+                        </span>
+                      </Link>
+                      <div className="flex shrink-0 flex-col items-end gap-1.5">
+                        {known && <span className={`text-[15px] font-bold tabular-nums ${dl.state === "late" ? "text-red-700 dark:text-red-300" : ""}`}>{formatCurrency(Number(b.amount), b.currency)}</span>}
+                        {known ? (
+                          <button type="button" onClick={() => setPaying(b)} data-testid="util-pay" className={`inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${dl.state === "late" || dl.state === "soon" ? "bg-primary text-primary-foreground" : "border bg-card"}`}>{dl.state === "late" || dl.state === "soon" ? "Mark paid" : "Review"}</button>
+                        ) : (
+                          <Link href={`/personal/utilities/add?id=${b.id}`} className="inline-flex min-h-10 items-center rounded-xl border bg-card px-3.5 text-sm font-bold">Add amount</Link>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )}
+
+          <section aria-labelledby="util-paid-h">
+            <div className="mt-2 flex items-baseline justify-between"><h2 id="util-paid-h" className={secLabel}>Paid in {mName}</h2>{paid.length > 0 && <span className="text-[13px] font-bold tabular-nums">{awg(total)}</span>}</div>
+            <div className={`mt-2 px-4 ${card}`} data-testid="util-list">
+              {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : paid.length === 0 ? (
+                <p className="py-4 text-sm text-muted-foreground">{all.length === 0 ? "No bills yet. Tap Add bill to start with water or electricity." : `Nothing paid in ${mName}.`}</p>
+              ) : (
+                <ul className="divide-y">
+                  {paid.map((b) => (
+                    <li key={b.id} data-testid="util-row">
+                      <Link href={`/personal/utilities/history?kind=${b.kind}`} className="flex min-h-14 items-center gap-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                        <UtilityIcon kind={b.kind} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[15px] font-bold">{kindLabel(b.kind)}{b.provider ? <span className="font-medium text-muted-foreground"> · {b.provider}</span> : null}</span>
+                          <span className="block text-[12.5px] text-muted-foreground">{forMonth(b)} · paid {b.paid_on ? formatDate(b.paid_on) : ""}{b.waiting ? " · waiting to send" : ""}</span>
+                          <span className="mt-1 flex flex-wrap gap-1.5"><PaidChip />{b.payment_ref && <RefChip value={b.payment_ref} />}</span>
+                        </span>
+                        <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+
+          <div className="pt-1">
+            <button type="button" onClick={() => setAskDay((v) => !v)} aria-expanded={askDay} className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-remind"><BellRing className="h-[18px] w-[18px]" aria-hidden="true" />{day ? `Reminder: day ${day} of the month` : "Remind me to add bills"}</button>
+            {askDay && (
+              <div className={`mt-1 p-4 ${card}`}>
+                <label htmlFor="util-day" className="mb-1.5 block text-[13px] font-bold text-foreground/80">Remind me on day</label>
+                <Select id="util-day" value={day} onChange={(e) => saveDay(e.target.value)}>
+                  <option value="">No reminder</option>
+                  {Array.from({ length: 28 }, (_, i) => <option key={i + 1} value={String(i + 1)}>{i + 1}</option>)}
+                </Select>
+                <p className="mt-2 text-xs text-muted-foreground">You get a phone alert that day if a utility you usually pay has no bill yet. Needs phone alerts turned on, with Payment reminders on.</p>
+                {saved && <p className="mt-2 text-xs font-semibold" role="status" data-testid="util-remind-saved">{saved}</p>}
+              </div>
+            )}
+          </div>
+        </div>
       </div>
+      {paying && <MarkPaidSheet bill={paying} onClose={() => setPaying(null)} onSaved={() => { setPaying(null); reload(); }} />}
     </div>
   );
 }

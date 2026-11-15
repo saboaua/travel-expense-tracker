@@ -77,7 +77,7 @@ export function UtilityHistory() {
               <li key={b.id} className="flex min-h-14 items-center gap-2 py-2" data-testid="util-bill">
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-semibold">{monthLabel(b.bill_month)}{b.provider ? <span className="font-normal text-muted-foreground"> · {b.provider}</span> : null}</span>
-                  <span className="block text-[13px] text-muted-foreground">{b.paid_on ? `Paid ${formatDate(b.paid_on)}` : b.due_date ? `Not paid yet · due ${formatDate(b.due_date)}` : "Not paid yet"}{b.notes ? ` · ${b.notes}` : ""}{b.waiting ? " · waiting to send" : ""}</span>
+                  <span className="block text-[13px] text-muted-foreground">{b.paid_on ? `Paid ${formatDate(b.paid_on)}` : b.due_date ? `Not paid yet · due ${formatDate(b.due_date)}` : "Not paid yet"}{b.payment_ref ? ` · Ref ${b.payment_ref}` : ""}{b.notes ? ` · ${b.notes}` : ""}{b.waiting ? " · waiting to send" : ""}</span>
                 </span>
                 {b.receipt_path && <button type="button" onClick={() => openPhoto(b.receipt_path!)} aria-label="Open the photo of this bill" className="flex h-11 w-11 items-center justify-center rounded-lg text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-blue-300 dark:hover:bg-blue-950"><ImageIcon className="h-4 w-4" aria-hidden="true" /></button>}
                 <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
