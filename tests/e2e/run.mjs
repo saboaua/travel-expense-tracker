@@ -3267,7 +3267,7 @@ try {
     await admin.page.getByText("Uber \u00b7 *.*5 USD").waitFor();
     assert((await admin.page.getByText("5.45").count()) === 0, "the real amount must not be on the page");
     const raw = await admin.page.evaluate(async () => (await fetch("/api/admin/security")).text());
-    assert(!raw.includes("5.45") && raw.includes("*.*5"), "the real amount must not even be sent to the browser");
+    assert(!raw.includes("5.45") && raw.includes("*.*5"), "the real amount must not even be sent to the browser: " + JSON.stringify({ has545: raw.includes("5.45"), masked: raw.includes("*.*5"), around: raw.includes("5.45") ? raw.slice(Math.max(0, raw.indexOf("5.45") - 200), raw.indexOf("5.45") + 60) : "", rows: fake.table("audit_logs").length }));
   });
 
   await test("support AI: a new request gets a saved summary, a failed one can be retried, and an old one can be summarized", async () => {
