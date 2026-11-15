@@ -1,6 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CalendarPlus, ExternalLink, Plus, TrendingUp, Upload, X, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -140,7 +141,7 @@ export function SubscriptionsView() {
           <section className="rounded-2xl bg-primary p-5 text-primary-foreground">
             <p className="text-sm opacity-85">You spend per month</p>
             <p className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <span className="text-4xl font-bold tracking-tight">{formatCurrency(monthly, headCurrency)}</span>
+              <span className="text-4xl font-bold tracking-tight"><Money amount={monthly} currency={headCurrency} /></span>
               <span className="text-sm opacity-85">{formatCurrency(Math.round(monthly * 12), headCurrency)} a year</span>
             </p>
             <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
@@ -187,7 +188,7 @@ export function SubscriptionsView() {
                     <span className="block text-sm text-muted-foreground">{whenText(daysUntil(s, today))} · {cycleLabel(s.cycle).toLowerCase()}{s.split_count > 1 ? ` · split ${s.split_count} ways` : ""}</span>
                     <RenewalBar s={s} today={today} />
                   </span>
-                  <span className="text-right text-sm font-semibold">{formatCurrency(myShare(s), s.currency)}{s.split_count > 1 && <span className="block text-xs font-normal text-muted-foreground">of {formatCurrency(s.price, s.currency)}</span>}</span>
+                  <span className="text-right text-sm font-semibold"><Money amount={myShare(s)} currency={s.currency} />{s.split_count > 1 && <span className="block text-xs font-normal text-muted-foreground">of {formatCurrency(s.price, s.currency)}</span>}</span>
                 </button>
               ))}
             </Card>
@@ -214,7 +215,7 @@ export function SubscriptionsView() {
                     <span className="block text-sm text-muted-foreground">{cycleLabel(s.cycle)} · next {formatDate(nextDue(s, today))}</span>
                     <RenewalBar s={s} today={today} />
                   </span>
-                  <span className="text-sm font-semibold">{formatCurrency(myShare(s), s.currency)}</span>
+                  <span className="text-sm font-semibold"><Money amount={myShare(s)} currency={s.currency} /></span>
                 </button>
               ))}
             </Card>
@@ -264,7 +265,7 @@ export function SubscriptionsView() {
             {editingSub && editingSub.price_history.length > 1 && (
               <div className="rounded-xl border p-3 text-sm">
                 <p className="mb-1 font-semibold">Price history</p>
-                {[...editingSub.price_history].reverse().map((h) => <p key={h.at} className="flex justify-between text-muted-foreground"><span>{h.at}</span><span>{formatCurrency(h.price, editingSub.currency)}</span></p>)}
+                {[...editingSub.price_history].reverse().map((h) => <p key={h.at} className="flex justify-between text-muted-foreground"><span>{h.at}</span><span><Money amount={h.price} currency={editingSub.currency} /></span></p>)}
               </div>
             )}
             {editingSub && (

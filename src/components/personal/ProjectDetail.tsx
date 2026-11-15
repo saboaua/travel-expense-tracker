@@ -1,6 +1,7 @@
 "use client";
 
 import { BackLink } from "@/components/ui/page-header";
+import { Money } from "@/components/ui/money";
 import { ShareWith } from "@/components/sharing/ShareWith";
 import { useConfirm } from "@/components/ui/confirm";
 import { useMemo, useState } from "react";
@@ -134,12 +135,12 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       {kind === "personal_trip" && <ShareWith kind="personal_trip" itemId={id} />}
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <Card><CardHeader className="pb-2"><CardDescription>Total spent</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{formatCurrency(totalUsd, "USD")}</p><p className="text-xs text-muted-foreground">{items.length} expense{items.length !== 1 ? "s" : ""}</p></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardDescription>Total spent</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold"><Money amount={totalUsd} currency="USD" /></p><p className="text-xs text-muted-foreground">{items.length} expense{items.length !== 1 ? "s" : ""}</p></CardContent></Card>
         {budget != null ? (
           <Card>
             <CardHeader className="pb-2"><CardDescription>Budget</CardDescription></CardHeader>
             <CardContent>
-              <p className="text-3xl font-bold">{formatCurrency(budget, project.currency)}</p>
+              <p className="text-3xl font-bold"><Money amount={budget} currency={project.currency} /></p>
               {pctUsed != null && spentInBudget != null ? (
                 <>
                   <div className="mt-2 h-1.5 rounded-full bg-muted"><div className={`h-1.5 rounded-full ${pctUsed >= 100 ? "bg-red-500" : pctUsed >= 80 ? "bg-amber-500" : "bg-primary"}`} style={{ width: `${Math.min(pctUsed, 100)}%` }} /></div>
@@ -191,8 +192,8 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
                   <p className="text-xs text-muted-foreground">{formatDate(e.expense_date)} · {e.category}{fromSpend ? " · Quick spend" : ""}{e.receipt_path ? (fromSpend ? " · invoice" : " · receipt") : ""}{waiting.has(e.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p>
                 </div>
                 <div className="shrink-0 text-right">
-                  <p className="font-semibold">{formatCurrency(e.amount_usd, "USD")}</p>
-                  {e.currency !== "USD" && <p className="text-xs text-muted-foreground">{formatCurrency(e.amount, e.currency)}</p>}
+                  <p className="font-semibold"><Money amount={e.amount_usd} currency="USD" /></p>
+                  {e.currency !== "USD" && <p className="text-xs text-muted-foreground"><Money amount={e.amount} currency={e.currency} /></p>}
                 </div>
               </Row>
               );

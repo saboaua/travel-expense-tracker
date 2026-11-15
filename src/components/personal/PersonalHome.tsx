@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Money } from "@/components/ui/money";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { Coins, CreditCard, Hammer, Landmark, Plus, Repeat } from "lucide-react";
@@ -81,9 +82,9 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
         <>
           <div>
             {usd != null ? (
-              <p className="text-2xl font-bold tabular-nums">{formatCurrency(usd, "USD")}<span className="text-sm font-medium text-muted-foreground"> / month (USD)</span></p>
+              <p className="text-2xl font-bold tabular-nums"><Money amount={usd} currency="USD" /><span className="text-sm font-medium text-muted-foreground"> / month (USD)</span></p>
             ) : (
-              totals.map((t) => <p key={t.currency} className="text-xl font-bold tabular-nums">{formatCurrency(t.monthly, t.currency)}<span className="text-sm font-medium text-muted-foreground"> / month</span></p>)
+              totals.map((t) => <p key={t.currency} className="text-xl font-bold tabular-nums"><Money amount={t.monthly} currency={t.currency} /><span className="text-sm font-medium text-muted-foreground"> / month</span></p>)
             )}
             <p className="text-xs text-muted-foreground">{subs.length === 1 ? "1 active subscription" : `${subs.length} active subscriptions`}</p>
           </div>

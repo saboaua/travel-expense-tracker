@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Money } from "@/components/ui/money";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { ArrowLeft, ChevronDown, ChevronUp, Crosshair, ExternalLink, Info, MapPin, Minus, Plus, Search, ShoppingBasket, Trash2 } from "lucide-react";
@@ -319,7 +320,7 @@ export function BestStore() {
                               {b.old > 0 && <span className={`${chip} bg-muted`}>{b.old} old price{b.old === 1 ? "" : "s"}</span>}
                             </span>
                           </span>
-                          <span className="shrink-0 text-right"><span className="block text-lg font-bold tabular-nums">{fmt(b.total)}</span><span className="block text-xs text-muted-foreground">{best && worst > b.total ? `Saves ${fmt(worst - b.total)}` : b.extra > 0 ? `+${fmt(b.extra)}` : ""}</span></span>
+                          <span className="shrink-0 text-right"><span className="block text-lg font-bold tabular-nums"><Money amount={b.total} currency={currency} /></span><span className="block text-xs text-muted-foreground">{best && worst > b.total ? `Saves ${fmt(worst - b.total)}` : b.extra > 0 ? `+${fmt(b.extra)}` : ""}</span></span>
                           {open === b.store ? <ChevronUp className="h-4 w-4 shrink-0" aria-hidden="true" /> : <ChevronDown className="h-4 w-4 shrink-0" aria-hidden="true" />}
                         </button>
                         {open === b.store && (

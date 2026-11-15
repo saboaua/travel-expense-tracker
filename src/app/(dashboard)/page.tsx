@@ -1,4 +1,5 @@
 import { FlightLine } from "@/components/flights/FlightLine";
+import { Money } from "@/components/ui/money";
 import { flightLine, nextFlight, type TripFlight } from "@/lib/flights";
 import { FeaturedTripCard } from "@/components/dashboard/FeaturedTripCard";
 import { TripWeather } from "@/components/TripWeather";
@@ -9,7 +10,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Plane, ChevronRight } from "lucide-react";
-import { formatCurrency, formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
+import { formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { buildScanOptions } from "@/lib/scan-destination";
 import { getDestinationInfo } from "@/lib/destination";
@@ -300,7 +301,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                           {lineFor(trip.id) && <div className="mt-0.5"><FlightLine flight={lineFor(trip.id)!} /></div>}
                         </div>
                         <div className="flex shrink-0 items-center gap-2">
-                          <span className="font-semibold tabular-nums">{formatCurrency(tripTotal, "USD")}</span>
+                          <span className="font-semibold tabular-nums"><Money amount={tripTotal} currency="USD" /></span>
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </Link>

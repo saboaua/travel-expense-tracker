@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Money } from "@/components/ui/money";
 import Link from "next/link";
 import { ArrowLeft, ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -271,7 +272,7 @@ export function QuickSpend() {
         <h2 className="flex-1 text-center text-[17px] font-bold" data-testid="month-label">{viewMonth === month ? "This month" : monthLabel(`${viewMonth}-01`)}</h2>
         <button type="button" onClick={() => setViewMonth(shiftMonth(`${viewMonth}-01`, 1).slice(0, 7))} disabled={viewMonth >= month} aria-label="Later month" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent disabled:opacity-30"><ChevronRight className="h-5 w-5" aria-hidden="true" /></button>
       </div>
-      {monthTotal && <p className="mt-1 text-[26px] font-bold tabular-nums tracking-tight" data-testid="month-total">{formatCurrency(monthTotal.total, monthTotal.currency)} <span className="text-sm font-medium text-muted-foreground">in {monthTotal.count} {monthTotal.count === 1 ? "spend" : "spends"}</span></p>}
+      {monthTotal && <p className="mt-1 text-[26px] font-bold tabular-nums tracking-tight" data-testid="month-total"><Money amount={monthTotal.total} currency={monthTotal.currency} /> <span className="text-sm font-medium text-muted-foreground">in {monthTotal.count} {monthTotal.count === 1 ? "spend" : "spends"}</span></p>}
       {houseInMonth && <p className="mt-1 text-xs text-muted-foreground" data-testid="month-house-note">Not included: {formatCurrency(houseInMonth.total, houseInMonth.currency)} of house costs, counted under House &amp; repairs.</p>}
       <div className="mt-2 rounded-2xl border bg-card px-4" data-testid="spend-list">
         {rows === null || shown === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : shown.length === 0 ? (
@@ -285,7 +286,7 @@ export function QuickSpend() {
                   <span className="block truncate text-[15px] font-semibold">{r.merchant || r.category}</span>
                   <span className="block text-[13px] text-muted-foreground">{formatDate(r.expense_date)} · {r.category}{r.waiting ? " · waiting to send" : ""}</span>
                 </span>
-                <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(r.amount), r.currency)}</span>
+                <span className="text-[15px] font-bold tabular-nums"><Money amount={Number(r.amount)} currency={r.currency} /></span>
                 </button>
                 <button type="button" onClick={() => remove(r)} aria-label={`Delete ${r.merchant || r.category}`} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-red-950"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
               </li>

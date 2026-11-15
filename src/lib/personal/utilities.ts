@@ -117,7 +117,7 @@ export function dueState(bill: BillRow, today: string): "late" | "soon" | null {
   return d <= 7 ? "soon" : null;
 }
 
-/** A USD amount in florins (AWG, shown as Afl.), at the fixed peg of 1.79 florins to the dollar. */
+/** A USD amount in florins (AWG), at the fixed peg of 1.79 florins to the dollar. */
 export const toAwg = (usd: number) => Math.round((Number(usd) || 0) * AWG_PER_USD * 100) / 100;
 
 /** A payment reference as saved: spaces trimmed and collapsed, at most 80 characters, empty means none. */

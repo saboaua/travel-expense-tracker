@@ -1,10 +1,11 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { Money } from "@/components/ui/money";
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Archive, Check, Download, MapPin, CalendarDays, Search, ArrowUpRight } from "lucide-react";
-import { formatCurrency, formatDateRange } from "@/lib/utils";
+import { formatDateRange } from "@/lib/utils";
 
 export type TripReportRow = {
   id: string;
@@ -93,7 +94,7 @@ export function TripReportList({ trips, year }: { trips: TripReportRow[]; year: 
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-lg font-bold tabular-nums">{formatCurrency(t.total, "USD")}</p>
+                    <p className="text-lg font-bold tabular-nums"><Money amount={t.total} currency="USD" /></p>
                     <p className="text-xs text-muted-foreground">{t.count} expense{t.count !== 1 ? "s" : ""}</p>
                   </div>
                 </div>

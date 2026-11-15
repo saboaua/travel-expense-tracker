@@ -55,7 +55,7 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
         <div className="flex items-stretch gap-3" aria-hidden="true">
           <div className="flex-1 rounded-2xl border bg-muted/50 p-3 font-mono text-xs leading-7"><b className="block text-center">SUPER FOOD</b>MILK 1L · 3.25<br />CHICKEN · 14.88<br />BREAD · 8.20<br /><b>TOTAL · 26.33</b></div>
           <div className="flex items-center text-xl text-primary">→</div>
-          <div className="flex-1 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-[13px] leading-7 dark:border-blue-900 dark:bg-blue-950"><div><span className="text-muted-foreground">Store</span> <b>Super Food</b></div><div><span className="text-muted-foreground">Items</span> <b>3</b></div><div><span className="text-muted-foreground">Total</span> <b>Afl. 26.33</b></div></div>
+          <div className="flex-1 rounded-2xl border border-blue-200 bg-blue-50 p-3 text-[13px] leading-7 dark:border-blue-900 dark:bg-blue-950"><div><span className="text-muted-foreground">Store</span> <b>Super Food</b></div><div><span className="text-muted-foreground">Items</span> <b>3</b></div><div><span className="text-muted-foreground">Total</span> <b>AWG 26.33</b></div></div>
         </div>
         <Feature icon={<Camera className="h-5 w-5" />} title="Flat and lit" text="Lay the receipt flat and avoid glare." />
         <Feature icon={<Check className="h-5 w-5" />} title="Rows that look off are marked" text="You fix them before anything is saved." />
@@ -68,11 +68,11 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
     return (
       <>
         <div><Pill>Highlight 2 of 3</Pill><div className="mt-2.5"><Title sub="One bar for the month. Groceries, shopping, bills, house and savings fill it in by themselves.">Know where your money goes</Title></div></div>
-        <div className="rounded-[20px] border bg-card p-3.5 shadow-sm" data-testid="tour-budget" role="img" aria-label="Example budget: Afl. 1,240 of 2,000 used, on track">
+        <div className="rounded-[20px] border bg-card p-3.5 shadow-sm" data-testid="tour-budget" role="img" aria-label="Example budget: AWG 1,240 of 2,000 used, on track">
           <div className="flex items-center justify-between"><div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">November budget · example</div><span className="rounded-[10px] bg-green-100 px-2.5 py-1 text-xs font-bold text-green-900 dark:bg-green-950 dark:text-green-200">On track</span></div>
-          <div className="mt-1.5 text-[28px] font-extrabold tabular-nums">Afl. 1,240 <span className="text-[15px] font-semibold text-muted-foreground">of 2,000</span></div>
+          <div className="mt-1.5 text-[28px] font-extrabold tabular-nums"><span className="text-[0.62em] font-bold tracking-wider opacity-65">AWG </span>1,240 <span className="text-[15px] font-semibold text-muted-foreground">of 2,000</span></div>
           <div className="relative mt-2.5"><div className="flex h-3.5 overflow-hidden rounded-full bg-muted"><div style={{ width: "21%", background: "#2563eb" }} /><div style={{ width: "6%", background: "#c026d3" }} /><div style={{ width: "15%", background: "#d97706" }} /><div style={{ width: "9%", background: "#16a34a" }} /><div style={{ width: "11%", background: "#7c3aed" }} /><div style={{ width: "6%", background: "#0d9488" }} /></div><div className="absolute -bottom-1 -top-1 w-0.5 bg-muted-foreground/70" style={{ left: "43%" }} /></div>
-          <div className="mt-2 text-xs text-muted-foreground">Grey tick = where you should be today. Afl. 760 left.</div>
+          <div className="mt-2 text-xs text-muted-foreground">Grey tick = where you should be today. AWG 760 left.</div>
           <div className="mt-2">
             <AreaRow color="#2563eb" icon={<ShoppingCart className="h-[17px] w-[17px]" />} label="Groceries" amount={420} limit={600} />
             <AreaRow color="#c026d3" icon={<ShoppingBag className="h-[17px] w-[17px]" />} label="Shopping" amount={120} limit={200} />
@@ -248,7 +248,7 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
               <Title sub="Used to pick your currency and to tell home receipts from trip receipts.">Where do you live?</Title>
               <div><label htmlFor="tour-country" className="mb-1.5 block text-[13px] font-semibold text-muted-foreground">Country</label><Input id="tour-country" data-autofocus value={country} onChange={(e) => setCountry(e.target.value)} placeholder="Aruba" maxLength={80} autoComplete="country-name" className="h-[50px] text-base" /></div>
               <div><label htmlFor="tour-city" className="mb-1.5 block text-[13px] font-semibold text-muted-foreground">City (optional)</label><Input id="tour-city" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Oranjestad" maxLength={80} autoComplete="address-level2" className="h-[50px] text-base" /></div>
-              {cur && <div className="flex items-start gap-2.5 rounded-[14px] bg-green-50 p-3 text-sm leading-snug text-green-900 dark:bg-green-950 dark:text-green-200" data-testid="tour-currency"><Check className="mt-0.5 h-[18px] w-[18px] shrink-0" aria-hidden="true" /><span>Receipts will start in <b>{cur} (Afl.)</b>. You can still pick another currency on any receipt.</span></div>}
+              {cur && <div className="flex items-start gap-2.5 rounded-[14px] bg-green-50 p-3 text-sm leading-snug text-green-900 dark:bg-green-950 dark:text-green-200" data-testid="tour-currency"><Check className="mt-0.5 h-[18px] w-[18px] shrink-0" aria-hidden="true" /><span>Receipts will start in <b>{cur}</b>. You can still pick another currency on any receipt.</span></div>}
               <button type="button" onClick={() => void findMe()} disabled={locating} className="flex min-h-11 items-center gap-2 text-[15px] font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><MapPin className="h-[18px] w-[18px]" aria-hidden="true" />{locating ? "Finding you..." : "Use my location"}</button>
             </>
           )}

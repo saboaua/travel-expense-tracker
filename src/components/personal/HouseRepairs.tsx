@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon } from "lucide-react";
@@ -11,7 +12,7 @@ import { fetchAll } from "@/lib/personal/fetch-all";
 import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
 import { convert, convertedCount, dominantCurrency, round2 } from "@/lib/personal/money";
 import { AREA_PREFIX, filterHouse, houseSpends, type SpendRow } from "@/lib/personal/quick-spend";
-import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
+import { formatDate, todayISO } from "@/lib/utils";
 
 const pill = (on: boolean) =>
   `inline-flex min-h-10 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
@@ -66,7 +67,7 @@ export function HouseRepairs() {
 
       <div className="lg:col-start-1 lg:row-start-2 lg:sticky lg:top-4">
       <div className="mt-4 rounded-2xl border bg-card p-4">
-        <p className="text-[28px] font-bold tabular-nums leading-none text-blue-700 dark:text-blue-300" data-testid="house-total">{formatCurrency(total, cur)} <span className="text-sm font-semibold text-foreground">spent in {year}</span></p>
+        <p className="text-[28px] font-bold tabular-nums leading-none text-blue-700 dark:text-blue-300" data-testid="house-total"><Money amount={total} currency={cur} /> <span className="text-sm font-semibold text-foreground">spent in {year}</span></p>
         {converted > 0 && <p className="mt-1 text-xs text-muted-foreground" data-testid="house-converted">{converted === 1 ? "One entry is" : `${converted} entries are`} in {cur === "AWG" ? "USD" : "AWG"} and added at the fixed rate, 1 USD = 1.79 AWG.</p>}
       </div>
 
@@ -96,8 +97,8 @@ export function HouseRepairs() {
                   <button type="button" onClick={() => openInvoice(r.receipt_path!)} className="inline-flex min-h-11 items-center gap-1 rounded-full bg-blue-50 px-2.5 text-[13px] font-semibold text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:bg-blue-950 dark:text-blue-200"><ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />Invoice</button>
                 )}
                 <span className="text-right">
-                  <span className="block text-[15px] font-bold tabular-nums">{formatCurrency(inCur(r) ?? Number(r.amount), inCur(r) == null ? r.currency : cur)}</span>
-                  {r.currency !== cur && <span className="block text-xs text-muted-foreground tabular-nums" data-testid="house-original">{formatCurrency(Number(r.amount), r.currency)}</span>}
+                  <span className="block text-[15px] font-bold tabular-nums"><Money amount={inCur(r) ?? Number(r.amount)} currency={inCur(r) == null ? r.currency : cur} /></span>
+                  {r.currency !== cur && <span className="block text-xs text-muted-foreground tabular-nums" data-testid="house-original"><Money amount={Number(r.amount)} currency={r.currency} /></span>}
                 </span>
               </li>
             ))}

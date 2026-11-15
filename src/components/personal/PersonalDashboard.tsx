@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Money } from "@/components/ui/money";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TripWeather } from "@/components/TripWeather";
@@ -423,7 +424,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
                   <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 pr-2 font-medium">Currency</th><th className="py-1 pr-2 text-right font-medium">Original</th><th className="py-1 text-right font-medium">In {BASE_CURRENCY}</th></tr></thead>
                   <tbody>
                     {a.byCurrency.map((c) => (
-                      <tr key={c.currency} className="border-t"><td className="py-2 pr-2">{c.currency}</td><td className="py-2 pr-2 text-right tabular-nums">{formatCurrency(c.original, c.currency)}</td><td className="py-2 text-right font-semibold tabular-nums">{c.awg == null ? "no rate" : money(c.awg)}</td></tr>
+                      <tr key={c.currency} className="border-t"><td className="py-2 pr-2">{c.currency}</td><td className="py-2 pr-2 text-right tabular-nums"><Money amount={c.original} currency={c.currency} /></td><td className="py-2 text-right font-semibold tabular-nums">{c.awg == null ? "no rate" : money(c.awg)}</td></tr>
                     ))}
                     <tr className="border-t-2"><td className="py-2 font-semibold">Total</td><td /><td className="py-2 text-right font-bold tabular-nums">{money(a.total)}</td></tr>
                   </tbody>

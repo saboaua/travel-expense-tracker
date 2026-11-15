@@ -1,6 +1,7 @@
 "use client";
 
 import { BackLink } from "@/components/ui/page-header";
+import { Money } from "@/components/ui/money";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 import { Alert } from "@/components/ui/alert";
 import { useMemo } from "react";
@@ -54,7 +55,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
               {[r.destination, r.start_date ? formatDate(r.start_date) + (r.end_date ? ` – ${formatDate(r.end_date)}` : "") : null].filter(Boolean).join(" · ")}
             </p>
           )}
-          <p className="mt-4 text-2xl font-bold tracking-tight">{formatCurrency(spent, "USD")}</p>
+          <p className="mt-4 text-2xl font-bold tracking-tight"><Money amount={spent} currency="USD" /></p>
           <p className="text-xs text-muted-foreground">
             {r.personal_expenses.length} expense{r.personal_expenses.length !== 1 ? "s" : ""}
             {r.budget ? ` · budget ${formatCurrency(Number(r.budget), r.currency)}` : ""}

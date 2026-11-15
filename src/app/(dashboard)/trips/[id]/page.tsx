@@ -1,4 +1,5 @@
 import { ExportMenu } from "@/components/trips/ExportMenu";
+import { Money } from "@/components/ui/money";
 import { BackLink } from "@/components/ui/page-header";
 import { ShareWith } from "@/components/sharing/ShareWith";
 import Link from "next/link";
@@ -22,7 +23,7 @@ import { TripHotel } from "@/components/trips/TripHotel";
 import { TripFlights } from "@/components/flights/TripFlights";
 import type { TripFlight } from "@/lib/flights";
 
-function Tile({ label, value, sub, wide }: { label: string; value: string; sub?: string; wide?: boolean }) {
+function Tile({ label, value, sub, wide }: { label: string; value: React.ReactNode; sub?: string; wide?: boolean }) {
   return (
     <div className={`rounded-xl border bg-card p-4 shadow-sm sm:p-5 ${wide ? "col-span-2 lg:col-span-1" : ""}`}>
       <p className="text-sm text-muted-foreground">{label}</p>
@@ -168,18 +169,18 @@ export default async function TripDetailPage({ params, searchParams }: { params:
 
       {/* The second money tile only appears when it says something new: a trip in another currency */}
       <div className={`grid grid-cols-2 gap-3 md:gap-4 ${primaryOther || (trip.currency && trip.currency !== "USD") ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
-        <Tile wide={!primaryOther && !(trip.currency && trip.currency !== "USD")} label="Total in USD" value={formatCurrency(usdTotal, "USD")} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
+        <Tile wide={!primaryOther && !(trip.currency && trip.currency !== "USD")} label="Total in USD" value={<Money amount={usdTotal} currency="USD" />} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
         {primaryOther ? (
           <Tile
             label={otherCurrencies.length > 1 ? "Other currencies" : `In ${primaryOther[0]}`}
-            value={formatCurrency(primaryOther[1], primaryOther[0])}
+            value={<Money amount={primaryOther[1]} currency={primaryOther[0]} />}
             sub={otherCurrencies.length > 1 ? otherCurrencies.map(([c, a]) => `${c} ${formatCurrency(a, c)}`).join(" \u00b7 ") : undefined}
           />
         ) : trip.currency && trip.currency !== "USD" ? (
-          <Tile label={`In ${trip.currency}`} value={formatCurrency(list.reduce((s, e) => s + Number(e.amount), 0), trip.currency)} />
+          <Tile label={`In ${trip.currency}`} value={<Money amount={list.reduce((s, e) => s + Number(e.amount), 0)} currency={trip.currency} />} />
         ) : null}
         <Tile label="Expenses" value={String(list.length)} sub={list.length ? `${withReceipts} with receipt photo${withReceipts !== 1 ? "s" : ""}` : "None yet"} />
-        <Tile label="Average per day" value={perDay != null ? formatCurrency(perDay, "USD") : "\u2014"} sub={upcoming ? "Starts soon" : `${elapsedDays} day${elapsedDays !== 1 ? "s" : ""}`} />
+        <Tile label="Average per day" value={perDay != null ? <Money amount={perDay} currency="USD" /> : "\u2014"} sub={upcoming ? "Starts soon" : `${elapsedDays} day${elapsedDays !== 1 ? "s" : ""}`} />
       </div>
 
       {slices.length > 0 && (

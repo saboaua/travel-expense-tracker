@@ -1,6 +1,7 @@
 "use client";
 
 import { openSigned } from "@/lib/open-signed";
+import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Image as ImageIcon, Pencil, Trash2 } from "lucide-react";
@@ -53,8 +54,8 @@ export function UtilityHistory() {
 
       <div className="mt-4 rounded-2xl border bg-card p-4" data-testid="util-stats">
         <div className="flex gap-6">
-          <div><p className="text-xs text-muted-foreground">Average</p><p className="text-xl font-bold tabular-nums" data-testid="util-average">{formatCurrency(toAwg(h.average), "AWG")}</p></div>
-          <div><p className="text-xs text-muted-foreground">Highest</p><p className="text-xl font-bold tabular-nums" data-testid="util-highest">{formatCurrency(toAwg(h.highest), "AWG")}</p></div>
+          <div><p className="text-xs text-muted-foreground">Average</p><p className="text-xl font-bold tabular-nums" data-testid="util-average"><Money amount={toAwg(h.average)} currency="AWG" /></p></div>
+          <div><p className="text-xs text-muted-foreground">Highest</p><p className="text-xl font-bold tabular-nums" data-testid="util-highest"><Money amount={toAwg(h.highest)} currency="AWG" /></p></div>
         </div>
         <div className="mt-4 flex h-24 items-end gap-2" role="img" aria-label="Last six months">
           {h.bars.map((b) => (
@@ -64,7 +65,7 @@ export function UtilityHistory() {
             </div>
           ))}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">Shown in florins (AWG, the same as Afl.). Other currencies are converted.</p>
+        <p className="mt-2 text-xs text-muted-foreground">Shown in florins (AWG). Other currencies are converted.</p>
       </div>
 
       <h2 className="mt-4 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Bills</h2>
@@ -80,7 +81,7 @@ export function UtilityHistory() {
                   <span className="block text-[13px] text-muted-foreground">{b.paid_on ? `Paid ${formatDate(b.paid_on)}` : b.due_date ? `Not paid yet · due ${formatDate(b.due_date)}` : "Not paid yet"}{b.payment_ref ? ` · Ref ${b.payment_ref}` : ""}{b.notes ? ` · ${b.notes}` : ""}{b.waiting ? " · waiting to send" : ""}</span>
                 </span>
                 {b.receipt_path && <button type="button" onClick={() => openPhoto(b.receipt_path!)} aria-label="Open the photo of this bill" className="flex h-11 w-11 items-center justify-center rounded-lg text-blue-700 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:text-blue-300 dark:hover:bg-blue-950"><ImageIcon className="h-4 w-4" aria-hidden="true" /></button>}
-                <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
+                <span className="text-[15px] font-bold tabular-nums"><Money amount={Number(b.amount)} currency={b.currency} /></span>
                 <Link href={`/personal/utilities/add?id=${b.id}`} aria-label={`Change ${monthLabel(b.bill_month)} bill`} className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Pencil className="h-4 w-4" aria-hidden="true" /></Link>
                 <button type="button" onClick={() => remove(b)} aria-label={`Delete ${monthLabel(b.bill_month)} bill`} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-red-950"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
               </li>

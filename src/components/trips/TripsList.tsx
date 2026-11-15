@@ -1,6 +1,7 @@
 "use client";
 
 import { Tabs } from "@/components/ui/tabs";
+import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -104,7 +105,7 @@ function TripCard({
 
         <div className="mt-4 flex items-end justify-between gap-3 border-t pt-4">
           <div>
-            <p className="text-2xl font-bold tracking-tight">{formatCurrency(trip.total, "USD")}</p>
+            <p className="text-2xl font-bold tracking-tight"><Money amount={trip.total} currency="USD" /></p>
             <p className="text-xs text-muted-foreground">
               {trip.count} expense{trip.count !== 1 ? "s" : ""}
             </p>

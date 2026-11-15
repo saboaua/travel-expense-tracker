@@ -1,6 +1,7 @@
 "use client";
 
 import { shiftMonth } from "@/lib/personal/utilities";
+import { Money } from "@/components/ui/money";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -170,7 +171,7 @@ export default function PersonalHubPage() {
           <div className="flex items-baseline justify-between gap-3 px-4 pb-3.5 md:px-5">
             {grocery ? (
               <>
-                <p className="text-[26px] font-bold tabular-nums tracking-tight">{formatCurrency(grocery.total, grocery.currency)} <span className="text-sm font-medium text-muted-foreground">this month</span></p>
+                <p className="text-[26px] font-bold tabular-nums tracking-tight"><Money amount={grocery.total} currency={grocery.currency} /> <span className="text-sm font-medium text-muted-foreground">this month</span></p>
                 <p className="shrink-0 text-[13px] text-muted-foreground">{plural(grocery.count, "receipt")}</p>
               </>
             ) : (

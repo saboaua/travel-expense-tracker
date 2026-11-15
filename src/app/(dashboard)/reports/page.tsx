@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Money } from "@/components/ui/money";
 import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -32,7 +33,7 @@ function Delta({ pct, suffix, empty }: { pct: number | null; suffix: string; emp
   );
 }
 
-function Tile({ icon: Icon, label, value, children }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string; children?: React.ReactNode }) {
+function Tile({ icon: Icon, label, value, children }: { icon: React.ComponentType<{ className?: string }>; label: string; value: React.ReactNode; children?: React.ReactNode }) {
   return (
     <div className="rounded-xl border bg-card p-4 shadow-sm sm:p-5">
       <p className="flex items-center gap-2 text-sm text-muted-foreground"><Icon className="h-4 w-4" />{label}</p>
@@ -141,16 +142,16 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       ) : (
         <>
           <div className="grid grid-cols-2 gap-3 md:gap-4 lg:grid-cols-4">
-            <Tile icon={Wallet} label={`${year} total`} value={fmt(s.total)}>
+            <Tile icon={Wallet} label={`${year} total`} value={<Money amount={s.total} currency="USD" />}>
               <Delta pct={s.yearChangePct} suffix={`vs ${year - 1}`} empty={`no ${year - 1} data`} />
             </Tile>
-            <Tile icon={CalendarRange} label={isCurrent ? "This month" : "Peak month"} value={fmt(s.focusMonthTotal)}>
+            <Tile icon={CalendarRange} label={isCurrent ? "This month" : "Peak month"} value={<Money amount={s.focusMonthTotal} currency="USD" />}>
               {isCurrent ? <Delta pct={s.focusMonthChangePct} suffix="vs last month" empty="no spending last month" /> : <span className="text-xs text-muted-foreground">{MONTH_LONG[s.focusMonthIndex]}</span>}
             </Tile>
             <Tile icon={Plane} label="Trips" value={String(tripRows.length)}>
               <span className="text-xs text-muted-foreground">{s.expenseCount} expense{s.expenseCount !== 1 ? "s" : ""}</span>
             </Tile>
-            <Tile icon={TrendingUp} label="Average per month" value={fmt(s.avgPerActiveMonth)}>
+            <Tile icon={TrendingUp} label="Average per month" value={<Money amount={s.avgPerActiveMonth} currency="USD" />}>
               <span className="text-xs text-muted-foreground">{activeMonths} active month{activeMonths !== 1 ? "s" : ""}</span>
             </Tile>
           </div>

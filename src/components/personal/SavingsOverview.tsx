@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, PiggyBank, Plus } from "lucide-react";
@@ -24,7 +25,7 @@ export function PlanCard({ plan, events, today }: { plan: SavingsPlan; events: S
       <div className="flex items-center gap-2.5">
         <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl" style={{ background: "#ccfbf1", color: TEAL }}><PiggyBank className="h-5 w-5" aria-hidden="true" /></span>
         <span className="min-w-0 flex-1"><b className="block truncate text-base">{plan.name}</b><span className="block text-[13px] text-muted-foreground">{isPaused(plan) ? "Paused" : ruleText(plan)}</span></span>
-        <span className="text-right"><b className="block text-base tabular-nums">{formatCurrency(plan.amount, plan.currency)}</b><span className="text-xs text-muted-foreground">a month</span></span>
+        <span className="text-right"><b className="block text-base tabular-nums"><Money amount={plan.amount} currency={plan.currency} /></b><span className="text-xs text-muted-foreground">a month</span></span>
       </div>
       {pct != null ? (
         <div className="mt-2.5">
@@ -84,8 +85,8 @@ export function SavingsOverview() {
         <div className="mt-4 space-y-3 lg:grid lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:items-start lg:gap-x-8 lg:space-y-0">
           <div className="rounded-2xl border bg-card p-4 lg:row-span-4 lg:self-start">
             <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p>
-            <p className="mt-1.5 text-[34px] font-bold leading-none tabular-nums" data-testid="savings-total">{formatCurrency(view.total, view.currency)}</p>
-            <p className="mt-1 text-[13px] text-muted-foreground">across {data.plans.length} {data.plans.length === 1 ? "plan" : "plans"} · <b className="text-foreground">{formatCurrency(view.monthly, view.currency)}</b> goes in each month</p>
+            <p className="mt-1.5 text-[34px] font-bold leading-none tabular-nums" data-testid="savings-total"><Money amount={view.total} currency={view.currency} /></p>
+            <p className="mt-1 text-[13px] text-muted-foreground">across {data.plans.length} {data.plans.length === 1 ? "plan" : "plans"} · <b className="text-foreground"><Money amount={view.monthly} currency={view.currency} /></b> goes in each month</p>
             <div className="mt-3 flex h-[110px] items-end gap-2.5" role="img" aria-label="Total saved at the end of each month">
               {view.chart.map((c, i) => (
                 <div key={c.month} className="flex h-full flex-1 flex-col items-center justify-end">

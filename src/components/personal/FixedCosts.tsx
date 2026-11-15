@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Money as AmountText } from "@/components/ui/money";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ChevronRight, Trash2 } from "lucide-react";
@@ -135,15 +136,15 @@ export function FixedCostsHub() {
         <>
           <Card className="rounded-2xl p-4" data-testid="fixed-month">
             <p className="text-[13px] font-bold text-muted-foreground">Fixed costs this month</p>
-            <p className="text-[30px] font-bold leading-tight tabular-nums">{formatCurrency(total, cur)}</p>
+            <p className="text-[30px] font-bold leading-tight tabular-nums"><AmountText amount={total} currency={cur} /></p>
             {fixedLines.length === 0 && <p className="text-sm text-muted-foreground">Nothing is due this month yet.</p>}
             {(["loans", "insurances", "cards"] as const).map((cat) => {
               const rows = fixedLines.filter((l) => l.category === cat);
               if (!rows.length) return null;
               return (
                 <div key={cat} className="mt-2 border-t pt-2">
-                  <div className="flex justify-between text-sm font-bold"><span>{CATEGORY_LABEL[cat]}</span><span className="tabular-nums">{formatCurrency(round2(rows.reduce((t, l) => t + of(l), 0)), cur)}</span></div>
-                  {rows.map((l) => <div key={`${l.kind}${l.currency}`} className="flex justify-between py-1 text-sm text-muted-foreground"><span>{costName(by.get(l.kind), l.kind)}</span><span className="tabular-nums">{formatCurrency(of(l), cur)}</span></div>)}
+                  <div className="flex justify-between text-sm font-bold"><span>{CATEGORY_LABEL[cat]}</span><span className="tabular-nums"><AmountText amount={round2(rows.reduce((t, l) => t + of(l), 0))} currency={cur} /></span></div>
+                  {rows.map((l) => <div key={`${l.kind}${l.currency}`} className="flex justify-between py-1 text-sm text-muted-foreground"><span>{costName(by.get(l.kind), l.kind)}</span><span className="tabular-nums"><AmountText amount={of(l)} currency={cur} /></span></div>)}
                 </div>
               );
             })}
@@ -151,7 +152,7 @@ export function FixedCostsHub() {
           {coming.length > 0 && (
             <Card className="rounded-2xl p-4" data-testid="fixed-coming">
               <p className="mb-1 text-sm font-bold">Coming up</p>
-              {coming.map(({ c, n }) => <div key={c.kind} className="flex justify-between border-t py-2 text-sm first:border-0"><span>{costName(c)}<span className="block text-xs text-muted-foreground">Due {Number(n!.date.slice(8, 10))} {MONTHS[Number(n!.date.slice(5, 7)) - 1]}</span></span><b className="tabular-nums">{formatCurrency(n!.amount, c.currency)}</b></div>)}
+              {coming.map(({ c, n }) => <div key={c.kind} className="flex justify-between border-t py-2 text-sm first:border-0"><span>{costName(c)}<span className="block text-xs text-muted-foreground">Due {Number(n!.date.slice(8, 10))} {MONTHS[Number(n!.date.slice(5, 7)) - 1]}</span></span><b className="tabular-nums"><AmountText amount={n!.amount} currency={c.currency} /></b></div>)}
             </Card>
           )}
           <div className="lg:grid lg:grid-cols-2 lg:gap-x-6">
@@ -219,7 +220,7 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
           <div><label htmlFor="fx-start" className={label}>Started</label><input id="fx-start" type="month" value={start} onChange={(e) => setStart(e.target.value)} className={field} /></div>
           <div><label htmlFor="fx-end" className={label}>Last payment</label><input id="fx-end" type="month" value={end} onChange={(e) => setEnd(e.target.value)} className={field} /><p className="mt-1 text-xs text-muted-foreground">Leave empty if you do not know.</p></div>
         </div>
-        {n > 0 && <Note tone="good"><span data-testid="fixed-preview">Adds <b>{formatCurrency(n, cur)}</b> to your spending every month{draft.end_month ? <> until <b>{monthLabel(draft.end_month)}</b>{left ? <>. {left.count} payment{left.count === 1 ? "" : "s"} left, {formatCurrency(left.total, cur)} in total</> : null}</> : null}.</span></Note>}
+        {n > 0 && <Note tone="good"><span data-testid="fixed-preview">Adds <b><AmountText amount={n} currency={cur} /></b> to your spending every month{draft.end_month ? <> until <b>{monthLabel(draft.end_month)}</b>{left ? <>. {left.count} payment{left.count === 1 ? "" : "s"} left, {formatCurrency(left.total, cur)} in total</> : null}</> : null}.</span></Note>}
         <Button type="submit" className="h-12 w-full text-base" disabled={busy || !ready || missing} data-testid="fixed-save">Save</Button>
         {mine && <Button type="button" variant="outline" className="h-12 w-full" disabled={busy} onClick={stop} data-testid="fixed-stop">Stop this payment</Button>}
       </form>
@@ -443,7 +444,7 @@ function EntryList({ rows, onDelete }: { rows: FixedEntry[]; onDelete: (id: stri
       {rows.map((r) => (
         <li key={r.id} className="flex items-center justify-between gap-2 border-t py-2 text-sm first:border-0" data-testid="fixed-entry">
           <span>{r.on_date}</span>
-          <span className="flex items-center gap-1"><b className="tabular-nums">{formatCurrency(r.amount, r.currency)}</b>
+          <span className="flex items-center gap-1"><b className="tabular-nums"><AmountText amount={r.amount} currency={r.currency} /></b>
             <button type="button" aria-label={`Delete ${r.on_date}`} onClick={() => r.id && onDelete(r.id)} className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><Trash2 className="h-4 w-4" aria-hidden="true" /></button></span>
         </li>
       ))}
@@ -554,7 +555,7 @@ export function GamblingForm() {
       {lim && (
         <Card className={`rounded-2xl p-4 ${state === "over" ? "border-red-300" : ""}`} data-testid="gambling-status" data-state={state}>
           <div className="flex items-baseline justify-between text-[13px]"><b className="text-muted-foreground">This month</b><span className="text-muted-foreground">Limit {formatCurrency(lim, cap)}</span></div>
-          <p className={`text-[30px] font-bold leading-tight tabular-nums ${state === "over" ? "text-red-700 dark:text-red-300" : ""}`}>{formatCurrency(spent, cap)} <span className="text-sm font-semibold">spent</span></p>
+          <p className={`text-[30px] font-bold leading-tight tabular-nums ${state === "over" ? "text-red-700 dark:text-red-300" : ""}`}><AmountText amount={spent} currency={cap} /> <span className="text-sm font-semibold">spent</span></p>
           <div className="mt-1 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full" style={{ width: `${Math.min(100, (spent / lim) * 100)}%`, background: state === "over" ? "#dc2626" : state === "near" ? "#d97706" : "#16a34a" }} /></div>
           {state === "over" && <p className="mt-2 rounded-lg bg-red-100 px-3 py-2 text-sm font-bold text-red-900 dark:bg-red-950 dark:text-red-100" data-testid="gambling-over">You are over your limit by {formatCurrency(round2(spent - lim), cap)}.</p>}
           {state === "near" && <p className="mt-2 rounded-lg bg-amber-100 px-3 py-2 text-sm font-bold text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="gambling-near">You have used 80% of your limit.</p>}

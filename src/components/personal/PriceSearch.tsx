@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { Money } from "@/components/ui/money";
 import { Search } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,6 @@ import { searchBestPrices, type OfferSource, type PriceGroup } from "@/lib/perso
 import type { CommunityRow } from "@/lib/personal/community";
 import type { Product } from "@/lib/personal/price-compare";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
-import { formatCurrency } from "@/lib/utils";
 
 const SOURCE_CLS: Record<OfferSource, string> = {
   own: "bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200",
@@ -67,7 +67,7 @@ export function PriceSearch({ products, currency }: { products: Product[]; curre
             {g.offers.map((o) => (
               <div key={`${o.store}|${o.source}`} data-testid="price-offer" className={`flex items-center justify-between gap-2 rounded-xl p-2.5 ${o.best ? "border-2 border-emerald-600 bg-emerald-50 dark:bg-emerald-500/10" : "border"}`}>
                 <span className="min-w-0"><b className="block truncate">{o.store}</b><span className={`mt-0.5 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold ${SOURCE_CLS[o.source]}`}>{o.note}</span></span>
-                <span className="shrink-0 text-right"><b className={`block text-lg tabular-nums ${o.best ? "text-emerald-800 dark:text-emerald-300" : ""}`}>{formatCurrency(o.price, g.currency)}</b>{o.best && <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Best price</span>}</span>
+                <span className="shrink-0 text-right"><b className={`block text-lg tabular-nums ${o.best ? "text-emerald-800 dark:text-emerald-300" : ""}`}><Money amount={o.price} currency={g.currency} /></b>{o.best && <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">Best price</span>}</span>
               </div>
             ))}
           </div>

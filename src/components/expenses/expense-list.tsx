@@ -1,13 +1,14 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { Money } from "@/components/ui/money";
 import { useConfirm } from "@/components/ui/confirm";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Camera, CloudOff, Paperclip, Receipt, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { formatCurrency, formatDayHeading, todayISO } from "@/lib/utils";
+import { formatDayHeading, todayISO } from "@/lib/utils";
 import { iconFor } from "@/lib/category-icons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { applyExpenseOutbox, deleteExpenseChange, makeExpenseChangeApi } from "@/lib/expense-outbox";
@@ -165,7 +166,7 @@ export function ExpenseList({ expenses: saved, currency, tripId }: ExpenseListPr
             {g.date && (
               <div className="flex items-center justify-between px-1 pt-1 text-xs font-medium text-muted-foreground">
                 <span>{formatDayHeading(g.date, today)}</span>
-                {known.length > 0 && <span className="tabular-nums">{formatCurrency(dayTotal, "USD")}</span>}
+                {known.length > 0 && <span className="tabular-nums"><Money amount={dayTotal} currency="USD" /></span>}
               </div>
             )}
             {g.items.map((expense) => {
@@ -200,8 +201,8 @@ export function ExpenseList({ expenses: saved, currency, tripId }: ExpenseListPr
                       </div>
                     </div>
                     <div className="shrink-0 text-right">
-                      <p className="font-semibold tabular-nums">{formatCurrency(Number(expense.amount), code)}</p>
-                      {usd != null && code !== "USD" && <p className="text-xs text-muted-foreground tabular-nums">{formatCurrency(usd, "USD")}</p>}
+                      <p className="font-semibold tabular-nums"><Money amount={Number(expense.amount)} currency={code} /></p>
+                      {usd != null && code !== "USD" && <p className="text-xs text-muted-foreground tabular-nums"><Money amount={usd} currency="USD" /></p>}
                     </div>
                   </Link>
                   <button

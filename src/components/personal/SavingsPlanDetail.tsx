@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Pause, PiggyBank, Pencil, Play, Plus, SkipForward, Check } from "lucide-react";
@@ -90,7 +91,7 @@ export function SavingsPlanDetail() {
 
       <div className="mt-3 rounded-2xl border bg-card p-4">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-          <span className="min-w-0 flex-1 basis-48"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p><p className="mt-1 break-words text-[32px] font-bold leading-tight tabular-nums" data-testid="plan-saved">{formatCurrency(saved, plan.currency)}</p></span>
+          <span className="min-w-0 flex-1 basis-48"><p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Saved so far</p><p className="mt-1 break-words text-[32px] font-bold leading-tight tabular-nums" data-testid="plan-saved"><Money amount={saved} currency={plan.currency} /></p></span>
           {pct != null && <span className="text-right text-[13px] text-muted-foreground">of {formatCurrency(plan.goal ?? 0, plan.currency)}<br /><b className="text-[15px] text-foreground">{pct}%</b></span>}
         </div>
         {pct != null && <div className="mt-3 h-3 overflow-hidden rounded-full bg-muted"><div className="h-full" style={{ width: `${pct}%`, background: TEAL }} /></div>}
@@ -134,7 +135,7 @@ export function SavingsPlanDetail() {
         })}
         <div className="flex min-h-14 items-center gap-2.5 border-t py-2" data-testid="plan-opening-row">
           <span className="min-w-0 flex-1"><b className="block text-[15px]">Starting balance</b><span className="block text-[13px] text-muted-foreground">Saved before the plan started</span></span>
-          <b className="text-[15px] tabular-nums">{formatCurrency(plan.opening_balance, plan.currency)}</b>
+          <b className="text-[15px] tabular-nums"><Money amount={plan.opening_balance} currency={plan.currency} /></b>
         </div>
       </div>
       <p className="mt-3 text-[13px] leading-snug text-muted-foreground">Each deposit is counted in its month&rsquo;s budget as Savings. Skip a month and it is left out of both the budget and the total. An extra deposit is a one-off that counts in the month you add it.</p>

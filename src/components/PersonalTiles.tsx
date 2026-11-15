@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { ChevronRight, Hammer, Plane, ShoppingCart } from "lucide-react";
 import { Card } from "@/components/ui/card";
-import { formatCurrency } from "@/lib/utils";
+import { Money } from "@/components/ui/money";
 import { toneStyle, type IconTone } from "@/lib/icon-tones";
 import type { PersonalSummary } from "@/lib/personal/summary";
 
 /** Personal spending at a glance, shown under the active trips on the dashboard. */
 export function PersonalTiles({ summary, currency = "USD" }: { summary: PersonalSummary; currency?: string }) {
-  const tiles: { href: string; label: string; icon: typeof ShoppingCart; tone: IconTone; amount: string; sub: string }[] = [
+  const tiles: { href: string; label: string; icon: typeof ShoppingCart; tone: IconTone; amount: number; currency: string; sub: string }[] = [
     {
       href: "/personal/groceries",
       label: "Groceries",
       icon: ShoppingCart,
       tone: "groceries",
-      amount: formatCurrency(summary.grocery?.total ?? 0, summary.grocery?.currency ?? currency),
+      amount: summary.grocery?.total ?? 0, currency: summary.grocery?.currency ?? currency,
       sub: summary.grocery ? `This month · ${summary.grocery.count} receipt${summary.grocery.count !== 1 ? "s" : ""}` : "Nothing this month yet",
     },
     {
@@ -21,7 +21,7 @@ export function PersonalTiles({ summary, currency = "USD" }: { summary: Personal
       label: "Home Projects",
       icon: Hammer,
       tone: "projects",
-      amount: formatCurrency(summary.projects.spent, currency),
+      amount: summary.projects.spent, currency,
       sub: `${summary.projects.count} active project${summary.projects.count !== 1 ? "s" : ""}`,
     },
     {
@@ -29,7 +29,7 @@ export function PersonalTiles({ summary, currency = "USD" }: { summary: Personal
       label: "Personal Travel",
       icon: Plane,
       tone: "travel",
-      amount: formatCurrency(summary.trips.spent, currency),
+      amount: summary.trips.spent, currency,
       sub: `${summary.trips.count} active trip${summary.trips.count !== 1 ? "s" : ""}`,
     },
   ];
@@ -48,7 +48,7 @@ export function PersonalTiles({ summary, currency = "USD" }: { summary: Personal
                 </span>
                 <ChevronRight className="hidden h-4 w-4 text-muted-foreground sm:block" aria-hidden="true" />
               </div>
-              <p className="mt-2 truncate text-base font-bold min-[400px]:text-lg sm:text-3xl">{t.amount}</p>
+              <p className="mt-2 truncate text-base font-bold min-[400px]:text-lg sm:text-3xl"><Money amount={t.amount} currency={t.currency} /></p>
               <p className="mt-1 text-[11px] leading-tight text-muted-foreground sm:text-xs">{t.sub}</p>
             </Card>
           </Link>

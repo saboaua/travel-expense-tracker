@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -258,7 +259,7 @@ export function GroceryPrices() {
 
       <div className="space-y-3">
         {list.map((p) => (
-          <ProductCard key={p.key} p={p} fmt={fmt} isOpen={open === p.key} onToggle={() => setOpen(open === p.key ? null : p.key)} online={online}
+          <ProductCard key={p.key} p={p} fmt={fmt} cur={cur} isOpen={open === p.key} onToggle={() => setOpen(open === p.key ? null : p.key)} online={online}
             onlineMatches={cur === ONLINE_CURRENCY ? onlineData?.matches[p.key] ?? null : null} verdict={verdicts.get(p.key) ?? null} community={community.get(p.key) ?? null} onlineReady={cur === ONLINE_CURRENCY && !!onlineData && onlineData.enabled.length > 0 && !onlineData.setup}
             onAnswerOnline={(m, same) => answerOnline(p.key, m, same)}
             onSeparate={(atomKey) => answer(p.atomKeys.filter((k) => k !== atomKey).map((k) => [atomKey, k] as [string, string]), false)} />
@@ -287,14 +288,14 @@ export function GroceryPrices() {
   );
 }
 
-function OnlineRow({ m, best, fmt, ask, onAnswer, online, max }: { m: OnlineMatch; best: boolean; fmt: (n: number) => string; ask: boolean; onAnswer: (same: boolean) => void; online: boolean; max: number }) {
+function OnlineRow({ m, best, cur, ask, onAnswer, online, max }: { m: OnlineMatch; best: boolean; cur: string; ask: boolean; onAnswer: (same: boolean) => void; online: boolean; max: number }) {
   const link = shopLink(m.url);
   return (
     <div className="border-t py-2.5" data-testid="online-row" data-store={m.store}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-[15px] font-semibold"><Globe className="h-4 w-4 text-indigo-700 dark:text-indigo-300" aria-hidden="true" />{m.storeName}</span>
         <OnlineChip />
-        <span className="ml-auto text-[17px] font-bold tabular-nums">{fmt(m.price)}</span>
+        <span className="ml-auto text-[17px] font-bold tabular-nums"><Money amount={m.price} currency={cur} /></span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-muted" aria-hidden="true"><div className={`h-2 rounded-full ${best ? "bg-emerald-600" : "bg-slate-400"}`} style={{ width: `${Math.max(8, Math.round((m.price / max) * 100))}%` }} /></div>
       <p className="mt-1.5 text-[13px] text-muted-foreground">Their name: <span className="font-medium text-foreground">{m.name}{m.size ? ` (${m.size})` : ""}</span></p>
@@ -320,13 +321,13 @@ function OnlineRow({ m, best, fmt, ask, onAnswer, online, max }: { m: OnlineMatc
   );
 }
 
-function StoreRow({ s, i, max, fmt, unit }: { s: StoreSummary; i: number; max: number; fmt: (n: number) => string; unit: string | null }) {
+function StoreRow({ s, i, max, fmt, cur, unit }: { s: StoreSummary; i: number; max: number; fmt: (n: number) => string; cur: string; unit: string | null }) {
   return (
     <div className="border-t py-2.5" data-testid="price-store">
       <div className="flex flex-wrap items-center gap-2">
         <span className="flex items-center gap-1.5 text-[15px] font-semibold"><Store className="h-4 w-4 text-muted-foreground" aria-hidden="true" /><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: STORE_COLORS[i % STORE_COLORS.length] }} aria-hidden="true" />{s.store}</span>
         {s.cheapest ? <Cheapest /> : s.extraPct != null && s.extra > 0 && <span className={`${chipBase} ${RED}`}>+{s.extra.toFixed(2)} · {s.extraPct}% more</span>}
-        <span className="ml-auto text-[17px] font-bold tabular-nums">{fmt(s.latest.price)}{unit && <span className="text-xs font-normal text-muted-foreground">/{unit}</span>}</span>
+        <span className="ml-auto text-[17px] font-bold tabular-nums"><Money amount={s.latest.price} currency={cur} />{unit && <span className="text-xs font-normal text-muted-foreground">/{unit}</span>}</span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-muted" aria-hidden="true"><div className={`h-2 rounded-full ${s.cheapest ? "bg-emerald-600" : "bg-slate-400"}`} style={{ width: `${Math.max(8, Math.round((s.latest.price / max) * 100))}%` }} /></div>
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] text-muted-foreground">
@@ -337,7 +338,7 @@ function StoreRow({ s, i, max, fmt, unit }: { s: StoreSummary; i: number; max: n
   );
 }
 
-function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
+function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; cur: string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
   const multi = p.stores.length > 1;
   const best = p.stores[0];
   const max = Math.max(...p.stores.map((s) => s.latest.price));
@@ -398,7 +399,7 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatch
                 <div className="mb-4" data-testid="online-block">
                   <p className={`${heading} mb-1`}>Online prices today</p>
                   {(() => { const mx = Math.max(...onlineMatches.map((m) => m.price), p.stores[0].latest.price); return onlineMatches.map((m) => (
-                    <OnlineRow key={m.store} m={m} best={m.status === "same" && verdict?.cheaper?.store === m.store} fmt={fmt} ask={m.status === "ask"} online={online} max={mx} onAnswer={(same) => onAnswerOnline(m, same)} />
+                    <OnlineRow key={m.store} m={m} best={m.status === "same" && verdict?.cheaper?.store === m.store} cur={cur} ask={m.status === "ask"} online={online} max={mx} onAnswer={(same) => onAnswerOnline(m, same)} />
                   )); })()}
                   {verdict?.cheaper && (
                     <p className="mt-2 flex items-start gap-2 rounded-xl bg-indigo-100 p-3 text-[15px] leading-snug text-indigo-950 dark:bg-indigo-500/20 dark:text-indigo-100" data-testid="online-saving">
@@ -410,11 +411,11 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatch
                 </div>
               )}
               <p className={`${heading} mb-1`}>{onlineReady && onlineMatches && onlineMatches.length > 0 ? "What you paid" : multi ? "Latest price by store" : "Price at this store"}</p>
-              {p.stores.map((s, i) => <StoreRow key={s.store} s={s} i={i} max={max} fmt={fmt} unit={p.unit} />)}
+              {p.stores.map((s, i) => <StoreRow key={s.store} s={s} i={i} max={max} fmt={fmt} cur={cur} unit={p.unit} />)}
               {p.saving && (
                 <p className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-100 p-3 text-[15px] leading-snug text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100" data-testid="price-saving">
                   <Tag className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                  <span><b>{p.saving.to} is cheaper.</b> Buy there and save <b>{fmt(p.saving.amount)}</b> each ({Math.round(p.saving.pct * 10) / 10}%).</span>
+                  <span><b>{p.saving.to} is cheaper.</b> Buy there and save <b><Money amount={p.saving.amount} currency={cur} /></b> each ({Math.round(p.saving.pct * 10) / 10}%).</span>
                 </p>
               )}
               {!p.saving && multi && <p className="mt-2 rounded-xl bg-muted p-3 text-[15px]">You bought it at the cheapest store last time.</p>}
@@ -432,9 +433,9 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatch
                 </>
               ) : <p className="text-sm text-muted-foreground">Buy it again and the price history shows here.</p>}
               <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div><dt className="text-xs text-muted-foreground">Average</dt><dd className="font-medium">{fmt(p.stats.avg)}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Lowest</dt><dd className="font-medium text-emerald-800 dark:text-emerald-300">{fmt(p.stats.min)}</dd></div>
-                <div><dt className="text-xs text-muted-foreground">Highest</dt><dd className="font-medium text-red-800 dark:text-red-300">{fmt(p.stats.max)}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Average</dt><dd className="font-medium"><Money amount={p.stats.avg} currency={cur} /></dd></div>
+                <div><dt className="text-xs text-muted-foreground">Lowest</dt><dd className="font-medium text-emerald-800 dark:text-emerald-300"><Money amount={p.stats.min} currency={cur} /></dd></div>
+                <div><dt className="text-xs text-muted-foreground">Highest</dt><dd className="font-medium text-red-800 dark:text-red-300"><Money amount={p.stats.max} currency={cur} /></dd></div>
               </dl>
             </div>
           </div>
@@ -445,7 +446,7 @@ function ProductCard({ p, fmt, isOpen, onToggle, onSeparate, online, onlineMatch
               <div key={i} className="flex items-center gap-3 border-t py-2 text-sm first:mt-1">
                 <span className="w-14 shrink-0 text-muted-foreground">{day(h.date)}</span>
                 <span className="min-w-0 flex-1"><span className="block font-semibold">{h.store}</span><span className="block truncate text-xs text-muted-foreground">{h.name}</span></span>
-                <span className="font-semibold tabular-nums">{fmt(h.price)}</span>
+                <span className="font-semibold tabular-nums"><Money amount={h.price} currency={cur} /></span>
                 <span className="flex w-16 justify-end"><Change pct={h.changePct} /></span>
               </div>
             ))}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Select } from "@/components/ui/select";
+import { Money } from "@/components/ui/money";
 import { Alert } from "@/components/ui/alert";
 import { Switch } from "@/components/ui/switch";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -456,9 +457,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 return (
                   <div className="space-y-2 rounded-2xl border bg-card p-3 text-sm" data-testid="receipt-split">
                     <b className="block text-[13px] tracking-wide text-muted-foreground">Where this receipt goes</b>
-                    <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b>{formatCurrency(groceries, currency)}</b></div>
-                    {sp.shopping > 0 && <div className="flex justify-between" data-testid="split-shopping"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b>{formatCurrency(sp.shopping, currency)}</b></div>}
-                    {needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b>{formatCurrency(needs, currency)}</b></div>}
+                    <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b><Money amount={groceries} currency={currency} /></b></div>
+                    {sp.shopping > 0 && <div className="flex justify-between" data-testid="split-shopping"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b><Money amount={sp.shopping} currency={currency} /></b></div>}
+                    {needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b><Money amount={needs} currency={currency} /></b></div>}
                     {needCount > 0 && <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-100">{needCount === 1 ? "1 line needs" : `${needCount} lines need`} a category. Until you pick one, {needCount === 1 ? "it counts" : "they count"} as Groceries.</p>}
                     <div className="flex items-center gap-3 border-t pt-1">
                       <span className="flex-1"><b className="block text-[14px]">Remember my choices</b><span className="text-xs text-muted-foreground">Next time, a product you sorted is sorted for you.</span></span>
@@ -553,7 +554,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700"><AlertTriangle className="h-5 w-5" aria-hidden="true" /></span>
                 <div>
                   <h2 id="dollar-title" className="text-lg font-bold leading-tight">$ found on this receipt</h2>
-                  <p className="mt-1.5 text-sm text-muted-foreground">The receipt only shows a <b>$</b> sign, no “USD”. You live in <b>{(homeRef.current || "").trim()}</b>, where shops price in florins, so this is most likely <b>{dollarAsk.suggest}</b> (Afl.).</p>
+                  <p className="mt-1.5 text-sm text-muted-foreground">The receipt only shows a <b>$</b> sign, no “USD”. You live in <b>{(homeRef.current || "").trim()}</b>, where shops price in florins, so this is most likely <b>{dollarAsk.suggest}</b>.</p>
                 </div>
               </div>
               {t > 0 && (

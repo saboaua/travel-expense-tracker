@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Money } from "@/components/ui/money";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -60,7 +61,7 @@ export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) 
               {paths.map((p) => <path key={p.key} d={p.d} fill={AREA_STYLE[p.key].color} />)}
               {paths.filter((p) => p.label).map((p) => <text key={`t${p.key}`} x={p.label!.x} y={p.label!.y + 5} textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff">{p.percent}%</text>)}
             </svg>
-            <p className="mt-1 text-center text-[13px] text-muted-foreground">Spent in {monthName} <b className="ml-1 text-lg tabular-nums text-foreground" data-testid="where-total">{formatCurrency(total, currencyShown)}</b></p>
+            <p className="mt-1 text-center text-[13px] text-muted-foreground">Spent in {monthName} <b className="ml-1 text-lg tabular-nums text-foreground" data-testid="where-total"><Money amount={total} currency={currencyShown} /></b></p>
           </div>
           <ul className="mt-3 min-w-0 flex-1 lg:mt-0" data-testid="where-list">
             {list.map((s, i) => (
@@ -68,7 +69,7 @@ export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) 
                 <Link href={HREF[s.key]} data-testid={`where-${s.key}`} className="flex min-h-12 items-center gap-2.5 py-2 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
                   <span className="h-3 w-3 shrink-0 rounded" style={{ background: AREA_STYLE[s.key].color }} aria-hidden="true" />
                   <b className="flex-1 text-[15px]">{LABEL[s.key]}</b>
-                  <b className="text-[15px] tabular-nums">{formatCurrency(s.value, currencyShown)}</b>
+                  <b className="text-[15px] tabular-nums"><Money amount={s.value} currency={currencyShown} /></b>
                   <span className="w-10 text-right text-[13px] font-bold tabular-nums text-muted-foreground">{s.percent}%</span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 </Link>

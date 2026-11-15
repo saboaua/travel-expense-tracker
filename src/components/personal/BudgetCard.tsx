@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Money } from "@/components/ui/money";
 import Link from "next/link";
 import { ChevronRight, Coins, Dices, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingBag, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -62,7 +63,7 @@ function AreaRow({ k, v }: { k: SpentArea; v: BudgetView }) {
       <div className="flex items-center gap-2.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: `${color}1a`, color }}><Icon className="h-[17px] w-[17px]" aria-hidden="true" /></span>
         <b className="flex-1 text-[15px]">{area.label}</b>
-        <span className="text-[15px] tabular-nums"><b>{Math.round(amount).toLocaleString("en-US")}</b>{limit ? <span className="text-[13px] text-muted-foreground"> / {Math.round(limit).toLocaleString("en-US")}</span> : <span className="text-[13px] text-muted-foreground">{k === "savings" ? " set aside" : " no limit"}</span>}</span>
+        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} over={over} />{limit ? <span className="text-[13px] text-muted-foreground"> of {formatCurrency(limit, v.currency)}</span> : <span className="text-[13px] text-muted-foreground">{k === "savings" ? " set aside" : " no limit"}</span>}</span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
       {limit ? (
@@ -83,7 +84,7 @@ function FixedRow({ k, v, limit }: { k: FixedCategory; v: BudgetView; limit: num
       <div className="flex items-center gap-2.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[10px]" style={{ background: `${color}1a`, color }}><Icon className="h-[17px] w-[17px]" aria-hidden="true" /></span>
         <b className="flex-1 text-[15px]">{CATEGORY_LABEL[k]}</b>
-        <span className="text-[15px] tabular-nums"><b className={over ? "text-red-700 dark:text-red-300" : ""}>{Math.round(amount).toLocaleString("en-US")}</b>{limit ? <span className={`text-[13px] ${over ? "text-red-700 dark:text-red-300" : "text-muted-foreground"}`}> / {Math.round(limit).toLocaleString("en-US")} limit</span> : null}</span>
+        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} over={over} />{limit ? <span className={`text-[13px] ${over ? "text-red-700 dark:text-red-300" : "text-muted-foreground"}`}> of {formatCurrency(limit, v.currency)} limit{over ? ", over" : ""}</span> : null}</span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
     </Link>
@@ -140,7 +141,7 @@ export function BudgetCard() {
         <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${STATE_CLASS[view.state]}`} data-testid="budget-state">{view.state === "ok" && <Check className="h-3 w-3" aria-hidden="true" />}{STATE_TEXT[view.state]}</span>
       </div>
       <p className="mt-2.5 text-[30px] font-bold leading-none tabular-nums" data-testid="budget-headline">
-        {view.over > 0 ? <><span className="text-red-700 dark:text-red-300">Over by {formatCurrency(view.over, view.currency)}</span> <span className="text-sm font-medium text-muted-foreground">of {formatCurrency(view.budget, view.currency)}</span></> : <>{formatCurrency(view.left, view.currency)} <span className="text-sm font-medium text-muted-foreground">left of {formatCurrency(view.budget, view.currency)}</span></>}
+        {view.over > 0 ? <><span className="text-red-700 dark:text-red-300"><span className="text-sm font-bold">Over by</span> <Money amount={view.over} currency={view.currency} /></span> <span className="text-sm font-medium text-muted-foreground">of {formatCurrency(view.budget, view.currency)}</span></> : <><Money amount={view.left} currency={view.currency} /> <span className="text-sm font-medium text-muted-foreground">left of {formatCurrency(view.budget, view.currency)}</span></>}
       </p>
       <div className="mb-1.5 mt-3"><TotalBar v={view} /></div>
       <p className="mb-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground" data-testid="budget-legend">

@@ -1,6 +1,7 @@
 "use client";
 
 import { BackLink } from "@/components/ui/page-header";
+import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
@@ -137,7 +138,7 @@ export function GroceryOverview() {
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
-            <Card><CardHeader className="pb-2"><CardDescription>Spent this month</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{fmt(thisMonth?.total || 0)}</p><p className="text-xs text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardDescription>Spent this month</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold"><Money amount={thisMonth?.total || 0} currency={cur} /></p><p className="text-xs text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</p></CardContent></Card>
             <Card><CardHeader className="pb-2"><CardDescription>vs last month</CardDescription></CardHeader><CardContent>
               {change == null ? <p className="text-3xl font-bold">—</p> : <p className={`text-3xl font-bold ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
               <p className="text-xs text-muted-foreground">{prevMonth ? `Last month ${fmt(prevMonth.total)}` : "No data last month"}</p>
@@ -160,7 +161,7 @@ export function GroceryOverview() {
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} unsent={unsent.has(r.id)}>
                   <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
-                  <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}>{fmt(r.total)}</p>
+                  <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}><Money amount={r.total} currency={cur} /></p>
                 </ReceiptRow>
               ))}
             </CardContent>

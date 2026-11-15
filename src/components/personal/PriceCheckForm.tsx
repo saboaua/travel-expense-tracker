@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Check, Trash2 } from "lucide-react";
@@ -207,7 +208,7 @@ export function PriceCheckForm() {
             <>
               <p className="mt-2 text-[13px] text-muted-foreground">Seen so far, cheapest first:</p>
               <ul className="mt-1 divide-y" data-testid="seen-so-far">
-                {soFar.map((r) => <li key={r.id} className="flex min-h-9 items-center justify-between text-sm"><span>{r.store}</span><b className="tabular-nums">{formatCurrency(Number(r.price), r.currency)}</b></li>)}
+                {soFar.map((r) => <li key={r.id} className="flex min-h-9 items-center justify-between text-sm"><span>{r.store}</span><b className="tabular-nums"><Money amount={Number(r.price)} currency={r.currency} /></b></li>)}
               </ul>
             </>
           )}
@@ -218,7 +219,7 @@ export function PriceCheckForm() {
                 {added.map((r) => (
                   <li key={r.id} className="flex min-h-12 items-center gap-2 text-sm" data-testid="added-price">
                     <span className="min-w-0 flex-1"><b className="block truncate">{r.store}</b><span className="text-[13px] text-muted-foreground">{formatDate(r.seen_on)}{r.waiting ? " · waiting to send" : ""}</span></span>
-                    <b className="tabular-nums">{formatCurrency(Number(r.price), r.currency)}</b>
+                    <b className="tabular-nums"><Money amount={Number(r.price)} currency={r.currency} /></b>
                     <button type="button" onClick={() => removePrice(r)} aria-label={`Delete ${r.store} price`} className="flex h-11 w-11 items-center justify-center rounded-lg text-red-600 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-red-950" data-testid="added-price-delete"><Trash2 className="h-4 w-4" aria-hidden="true" /></button>
                   </li>
                 ))}

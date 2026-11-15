@@ -73,7 +73,7 @@ export function UtilitiesOverview() {
         <aside className="order-1 space-y-3 lg:order-2" aria-label="This month">
           <div className={`${card} p-4`}>
             <p className={secLabel}>Paid in {mName}</p>
-            <p className="mt-1 leading-none" data-testid="util-total"><Money amount={toAwg(total)} currency="AWG" size="text-[36px]" /></p>
+            <p className="mt-1 leading-none" data-testid="util-total"><Money amount={toAwg(total)} currency="AWG" className="text-[36px]" /></p>
             {pct != null && (
               <p className="mt-2"><span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-bold" data-testid="util-change">{pct === 0 ? `Same as ${prevName}` : `${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${prevName}`}</span></p>
             )}
@@ -81,7 +81,7 @@ export function UtilitiesOverview() {
               <p className="mb-1.5 text-xs font-bold text-muted-foreground">Last 4 months</p>
               <TrendBars data={months} fmt={awg} />
             </div>
-            <p className="mt-3 text-xs text-muted-foreground">Florins (AWG, the same as Afl.). Other currencies are converted.</p>
+            <p className="mt-3 text-xs text-muted-foreground">Florins (AWG). Other currencies are converted.</p>
           </div>
           {split.length > 0 && (
             <div className={`${card} p-4`}>
@@ -122,7 +122,7 @@ export function UtilitiesOverview() {
                         </span>
                       </Link>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        {known && <Money amount={Number(b.amount)} currency={b.currency} className={dl.state === "late" ? "text-red-700 dark:text-red-300" : ""} />}
+                        {known && <Money amount={Number(b.amount)} currency={b.currency} className="text-[17px]" over={dl.state === "late"} />}
                         {known ? (
                           <button type="button" onClick={() => setPaying(b)} data-testid="util-pay" className={dl.state === "late" || dl.state === "soon" ? payBtn : reviewBtn}>{dl.state === "late" || dl.state === "soon" ? <><Check className="h-4 w-4" aria-hidden="true" />Mark paid</> : <>Review<ChevronRight className="h-4 w-4" aria-hidden="true" /></>}</button>
                         ) : (
@@ -137,7 +137,7 @@ export function UtilitiesOverview() {
           )}
 
           <section aria-labelledby="util-paid-h">
-            <div className="mt-2 flex items-baseline justify-between"><h2 id="util-paid-h" className={secLabel}>Paid in {mName}</h2>{paid.length > 0 && <Money amount={toAwg(total)} currency="AWG" size="text-[15px]" />}</div>
+            <div className="mt-2 flex items-baseline justify-between"><h2 id="util-paid-h" className={secLabel}>Paid in {mName}</h2>{paid.length > 0 && <Money amount={toAwg(total)} currency="AWG" className="text-[15px]" />}</div>
             <div className={`mt-2 px-4 ${card}`} data-testid="util-list">
               {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : paid.length === 0 ? (
                 <p className="py-4 text-sm text-muted-foreground">{all.length === 0 ? "No bills yet. Tap Add bill to start with water or electricity." : `Nothing paid in ${mName}.`}</p>
@@ -152,7 +152,7 @@ export function UtilitiesOverview() {
                           <span className="block text-[12.5px] text-muted-foreground">{forMonth(b)} · paid {b.paid_on ? formatDate(b.paid_on) : ""}{b.waiting ? " · waiting to send" : ""}</span>
                           <span className="mt-1 flex flex-wrap gap-1.5"><PaidChip />{b.payment_ref && <RefChip value={b.payment_ref} />}</span>
                         </span>
-                        <Money amount={Number(b.amount)} currency={b.currency} />
+                        <Money amount={Number(b.amount)} currency={b.currency} className="text-[17px]" />
                       </Link>
                     </li>
                   ))}

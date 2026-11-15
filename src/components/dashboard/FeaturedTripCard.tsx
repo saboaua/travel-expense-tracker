@@ -1,8 +1,9 @@
 import Link from "next/link";
+import { Money } from "@/components/ui/money";
 import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, RefreshCw } from "lucide-react";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { StatusChip } from "@/components/flights/FlightPanel";
-import { formatCurrency, formatDate } from "@/lib/utils";
+import { formatDate } from "@/lib/utils";
 import { BADGE_CLASS, type TripBadge } from "@/lib/trip-card";
 import { directionsUrl, type Hotel } from "@/lib/hotel";
 import { clock, durationMinutes, durationText, shownArrival, shownDeparture, type TripFlight } from "@/lib/flights";
@@ -166,7 +167,7 @@ export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, h
 
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xl font-bold tabular-nums">{formatCurrency(total, "USD")}</p>
+            <p className="text-xl font-bold tabular-nums"><Money amount={total} currency="USD" /></p>
             <p className="text-sm text-muted-foreground">spent &middot; {count} expense{count !== 1 ? "s" : ""}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useConfirm } from "@/components/ui/confirm";
+import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -78,7 +79,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
         <div>
           <h1 className="text-2xl font-bold">{receipt.store}</h1>
           <p className="text-sm text-muted-foreground">{formatDate(receipt.purchase_date)}</p>
-          <p className={`mt-2 text-3xl font-bold ${receipt.prices_only ? "text-muted-foreground" : ""}`}>{fmt(receipt.total)}</p>
+          <p className={`mt-2 text-3xl font-bold ${receipt.prices_only ? "text-muted-foreground" : ""}`}><Money amount={receipt.total} currency={receipt.currency} /></p>
           {receipt.prices_only && <p className="mt-1 text-xs text-muted-foreground" data-testid="prices-only-detail"><span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold">Prices only</span>Kept for its prices. Not counted in your spending.</p>}
           {items.length > 0 && Math.abs(receipt.total - itemsSum) > 0.05 && (
             <p className="text-xs text-muted-foreground">Items add up to {fmt(itemsSum)}; the difference is tax, discounts or items not listed.</p>
@@ -98,9 +99,9 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
           <Card data-testid="receipt-split">
             <CardContent className="space-y-1.5 pt-6 text-sm">
               <b className="block text-[13px] tracking-wide text-muted-foreground">Where this receipt goes</b>
-              <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b>{fmt(sp.groceries)}</b></div>
-              {sp.shopping > 0 && <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b>{fmt(sp.shopping)}</b></div>}
-              {sp.needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b>{fmt(sp.needs)}</b></div>}
+              <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-green-600" />Groceries</span><b><Money amount={sp.groceries} currency={receipt.currency} /></b></div>
+              {sp.shopping > 0 && <div className="flex justify-between"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-fuchsia-600" />Shopping</span><b><Money amount={sp.shopping} currency={receipt.currency} /></b></div>}
+              {sp.needs > 0 && <div className="flex justify-between text-amber-800 dark:text-amber-200" data-testid="split-needs"><span className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-sm bg-amber-500" />Needs a category</span><b><Money amount={sp.needs} currency={receipt.currency} /></b></div>}
               {sp.needs > 0 && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                   {sp.needsCount === 1 ? "1 line is" : `${sp.needsCount} lines are`} still in Other. Until you sort {sp.needsCount === 1 ? "it" : "them"}, {sp.needsCount === 1 ? "it counts" : "they count"} as Groceries.{" "}
@@ -121,7 +122,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
                 <p className="truncate text-sm font-medium">{it.name}</p>
                 <p className="text-xs text-muted-foreground">{it.category}{it.unit ? ` · ${it.quantity} ${it.unit} × ${fmt(it.unit_price)}/${it.unit}` : it.quantity !== 1 ? ` · ${it.quantity} × ${fmt(it.unit_price)}` : ""}</p>
               </div>
-              <p className="text-sm font-semibold tabular-nums">{fmt(it.line_total)}</p>
+              <p className="text-sm font-semibold tabular-nums"><Money amount={it.line_total} currency={receipt.currency} /></p>
             </div>
           ))}
         </CardContent>
