@@ -34,7 +34,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 
 const BACK = "/personal/groceries";
 
-type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean; sorted?: boolean };
+type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean; sorted?: boolean; notWeighed?: boolean };
 const uid = () => Math.random().toString(36).slice(2);
 const money = (s: string) => {
   const n = parseFloat(s);
@@ -494,6 +494,16 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                       <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
+                  {!r.unit && !r.notWeighed && money(r.quantity) > 0 && !Number.isInteger(money(r.quantity)) && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 p-2.5 dark:border-amber-500/40 dark:bg-amber-500/10" data-testid="weigh-ask">
+                      <p className="text-[13px] font-semibold text-amber-900 dark:text-amber-200">Sold by weight? Pick the unit</p>
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button type="button" size="sm" className="min-h-[44px] rounded-full px-4" onClick={() => update(r.key, { unit: "kg" })}>kg</Button>
+                        <Button type="button" size="sm" variant="outline" className="min-h-[44px] rounded-full px-4" onClick={() => update(r.key, { unit: "lb" })}>lb</Button>
+                        <Button type="button" size="sm" variant="outline" className="min-h-[44px] rounded-full px-4" onClick={() => update(r.key, { notWeighed: true })}>Not by weight</Button>
+                      </div>
+                    </div>
+                  )}
                   {r.unit && <p className="text-xs text-muted-foreground">Weighed: {money(r.quantity)} {r.unit} @ {formatCurrency(money(r.unit_price), currency)}/{r.unit}</p>}
                   <div className="grid grid-cols-3 gap-2">
                     <div><label htmlFor={`gr-${r.key}-qty`} className="text-xs text-muted-foreground">{r.unit ? `Weight (${r.unit})` : "Qty"}</label><Input id={`gr-${r.key}-qty`} type="number" step="any" min="0" value={r.quantity} onChange={(e) => setQty(r, e.target.value)} /></div>

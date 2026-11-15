@@ -2,7 +2,7 @@
  * Price tracker rules: which receipt lines are the same product (even from different stores and with different wording),
  * which store is cheaper, and how the price at each store moved. Pure functions, no I/O, so they are unit-tested.
  */
-import { normalizeItemName, type PricePoint, type PriceStats, priceStats, type TrackerRow } from "@/lib/personal/grocery";
+import { effectiveUnit, normalizeItemName, type PricePoint, type PriceStats, priceStats, type TrackerRow } from "@/lib/personal/grocery";
 
 /* ---------------- sizes ---------------- */
 
@@ -80,7 +80,7 @@ export type StoreSummary = {
   stale: boolean;
 };
 
-export type HistoryEntry = PricePoint & { name: string; changePct: number | null };
+export type HistoryEntry = PricePoint & { name: string; changePct: number | null; qty: number; paid: number; unit: string | null };
 
 export type Product = {
   key: string;
@@ -135,13 +135,13 @@ export function summarizeStores(history: PricePoint[]): StoreSummary[] {
 }
 
 /** Every purchase with its change against the previous purchase at the same store (newest first). */
-export function historyWithChange(rows: { date: string; store: string; price: number; name: string }[]): HistoryEntry[] {
+export function historyWithChange(rows: { date: string; store: string; price: number; name: string; qty?: number; paid?: number; unit?: string | null }[]): HistoryEntry[] {
   const asc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const lastAt = new Map<string, number>();
   const out = asc.map((r) => {
     const prev = lastAt.get(r.store);
     lastAt.set(r.store, r.price);
-    return { ...r, changePct: prev == null ? null : pct1(r.price, prev) };
+    return { ...r, qty: r.qty ?? 1, paid: r.paid ?? r.price, unit: r.unit ?? null, changePct: prev == null ? null : pct1(r.price, prev) };
   });
   return out.reverse();
 }
@@ -157,7 +157,7 @@ type Cluster = { atoms: string[]; rows: TrackerRow[] };
 function cluster(rows: TrackerRow[], decisions: MatchDecision[]) {
   const atoms = new Map<string, { atom: Atom; rows: TrackerRow[] }>();
   for (const r of rows) {
-    const a = atomOf(r.name, r.receipt.currency, r.unit ?? null);
+    const a = atomOf(r.name, r.receipt.currency, effectiveUnit(r.unit, r.quantity));
     const g = atoms.get(a.key) ?? { atom: a, rows: [] };
     g.rows.push(r);
     atoms.set(a.key, g);
@@ -216,7 +216,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
     const firstAtom = atoms.get(c.atoms[0])!.atom;
     const latestRow = [...c.rows].sort((a, b) => b.receipt.purchase_date.localeCompare(a.receipt.purchase_date))[0];
     const named = c.atoms.map((k) => ({ atomKey: k, name: atoms.get(k)!.rows[0].name }));
-    const history = historyWithChange(c.rows.map((r) => ({ date: r.receipt.purchase_date, store: r.receipt.store, price: r.unit_price, name: r.name })));
+    const history = historyWithChange(c.rows.map((r) => ({ date: r.receipt.purchase_date, store: r.receipt.store, price: r.unit_price, name: r.name, qty: r.quantity, paid: r.line_total, unit: effectiveUnit(r.unit, r.quantity) })));
     const asc = [...history].reverse();
     const stores = summarizeStores(asc);
     const lastStore = stores.find((s) => s.store === asc[asc.length - 1].store)!;
@@ -234,7 +234,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
       name: cleanName(display.name),
       size: size ? size.label : null,
       currency: firstAtom.currency,
-      unit: latestRow.unit ?? null,
+      unit: effectiveUnit(latestRow.unit, latestRow.quantity),
       category: latestRow.category,
       names: named,
       history,

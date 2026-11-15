@@ -1193,6 +1193,42 @@ try {
     }
   });
 
+  await test("weighed prices: per kg, with what you paid, and a kg question for a line with no unit", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const rid = "9c000000-0000-4000-8000-0000000f0001";
+    fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: "Hong Kong Supercenter", purchase_date: today, total: 7.47, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    fake.table("grocery_items").push({ id: "9d000000-0000-4000-8000-0000000f0101", receipt_id: rid, user_id: PAT, name: "kale green", normalized_name: "kale green", category: "Produce", quantity: 0.25, unit_price: 29.86, line_total: 7.47, unit: null, created_at: new Date().toISOString() });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const card = page.getByTestId("price-product").filter({ hasText: "kale green" });
+      await card.first().waitFor({ timeout: 60000 });
+      assert(/\/kg/.test(await card.first().innerText()), "the price on the card says per kg: " + (await card.first().innerText()));
+      await card.first().getByRole("button").first().click();
+      const detail = card.first().getByTestId("price-detail");
+      await detail.waitFor();
+      await detail.getByTestId("price-by-weight").waitFor();
+      const line = await detail.getByTestId("price-weighed-line").first().innerText();
+      assert(/0\.25 kg at .*29\.86 \/ kg/.test(line), "the purchase shows weight and price per kg: " + line);
+      assert(/You paid/.test(await detail.innerText()) && /7\.47/.test(await detail.innerText()), "and what you paid");
+      await page.goto(`${BASE}/personal/groceries/${rid}`);
+      await page.getByText(/0\.25 kg at .*29\.86 \/ kg/).first().waitFor({ timeout: 30000 });
+      await page.goto(`${BASE}/personal/groceries/new?manual=1`);
+      await page.getByLabel(/Item 1 name/).fill("Mango");
+      await page.getByLabel("Qty").first().fill("0.4");
+      await page.getByTestId("weigh-ask").waitFor();
+      await page.getByTestId("weigh-ask").getByRole("button", { name: "kg", exact: true }).click();
+      await page.getByText(/Weighed: 0\.4 kg/).waitFor();
+      assert((await page.getByTestId("weigh-ask").count()) === 0, "the question goes away once answered");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000f0")) a.splice(i, 1); }
+    }
+  });
+
   await test("fixed costs: mortgage, car, credit card and a gambling limit are set up and counted in the budget", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);

@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ArrowLeft, CloudOff, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, receiptKey, type ReceiptBundle } from "@/lib/offline-grocery";
+import { effectiveUnit } from "@/lib/personal/grocery";
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, deleteRow, makeRowApi } from "@/lib/row-outbox";
@@ -120,7 +121,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
             <div key={it.id} className="flex items-center justify-between gap-3 border-b py-2 last:border-0">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{it.name}</p>
-                <p className="text-xs text-muted-foreground">{it.category}{it.unit ? ` · ${it.quantity} ${it.unit} × ${fmt(it.unit_price)}/${it.unit}` : it.quantity !== 1 ? ` · ${it.quantity} × ${fmt(it.unit_price)}` : ""}</p>
+                <p className="text-xs text-muted-foreground">{it.category}{(() => { const u = effectiveUnit(it.unit, it.quantity); return u ? ` · ${it.quantity} ${u} at ${fmt(it.unit_price)} / ${u}` : it.quantity !== 1 ? ` · ${it.quantity} × ${fmt(it.unit_price)}` : ""; })()}</p>
               </div>
               <p className="text-sm font-semibold tabular-nums"><Money amount={it.line_total} currency={receipt.currency} /></p>
             </div>

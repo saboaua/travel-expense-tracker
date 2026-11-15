@@ -1,5 +1,5 @@
 import { parseSize, atomOf, buildProducts, looksAlike, wordsClose, cleanName, summarizeStores, historyWithChange, matchesFilter, priceSummary } from "../src/lib/personal/price-compare";
-import type { TrackerRow } from "../src/lib/personal/grocery";
+import { effectiveUnit, type TrackerRow } from "../src/lib/personal/grocery";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -123,6 +123,19 @@ eq("filter up", all.filter((x) => matchesFilter(x, "up")).map((x) => x.name), ["
 eq("filter down", all.filter((x) => matchesFilter(x, "down")).map((x) => x.name), ["Milk Whole"]);
 eq("filter elsewhere", all.filter((x) => matchesFilter(x, "elsewhere")).map((x) => x.name), ["Corona Extra"]);
 eq("summary", priceSummary(all), { up: 1, down: 1, elsewhere: 1, saveTotal: 0.26, stores: 3 });
+
+
+// weighed lines: price is per kg, the amount paid is kept, and an old line with no unit is read as kg
+{
+  eq("unit kept", effectiveUnit("lb", 0.5), "lb");
+  eq("fractional no unit is kg", effectiveUnit(null, 0.25), "kg");
+  eq("whole no unit stays none", effectiveUnit(null, 2), null);
+  const { products } = buildProducts([row("kale green", 29.86, "Hong Kong", "2026-11-15", { quantity: 0.25, line_total: 7.47 })]);
+  eq("kale unit", products[0].unit, "kg");
+  eq("kale price per kg", products[0].stats.last, 29.86);
+  eq("kale paid", products[0].history[0].paid, 7.47);
+  eq("kale qty", products[0].history[0].qty, 0.25);
+}
 
 console.log(fail ? `${fail} FAILED` : "price-compare: all checks passed");
 process.exit(fail ? 1 : 0);

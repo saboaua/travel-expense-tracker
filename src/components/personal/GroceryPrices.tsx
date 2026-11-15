@@ -410,7 +410,7 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
                   <p className="mt-2 flex items-start gap-2 text-[13px] leading-snug text-muted-foreground"><Globe className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />Online prices are shown for comparison only. They are never added to what you spent. Shelf prices and delivery fees can differ.</p>
                 </div>
               )}
-              <p className={`${heading} mb-1`}>{onlineReady && onlineMatches && onlineMatches.length > 0 ? "What you paid" : multi ? "Latest price by store" : "Price at this store"}</p>
+              <p className={`${heading} mb-1 flex flex-wrap items-center gap-2`}>{onlineReady && onlineMatches && onlineMatches.length > 0 ? "What you paid" : multi ? "Latest price by store" : "Price at this store"}{p.unit && <span className="rounded-full bg-teal-100 px-2 py-0.5 text-[11px] font-bold normal-case tracking-normal text-teal-900 dark:bg-teal-500/20 dark:text-teal-200" data-testid="price-by-weight">Price per {p.unit}</span>}</p>
               {p.stores.map((s, i) => <StoreRow key={s.store} s={s} i={i} max={max} fmt={fmt} cur={cur} unit={p.unit} />)}
               {p.saving && (
                 <p className="mt-2 flex items-start gap-2 rounded-xl bg-emerald-100 p-3 text-[15px] leading-snug text-emerald-950 dark:bg-emerald-500/20 dark:text-emerald-100" data-testid="price-saving">
@@ -433,9 +433,9 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
                 </>
               ) : <p className="text-sm text-muted-foreground">Buy it again and the price history shows here.</p>}
               <dl className="mt-3 grid grid-cols-3 gap-2 text-sm">
-                <div><dt className="text-xs text-muted-foreground">Average</dt><dd className="font-medium"><Money amount={p.stats.avg} currency={cur} /></dd></div>
-                <div><dt className="text-xs text-muted-foreground">Lowest</dt><dd className="font-medium text-emerald-800 dark:text-emerald-300"><Money amount={p.stats.min} currency={cur} /></dd></div>
-                <div><dt className="text-xs text-muted-foreground">Highest</dt><dd className="font-medium text-red-800 dark:text-red-300"><Money amount={p.stats.max} currency={cur} /></dd></div>
+                <div><dt className="text-xs text-muted-foreground">Average</dt><dd className="font-medium"><Money amount={p.stats.avg} currency={cur} />{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Lowest</dt><dd className="font-medium text-emerald-800 dark:text-emerald-300"><Money amount={p.stats.min} currency={cur} />{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</dd></div>
+                <div><dt className="text-xs text-muted-foreground">Highest</dt><dd className="font-medium text-red-800 dark:text-red-300"><Money amount={p.stats.max} currency={cur} />{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</dd></div>
               </dl>
             </div>
           </div>
@@ -445,8 +445,10 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
             {p.history.slice(0, 12).map((h, i) => (
               <div key={i} className="flex items-center gap-3 border-t py-2 text-sm first:mt-1">
                 <span className="w-14 shrink-0 text-muted-foreground">{day(h.date)}</span>
-                <span className="min-w-0 flex-1"><span className="block font-semibold">{h.store}</span><span className="block truncate text-xs text-muted-foreground">{h.name}</span></span>
-                <span className="font-semibold tabular-nums"><Money amount={h.price} currency={cur} /></span>
+                <span className="min-w-0 flex-1"><span className="block font-semibold">{h.store}</span><span className="block truncate text-xs text-muted-foreground">{h.name}</span>{h.unit && <span className="block text-xs text-muted-foreground" data-testid="price-weighed-line">{h.qty} {h.unit} at {fmt(h.price)} / {h.unit}</span>}</span>
+                {h.unit
+                  ? <span className="text-right"><span className="block text-[11px] text-muted-foreground">You paid</span><span className="block font-semibold tabular-nums"><Money amount={h.paid} currency={cur} /></span></span>
+                  : <span className="font-semibold tabular-nums"><Money amount={h.price} currency={cur} /></span>}
                 <span className="flex w-16 justify-end"><Change pct={h.changePct} /></span>
               </div>
             ))}

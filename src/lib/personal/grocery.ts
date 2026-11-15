@@ -335,6 +335,12 @@ export function parseLineItems(text: string): GroceryLine[] {
 
 /* ---------------- price statistics ---------------- */
 
+/** The unit a line is sold in. A saved unit wins; an old weighed line has a fractional quantity (0.25) and no unit, which can only be a weight, so it reads as kg. */
+export function effectiveUnit(unit: string | null | undefined, quantity: number): string | null {
+  if (unit) return unit;
+  return Number.isFinite(quantity) && quantity > 0 && !Number.isInteger(quantity) ? "kg" : null;
+}
+
 export type PricePoint = { date: string; price: number; store: string };
 
 export type PriceStats = {
