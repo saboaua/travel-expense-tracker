@@ -917,11 +917,14 @@ try {
     assert((await page.getByTestId("tour-count").innerText()).includes("1 of 5"), "the tour starts at 1 of 5");
     await page.getByTestId("tour-next").click();
     assert((await page.getByTestId("welcome-tour").innerText()).includes("Scan, don't type"), "the first highlight is the scan");
+    assert((await page.getByTestId("welcome-tour").innerText()).includes("Every line is sorted"), "the scan highlight says lines are sorted");
     await page.getByTestId("tour-next").click();
     await page.getByTestId("tour-budget").waitFor();
     assert((await page.getByTestId("welcome-tour").innerText()).includes("Know where your money goes"), "the second highlight is the budget");
+    assert((await page.getByTestId("tour-budget").innerText()).includes("Shopping"), "the budget example has a Shopping row");
     await page.getByTestId("tour-next").click();
     assert((await page.getByTestId("welcome-tour").innerText()).includes("Bills from your Gmail"), "the third highlight is bills and more");
+    assert((await page.getByTestId("welcome-tour").innerText()).includes("Community badges"), "the third highlight offers Community badges");
     await page.getByTestId("tour-next").click();
     assert((await page.getByTestId("tour-count").innerText()).includes("3 of 5"), "then the picks step");
     await page.getByTestId("track-spending").click();

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Camera, Check, ChevronRight, Coins, Home, MapPin, Plane, Plus, Send, Share, ShoppingCart, Users, Wallet, Wifi, X, Zap, Mail, Download } from "lucide-react";
+import { BookOpen, Camera, Check, ChevronRight, Coins, Home, MapPin, Plane, Plus, Send, Share, ShoppingCart, Users, Wallet, Wifi, X, Zap, Mail, Download, ShoppingBag, Award } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
@@ -59,6 +59,7 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
         </div>
         <Feature icon={<Camera className="h-5 w-5" />} title="Flat and lit" text="Lay the receipt flat and avoid glare." />
         <Feature icon={<Check className="h-5 w-5" />} title="Rows that look off are marked" text="You fix them before anything is saved." />
+        <Feature icon={<ShoppingBag className="h-5 w-5" />} title="Every line is sorted" text="Groceries, shopping and pharmacy are kept apart. A line it cannot place asks you once, then it remembers." />
         <Learn slug="add-a-trip-receipt" label="How to add a trip receipt" />
       </>
     );
@@ -66,14 +67,15 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
   if (id === "budget") {
     return (
       <>
-        <div><Pill>Highlight 2 of 3</Pill><div className="mt-2.5"><Title sub="One bar for the month. Groceries, bills, house and savings fill it in by themselves.">Know where your money goes</Title></div></div>
+        <div><Pill>Highlight 2 of 3</Pill><div className="mt-2.5"><Title sub="One bar for the month. Groceries, shopping, bills, house and savings fill it in by themselves.">Know where your money goes</Title></div></div>
         <div className="rounded-[20px] border bg-card p-3.5 shadow-sm" data-testid="tour-budget" role="img" aria-label="Example budget: Afl. 1,240 of 2,000 used, on track">
           <div className="flex items-center justify-between"><div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">November budget · example</div><span className="rounded-[10px] bg-green-100 px-2.5 py-1 text-xs font-bold text-green-900 dark:bg-green-950 dark:text-green-200">On track</span></div>
           <div className="mt-1.5 text-[28px] font-extrabold tabular-nums">Afl. 1,240 <span className="text-[15px] font-semibold text-muted-foreground">of 2,000</span></div>
-          <div className="relative mt-2.5"><div className="flex h-3.5 overflow-hidden rounded-full bg-muted"><div style={{ width: "21%", background: "#2563eb" }} /><div style={{ width: "15%", background: "#d97706" }} /><div style={{ width: "9%", background: "#16a34a" }} /><div style={{ width: "11%", background: "#7c3aed" }} /><div style={{ width: "6%", background: "#0d9488" }} /></div><div className="absolute -bottom-1 -top-1 w-0.5 bg-muted-foreground/70" style={{ left: "43%" }} /></div>
+          <div className="relative mt-2.5"><div className="flex h-3.5 overflow-hidden rounded-full bg-muted"><div style={{ width: "21%", background: "#2563eb" }} /><div style={{ width: "6%", background: "#c026d3" }} /><div style={{ width: "15%", background: "#d97706" }} /><div style={{ width: "9%", background: "#16a34a" }} /><div style={{ width: "11%", background: "#7c3aed" }} /><div style={{ width: "6%", background: "#0d9488" }} /></div><div className="absolute -bottom-1 -top-1 w-0.5 bg-muted-foreground/70" style={{ left: "43%" }} /></div>
           <div className="mt-2 text-xs text-muted-foreground">Grey tick = where you should be today. Afl. 760 left.</div>
           <div className="mt-2">
             <AreaRow color="#2563eb" icon={<ShoppingCart className="h-[17px] w-[17px]" />} label="Groceries" amount={420} limit={600} />
+            <AreaRow color="#c026d3" icon={<ShoppingBag className="h-[17px] w-[17px]" />} label="Shopping" amount={120} limit={200} />
             <AreaRow color="#d97706" icon={<Zap className="h-[17px] w-[17px]" />} label="Utilities" amount={308} limit={400} />
             <AreaRow color="#16a34a" icon={<Coins className="h-[17px] w-[17px]" />} label="Quick spend" amount={180} limit={300} />
             <AreaRow color="#7c3aed" icon={<Home className="h-[17px] w-[17px]" />} label="House" amount={220} limit={400} />
@@ -90,12 +92,13 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
     <>
       <div><Pill>Highlight 3 of 3</Pill><div className="mt-2.5"><Title sub="Bills, prices and trips, handled for you.">And it does the boring parts</Title></div></div>
       <div className="flex flex-col gap-2.5">
-        {tile(<Mail className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Bills from your Gmail", "Water, power and internet bills appear in Utilities with a phone alert.")}
-        {tile(<ShoppingCart className="h-5 w-5" />, "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Price tracker", "See which store sells the same item for less.")}
-        {tile(<Wifi className="h-5 w-5" />, "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300", "Works offline", "Add receipts with no signal. They sync later.")}
-        {tile(<Send className="h-5 w-5" />, "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300", "Telegram", "Send a receipt photo to a chat and it is added.")}
+        {tile(<Mail className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Bills from your Gmail", "Bills appear in Utilities with an alert.")}
+        {tile(<ShoppingCart className="h-5 w-5" />, "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Price tracker", "See which store sells it for less.")}
+        {tile(<Award className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Community badges", "Share prices, earn badges.")}
+        {tile(<Wifi className="h-5 w-5" />, "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300", "Works offline", "Add receipts with no signal.")}
+        {tile(<Send className="h-5 w-5" />, "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300", "Telegram", "Send a receipt photo to a chat.")}
         {tile(<Users className="h-5 w-5" />, "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", "Share with a partner", "Look at the same budget together.")}
-        {tile(<Plane className="h-5 w-5" />, "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Business trips", "Flights, hotels, receipts and a PDF report.")}
+        {tile(<Plane className="h-5 w-5" />, "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Business trips", "Flights, hotels and a PDF report.")}
       </div>
       <Learn slug="bills-from-email" label="Get your bills from your email" />
     </>
