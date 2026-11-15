@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1368,6 +1368,7 @@ try {
       await page.getByTestId("pro-reference").waitFor();
       assert((await page.getByTestId("pro-tab-bitcoin").count()) === 0, "no Bitcoin tab while it is off");
       // a bad address, a seed phrase and a typo are refused, and nothing is added
+      await ap.getByTestId("btc-mode-list").click();
       await ap.getByTestId("btc-paste").fill(`${A1}\nabandon abandon abandon about\nbc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5`);
       await ap.getByTestId("btc-add").click();
       await ap.getByText(/do not look like Bitcoin addresses/).waitFor();
@@ -1479,6 +1480,86 @@ try {
     } finally {
       await ctx.close(); await actx.close();
       for (const t of ["user_plans", "plan_payments", "payment_settings", "btc_addresses"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("bitcoin xpub: the admin pastes a wallet key, checks the first addresses, people get the next address each time, unpaid ones are reused after 5", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000); actx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage(); const ap = await actx.newPage();
+    const Z = "zpub6rFR7y4Q2AijBEqTUquhVz398htDFrtymD9xYYfG1m4wAcvPhXNfE3EfH1r1ADqtfSdVCToUG868RvUUkgDKf31mGDtKsAYz2oz2AGutZYs";
+    const I0 = "bc1qcr8te4kr609gcawutmrza0j4xv80jy8z306fyu", I1 = "bc1qnjg0jd8228aq7egyzacy8cys3knf9xvrerkf9g";
+    const quote = async () => { const r = await page.request.post(`${BASE}/api/pro/bitcoin`, { data: { period: "yearly" } }); return { status: r.status(), body: await r.json().catch(() => ({})) }; };
+    const expire = () => { for (const r of fake.table("plan_payments")) if (r.status === "pending" && r.method === "bitcoin" && !r.claimed_at) r.expires_at = new Date(Date.now() - 60_000).toISOString(); };
+    try {
+      fake.table("btc_wallet").push({ id: 1, xpub: null, xpub_type: null, next_index: 0 });
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByLabel("Monthly").fill("12");
+      await ap.getByLabel("Yearly").fill("120");
+      await ap.getByTestId("pay-add-account").click();
+      await ap.getByLabel("Bank").first().fill("Aruba Bank");
+      await ap.getByLabel("Account number").first().fill("1234567890");
+      // a private key and a seed phrase are refused
+      await ap.getByTestId("btc-xpub").fill("zprvAWgYBBk7JR8Gjrh4UJQ2uJdG1r3WNRRfURiABBE3RvMXYSrRJL62XuezvGdPvG6GFBZduosCc1YP5wixPox7zhZLfiUm8aunE96BBa4Kei5");
+      await ap.getByTestId("btc-check-key").click();
+      await ap.getByText(/That is a private key/).waitFor();
+      await ap.getByTestId("btc-xpub").fill(Z);
+      // saving a new key without checking it is refused
+      await ap.getByTestId("btc-toggle").click();
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Check the key and confirm that the first addresses match/).waitFor();
+      assert(!fake.table("btc_wallet")[0].xpub, "the key is not saved before it is confirmed");
+      await ap.getByTestId("btc-check-key").click();
+      await ap.getByTestId("btc-preview").waitFor();
+      const shown = await ap.getByTestId("btc-preview").innerText();
+      assert(shown.includes(I0) && shown.includes(I1) && /Native SegWit/.test(shown), "the first two addresses and the type are shown: " + shown);
+      await ap.getByTestId("btc-match").check();
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Saved\. People see this/).waitFor();
+      const w = fake.table("btc_wallet")[0];
+      assert(w.xpub === Z && w.xpub_type === "native" && Number(w.next_index) === 0, "the key is saved: " + JSON.stringify(w));
+      assert(fake.table("audit_logs").some((r) => r.action === "bitcoin.xpub_set" && !JSON.stringify(r.details).includes(Z)), "setting the key is audited without the key");
+      // the first request gets address 0, the next gets address 1
+      const q0 = await quote();
+      assert(q0.status === 200 && q0.body.payment.btc_address === I0, "the first request gets address 0: " + JSON.stringify(q0));
+      assert(Number(fake.table("btc_wallet")[0].next_index) === 1, "the counter moved");
+      const again = await quote();
+      assert(again.body.payment.btc_address === I0 && Number(fake.table("btc_wallet")[0].next_index) === 1, "asking again keeps the same address");
+      expire();
+      const q1 = await quote();
+      assert(q1.body.payment.btc_address === I1, "the next request gets address 1: " + JSON.stringify(q1.body));
+      for (let i = 2; i <= 4; i++) { expire(); const q = await quote(); assert(q.status === 200 && /^bc1q/.test(q.body.payment.btc_address), `request ${i} gets a new address`); }
+      assert(Number(fake.table("btc_wallet")[0].next_index) === 5, "five addresses are out");
+      // the sixth does not go further: the oldest unpaid one is used again
+      expire();
+      const q5 = await quote();
+      assert(q5.status === 200 && q5.body.payment.btc_address === I0 && Number(fake.table("btc_wallet")[0].next_index) === 5, "after five unpaid, address 0 is reused: " + JSON.stringify(q5.body));
+      // paying it counts: the person says they paid and the admin confirms
+      const paid = await page.request.post(`${BASE}/api/pro/bitcoin/paid`, { data: { id: q5.body.payment.id } });
+      assert(paid.status() === 200, "I have paid works");
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("pay-btc").waitFor();
+      await ap.getByTestId("pay-confirm").click();
+      await ap.getByText(/Payment confirmed/).waitFor();
+      // now address 0 is paid, so the next request goes forward to a new address
+      const q6 = await quote();
+      assert(q6.status === 200 && /^bc1q/.test(q6.body.payment.btc_address) && ![I0, I1].includes(q6.body.payment.btc_address) && Number(fake.table("btc_wallet")[0].next_index) === 6, "a paid address is never reused: " + JSON.stringify(q6.body));
+      // the user page offers Bitcoin without any pasted list, and the key is not in what the page can read
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("btc-quote").waitFor();
+      assert(!(await page.content()).includes(Z), "the key is not on the user's page");
+      // the admin sees how many are given out
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByTestId("btc-given").waitFor();
+      assert(/6/.test(await ap.getByTestId("btc-given").innerText()), "the admin sees 6 given out");
+    } finally {
+      await ctx.close(); await actx.close();
+      for (const t of ["user_plans", "plan_payments", "payment_settings", "btc_addresses", "btc_wallet"]) fake.table(t).splice(0);
     }
   });
 

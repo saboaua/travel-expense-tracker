@@ -5,7 +5,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { rateToUsd } from "@/lib/currencies";
 import { btcAmount, quoteExpired } from "@/lib/bitcoin";
 import { getBtcUsd } from "@/lib/btc-price";
-import { hasFreeAddress, loadSettings, serviceDb } from "@/lib/btc-server";
+import { hasFreeAddress, loadSettings, serviceDb, takeAddress } from "@/lib/btc-server";
 import { PAYMENT_COLS, isPayPeriod, priceFor, userReference, type PlanPayment } from "@/lib/payments";
 
 export const dynamic = "force-dynamic";
@@ -68,15 +68,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: /btc_|plan_payments_method_check|claimed_at|expires_at/.test(insErr.message) ? "Bitcoin is not set up yet. Ask your admin." : "Could not start the Bitcoin payment." }, { status: 500 });
   }
 
-  // Take one unused address. The update only succeeds while the address is still free, so two people never get the same one.
-  let address: string | null = null;
-  for (let i = 0; i < 6 && !address; i++) {
-    const { data: free } = await db.from("btc_addresses").select("address").is("payment_id", null).order("created_at", { ascending: true }).limit(1);
-    const candidate = free?.[0]?.address as string | undefined;
-    if (!candidate) break;
-    const { data: took } = await db.from("btc_addresses").update({ payment_id: id }).eq("address", candidate).is("payment_id", null).select("address");
-    if ((took ?? []).length === 1) address = candidate;
-  }
+  // One address for this request (the next one from the wallet key, or an unused one from the list)
+  const address = await takeAddress(db, id);
   if (!address) {
     await db.from("plan_payments").delete().eq("id", id);
     return NextResponse.json({ error: "Bitcoin is not available right now. Pay by bank transfer or try again later." }, { status: 503 });
