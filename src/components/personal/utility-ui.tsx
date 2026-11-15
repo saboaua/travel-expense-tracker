@@ -3,6 +3,7 @@ import { cn } from "@/lib/utils";
 import { IconTile } from "@/components/ui/icon-tile";
 import { toneStyle, type IconTone } from "@/lib/icon-tones";
 import { monthShort, type BillRow } from "@/lib/personal/utilities";
+import { formatCurrency } from "@/lib/utils";
 
 const KINDS: Record<string, { icon: LucideIcon; tone: IconTone }> = {
   water: { icon: Droplet, tone: "water" },
@@ -67,3 +68,21 @@ export function SplitBar({ parts, label }: { parts: { kind: string; pct: number 
 }
 
 export type { BillRow };
+
+/** An amount with the currency small and muted and the number large, so figures line up on the right edge. */
+export function Money({ amount, currency, className, size = "text-[17px]" }: { amount: number; currency: string; className?: string; size?: string }) {
+  const full = formatCurrency(amount, currency);
+  const m = /^([^\d-]+?)\s*(-?[\d,]+(?:\.\d+)?)$/.exec(full.replace(/\u00a0/g, " "));
+  if (!m) return <span className={cn("font-extrabold tabular-nums", className)}>{full}</span>;
+  return (
+    <span className={cn("whitespace-nowrap tabular-nums", className)} aria-label={full}>
+      <span className="mr-1 text-[10.5px] font-bold tracking-wider text-muted-foreground" aria-hidden="true">{m[1].trim()}</span>
+      <span className={cn("font-extrabold tracking-tight", size)} aria-hidden="true">{m[2]}</span>
+    </span>
+  );
+}
+
+const BTN = "inline-flex h-10 min-w-[104px] items-center justify-center gap-1.5 rounded-[10px] px-3 text-[13.5px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+export const payBtn = `${BTN} bg-primary text-primary-foreground shadow-sm`;
+export const reviewBtn = `${BTN} border border-primary/25 bg-primary/10 text-primary`;
+export const addAmountBtn = `${BTN} border border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100`;

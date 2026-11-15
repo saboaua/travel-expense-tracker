@@ -2,13 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, BellRing, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
+import { ArrowLeft, BellRing, Check, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Select } from "@/components/ui/select";
 import { useUtilityBills } from "@/lib/personal/use-utility-bills";
 import { dueBills, dueLabel, kindLabel, monthChange, monthLabel, monthStart, paidIn, percentChange, shiftMonth, splitByKind, trend, type BillRow } from "@/lib/personal/utilities";
-import { EmailChip, LateChip, MissingChip, PaidChip, RefChip, SoonChip, SplitBar, TrendBars, UtilityIcon } from "@/components/personal/utility-ui";
+import { EmailChip, LateChip, MissingChip, Money, PaidChip, addAmountBtn, payBtn, reviewBtn, RefChip, SoonChip, SplitBar, TrendBars, UtilityIcon } from "@/components/personal/utility-ui";
 import { MarkPaidSheet } from "@/components/personal/MarkPaidSheet";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { toAwg } from "@/lib/personal/utilities";
@@ -73,7 +73,7 @@ export function UtilitiesOverview() {
         <aside className="order-1 space-y-3 lg:order-2" aria-label="This month">
           <div className={`${card} p-4`}>
             <p className={secLabel}>Paid in {mName}</p>
-            <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-none tabular-nums" data-testid="util-total">{awg(total)}</p>
+            <p className="mt-1 leading-none" data-testid="util-total"><Money amount={toAwg(total)} currency="AWG" size="text-[36px]" /></p>
             {pct != null && (
               <p className="mt-2"><span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-bold" data-testid="util-change">{pct === 0 ? `Same as ${prevName}` : `${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${prevName}`}</span></p>
             )}
@@ -122,11 +122,11 @@ export function UtilitiesOverview() {
                         </span>
                       </Link>
                       <div className="flex shrink-0 flex-col items-end gap-1.5">
-                        {known && <span className={`text-[15px] font-bold tabular-nums ${dl.state === "late" ? "text-red-700 dark:text-red-300" : ""}`}>{formatCurrency(Number(b.amount), b.currency)}</span>}
+                        {known && <Money amount={Number(b.amount)} currency={b.currency} className={dl.state === "late" ? "text-red-700 dark:text-red-300" : ""} />}
                         {known ? (
-                          <button type="button" onClick={() => setPaying(b)} data-testid="util-pay" className={`inline-flex min-h-10 items-center rounded-xl px-3.5 text-sm font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${dl.state === "late" || dl.state === "soon" ? "bg-primary text-primary-foreground" : "border bg-card"}`}>{dl.state === "late" || dl.state === "soon" ? "Mark paid" : "Review"}</button>
+                          <button type="button" onClick={() => setPaying(b)} data-testid="util-pay" className={dl.state === "late" || dl.state === "soon" ? payBtn : reviewBtn}>{dl.state === "late" || dl.state === "soon" ? <><Check className="h-4 w-4" aria-hidden="true" />Mark paid</> : <>Review<ChevronRight className="h-4 w-4" aria-hidden="true" /></>}</button>
                         ) : (
-                          <Link href={`/personal/utilities/add?id=${b.id}`} className="inline-flex min-h-10 items-center rounded-xl border bg-card px-3.5 text-sm font-bold">Add amount</Link>
+                          <Link href={`/personal/utilities/add?id=${b.id}`} className={addAmountBtn}><Plus className="h-4 w-4" aria-hidden="true" />Add amount</Link>
                         )}
                       </div>
                     </li>
@@ -137,7 +137,7 @@ export function UtilitiesOverview() {
           )}
 
           <section aria-labelledby="util-paid-h">
-            <div className="mt-2 flex items-baseline justify-between"><h2 id="util-paid-h" className={secLabel}>Paid in {mName}</h2>{paid.length > 0 && <span className="text-[13px] font-bold tabular-nums">{awg(total)}</span>}</div>
+            <div className="mt-2 flex items-baseline justify-between"><h2 id="util-paid-h" className={secLabel}>Paid in {mName}</h2>{paid.length > 0 && <Money amount={toAwg(total)} currency="AWG" size="text-[15px]" />}</div>
             <div className={`mt-2 px-4 ${card}`} data-testid="util-list">
               {rows === null ? <p className="py-4 text-sm text-muted-foreground">&nbsp;</p> : paid.length === 0 ? (
                 <p className="py-4 text-sm text-muted-foreground">{all.length === 0 ? "No bills yet. Tap Add bill to start with water or electricity." : `Nothing paid in ${mName}.`}</p>
@@ -152,7 +152,7 @@ export function UtilitiesOverview() {
                           <span className="block text-[12.5px] text-muted-foreground">{forMonth(b)} · paid {b.paid_on ? formatDate(b.paid_on) : ""}{b.waiting ? " · waiting to send" : ""}</span>
                           <span className="mt-1 flex flex-wrap gap-1.5"><PaidChip />{b.payment_ref && <RefChip value={b.payment_ref} />}</span>
                         </span>
-                        <span className="text-[15px] font-bold tabular-nums">{formatCurrency(Number(b.amount), b.currency)}</span>
+                        <Money amount={Number(b.amount)} currency={b.currency} />
                       </Link>
                     </li>
                   ))}
