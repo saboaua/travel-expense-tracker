@@ -35,6 +35,7 @@ export async function extractDocumentFields(file: File): Promise<DocumentScan> {
       form.append("file", image);
       form.append("mode", "document");
       const res = await fetch("/api/ocr", { method: "POST", body: form });
+      if (typeof window !== "undefined") window.dispatchEvent(new Event("lifolio:ai-scan"));
       if (res.status === 503) {
         aiUnavailable = true;
         reason = "not_configured";
@@ -72,6 +73,7 @@ export function scanFailureMessage(reason?: string): string {
   const tip = " Retake it flat and well lit with the whole page in view (including the two lines of < < < at the bottom), or enter the details below.";
   if (reason === "not_configured") return "AI reading is not set up on the server (GEMINI_API_KEY is missing), and the passport's printed lines could not be read on this device." + tip;
   if (reason === "limit") return "Too many scans this hour. Enter the details below or try again later.";
+  if (reason === "quota") return "Your AI scans for this month are used up. The passport's printed lines were read on this device when they could be; check the details below.";
   if (reason?.startsWith("ai_failed")) {
     const code = reason.split("_")[2];
     return `The AI reader returned an error${code ? ` (${code})` : ""}, and the printed lines could not be read on this device.` + tip;

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Copy, Mail } from "lucide-react";
+import { ArrowLeft, Copy, Crown, Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -13,6 +13,9 @@ import { setupNeeded } from "@/lib/setup-message";
 import { formatDate } from "@/lib/utils";
 import { isMissingColumn } from "@/lib/columns";
 import { gmailScript } from "@/lib/personal/gmail-script";
+import { featureLocked } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
+import { todayISO } from "@/lib/utils";
 
 type Sender = { id: string; name: string; email: string; accounts?: string[] };
 type LogRow = { id: string; sender: string | null; subject: string | null; status: string; summary: string | null; code: string | null; account?: string | null; created_at: string };
@@ -26,6 +29,7 @@ const STATUS: Record<string, { text: string; cls: string }> = {
   wrong_account: { text: "Skipped", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   ignored_sender: { text: "Ignored", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   unreadable: { text: "Add by hand", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
+  needs_pro: { text: "Waiting for Pro", cls: "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-200" },
   confirmation: { text: "Code", cls: "bg-blue-50 text-blue-800 dark:bg-blue-950 dark:text-blue-200" },
 };
 
@@ -102,6 +106,10 @@ export function BillEmails() {
     await load();
   };
 
+  const lim = useLimits();
+  const locked = !!lim && featureLocked(lim.limits, lim.who, "bills_email", todayISO());
+  // Someone who already set it up still sees their senders and what arrived; a new Free person sees only the Pro card
+  const setUpBefore = !!key || (senders ?? []).length > 0 || (log ?? []).length > 0;
   const lastMail = (log ?? []).find((r) => r.status !== "confirmation") ?? null;
   const script = key ? gmailScript(key, `${typeof window === "undefined" ? "" : window.location.origin}/api/email/gmail`) : "";
   const have = new Set((senders ?? []).map((s) => s.email));
@@ -118,7 +126,24 @@ export function BillEmails() {
       {setup && <Alert>{setup}</Alert>}
       {error && <Alert>{error}</Alert>}
 
-      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0">
+      {locked && (
+        <div className="space-y-3" data-testid="bills-email-locked">
+          <Card className="space-y-3 rounded-2xl p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"><Mail className="h-5 w-5" aria-hidden="true" /></span>
+              <div className="min-w-0 flex-1"><p className="font-semibold">Bills by email is a Pro feature</p><p className="text-sm text-muted-foreground">Your own address reads the bills from Elmar, WEB, Setar and others, and adds them for you.</p></div>
+            </div>
+            <Link href="/personal/pro" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground" data-testid="bills-email-get-pro"><Crown className="h-5 w-5" aria-hidden="true" />Get Pro</Link>
+          </Card>
+          <Card className="rounded-2xl p-4 text-[13.5px] leading-relaxed">
+            <p className="font-bold">On the Free plan you can still</p>
+            <p className="mt-1 text-muted-foreground">· Add a bill by hand<br />· Scan a paper bill<br />· See what is due and what is paid</p>
+          </Card>
+          <p className="text-center text-xs leading-relaxed text-muted-foreground">Bills already imported stay in your list. New emails wait until Pro is on, then they are added.</p>
+        </div>
+      )}
+
+      <div className={`space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-4 lg:space-y-0${locked && !setUpBefore ? " hidden" : ""}`} data-testid="bills-email-body">
         <div className="space-y-4">
           <Card className="space-y-1.5 rounded-2xl p-4">
             <div className="flex items-center justify-between gap-2">

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminService, isMissingTable } from "@/lib/admin-roles-api";
+import { onProOn } from "@/lib/pro-on";
 import { logAudit } from "@/lib/audit";
 import { PLAN_COLS, defaultEndsOn, isIsoDate, isPeriod } from "@/lib/plans";
 import { parseReceived } from "@/lib/payments";
@@ -64,5 +65,6 @@ export async function PUT(request: Request) {
     await logAudit({ actorId: ctx.me.id, actorEmail: ctx.me.email, action: "payment.recorded", entityType: "user", entityId: userId, details: { amount: received.value.amount, method: received.value.method, reference: received.value.reference } }).catch(() => {});
   }
   await logAudit({ actorId: ctx.me.id, actorEmail: ctx.me.email, action: "plan.set", entityType: "user", entityId: userId, details: { period: body.period, endsOn } }).catch(() => {});
+  await onProOn(ctx.admin, userId);
   return NextResponse.json({ ok: true });
 }

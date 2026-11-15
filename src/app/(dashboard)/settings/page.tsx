@@ -8,6 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, Copy, ExternalLink, Send } from "lucide-react";
+import Link from "next/link";
+import { FEATURE_LABEL, featureLocked, type ProFeature } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
+import { todayISO } from "@/lib/utils";
 
 type TelegramStatus = {
   linked: boolean;
@@ -26,6 +30,8 @@ export default function SettingsPage() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const lim = useLimits();
+  const proOnly = (["telegram_save", "telegram_summary", "doc_reminders"] as ProFeature[]).filter((f) => !!lim && featureLocked(lim.limits, lim.who, f, todayISO()));
   const [featureOn, setFeatureOn] = useState(false);
   const [status, setStatus] = useState<TelegramStatus | null>(null);
   const [linking, setLinking] = useState(false);
@@ -204,6 +210,15 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
+            {proOnly.length > 0 && (
+              <div className="rounded-xl border p-3 text-sm" data-testid="telegram-pro-only">
+                <p className="font-semibold">Trip reminders are free for everyone.</p>
+                <ul className="mt-2 divide-y">
+                  {proOnly.map((f) => (<li key={f} className="flex items-center justify-between gap-3 py-2"><span>{FEATURE_LABEL[f]}</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200">Pro</span></li>))}
+                </ul>
+                <Link href="/personal/pro" className="mt-2 inline-flex min-h-10 items-center text-sm font-bold text-primary underline">Get Pro</Link>
+              </div>
+            )}
             <p className="text-sm">
               Status:{" "}
               {status?.linked ? (

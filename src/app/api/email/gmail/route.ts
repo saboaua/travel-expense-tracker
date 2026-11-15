@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { handleInbound, verifyMode, type InboundPayload } from "@/lib/bill-email-inbound";
+import { isLocked } from "@/lib/limits-server";
 import { sendPush, serviceClient } from "@/lib/push";
 
 export const dynamic = "force-dynamic";
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
     Attachments: Array.isArray(body.Attachments) ? (body.Attachments as InboundPayload["Attachments"])!.slice(0, 1) : [],
   };
   try {
-    const result = await handleInbound(u.db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH));
+    const result = await handleInbound(u.db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH), (uid) => isLocked(u.db, uid, "bills_email"));
     if (!result.ok) console.error("[bill-email]", result.error);
     return NextResponse.json(result.ok ? { ok: true, status: result.status } : { ok: false }, { status: result.ok ? 200 : 500 });
   } catch (e) {

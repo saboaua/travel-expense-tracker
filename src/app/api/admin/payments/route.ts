@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireAdminService, isMissingTable } from "@/lib/admin-roles-api";
+import { onProOn } from "@/lib/pro-on";
 import { logAudit } from "@/lib/audit";
 import { isMissingColumn } from "@/lib/columns";
 import { PAYMENT_BASE_COLS, PAYMENT_COLS, renewedEndsOn, type PlanPayment } from "@/lib/payments";
@@ -56,5 +57,6 @@ export async function POST(request: Request) {
   const { error } = await ctx.admin.from("plan_payments").update({ status: "confirmed", paid_on: today, ...decided }).eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   await logAudit({ actorId: ctx.me.id, actorEmail: ctx.me.email, action: "payment.confirmed", entityType: "user", entityId: pay.user_id, details: { amount: pay.amount, period: pay.period, endsOn, reference: pay.reference, method: pay.method, btc: pay.btc_amount ?? undefined, txid: pay.txid ?? undefined } }).catch(() => {});
+  await onProOn(ctx.admin, pay.user_id);
   return NextResponse.json({ ok: true, endsOn });
 }

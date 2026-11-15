@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -2713,6 +2713,93 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["utility_bills", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("pro limits: the admin sets them, Free sees the AI scan meter and the used-up notice, the documents limit and locked features, and bills held for Pro arrive when Pro comes on", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000); actx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage(); const ap = await actx.newPage();
+    const month = today.slice(0, 7);
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // before the start day nothing is limited
+      assert((await (await page.request.get(`${BASE}/api/ocr/usage`)).json()).limited === false, "no limits until the admin sets a start day");
+      // the admin sets the limits
+      await ap.goto(`${BASE}/admin/pro-limits`);
+      await ap.getByTestId("lim-start").fill(addDays(today, -1));
+      await ap.locator("#lim-scans").fill("2");
+      await ap.locator("#lim-free-docs").fill("1");
+      await ap.getByTestId("lim-save").click();
+      for (let i = 0; i < 40 && !fake.table("pro_limits").length; i++) await new Promise((ok) => setTimeout(ok, 250));
+      const row = fake.table("pro_limits")[0];
+      assert(row && row.starts_on === addDays(today, -1) && Number(row.free_ai_scans) === 2 && Number(row.free_documents) === 1, "the limits are saved: " + JSON.stringify(row));
+      // AI scans: 1 of 2, then used up
+      fake.table("ai_scan_usage").push({ user_id: PAT, month, count: 1 });
+      const u1 = await (await page.request.get(`${BASE}/api/ocr/usage`)).json();
+      assert(u1.limited && u1.used === 1 && u1.limit === 2 && u1.left === 1 && !u1.exhausted, "1 of 2 used: " + JSON.stringify(u1));
+      await page.goto(`${BASE}/trips/${TRIP_ID}/add-expense`);
+      await page.getByTestId("ai-meter").waitFor();
+      assert(/1 of 2/.test(await page.getByTestId("ai-meter-count").textContent()), "the meter shows 1 of 2");
+      fake.table("ai_scan_usage")[0].count = 2;
+      const photo = { name: "r.png", mimeType: "image/png", buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64") };
+      const over = await page.request.post(`${BASE}/api/ocr`, { multipart: { file: photo } });
+      const ob = await over.json();
+      assert(over.status() === 429 && ob.reason === "quota" && ob.limit === 2, "a used-up Free account is told to use on-device reading: " + over.status() + JSON.stringify(ob));
+      await page.reload();
+      await page.getByTestId("ai-meter-used-up").waitFor();
+      await page.getByTestId("ai-meter-get-pro").waitFor();
+      // Pro and admins are never limited
+      assert((await (await ap.request.get(`${BASE}/api/ocr/usage`)).json()).limited === false, "an admin has no limit");
+      // documents: Free holds 1
+      fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000004aa", user_id: PAT, kind: "visa", title: "Limit Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/documents`);
+      await page.getByTestId("doc-limit").waitFor();
+      assert(/1 of 1/.test(await page.locator("body").textContent()), "the page says 1 of 1 on the Free plan");
+      assert(await page.getByTestId("doc-add").isDisabled(), "Add is off when the vault is full");
+      await page.getByTestId("doc-get-pro").waitFor();
+      await page.getByTestId("doc-reminders-locked").waitFor();
+      // bill import by email is Pro
+      await page.goto(`${BASE}/personal/utilities/emails`);
+      await page.getByTestId("bills-email-locked").waitFor();
+      await page.getByTestId("bills-email-get-pro").waitFor();
+      // Telegram: Pro-only notice in settings
+      await page.route("**/api/telegram/link", (route) => route.fulfill({ json: { linked: false, botUsername: "lifolio_test_bot", link: "https://t.me/lifolio_test_bot?start=x", prefs: {} } }));
+      await page.goto(`${BASE}/settings`);
+      await page.getByTestId("telegram-pro-only").waitFor();
+      await page.unroute("**/api/telegram/link");
+      // the Get Pro page compares the plans (once prices and a bank are set)
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByLabel("Monthly").fill("12");
+      await ap.getByLabel("Yearly").fill("120");
+      await ap.getByTestId("pay-add-account").click();
+      await ap.getByLabel("Bank").first().fill("Aruba Bank");
+      await ap.getByLabel("Account number").first().fill("1234567890");
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Saved\. People see this/).waitFor();
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-compare").waitFor();
+      // a bill sent by email waits for Pro, then is added when Pro comes on
+      const key = "c".repeat(32);
+      fake.table("bill_email_addresses").push({ user_id: PAT, token: key, created_at: new Date().toISOString() });
+      fake.table("bill_email_senders").push({ id: "5e000000-0000-4000-8000-000000000001", user_id: PAT, email: "noreply@elmar.aw", accounts: [], created_at: new Date().toISOString() });
+      const mail = { From: "ELMAR <noreply@elmar.aw>", Subject: "Your new ELMAR bill is ready", Date: new Date().toISOString(), MessageID: "lim1", TextBody: "Account Number: 541324-1019191\n- New Bill Amount: AWG 116.17\n- Bill Due Date: Dec 14, 2026", Auth: "", Attachments: [] };
+      const held = await page.request.post(`${BASE}/api/email/gmail`, { headers: { "x-bill-key": key }, data: mail });
+      assert(held.status() === 200 && (await held.json()).status === "needs_pro", "the bill waits for Pro");
+      assert(fake.table("bill_email_held").length === 1 && fake.table("utility_bills").length === 0, "the bill is kept, not added");
+      const on = await ap.request.put(`${BASE}/api/admin/plans`, { data: { userId: PAT, period: "gift" } });
+      assert(on.status() === 200, "the admin switches Pro on: " + on.status());
+      for (let i = 0; i < 40 && !fake.table("utility_bills").length; i++) await new Promise((ok) => setTimeout(ok, 250));
+      assert(fake.table("utility_bills").length === 1 && fake.table("bill_email_held").length === 0, "the held bill is added once Pro is on and the held copy is gone");
+      // and Pro is no longer limited
+      assert((await (await page.request.get(`${BASE}/api/ocr/usage`)).json()).limited === false, "Pro has no AI scan limit");
+    } finally {
+      await ctx.close(); await actx.close();
+      for (const t of ["pro_limits", "ai_scan_usage", "bill_email_held", "payment_settings", "user_plans", "utility_bills", "bill_email_addresses", "bill_email_senders", "bill_email_log", "travel_documents"]) fake.table(t).splice(0);
     }
   });
 

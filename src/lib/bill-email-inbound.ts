@@ -14,7 +14,7 @@ export type InboundPayload = {
 };
 
 export type InboundResult =
-  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "wrong_account" | "unreadable" | "confirmation" | "skipped_duplicate" | "added"; billId?: string }
+  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "wrong_account" | "unreadable" | "confirmation" | "skipped_duplicate" | "added" | "needs_pro"; billId?: string }
   | { ok: false; error: string };
 
 const MAX_PDF = 4 * 1024 * 1024;
@@ -72,7 +72,7 @@ type Notify = (userId: string, bill: { company: string; month: string; due: stri
  * One email arriving at someone's private address. `db` is the service client (nobody signed in is calling).
  * Never throws for bad mail: everything ends in a log line the person can read.
  */
-export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0, verify: VerifyMode = "off"): Promise<InboundResult> {
+export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0, verify: VerifyMode = "off", locked?: (userId: string) => Promise<boolean>): Promise<InboundResult> {
   const token = tokenFromRecipient(p.OriginalRecipient || p.To, p.MailboxHash);
   if (!token) return { ok: true, status: "no_address" };
   const addr = await db.from("bill_email_addresses").select("user_id").eq("token", token).maybeSingle();
@@ -130,6 +130,13 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
     }
   }
 
+  // Bills by email is a Pro feature: keep this verified bill and add it when Pro is on
+  if (locked && (await locked(userId))) {
+    await holdBill(db, userId, p);
+    await log("needs_pro", { summary: `${parsed.company} · ${monthName(parsed.bill_month)}: waiting for Pro`, account: parsed.account });
+    return { ok: true, status: "needs_pro" };
+  }
+
   const dup = await db.from("utility_bills").select("id").eq("user_id", userId).eq("dedupe_key", bill.dedupe_key).maybeSingle();
   if (dup.data) { await log("skipped_duplicate", { summary: `${parsed.company} ${monthName(parsed.bill_month)}: already added`, bill_id: (dup.data as { id: string }).id, account: parsed.account }); return { ok: true, status: "skipped_duplicate" }; }
 
@@ -158,6 +165,35 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   await log("added", { summary, bill_id: billId, account: parsed.account });
   await notify(userId, { company, month: monthName(parsed.bill_month), due: parsed.due_date });
   return { ok: true, status: "added", billId };
+}
+
+const HELD_MAX = 20;
+const HELD_BYTES = 1_500_000;
+
+/** Keep a checked email for later. A big PDF is dropped to save space: the bill itself is still added. */
+async function holdBill(db: SupabaseClient, userId: string, p: InboundPayload) {
+  let payload: InboundPayload = p;
+  if (JSON.stringify(p).length > HELD_BYTES) payload = { ...p, Attachments: [] };
+  await db.from("bill_email_held").insert({ user_id: userId, payload });
+  const old = await db.from("bill_email_held").select("id").eq("user_id", userId).order("created_at", { ascending: false }).range(HELD_MAX, HELD_MAX + 100);
+  const ids = ((old.data ?? []) as { id: string }[]).map((r) => r.id);
+  if (ids.length) await db.from("bill_email_held").delete().in("id", ids);
+}
+
+/** Pro just came on: add the bills that were waiting. Returns how many were handled. */
+export async function releaseHeldBills(db: SupabaseClient, userId: string, notify: Notify = async () => 0): Promise<number> {
+  const { data, error } = await db.from("bill_email_held").select("id, payload").eq("user_id", userId).order("created_at", { ascending: true }).limit(HELD_MAX);
+  if (error || !data?.length) return 0;
+  let done = 0;
+  for (const row of data as { id: string; payload: InboundPayload }[]) {
+    // claim the row first so two releases cannot add the same bill twice
+    const { data: gone } = await db.from("bill_email_held").delete().eq("id", row.id).select("id");
+    if (!(gone ?? []).length) continue;
+    await handleInbound(db, row.payload, notify, "off");
+    done++;
+  }
+  await db.from("bill_email_log").delete().eq("user_id", userId).eq("status", "needs_pro");
+  return done;
 }
 
 /** The utility_bills row for a parsed email: amount 0 with a check mark when the email had none. */

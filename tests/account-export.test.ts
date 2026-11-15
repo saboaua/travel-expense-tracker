@@ -27,6 +27,8 @@ const NOT_EXPORTED = new Set([
   "bill_email_addresses", "bill_email_senders", "bill_email_log", // private forwarding address, sender list and mail log
   "sharing_settings", "trip_flights", "iptv_clients", "iptv_customers", // separate features with their own data tools
   "plan_payments", // payments for Pro, kept for the books
+  "ai_scan_usage", // monthly AI scan counter, resets by itself
+  "bill_email_held", // bills waiting for Pro, added when Pro comes on
   "user_plans", // the plan an admin switched on for you, not data you entered
 ]);
 const sql = readdirSync("supabase").filter((f) => f.endsWith(".sql")).map((f) => readFileSync(`supabase/${f}`, "utf8")).join("\n");

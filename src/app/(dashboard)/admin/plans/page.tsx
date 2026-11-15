@@ -91,6 +91,7 @@ export default function AdminPlansPage() {
       {error && <Alert>{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
       <Link href="/admin/payment-settings" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="payment-settings-link">Prices and bank accounts</Link>
+      <Link href="/admin/pro-limits" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="pro-limits-link">Pro plan limits</Link>
 
       {pending.length > 0 && (
         <section className="space-y-2" data-testid="pay-pending">

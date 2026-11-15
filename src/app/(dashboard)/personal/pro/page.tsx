@@ -4,6 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Bitcoin, Check, Clock, Copy, Crown, Landmark } from "lucide-react";
 import { BitcoinPay } from "@/components/pro/BitcoinPay";
 import { withColumnFallback } from "@/lib/columns";
+import { proComparison } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -29,6 +31,7 @@ export default function GetProPage() {
   const [error, setError] = useState<string | null>(null);
   const [btc, setBtc] = useState<{ available: boolean; confirmations: number }>({ available: false, confirmations: 0 });
   const [tab, setTab] = useState<"bank" | "bitcoin">("bank");
+  const lim = useLimits();
 
   const load = useCallback(async () => {
     try {
@@ -105,6 +108,14 @@ export default function GetProPage() {
 
           {ready && !pending && (
             <>
+              {lim?.limits.starts_on && !proNow && (
+                <Card><CardContent className="py-4" data-testid="pro-compare">
+                  <div className="flex items-center pb-1.5 text-xs font-extrabold text-muted-foreground"><span className="flex-[1.6]" /><span className="flex-1 text-center">Free</span><span className="flex-1 text-center text-primary">Pro</span></div>
+                  {proComparison(lim.limits).map((r) => (
+                    <div key={r.label} className="flex items-center gap-2 border-t py-2 text-sm"><span className="flex-[1.6] font-semibold">{r.label}</span><span className="flex-1 text-center text-muted-foreground">{r.free}</span><span className="flex-1 text-center font-extrabold text-green-700 dark:text-green-300">{r.pro}</span></div>
+                  ))}
+                </CardContent></Card>
+              )}
               <div className="flex gap-3" role="radiogroup" aria-label="Plan">
                 {(["monthly", "yearly"] as PayPeriod[]).map((p) => (
                   <button key={p} type="button" role="radio" aria-checked={period === p} onClick={() => setPeriod(p)} data-testid={`pro-${p}`} className={cn(pick, period === p ? "border-primary bg-primary/5" : "bg-card")}>

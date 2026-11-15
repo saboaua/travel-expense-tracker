@@ -1,5 +1,6 @@
 "use client";
 
+import { AiScanMeter } from "@/components/pro/AiScanMeter";
 import { BackLink } from "@/components/ui/page-header";
 import { Select } from "@/components/ui/select";
 import { Alert } from "@/components/ui/alert";
@@ -312,6 +313,7 @@ export default function AddExpensePage() {
                 </div>
               )}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              <AiScanMeter />
               {ocrNote && <p className="text-xs text-muted-foreground flex items-start gap-1.5"><ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{ocrNote}</p>}
               <p className="text-xs text-muted-foreground">Photos are automatically resized for storage and print quality.</p>
             </div>

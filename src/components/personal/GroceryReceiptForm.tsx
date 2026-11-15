@@ -1,5 +1,6 @@
 "use client";
 
+import { AiScanMeter } from "@/components/pro/AiScanMeter";
 import { Select } from "@/components/ui/select";
 import { Money } from "@/components/ui/money";
 import { Alert } from "@/components/ui/alert";
@@ -346,6 +347,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
             {(!manual || receiptId) && (
             <div className="space-y-2">
               <label className="text-sm font-medium">Receipt photo</label>
+              <AiScanMeter />
               <ReceiptCapture
                 incoming={incoming}
                 onIncomingTaken={() => setIncoming(null)}

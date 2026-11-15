@@ -2,6 +2,7 @@
  * What the bot does with each message and button press. The webhook route only checks the secret and hands updates here.
  * Uses the service role, so every query is limited to the linked person's own id.
  */
+import { isLocked } from "@/lib/limits-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { answerCallback, getBotConfig, sendMessage } from "@/lib/telegram";
 import { PERSONAL_PROJECT_COLS, TELEGRAM_PENDING_COLS, TELEGRAM_PENDING_COLS_V2, isMissingColumn } from "@/lib/columns";
@@ -43,6 +44,9 @@ const HELP = [
   "/help — this message",
 ].join("\n");
 
+/** What the bot says to a Free person who asks for a Pro feature. Trip reminders still work. */
+const PRO_TEXT = (what: string) => `${what} a Pro feature. Your trip reminders still work.\n\nGet Pro: ${process.env.NEXT_PUBLIC_SITE_URL || "https://lifolio-woad.vercel.app"}/personal/pro`;
+
 const ADMIN_HELP = ["", "Admins:", "/health — app health summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
 
 export async function handleMessage(supabase: Db, message: TgMessage) {
@@ -70,6 +74,7 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
     return cmd.name === "newuser" ? requestNewUser(supabase, chatId, priv, profile, cmd.args) : requestRoleChange(supabase, chatId, priv, profile, cmd.args);
   }
   if (cmd?.name === "summary") {
+    if (await isLocked(supabase, profile.id, "telegram_summary").catch(() => false)) return void (await sendMessage(chatId, PRO_TEXT("Summaries are")));
     const summary = await gatherUserSummary(supabase, todayISO(), profile.id);
     return void (await sendMessage(chatId, summaryIsEmpty(summary) ? "Nothing to report yet: no trips planned and no spending this month." : userSummaryText(summary)));
   }
@@ -89,6 +94,7 @@ export async function handleMessage(supabase: Db, message: TgMessage) {
   const doc = message.document;
   const fileId = photo?.file_id || doc?.file_id;
   if (fileId) {
+    if (await isLocked(supabase, profile.id, "telegram_save").catch(() => false)) return void (await sendMessage(chatId, PRO_TEXT("Saving by chat is")));
     const mime = doc?.mime_type || "image/jpeg";
     return handleUpload(supabase, chatId, profile, { file_id: fileId, mime, file_name: doc?.file_name || "receipt.jpg" }, message.caption ?? null);
   }

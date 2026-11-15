@@ -4,6 +4,7 @@ import { claimOnce, sendPush } from "@/lib/push";
 import { clockText } from "@/lib/push-text";
 import { documentTier, type ReminderDoc } from "@/lib/telegram-reminders";
 import { kindLabel } from "@/lib/documents";
+import { isLocked } from "@/lib/limits-server";
 import { addDaysISO } from "@/lib/utils";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
@@ -68,9 +69,13 @@ export async function documentsExpiring(db: SupabaseClient, today: string): Prom
   const r = await db.from("travel_documents").select("id, user_id, kind, title, expiry_date").not("expiry_date", "is", null).limit(5000);
   if (r.error) { if (missing(r.error.message)) return 0; throw new Error(r.error.message); }
   let n = 0;
+  const lockedFor = new Map<string, boolean>();
   for (const d of (r.data ?? []) as ReminderDoc[]) {
     const step = documentTier(d, today);
     if (!step) continue;
+    // Expiry reminders are a Pro feature once the limits have started
+    if (!lockedFor.has(d.user_id)) lockedFor.set(d.user_id, await isLocked(db, d.user_id, "doc_reminders", today).catch(() => false));
+    if (lockedFor.get(d.user_id)) continue;
     if (!(await claimOnce(d.user_id, `doc:${d.id}:${d.expiry_date}:${step.tier}`))) continue;
     n += await sendPush(d.user_id, "document", "documents", { label: kindLabel(d.kind), days: step.days, date: d.expiry_date }, { today });
   }

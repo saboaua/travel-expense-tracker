@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
+import { serviceDb } from "@/lib/service-db";
+import { countAiScan, scanStatusFor } from "@/lib/limits-server";
 import { createClient } from "@/lib/supabase/server";
 import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, recheckGroceryWithAi, type GroceryScan, extractReceiptWithAi } from "@/lib/ocr-ai";
 
@@ -47,17 +49,27 @@ export async function POST(request: Request) {
   }
   const currency = String(form.get("currency") || "").toUpperCase();
 
+  // Free plan: a monthly number of AI scans. The second look at a grocery receipt belongs to the scan before it. Over the number the phone reads the photo itself.
+  const mode = String(form.get("mode") || "");
+  const db = serviceDb();
+  let counted = false;
+  const count = async () => { if (db && !counted && mode !== "grocery-recheck") { counted = true; await countAiScan(db, user.id).catch(() => {}); } };
+  if (db && mode !== "grocery-recheck") {
+    const st = await scanStatusFor(db, user.id).catch(() => null);
+    if (st?.exhausted) return NextResponse.json({ error: "AI scans used up", reason: "quota", used: st.used, limit: st.limit, resetsOn: st.resetsOn }, { status: 429 });
+  }
+
   const image = { data: new Uint8Array(await file.arrayBuffer()), mime: file.type };
   const hints = { currency: /^[A-Z]{3}$/.test(currency) ? currency : null, categories };
 
   try {
     if (form.get("mode") === "document") {
       const result = await extractDocumentWithAi(image);
-      return NextResponse.json({ result });
+      { await count(); return NextResponse.json({ result }); }
     }
     if (form.get("mode") === "flight") {
       const result = await extractFlightWithAi(image);
-      return NextResponse.json({ result });
+      { await count(); return NextResponse.json({ result }); }
     }
     if (form.get("mode") === "grocery-recheck") {
       // The first reading arrives with the photo; the answer is a better reading or null
@@ -71,14 +83,14 @@ export async function POST(request: Request) {
         items: first.items.map((i) => ({ name: String(i?.name ?? "").slice(0, 160), quantity: num(i?.quantity) || 1, unit_price: num(i?.unit_price) ?? 0, line_total: num(i?.line_total) ?? 0, category: String(i?.category ?? "Other").slice(0, 60), unit: i?.unit ? String(i.unit).slice(0, 4) : null })),
       };
       const result = await recheckGroceryWithAi(image, hints, first);
-      return NextResponse.json({ result });
+      { await count(); return NextResponse.json({ result }); }
     }
     if (form.get("mode") === "grocery") {
       const result = await extractGroceryChecked(image, hints);
-      return NextResponse.json({ result });
+      { await count(); return NextResponse.json({ result }); }
     }
     const result = await extractReceiptWithAi(image, hints);
-    return NextResponse.json({ result });
+    { await count(); return NextResponse.json({ result }); }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error("[ocr]", msg);

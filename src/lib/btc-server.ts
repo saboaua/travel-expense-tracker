@@ -1,14 +1,10 @@
 /** Server helpers for Bitcoin Pro payments. */
-import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { PAYMENT_BASE_SETTINGS_COLS, PAYMENT_SETTINGS_COLS, EMPTY_SETTINGS, type PaymentSettings } from "@/lib/payments";
 import { isMissingColumn } from "@/lib/columns";
 import { deriveAddress, parseExtendedKey, type XpubType } from "@/lib/bitcoin-xpub";
 
-export function serviceDb() {
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return null;
-  return createServiceClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
-}
-export type ServiceDb = NonNullable<ReturnType<typeof serviceDb>>;
+export { serviceDb, type ServiceDb } from "@/lib/service-db";
+import type { ServiceDb } from "@/lib/service-db";
 
 /** Payment settings, with Bitcoin switched off when the Bitcoin migration has not been run. */
 export async function loadSettings(db: ServiceDb): Promise<PaymentSettings | null> {

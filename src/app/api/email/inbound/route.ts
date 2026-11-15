@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "crypto";
 import { handleInbound, verifyMode, type InboundPayload } from "@/lib/bill-email-inbound";
 import { sendPush, serviceClient } from "@/lib/push";
+import { isLocked } from "@/lib/limits-server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -30,7 +31,7 @@ export async function POST(req: Request) {
   const db = serviceClient();
   if (!db) return NextResponse.json({ ok: false, error: "Service role key missing" }, { status: 503 });
   try {
-    const result = await handleInbound(db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH));
+    const result = await handleInbound(db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH), (uid) => isLocked(db, uid, "bills_email"));
     if (!result.ok) console.error("[bill-email]", result.error);
     return NextResponse.json(result.ok ? { ok: true, status: result.status } : { ok: false });
   } catch (e) {

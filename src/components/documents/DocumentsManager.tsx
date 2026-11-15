@@ -5,7 +5,7 @@ import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CloudOff, Crop, Loader2, Plus, Sparkles, X } from "lucide-react";
+import { Camera, CloudOff, Crop, Loader2, Lock, Plus, Sparkles, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,6 +23,10 @@ import { applyDocumentOutbox, deleteDocument, isDocumentSave, makeDocumentApi, s
 import { browserOutbox, SYNCED_EVENT } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { DocLimitNotice } from "@/components/pro/DocLimit";
+import { AiScanMeter } from "@/components/pro/AiScanMeter";
+import { docStatus, featureLocked } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
 
 /**
  * Lists and uploads documents. With a tripId it shows that trip's documents,
@@ -66,6 +70,11 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   const { items: waiting } = useOutbox(userId);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const lim = useLimits();
+  const [totalDocs, setTotalDocs] = useState<number | null>(null);
+  const today0 = todayISO();
+  const docLimit = lim && totalDocs != null ? docStatus(lim.limits, lim.who, totalDocs + waiting.filter((i) => isDocumentSave(i) && !docs.some((d) => d.id === i.id)).length, today0) : null;
+  const remindersLocked = !!lim && featureLocked(lim.limits, lim.who, "doc_reminders", today0);
   const visibleDocs = useMemo(() => applyDocumentOutbox(docs, waiting, tripId), [docs, waiting, tripId]);
   const waitingIds = useMemo(() => new Set(waiting.filter((i) => i.kind.startsWith("document.")).map((i) => i.id)), [waiting]);
   const waitingHere = visibleDocs.filter((d) => waitingIds.has(d.id)).length;
@@ -86,6 +95,8 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       return;
     }
     const list = res.data;
+    // How many documents the person holds in all (trip documents count too), for the Free plan limit
+    if (!res.fromCache) { const c = await supabase.from("travel_documents").select("id", { count: "exact", head: true }).eq("user_id", userId!); if (!c.error && c.count != null) setTotalDocs(c.count); }
     setSavedAt(res.fromCache ? res.savedAt : null);
     setDocs(list);
     const paths = list.map((d) => d.file_path).filter(Boolean) as string[];
@@ -179,6 +190,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     setError(null);
     const label = title.trim() || (kind === "passport" ? "Passport" : file?.name.replace(/\.[^.]+$/, "") || "");
     if (!label) return setError("Give the document a name.");
+    if (docLimit?.full && !editing) return setError(`Your ${lim?.who.pro ? "Pro" : "Free"} plan holds ${docLimit.limit} documents.`);
     if (kind === "passport" && !expiry) return setError("Enter the passport expiry date so we can remind you to renew it.");
     setSaving(true);
     try {
@@ -316,6 +328,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
   }, [adding, cropping, title, number, country, expiry, notes, file, editing, saving]);
 
   const openAdd = () => {
+    if (docLimit?.full) return;
     setEditing(null);
     setAdding(true);
     setTimeout(() => formRef.current?.scrollIntoView({ behavior: "smooth", block: "center" }), 50);
@@ -326,8 +339,8 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       {!tripId && (
         <PageHeader
           title="Documents"
-          description="Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid."
-          actions={<Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd}><Plus className="h-4 w-4" /> Add document</Button>}
+          description={docLimit && docLimit.limit != null ? `${docLimit.count} of ${docLimit.limit} on the ${lim?.who.pro ? "Pro" : "Free"} plan` : "Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid."}
+          actions={<Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd} disabled={!!docLimit?.full} data-testid="doc-add">{docLimit?.full ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />} Add document</Button>}
         />
       )}
       {cropping && <ReceiptCropper file={cropping.file} title="Crop to the part you need" hint="Keep the whole page in view, including the two lines of < < < at the bottom of a passport." initialCrop={{ x: 2, y: 2, w: 96, h: 96 }} onDone={onCropped} onCancel={() => { setCropping(null); if (!cropped) { setOriginal(null); } }} />}
@@ -335,6 +348,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       {!tripId && <OfflineNotice savedAt={savedAt} writable />}
       {waitingHere > 0 && <p data-testid="docs-waiting" className="flex items-center gap-1.5 text-xs text-amber-700 dark:text-amber-300"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> {waitingHere} waiting to sync</p>}
       {error && !adding && <Alert>{error}</Alert>}
+      {!tripId && docLimit && <DocLimitNotice status={docLimit} pro={!!lim?.who.pro} remindersLocked={remindersLocked} />}
 
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
@@ -370,6 +384,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
               {scanning ? "Reading…" : "Scan with camera"}
             </button>
             <p className="mt-2 text-xs text-muted-foreground">Take a photo of your passport page (or any travel document) and we fill in the details for you.</p>
+            <AiScanMeter className="mt-2" />
             {scanNote && (
               <p className="mt-2 flex items-start gap-1.5 text-xs text-foreground" role="status">
                 <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
@@ -465,8 +480,8 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
         </form>
         </div>
       ) : tripId ? (
-        <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => { setEditing(null); setAdding(true); }}>
-          <Plus className="h-4 w-4" /> Add document
+        <Button type="button" variant="outline" size="sm" className="gap-2" disabled={!!docLimit?.full} onClick={() => { if (docLimit?.full) return; setEditing(null); setAdding(true); }}>
+          {docLimit?.full ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />} Add document
         </Button>
       ) : null}
     </div>

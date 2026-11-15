@@ -2,6 +2,7 @@
  * Messages the app sends on its own (trip reminders, admin alerts). The rules are pure and tested;
  * `sendToUser` / `sendToAdmins` add the database and Telegram calls around them.
  */
+import { isLocked } from "@/lib/limits-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendMessage } from "@/lib/telegram";
 
@@ -100,6 +101,8 @@ export async function sendToUser(
 ): Promise<SendResult> {
   const { data: profile } = await supabase.from("profiles").select("telegram_id").eq("id", userId).maybeSingle();
   if (!profile?.telegram_id) return "not_linked";
+  // Summaries and document expiry reminders are Pro features once the limits have started
+  if ((kind === "summary" || kind === "document_reminder") && (await isLocked(supabase, userId, kind === "summary" ? "telegram_summary" : "doc_reminders").catch(() => false))) return "kind_off";
 
   const decision = shouldSend(await loadPrefs(supabase, userId), kind, opts.now ?? new Date(), opts.urgent);
   if (!decision.send) return decision.reason === "ok" ? "failed" : decision.reason;
