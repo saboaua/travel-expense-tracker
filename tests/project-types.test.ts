@@ -54,9 +54,9 @@ const xlsx = await buildProjectWorkbook(data);
 eq("the Excel file is a zip", new Uint8Array(xlsx as ArrayBuffer).slice(0, 2).join(","), "80,75");
 const ExcelJS = (await import("exceljs")).default;
 const wb = new ExcelJS.Workbook(); await wb.xlsx.load(xlsx as ArrayBuffer);
-const ws = wb.getWorksheet("Expenses")!;
+const ws = wb.getWorksheet("Report")!;
 eq("Excel has the project name and every expense", [ws.getCell("A1").value, ws.getCell("B5").value, ws.getCell("B6").value], ["Yamaha service", "", "Hardware Store"]);
-eq("Excel total", ws.getCell("F7").value, 75.87);
+eq("Excel total", ws.getCell("E7").value, 75.87);
 const pdfBig = await buildProjectPdf({ ...data, lines: Array.from({ length: 120 }, (_, i) => ({ ...lines[0], merchant: `Shop ${i} ${"x".repeat(80)} é ✓` })) });
 eq("a long list runs onto more pages without failing", pdfBig.length > pdf.length, true);
 

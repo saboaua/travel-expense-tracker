@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { compressAvatarImage } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
+import { BusinessLogoField } from "@/components/BusinessLogoField";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
@@ -308,6 +309,8 @@ export default function ProfilePage() {
                 placeholder="Acme Inc."
               />
             </div>
+
+            <BusinessLogoField />
 
             <div className="space-y-2">
               <p className="text-sm font-medium">Email</p>

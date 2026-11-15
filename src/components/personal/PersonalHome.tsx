@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Money } from "@/components/ui/money";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
-import { Coins, CreditCard, Hammer, Landmark, Plus, Repeat } from "lucide-react";
+import { Coins, CreditCard, Hammer, Landmark, Plus, Repeat, FileBarChart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
@@ -43,6 +43,7 @@ function KeepHandy({ testId }: { testId: string }) {
     { href: "/personal/loyalty", label: "Loyalty cards", icon: CreditCard, primary: false, show: perms.has("loyalty") },
     { href: "/personal/projects", label: "Projects", icon: Hammer, primary: false, show: perms.has("personal") },
     { href: "/personal/fixed", label: "Fixed costs", icon: Landmark, primary: false, show: perms.has("personal") },
+    { href: "/personal/reports", label: "Reports", icon: FileBarChart, primary: false, show: perms.has("personal") },
   ].filter((i) => i.show);
   if (items.length === 0) return null;
   return (

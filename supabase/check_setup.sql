@@ -21,6 +21,7 @@ need_cols(tbl, col, fix) as (values
   ('utility_bills','dedupe_key','migration_bill_emails.sql'),
   ('utility_bills','needs_check','migration_bill_emails.sql'),
   ('utility_bills','payment_ref','migration_utility_payment_ref.sql'),
+  ('profiles','business_logo_path','migration_report_logo.sql'),
   ('personal_projects','project_type','migration_project_types_plans.sql'),
   ('personal_projects','type_label','migration_project_types_plans.sql'),
   ('personal_projects','type_icon','migration_project_types_plans.sql'),

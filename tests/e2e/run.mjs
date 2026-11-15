@@ -1801,7 +1801,7 @@ try {
       await page.getByTestId("export-excel-locked").waitFor();
       if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/proj-detail.png", fullPage: true });
       assert((await page.getByTestId("export-pdf-locked").count()) === 1 && /Pro feature/.test(await page.getByTestId("project-export").textContent()), "both reports show a Pro lock and the note");
-      const locked = await page.evaluate(async (id) => { const r = await fetch(`/api/export/project/${id}/excel`); return r.status; }, car.id);
+      const locked = await page.evaluate(async (id) => { const r = await fetch(`/api/export/report?scope=project&id=${id}&format=excel`); return r.status; }, car.id);
       assert(locked === 402, "the server refuses the report without Pro: " + locked);
       // the admin turns Pro on
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
@@ -1818,19 +1818,93 @@ try {
       // now Pat can download both
       await page.reload();
       await page.getByTestId("export-excel").waitFor();
-      const got = await page.evaluate(async (id) => { const out = {}; for (const f of ["excel", "pdf"]) { const r = await fetch(`/api/export/project/${id}/${f}`); const b = new Uint8Array(await r.arrayBuffer()); out[f] = [r.status, r.headers.get("content-type"), String.fromCharCode(...b.slice(0, 4))]; } return out; }, car.id);
+      const got = await page.evaluate(async (id) => { const out = {}; for (const f of ["excel", "pdf"]) { const r = await fetch(`/api/export/report?scope=project&id=${id}&format=${f}`); const b = new Uint8Array(await r.arrayBuffer()); out[f] = [r.status, r.headers.get("content-type"), String.fromCharCode(...b.slice(0, 4))]; } return out; }, car.id);
       assert(got.pdf[0] === 200 && /pdf/.test(got.pdf[1]) && got.pdf[2] === "%PDF", "the PDF downloads: " + JSON.stringify(got));
       assert(got.excel[0] === 200 && /spreadsheet/.test(got.excel[1]) && got.excel[2].startsWith("PK"), "the Excel file downloads: " + JSON.stringify(got));
       // an ended plan is free again
       plan.ends_on = "2020-01-01";
       await page.reload();
       await page.getByTestId("export-excel-locked").waitFor();
-      assert((await page.evaluate(async (id) => (await fetch(`/api/export/project/${id}/pdf`)).status, car.id)) === 402, "an ended plan is refused");
+      assert((await page.evaluate(async (id) => (await fetch(`/api/export/report?scope=project&id=${id}&format=pdf`)).status, car.id)) === 402, "an ended plan is refused");
     } finally {
       await ctx.close();
       await actx.close();
       fake.table("user_plans").splice(0);
       for (const n of ["Toyota Hilux service", "Anna and Ray wedding", "Roof patch"]) { const a = fake.table("personal_projects"); const i = a.findIndex((r) => r.name === n); if (i >= 0) a.splice(i, 1); }
+    }
+  });
+
+  await test("reports: add a logo in Profile, then a month overview, groceries and project report carry it, and it can be switched off", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const ExcelJS = (await import("exceljs")).default;
+    const month = new Date().toISOString().slice(0, 7);
+    const day = `${month}-02`;
+    const RID = "9c000000-0000-4000-8000-00000000b0b1", PID = "9c000000-0000-4000-8000-00000000b0b2";
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    try {
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "gift", ends_on: null });
+      const prof = fake.table("profiles").find((r) => r.id === PAT);
+      prof.company_name = "Lotto Brands Aruba";
+      fake.table("grocery_receipts").push({ id: RID, user_id: PAT, store: "Super Food", purchase_date: day, total: 25, currency: "AWG", prices_only: false });
+      fake.table("grocery_items").push({ id: "9c000000-0000-4000-8000-00000000b0b3", user_id: PAT, receipt_id: RID, name: "Whole milk", category: "Dairy", quantity: 2, unit_price: 5, line_total: 10 });
+      fake.table("personal_spends").push({ id: "9c000000-0000-4000-8000-00000000b0b4", user_id: PAT, merchant: "Coffee Shop", amount: 4.5, currency: "AWG", amount_usd: 2.51, category: "Street food", expense_date: day, notes: null });
+      fake.table("personal_projects").push({ id: PID, user_id: PAT, kind: "home_project", name: "Garage door", destination: null, description: null, start_date: null, end_date: null, budget: null, currency: "USD", status: "active", created_at: new Date().toISOString() });
+      fake.table("personal_expenses").push({ id: "9c000000-0000-4000-8000-00000000b0b5", user_id: PAT, project_id: PID, merchant: "Hardware", amount: 40, currency: "USD", amount_usd: 40, category: "Materials", expense_date: day, notes: null });
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // the logo is added once, in Profile
+      await page.goto(`${BASE}/profile`);
+      await page.getByRole("button", { name: /Personal information/ }).click();
+      await page.getByTestId("business-logo").waitFor();
+      await page.getByTestId("business-logo-input").setInputFiles({ name: "logo.png", mimeType: "image/png", buffer: PNG });
+      await page.getByTestId("business-logo-img").waitFor();
+      assert(String(prof.business_logo_path || "").startsWith(`${PAT}/logo/`), "the logo path is saved on the profile: " + prof.business_logo_path);
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/rep-profile.png", fullPage: true });
+      // the Reports page
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("keep-handy-mobile").getByRole("link", { name: "Reports" }).click();
+      await page.waitForURL((u) => u.pathname === "/personal/reports");
+      await page.getByTestId("report-excel").waitFor();
+      await page.getByTestId("logo-preview").waitFor();
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/rep-page.png", fullPage: true });
+      const href = await page.getByTestId("report-excel").getAttribute("href");
+      assert(/scope=month/.test(href) && new RegExp(`month=${month}`).test(href) && /logo=1/.test(href), "the Excel link asks for this month with the logo: " + href);
+      const get = async (q) => { const r = await ctx.request.get(`${BASE}/api/export/report?${q}`); return { status: r.status(), type: r.headers()["content-type"], body: await r.body() }; };
+      const sheet = async (body) => { const wb = new ExcelJS.Workbook(); await wb.xlsx.load(body); return wb; };
+      const cells = (wb) => { const out = []; wb.getWorksheet("Report").eachRow((r) => r.eachCell((c) => out.push(String(c.value?.result ?? c.value)))); return out.join("|"); };
+      const m = await get(`scope=month&month=${month}&format=excel&logo=1`);
+      const mw = await sheet(m.body);
+      assert(m.status === 200 && mw.model.media?.length === 1, "the month overview carries the logo picture: " + m.status + " media " + mw.model.media?.length);
+      assert(/Lotto Brands Aruba/.test(cells(mw)) && /Super Food/.test(cells(mw)) && /Coffee Shop/.test(cells(mw)) && /Garage door|Hardware/.test(cells(mw)), "it lists the receipt, the quick spend and the project expense: " + cells(mw).slice(0, 400));
+      const off = await sheet((await get(`scope=month&month=${month}&format=excel&logo=0`)).body);
+      assert((off.model.media?.length ?? 0) === 0 && !/Lotto Brands Aruba/.test(cells(off)), "with the logo off there is no picture and no company name");
+      const g = await get(`scope=groceries&month=${month}&format=excel&logo=1`);
+      assert(g.status === 200 && /Whole milk/.test(cells(await sheet(g.body))), "the groceries report lists the item: " + g.status);
+      const pdf = await get(`scope=month&month=${month}&format=pdf&logo=1`);
+      assert(pdf.status === 200 && pdf.body.subarray(0, 4).toString() === "%PDF", "the month overview PDF downloads");
+      const pj = await get(`scope=project&id=${PID}&format=excel&logo=1`);
+      const pw = await sheet(pj.body);
+      assert(pj.status === 200 && pw.model.media?.length === 1 && /Hardware/.test(cells(pw)), "the project report carries the logo and the expense");
+      assert((await get(`scope=month&month=2026-13&format=excel`)).status === 400, "a bad month is refused");
+      // the switch turns the logo off in the link
+      await page.getByRole("switch").click();
+      assert(/logo=0/.test(await page.getByTestId("report-excel").getAttribute("href")), "the switch puts logo=0 in the link");
+      // the project filter and link
+      await page.getByTestId("scope-project").click();
+      assert(/scope=project/.test(await page.getByTestId("report-pdf").getAttribute("href")) && new RegExp(`id=${PID}`).test(await page.getByTestId("report-pdf").getAttribute("href")), "the project link names the project");
+      // without Pro the page is locked
+      fake.table("user_plans").splice(0);
+      await page.reload();
+      await page.getByTestId("report-pro-note").waitFor();
+      assert((await page.getByTestId("report-excel").count()) === 0 && (await page.getByTestId("report-excel-off").count()) === 1, "free accounts see locked buttons");
+      assert((await get(`scope=month&month=${month}&format=excel`)).status === 402, "and the server refuses");
+    } finally {
+      await ctx.close();
+      fake.table("user_plans").splice(0);
+      for (const [t, id] of [["grocery_receipts", RID], ["grocery_items", "9c000000-0000-4000-8000-00000000b0b3"], ["personal_spends", "9c000000-0000-4000-8000-00000000b0b4"], ["personal_projects", PID], ["personal_expenses", "9c000000-0000-4000-8000-00000000b0b5"]]) { const a = fake.table(t); const i = a.findIndex((r) => r.id === id); if (i >= 0) a.splice(i, 1); }
+      const pr = fake.table("profiles").find((r) => r.id === PAT); if (pr) { delete pr.business_logo_path; delete pr.company_name; }
     }
   });
 

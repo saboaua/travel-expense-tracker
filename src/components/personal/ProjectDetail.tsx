@@ -24,6 +24,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 import { TypeChip, TypeTile } from "@/components/personal/ProjectType";
 import { resolveType } from "@/lib/personal/project-types";
 import { usePro } from "@/lib/use-pro";
+import { ReportLogoSwitch } from "@/components/reports/ReportLogoSwitch";
 
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
@@ -34,6 +35,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
   const { items: pending } = useOutbox(userId);
   const [error, setError] = useState<string | null>(null);
   const pro = usePro();
+  const [withLogo, setWithLogo] = useState(true);
   // Waiting changes show as if they were already saved
   const project = useMemo(() => (bundle ? (applyRows([bundle.project], pending, "personal_projects")[0] ?? null) : null), [bundle, pending]);
   const expenses = useMemo(
@@ -178,9 +180,10 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
         <Card data-testid="project-export">
           <CardHeader className="pb-2"><CardTitle className="text-base">Reports</CardTitle><CardDescription>The project name, every expense and the totals.</CardDescription></CardHeader>
           <CardContent className="space-y-3">
+            {pro && <ReportLogoSwitch on={withLogo} onChange={setWithLogo} />}
             <div className="flex flex-wrap gap-3">
               {([["excel", "Excel report", FileSpreadsheet], ["pdf", "PDF report", FileText]] as const).map(([f, label, Icon]) => pro ? (
-                <a key={f} href={`/api/export/project/${id}/${f}`} download className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-4 text-sm font-bold hover:bg-accent" data-testid={`export-${f}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</a>
+                <a key={f} href={`/api/export/report?scope=project&id=${id}&format=${f}&logo=${withLogo ? 1 : 0}`} download className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-4 text-sm font-bold hover:bg-accent" data-testid={`export-${f}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</a>
               ) : (
                 <span key={f} aria-disabled="true" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-muted px-4 text-sm font-bold text-muted-foreground" data-testid={`export-${f}-locked`}>
                   <Icon className="h-4 w-4" aria-hidden="true" />{label}

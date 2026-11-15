@@ -230,16 +230,32 @@ export function createFakeSupabase() {
 
   /* ---------------- Storage ---------------- */
 
+  // supabase-js sends a Blob as multipart form data: keep only the file itself, as the real storage does
+  function filePart(req, body) {
+    const m = /multipart\/form-data;\s*boundary=(.+)$/i.exec(String(req.headers["content-type"] || ""));
+    if (!m) return body;
+    const sep = Buffer.from(`--${m[1]}`);
+    let at = body.indexOf(sep);
+    while (at >= 0) {
+      const next = body.indexOf(sep, at + sep.length);
+      const part = body.subarray(at + sep.length, next < 0 ? body.length : next);
+      const split = part.indexOf("\r\n\r\n");
+      if (split >= 0 && /filename=|name=""/.test(part.subarray(0, split).toString("latin1"))) return part.subarray(split + 4, part.length - 2);
+      at = next;
+    }
+    return body;
+  }
+
   function storageApi(req, res, url, rawBody) {
     const p = decodeURIComponent(url.pathname.replace("/storage/v1/object", ""));
     if (req.method === "POST" && p.startsWith("/sign/")) return send(res, 200, { signedURL: `/object/sign${p.slice(5)}?token=x` });
     if ((req.method === "POST" || req.method === "PUT") && !p.startsWith("/sign/")) {
-      storage.set(p.replace(/^\//, ""), rawBody);
+      storage.set(p.replace(/^\//, ""), filePart(req, rawBody));
       log.push({ table: "storage", op: "upload", path: p.replace(/^\//, ""), bytes: rawBody.length });
       return send(res, 200, { Key: p.replace(/^\//, ""), Id: randomUUID() });
     }
     if (req.method === "DELETE") return send(res, 200, []);
-    const data = storage.get(p.replace(/^\/(authenticated|public)\//, "").replace(/^\//, ""));
+    const data = storage.get(p.replace(/^\/(authenticated|public|sign)\//, "").replace(/^\//, ""));
     if (data) { res.writeHead(200, { "content-type": "image/jpeg" }); return res.end(data); }
     return send(res, 404, { message: "Object not found", statusCode: "404" });
   }
