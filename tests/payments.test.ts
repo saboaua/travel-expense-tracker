@@ -1,3 +1,4 @@
+import { planCardText } from "../src/lib/plans";
 import { userReference, priceFor, monthsFree, parseSettings, renewedEndsOn, parseReceived } from "../src/lib/payments";
 
 let fail = 0;
@@ -24,6 +25,12 @@ eq("early renewal keeps days left", renewedEndsOn("monthly", "2026-11-15", "2026
 eq("received ok", parseReceived({ amount: "120", paid_on: "2026-11-15", method: "cmb", reference: " LIF-1 ", note: "" }, "AWG"), { ok: true, value: { amount: 120, paid_on: "2026-11-15", method: "cmb", reference: "LIF-1", note: null } });
 eq("received no amount", parseReceived({ amount: "", paid_on: "2026-11-15" }, "AWG").ok, false);
 eq("received bad date", parseReceived({ amount: 5, paid_on: "x" }, "AWG").ok, false);
+
+eq("card free", planCardText({ isAdmin: false, row: null, today: "2026-11-15" }).title, "Free plan");
+eq("card pro", planCardText({ isAdmin: false, row: { period: "yearly", ends_on: "2027-11-15" }, today: "2026-11-15" }), { title: "Pro, yearly", sub: "Until 2027-11-15 · 365 days left", pro: true, admin: false });
+eq("card no end", planCardText({ isAdmin: false, row: { period: "gift", ends_on: null }, today: "2026-11-15" }).sub, "No end date");
+eq("card ended", planCardText({ isAdmin: false, row: { period: "monthly", ends_on: "2026-10-01" }, today: "2026-11-15" }).title, "Free plan");
+eq("card admin", planCardText({ isAdmin: true, row: null, today: "2026-11-15" }).title, "Pro, admin access");
 
 console.log(fail ? `${fail} FAILED` : "payments: all checks passed");
 process.exit(fail ? 1 : 0);

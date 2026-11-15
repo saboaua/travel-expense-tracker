@@ -1295,6 +1295,15 @@ try {
       await ap.getByText(/Pro is on for/).waitFor();
       const kept = fake.table("plan_payments").filter((r) => r.user_id === PAT && r.method === "cmb");
       assert(kept.length === 1 && kept[0].status === "confirmed" && Number(kept[0].amount) === 12 && kept[0].note === "Paid at the counter", "the payment received is kept: " + JSON.stringify(kept));
+      // the Profile page says which plan this is
+      fake.table("user_plans").splice(0);
+      await page.goto(`${BASE}/profile`);
+      await page.getByTestId("plan-card").waitFor();
+      assert(/Free plan/.test(await page.getByTestId("plan-card-title").innerText()) && /Get Pro/.test(await page.getByTestId("plan-card-link").innerText()), "no plan reads Free plan with Get Pro");
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "yearly", ends_on: "2099-01-01" });
+      await page.reload();
+      await page.getByTestId("plan-card").waitFor();
+      assert(/Pro, yearly/.test(await page.getByTestId("plan-card-title").innerText()) && /Add time/.test(await page.getByTestId("plan-card-link").innerText()), "a Pro plan reads Pro, yearly with Add time");
       // a locked report links to the payment page
       fake.table("user_plans").splice(0);
       await page.goto(`${BASE}/personal/reports`);

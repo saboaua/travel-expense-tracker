@@ -34,3 +34,14 @@ export function planSummary(row: Pick<PlanRow, "period" | "ends_on"> | null | un
   if (!active) return { title: "Free", sub: "Pro ended " + row.ends_on, pro: false };
   return { title: PERIOD_LABEL[row.period] ?? "Pro", sub: row.ends_on ? `Until ${row.ends_on}` : "No end date", pro: true };
 }
+
+/** What the Profile plan card says: the title, the line under it, and whether Pro is on. Admins always have Pro. */
+export function planCardText(opts: { isAdmin: boolean; row: Pick<PlanRow, "period" | "ends_on"> | null | undefined; today: string }): { title: string; sub: string; pro: boolean; admin: boolean } {
+  if (opts.isAdmin) return { title: "Pro, admin access", sub: "Always on for admins", pro: true, admin: true };
+  const s = planSummary(opts.row, opts.today);
+  if (!s.pro) return { title: "Free plan", sub: "Excel and PDF reports are a Pro feature", pro: false, admin: false };
+  const end = opts.row?.ends_on;
+  if (!end) return { title: s.title.replace("Pro, ", "Pro, "), sub: "No end date", pro: true, admin: false };
+  const days = Math.max(0, Math.round((Date.parse(end) - Date.parse(opts.today)) / 86400000));
+  return { title: s.title, sub: `Until ${end} · ${days} day${days === 1 ? "" : "s"} left`, pro: true, admin: false };
+}

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { compressAvatarImage } from "@/lib/compress-image";
 import { Button } from "@/components/ui/button";
 import { BusinessLogoField } from "@/components/BusinessLogoField";
+import { PlanCard } from "@/components/PlanCard";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
@@ -195,6 +196,7 @@ export default function ProfilePage() {
   return (
     <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
       <PageHeader title="Profile" description={<>Manage your personal information, password, and integrations</>} />
+      <PlanCard />
 
       {/* Avatar + basic info card */}
       <Card>
