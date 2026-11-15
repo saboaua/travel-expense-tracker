@@ -72,15 +72,14 @@ export function UtilitiesOverview() {
         {/* Summary: first on a phone, on the right of the lists on a desktop */}
         <aside className="order-1 space-y-3 lg:order-2" aria-label="This month">
           <div className={`${card} p-4`}>
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <p className={secLabel}>Paid in {mName}</p>
-                <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-none tabular-nums" data-testid="util-total">{awg(total)}</p>
-                {pct != null && (
-                  <p className="mt-2"><span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-bold" data-testid="util-change">{pct === 0 ? `Same as ${prevName}` : `${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${prevName}`}</span></p>
-                )}
-              </div>
-              <div className="w-32 shrink-0"><TrendBars data={months} fmt={awg} /></div>
+            <p className={secLabel}>Paid in {mName}</p>
+            <p className="mt-1 whitespace-nowrap text-[30px] font-bold leading-none tabular-nums" data-testid="util-total">{awg(total)}</p>
+            {pct != null && (
+              <p className="mt-2"><span className="inline-flex rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-bold" data-testid="util-change">{pct === 0 ? `Same as ${prevName}` : `${Math.abs(pct)}% ${pct > 0 ? "more" : "less"} than ${prevName}`}</span></p>
+            )}
+            <div className="mt-3.5 border-t pt-3">
+              <p className="mb-1.5 text-xs font-bold text-muted-foreground">Last 4 months</p>
+              <TrendBars data={months} fmt={awg} />
             </div>
             <p className="mt-3 text-xs text-muted-foreground">Florins (AWG, the same as Afl.). Other currencies are converted.</p>
           </div>

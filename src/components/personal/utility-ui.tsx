@@ -33,12 +33,12 @@ export function RefChip({ value }: { value: string }) { return <span data-testid
 export function TrendBars({ data, fmt }: { data: { month: string; usd: number }[]; fmt: (usd: number) => string }) {
   const max = Math.max(...data.map((d) => d.usd), 1);
   return (
-    <div className="flex h-[68px] items-end gap-2" role="img" aria-label={`Paid each month: ${data.map((d) => `${monthShort(d.month)} ${fmt(d.usd)}`).join(", ")}`} data-testid="util-trend">
+    <div className="flex h-[76px] items-end gap-3" role="img" aria-label={`Paid each month: ${data.map((d) => `${monthShort(d.month)} ${fmt(d.usd)}`).join(", ")}`} data-testid="util-trend">
       {data.map((d, i) => {
         const now = i === data.length - 1;
         return (
           <div key={d.month} className="flex flex-1 flex-col items-center gap-1" aria-hidden="true">
-            <div className={cn("w-full max-w-[34px] rounded-md", now ? "bg-primary" : "bg-primary/20")} style={{ height: `${Math.max(6, Math.round((d.usd / max) * 44))}px` }} />
+            <div className={cn("w-full max-w-[40px] rounded-md", now ? "bg-primary" : "bg-primary/20")} style={{ height: `${Math.max(6, Math.round((d.usd / max) * 44))}px` }} />
             <span className={cn("text-[11px]", now ? "font-bold text-primary" : "text-muted-foreground")}>{monthShort(d.month)}</span>
           </div>
         );
