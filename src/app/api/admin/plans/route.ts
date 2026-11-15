@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminService, isMissingTable } from "@/lib/admin-roles-api";
 import { logAudit } from "@/lib/audit";
 import { PLAN_COLS, defaultEndsOn, isIsoDate, isPeriod } from "@/lib/plans";
+import { parseReceived } from "@/lib/payments";
 import { todayISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,7 +29,7 @@ export async function GET() {
   });
 }
 
-/** Body: { userId, period: "monthly" | "yearly" | "gift" | "free", endsOn?: "YYYY-MM-DD" }. Free removes the plan. */
+/** Body: { userId, period: "monthly" | "yearly" | "gift" | "free", endsOn?: "YYYY-MM-DD", payment?: { amount, paid_on, method, reference, note } }. Free removes the plan. A payment is kept in the ledger as confirmed. */
 export async function PUT(request: Request) {
   const ctx = await requireAdminService();
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -48,8 +49,20 @@ export async function PUT(request: Request) {
   if (endsOn !== null && !isIsoDate(endsOn)) return NextResponse.json({ error: "The end date is not a valid date." }, { status: 400 });
   if (endsOn !== null && endsOn < today) return NextResponse.json({ error: "The end date is already past." }, { status: 400 });
 
+  let received: ReturnType<typeof parseReceived> | null = null;
+  if (body.payment) {
+    if (body.period === "gift") return NextResponse.json({ error: "A free gift has no payment. Choose Monthly or Yearly." }, { status: 400 });
+    received = parseReceived(body.payment, "AWG");
+    if (!received.ok) return NextResponse.json({ error: received.error }, { status: 400 });
+  }
   const { error } = await ctx.admin.from("user_plans").upsert({ user_id: userId, plan: "pro", period: body.period, ends_on: endsOn, updated_at: new Date().toISOString(), updated_by: ctx.me.id }, { onConflict: "user_id" });
   if (error) return NextResponse.json({ error: isMissingTable(error.message) ? MISSING : error.message }, { status: 500 });
+  if (received && received.ok) {
+    const { data: cfg } = await ctx.admin.from("payment_settings").select("currency").eq("id", 1).maybeSingle();
+    const { error: payErr } = await ctx.admin.from("plan_payments").insert({ user_id: userId, period: body.period, amount: received.value.amount, currency: cfg?.currency ?? "AWG", method: received.value.method, reference: received.value.reference, note: received.value.note, status: "confirmed", paid_on: received.value.paid_on, decided_at: new Date().toISOString(), decided_by: ctx.me.id });
+    if (payErr) return NextResponse.json({ error: "Pro is on, but the payment was not saved: " + (isMissingTable(payErr.message) ? "run supabase/migration_pro_payments.sql first." : payErr.message) }, { status: 500 });
+    await logAudit({ actorId: ctx.me.id, actorEmail: ctx.me.email, action: "payment.recorded", entityType: "user", entityId: userId, details: { amount: received.value.amount, method: received.value.method, reference: received.value.reference } }).catch(() => {});
+  }
   await logAudit({ actorId: ctx.me.id, actorEmail: ctx.me.email, action: "plan.set", entityType: "user", entityId: userId, details: { period: body.period, endsOn } }).catch(() => {});
   return NextResponse.json({ ok: true });
 }

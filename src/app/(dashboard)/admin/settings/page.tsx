@@ -74,6 +74,14 @@ const sections: { href: string; feature: string; title: string; description: str
     tone: "badges",
   },
   {
+    href: "/admin/payment-settings",
+    feature: "admin.only",
+    title: "Pro payments",
+    description: "The Pro prices, the bank accounts and the instructions people see when they pay by bank transfer.",
+    icon: Crown,
+    tone: "badges",
+  },
+  {
     href: "/admin/doit",
     feature: "admin.only",
     title: "Do it Aruba Prices",

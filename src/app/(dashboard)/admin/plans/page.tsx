@@ -9,9 +9,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Crown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { defaultEndsOn, planSummary, type PlanPeriod, type PlanRow } from "@/lib/plans";
+import { METHOD_LABEL, priceFor, userReference, type PayMethod, type PaymentSettings } from "@/lib/payments";
+import { Money } from "@/components/ui/money";
+import Link from "next/link";
 
 type Person = { id: string; email: string | null; name: string; role: string; plan: PlanRow | null };
 type Choice = PlanPeriod | "free";
+type Pending = { id: string; name: string; period: "monthly" | "yearly"; amount: number; currency: string; reference: string; created_at: string };
 
 const chip = "inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border px-3 text-[13.5px] font-bold";
 
@@ -26,6 +30,14 @@ export default function AdminPlansPage() {
   const [period, setPeriod] = useState<Choice>("monthly");
   const [endsOn, setEndsOn] = useState("");
   const [saving, setSaving] = useState(false);
+  const [pending, setPending] = useState<Pending[]>([]);
+  const [cfg, setCfg] = useState<PaymentSettings | null>(null);
+  const [got, setGot] = useState(false);
+  const [amount, setAmount] = useState("");
+  const [paidOn, setPaidOn] = useState("");
+  const [method, setMethod] = useState<PayMethod>("aruba_bank");
+  const [ref, setRef] = useState("");
+  const [note, setNote] = useState("");
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +45,9 @@ export default function AdminPlansPage() {
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.error) setError(json.error || "Could not load.");
     else { setError(null); setPeople(json.people); setToday(json.today); }
+    const [pay, set] = await Promise.all([fetch("/api/admin/payments").then((r) => r.json()).catch(() => ({})), fetch("/api/admin/payment-settings").then((r) => r.json()).catch(() => ({}))]);
+    setPending(Array.isArray(pay.pending) ? pay.pending : []);
+    setCfg(set.settings ?? null);
     setLoading(false);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -40,13 +55,22 @@ export default function AdminPlansPage() {
   const rows = useMemo(() => people.map((p) => ({ p, s: planSummary(p.plan, today) })).filter(({ p, s }) => (p.role === "admin" ? false : filter === "all" ? true : filter === "pro" ? s.pro : !s.pro)), [people, today, filter]);
   const chosen = people.find((p) => p.id === pick) ?? null;
 
-  const choose = (id: string) => { setPick(id); setNotice(null); setPeriod("monthly"); setEndsOn(defaultEndsOn("monthly", today) ?? ""); };
-  const changePeriod = (c: Choice) => { setPeriod(c); setEndsOn(c === "free" ? "" : defaultEndsOn(c, today) ?? ""); };
+  const fillPayment = (c: Choice, id: string) => { setAmount(cfg && (c === "monthly" || c === "yearly") ? String(priceFor(cfg, c)) : ""); setPaidOn(today); setRef(userReference(id)); setNote(""); };
+  const choose = (id: string) => { setPick(id); setNotice(null); setPeriod("monthly"); setEndsOn(defaultEndsOn("monthly", today) ?? ""); setGot(false); setMethod("aruba_bank"); fillPayment("monthly", id); };
+  const changePeriod = (c: Choice) => { setPeriod(c); setEndsOn(c === "free" ? "" : defaultEndsOn(c, today) ?? ""); if (c === "gift" || c === "free") setGot(false); if (pick) fillPayment(c, pick); };
+  const decide = async (id: string, action: "confirm" | "reject") => {
+    setError(null); setNotice(null);
+    const res = await fetch("/api/admin/payments", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, action }) });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) return setError(json.error || "Could not save.");
+    setNotice(action === "confirm" ? "Payment confirmed. Pro is on." : "Payment rejected.");
+    load();
+  };
 
   const save = async () => {
     if (!chosen) return;
     setSaving(true); setError(null); setNotice(null);
-    const res = await fetch("/api/admin/plans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: chosen.id, period, endsOn: period === "free" ? undefined : endsOn || null }) });
+    const res = await fetch("/api/admin/plans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: chosen.id, period, endsOn: period === "free" ? undefined : endsOn || null, payment: got && (period === "monthly" || period === "yearly") ? { amount, paid_on: paidOn, method, reference: ref, note } : undefined }) });
     const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) return setError(json.error || "Could not save.");
@@ -65,6 +89,21 @@ export default function AdminPlansPage() {
       </CardContent></Card>
       {error && <Alert>{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}
+      <Link href="/admin/payment-settings" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="payment-settings-link">Prices and bank accounts</Link>
+
+      {pending.length > 0 && (
+        <section className="space-y-2" data-testid="pay-pending">
+          <p className="text-xs font-extrabold tracking-wide text-muted-foreground">PAYMENTS TO CHECK</p>
+          <Card><CardContent className="divide-y p-0">
+            {pending.map((p) => (
+              <div key={p.id} className="space-y-3 p-4" data-testid="pay-request">
+                <div className="flex items-center gap-3"><div className="min-w-0 flex-1"><p className="truncate font-semibold">{p.name}</p><p className="text-sm text-muted-foreground">{p.period === "yearly" ? "Yearly" : "Monthly"} · {p.reference}</p></div><Money amount={Number(p.amount)} currency={p.currency} className="text-base" /></div>
+                <div className="flex gap-2"><Button size="sm" className="bg-green-700 text-white hover:bg-green-800" onClick={() => decide(p.id, "confirm")} data-testid="pay-confirm"><Check className="h-4 w-4" aria-hidden="true" />Confirm payment</Button><Button size="sm" variant="outline" className="text-red-700" onClick={() => decide(p.id, "reject")} data-testid="pay-reject">Reject</Button></div>
+              </div>
+            ))}
+          </CardContent></Card>
+        </section>
+      )}
 
       <div className="flex flex-wrap gap-2" role="group" aria-label="Filter">
         {(["all", "pro", "free"] as const).map((f) => (
@@ -99,6 +138,24 @@ export default function AdminPlansPage() {
               <label htmlFor="plan-ends" className="text-sm font-medium">Pro ends on</label>
               <Input id="plan-ends" type="date" value={endsOn} min={today} onChange={(e) => setEndsOn(e.target.value)} />
               <p className="text-xs text-muted-foreground">{period === "gift" ? "Leave it empty for no end date." : "Set when the paid time runs out. Pro switches off after this day."}</p>
+            </div>
+          )}
+          {(period === "monthly" || period === "yearly") && (
+            <div className="space-y-3 rounded-xl border p-3" data-testid="plan-payment">
+              <label className="flex min-h-11 items-center gap-3 text-sm font-semibold"><input type="checkbox" className="h-5 w-5" checked={got} onChange={(e) => setGot(e.target.checked)} data-testid="plan-got-paid" />Payment received for this plan</label>
+              {got && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1"><label htmlFor="plan-amount" className="text-xs font-medium">Amount (AWG)</label><Input id="plan-amount" inputMode="decimal" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
+                    <div className="space-y-1"><label htmlFor="plan-paid-on" className="text-xs font-medium">Date received</label><Input id="plan-paid-on" type="date" value={paidOn} onChange={(e) => setPaidOn(e.target.value)} /></div>
+                  </div>
+                  <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Paid with">
+                    {(Object.keys(METHOD_LABEL) as PayMethod[]).map((m) => <button key={m} type="button" role="radio" aria-checked={method === m} onClick={() => setMethod(m)} className={cn(chip, method === m ? "border-primary bg-primary text-primary-foreground" : "bg-card")}>{METHOD_LABEL[m]}</button>)}
+                  </div>
+                  <div className="space-y-1"><label htmlFor="plan-ref" className="text-xs font-medium">Reference</label><Input id="plan-ref" value={ref} onChange={(e) => setRef(e.target.value)} /></div>
+                  <div className="space-y-1"><label htmlFor="plan-note" className="text-xs font-medium">Note (optional)</label><Input id="plan-note" value={note} onChange={(e) => setNote(e.target.value)} /></div>
+                </>
+              )}
             </div>
           )}
           <div className="flex gap-2"><Button onClick={save} disabled={saving} data-testid="plan-save"><Check className="h-4 w-4" aria-hidden="true" />{period === "free" ? "Remove Pro" : "Turn on Pro"}</Button><Button variant="outline" onClick={() => setPick(null)}>Cancel</Button></div>

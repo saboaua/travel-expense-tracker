@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Crown, FileSpreadsheet, FileText, Lock } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
@@ -76,7 +77,7 @@ export default function ReportsPage() {
           <span key={f} aria-disabled="true" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-muted text-sm font-bold text-muted-foreground" data-testid={`report-${f}-off`}><Icon className="h-4 w-4" aria-hidden="true" />{label}{pro === false && <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200"><Lock className="h-3 w-3" aria-hidden="true" />Pro</span>}</span>
         ))}
       </div>
-      {pro === false && <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="report-pro-note"><Crown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><b>Reports are a Pro feature.</b> Ask your admin to turn Pro on for your account.</span></p>}
+      {pro === false && <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="report-pro-note"><Crown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><b>Reports are a Pro feature.</b> <Link href="/personal/pro" className="font-bold underline" data-testid="get-pro-link">See how to get Pro</Link>.</span></p>}
     </div>
   );
 }

@@ -191,7 +191,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
                 </span>
               ))}
             </div>
-            {pro === false && <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100"><Crown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><b>Reports are a Pro feature.</b> Ask your admin to turn Pro on for your account.</span></p>}
+            {pro === false && <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100"><Crown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><b>Reports are a Pro feature.</b> <Link href="/personal/pro" className="font-bold underline" data-testid="get-pro-link">See how to get Pro</Link>.</span></p>}
           </CardContent>
         </Card>
       )}

@@ -88,6 +88,8 @@ col_checks as (
 need_tables(tbl, fix) as (values
   ('house_areas','migration_house_areas.sql'),
   ('user_plans','migration_project_types_plans.sql'),
+  ('payment_settings','migration_pro_payments.sql'),
+  ('plan_payments','migration_pro_payments.sql'),
   ('utility_bills','migration_utilities.sql'),
   ('bill_email_addresses','migration_bill_emails.sql'),
   ('bill_email_senders','migration_bill_emails.sql'),

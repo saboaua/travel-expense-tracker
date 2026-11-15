@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1226,6 +1226,83 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000f0")) a.splice(i, 1); }
+    }
+  });
+
+  await test("pro payments: the admin sets prices and banks, a user asks with a reference, the admin confirms, and a payment received is kept", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000); actx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage(); const ap = await actx.newPage();
+    try {
+      // nothing set up yet
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByText(/Payment details are not set up yet/).first().waitFor();
+      // the admin sets prices and two banks
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByLabel("Monthly").fill("12");
+      await ap.getByLabel("Yearly").fill("120");
+      await ap.getByTestId("pay-add-account").click();
+      await ap.getByLabel("Bank").first().fill("Aruba Bank");
+      await ap.getByLabel("Account name").first().fill("Lifolio");
+      await ap.getByLabel("Account number").first().fill("1234567890");
+      await ap.getByTestId("pay-add-account").click();
+      await ap.getByLabel("Bank").nth(1).fill("CMB");
+      await ap.getByLabel("Account number").nth(1).fill("0987654321");
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Saved\. People see this/).waitFor();
+      const cfg = fake.table("payment_settings")[0];
+      assert(cfg && Number(cfg.yearly_price) === 120 && cfg.accounts.length === 2, "prices and both banks are saved: " + JSON.stringify(cfg));
+      // the user sees them, picks yearly and says they paid
+      await page.goto(`${BASE}/personal/projects`);
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-reference").waitFor();
+      const ref = (await page.getByTestId("pro-reference").innerText()).trim();
+      assert(/^LIF-[0-9A-F]{5}$/.test(ref), "a reference like LIF-4821: " + ref);
+      assert((await page.getByTestId("pro-account").count()) === 2, "both bank accounts show");
+      assert(/Best value/.test(await page.getByTestId("pro-yearly").innerText()) && /2 months free/.test(await page.getByTestId("pro-yearly").innerText()), "yearly shows 2 months free");
+      await page.getByTestId("pro-yearly").click();
+      await page.getByTestId("pro-paid").click();
+      await page.getByTestId("pro-pending").waitFor();
+      const req = fake.table("plan_payments").find((r) => r.user_id === PAT);
+      assert(req && req.status === "pending" && req.period === "yearly" && Number(req.amount) === 120 && req.reference === ref, "a pending request is saved: " + JSON.stringify(req));
+      assert(fake.table("user_plans").length === 0, "Pro is not on yet");
+      // the admin sees it and confirms
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("pay-request").waitFor();
+      assert(/Pat Tester/.test(await ap.getByTestId("pay-request").innerText()) && new RegExp(ref).test(await ap.getByTestId("pay-request").innerText()), "the request shows the name and reference");
+      await ap.getByTestId("pay-confirm").click();
+      await ap.getByText(/Payment confirmed/).waitFor();
+      const plan = fake.table("user_plans").find((r) => r.user_id === PAT);
+      assert(plan && plan.period === "yearly" && /^\d{4}-\d{2}-\d{2}$/.test(plan.ends_on), "Pro is on with an end date: " + JSON.stringify(plan));
+      assert(fake.table("plan_payments").find((r) => r.user_id === PAT).status === "confirmed", "the payment is confirmed in the ledger");
+      await ap.getByTestId("pay-pending").waitFor({ state: "detached" });
+      await page.reload();
+      await page.getByTestId("pro-active").waitFor();
+      // adding a plan by hand with the money received is kept in the ledger
+      fake.table("user_plans").splice(0);
+      await ap.getByTestId("plan-person-pat@example.com").click();
+      await ap.getByRole("radio", { name: "Monthly" }).click();
+      await ap.getByTestId("plan-got-paid").check();
+      assert((await ap.getByLabel("Amount (AWG)").inputValue()) === "12", "the amount is filled from the price");
+      await ap.getByRole("radio", { name: "CMB" }).click();
+      await ap.getByLabel("Note (optional)").fill("Paid at the counter");
+      await ap.getByTestId("plan-save").click();
+      await ap.getByText(/Pro is on for/).waitFor();
+      const kept = fake.table("plan_payments").filter((r) => r.user_id === PAT && r.method === "cmb");
+      assert(kept.length === 1 && kept[0].status === "confirmed" && Number(kept[0].amount) === 12 && kept[0].note === "Paid at the counter", "the payment received is kept: " + JSON.stringify(kept));
+      // a locked report links to the payment page
+      fake.table("user_plans").splice(0);
+      await page.goto(`${BASE}/personal/reports`);
+      await page.getByTestId("get-pro-link").click();
+      await page.waitForURL((u) => u.pathname === "/personal/pro");
+    } finally {
+      await ctx.close(); await actx.close();
+      for (const t of ["user_plans", "plan_payments", "payment_settings"]) fake.table(t).splice(0);
     }
   });
 
