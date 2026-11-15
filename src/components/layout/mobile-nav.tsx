@@ -105,7 +105,7 @@ export function MobileNav() {
             <div className="border-t pt-3 space-y-1">
               <ThemeToggle className="w-full justify-start gap-3" />
               <Button type="button" variant="ghost" className="w-full justify-start gap-3 text-red-600 hover:text-red-600" onClick={logout}>
-                <LogOut className="h-5 w-5" /> Sign out
+                <IconTile tone="security" className="h-8 w-8 rounded-lg"><LogOut className="h-[18px] w-[18px]" /></IconTile> Sign out
               </Button>
             </div>
           </div>

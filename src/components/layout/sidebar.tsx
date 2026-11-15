@@ -116,7 +116,7 @@ export function Sidebar() {
           </Link>
           <ThemeToggle className="w-full justify-start gap-3" />
           <Button variant="ghost" className="w-full justify-start gap-3" onClick={handleLogout}>
-            <LogOut className="h-5 w-5" /> Sign out
+            <IconTile tone="security" className="h-8 w-8 rounded-lg"><LogOut className="h-[18px] w-[18px]" /></IconTile> Sign out
           </Button>
         </div>
       </div>
