@@ -13,7 +13,10 @@ eq("no discount", monthsFree({ monthly_price: 12, yearly_price: 144 }), 0);
 eq("no price, no discount", monthsFree({ monthly_price: 0, yearly_price: 0 }), 0);
 
 const ok = parseSettings({ monthly_price: "12,50", yearly_price: 120, currency: "awg", instructions: " Use the reference. ", accounts: [{ bank: "Aruba Bank", name: "Lifolio", number: "123", currency: "" }, { bank: "", number: "" }] });
-eq("settings ok", ok.ok && ok.value, { currency: "AWG", monthly_price: 12.5, yearly_price: 120, accounts: [{ bank: "Aruba Bank", name: "Lifolio", number: "123", currency: "AWG" }], instructions: "Use the reference." });
+eq("settings ok", ok.ok && ok.value, { currency: "AWG", monthly_price: 12.5, yearly_price: 120, accounts: [{ bank: "Aruba Bank", name: "Lifolio", number: "123", currency: "AWG" }], instructions: "Use the reference.", btc_enabled: false, btc_quote_minutes: 30, btc_confirmations: 2 });
+eq("btc settings", parseSettings({ monthly_price: 1, yearly_price: 1, btc_enabled: true, btc_quote_minutes: "45", btc_confirmations: 0 }).ok && (parseSettings({ monthly_price: 1, yearly_price: 1, btc_enabled: true, btc_quote_minutes: "45", btc_confirmations: 0 }) as { value: { btc_enabled: boolean; btc_quote_minutes: number; btc_confirmations: number } }).value.btc_quote_minutes, 45);
+eq("btc minutes too low", parseSettings({ monthly_price: 1, yearly_price: 1, btc_quote_minutes: 2 }).ok, false);
+eq("btc confirmations too high", parseSettings({ monthly_price: 1, yearly_price: 1, btc_confirmations: 20 }).ok, false);
 eq("settings bad price", parseSettings({ monthly_price: "abc", yearly_price: 1 }).ok, false);
 eq("settings half account", parseSettings({ monthly_price: 1, yearly_price: 1, accounts: [{ bank: "CMB", number: "" }] }).ok, false);
 eq("settings too many", parseSettings({ monthly_price: 1, yearly_price: 1, accounts: Array.from({ length: 7 }, () => ({ bank: "x", number: "1" })) }).ok, false);

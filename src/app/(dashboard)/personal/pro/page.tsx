@@ -1,14 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Check, Clock, Copy, Crown, Landmark } from "lucide-react";
+import { Bitcoin, Check, Clock, Copy, Crown, Landmark } from "lucide-react";
+import { BitcoinPay } from "@/components/pro/BitcoinPay";
+import { withColumnFallback } from "@/lib/columns";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Money } from "@/components/ui/money";
 import { createClient } from "@/lib/supabase/client";
-import { PAYMENT_COLS, PAYMENT_SETTINGS_COLS, monthsFree, priceFor, userReference, type PayPeriod, type PaymentSettings, type PlanPayment } from "@/lib/payments";
+import { PAYMENT_BASE_COLS, PAYMENT_BASE_SETTINGS_COLS, PAYMENT_COLS, PAYMENT_SETTINGS_COLS, monthsFree, priceFor, userReference, type PayPeriod, type PaymentSettings, type PlanPayment } from "@/lib/payments";
 import { PLAN_COLS, isProActive, type PlanRow } from "@/lib/plans";
 import { cn, formatDate, todayISO } from "@/lib/utils";
 
@@ -25,6 +27,8 @@ export default function GetProPage() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [btc, setBtc] = useState<{ available: boolean; confirmations: number }>({ available: false, confirmations: 0 });
+  const [tab, setTab] = useState<"bank" | "bitcoin">("bank");
 
   const load = useCallback(async () => {
     try {
@@ -34,8 +38,8 @@ export default function GetProPage() {
       if (!id) return setState("setup");
       setUid(id);
       const [cfg, pays, pl] = await Promise.all([
-        supabase.from("payment_settings").select(PAYMENT_SETTINGS_COLS).eq("id", 1).maybeSingle(),
-        supabase.from("plan_payments").select(PAYMENT_COLS).eq("user_id", id).order("created_at", { ascending: false }).limit(5),
+        withColumnFallback((cols) => supabase.from("payment_settings").select(cols).eq("id", 1).maybeSingle(), PAYMENT_SETTINGS_COLS, PAYMENT_BASE_SETTINGS_COLS),
+        withColumnFallback((cols) => supabase.from("plan_payments").select(cols).eq("user_id", id).neq("status", "expired").order("created_at", { ascending: false }).limit(5), PAYMENT_COLS, PAYMENT_BASE_COLS),
         supabase.from("user_plans").select(PLAN_COLS).eq("user_id", id).maybeSingle(),
       ]);
       if (cfg.error || !cfg.data) return setState("setup");
@@ -44,16 +48,24 @@ export default function GetProPage() {
       const rows = ((pays.data ?? []) as unknown as PlanPayment[]);
       setPending(rows.find((r) => r.status === "pending") ?? null);
       setRejected(rows[0]?.status === "rejected");
+      try { const r = await fetch("/api/pro/bitcoin"); const j = r.ok ? await r.json() : null; setBtc({ available: !!j?.available, confirmations: Number(j?.confirmations) || 0 }); } catch { setBtc({ available: false, confirmations: 0 }); }
       setPlan((pl.data as PlanRow | null) ?? null);
       setState("ready");
     } catch { setState("setup"); }
   }, []);
   useEffect(() => { load(); }, [load]);
+  // While a payment is being checked, look again now and then so the page notices when it is decided
+  useEffect(() => { if (!pending) return; const t = setInterval(load, 30000); return () => clearInterval(t); }, [pending, load]);
 
   const reference = uid ? userReference(uid) : "";
   const today = todayISO();
   const proNow = isProActive(plan, today);
-  const ready = !!settings && settings.accounts.length > 0 && priceFor(settings, "monthly") > 0;
+  const hasPrice = !!settings && priceFor(settings, "monthly") > 0;
+  const bankReady = hasPrice && !!settings && settings.accounts.length > 0;
+  const btcReady = hasPrice && btc.available;
+  const btcOpen = pending?.method === "bitcoin";
+  const ready = bankReady || btcReady || btcOpen;
+  const showBtc = btcOpen || (tab === "bitcoin" && btcReady) || (!bankReady && btcReady);
 
   const copy = async () => { try { await navigator.clipboard.writeText(reference); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* the code is on screen to copy by hand */ } };
 
@@ -69,7 +81,7 @@ export default function GetProPage() {
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
       <BackLink href="/personal">Personal</BackLink>
-      <PageHeader title="Get Pro" description="Pay by bank transfer from your bank app" />
+      <PageHeader title="Get Pro" description={btc.available ? "Pay by bank transfer or Bitcoin" : "Pay by bank transfer from your bank app"} />
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}
       {state === "setup" && <Alert>Payment details are not set up yet. Ask your admin.</Alert>}
       {state === "ready" && settings && (
@@ -78,7 +90,7 @@ export default function GetProPage() {
           {rejected && !pending && <Alert>Your last payment could not be matched. Check the amount and the reference, then try again or tell your admin.</Alert>}
           {!ready && <Alert>Payment details are not set up yet. Ask your admin.</Alert>}
 
-          {ready && pending && (
+          {ready && pending && !btcOpen && (
             <>
               <Card><CardContent className="space-y-3 py-4" data-testid="pro-pending">
                 <div className="flex items-center gap-3"><span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200"><Clock className="h-5 w-5" aria-hidden="true" /></span>
@@ -88,6 +100,8 @@ export default function GetProPage() {
               <p className="text-center text-sm text-muted-foreground">Paid the wrong amount or no reference? Tell your admin and give them this reference: <b>{pending.reference}</b></p>
             </>
           )}
+
+          {ready && btcOpen && <BitcoinPay period={pending!.period} pending={pending} confirmations={btc.confirmations} onChanged={load} />}
 
           {ready && !pending && (
             <>
@@ -100,6 +114,14 @@ export default function GetProPage() {
                   </button>
                 ))}
               </div>
+              {bankReady && btcReady && (
+                <div className="flex gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label="How to pay">
+                  <button type="button" role="tab" aria-selected={!showBtc} onClick={() => setTab("bank")} data-testid="pro-tab-bank" className={cn("flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl text-sm font-extrabold", !showBtc ? "bg-card shadow-sm" : "text-muted-foreground")}><Landmark className="h-4 w-4" aria-hidden="true" />Bank transfer</button>
+                  <button type="button" role="tab" aria-selected={showBtc} onClick={() => setTab("bitcoin")} data-testid="pro-tab-bitcoin" className={cn("flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl text-sm font-extrabold", showBtc ? "bg-card shadow-sm" : "text-muted-foreground")}><Bitcoin className="h-4 w-4" aria-hidden="true" />Bitcoin</button>
+                </div>
+              )}
+              {showBtc && <BitcoinPay period={period} pending={null} confirmations={btc.confirmations} onChanged={load} />}
+              {!showBtc && <>
               <Card><CardContent className="space-y-1.5 py-4 text-sm leading-relaxed">
                 <p className="font-semibold">How to pay</p>
                 <p>1. Open your bank app.</p>
@@ -122,6 +144,7 @@ export default function GetProPage() {
               ))}
               {error && <Alert>{error}</Alert>}
               <Button className="min-h-[52px] w-full text-[15px]" onClick={iPaid} disabled={busy} data-testid="pro-paid"><Check className="h-5 w-5" aria-hidden="true" />I have paid</Button>
+              </>}
             </>
           )}
         </>

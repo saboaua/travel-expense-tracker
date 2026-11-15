@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -116,9 +116,17 @@ await new Promise((ok) => http.createServer((req, res) => {
 }).listen(MAIL_PORT, ok));
 // A stand-in for Gemini: the support summary asks it. "mode" decides the answer.
 const gemini = { mode: "off", calls: [] };
+// The same stand-in answers the Bitcoin price lookup (Coinbase style)
+const btcPrice = { usd: "54300.00", fail: false, calls: 0 };
 const GEMINI_PORT = Number(process.env.E2E_GEMINI_PORT || 54397);
 await new Promise((ok) => http.createServer((req, res) => {
   let b = ""; req.on("data", (d) => (b += d)); req.on("end", () => {
+    if (/\/v2\/prices\/BTC-USD\/spot/.test(req.url || "")) {
+      btcPrice.calls++;
+      if (btcPrice.fail) { res.writeHead(503, { "Content-Type": "application/json" }); return res.end("{}"); }
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ data: { base: "BTC", currency: "USD", amount: btcPrice.usd } }));
+    }
     if (!/generateContent/.test(req.url || "") || gemini.mode === "off") { res.writeHead(503, { "Content-Type": "application/json" }); return res.end('{"error":{"message":"unavailable"}}'); }
     gemini.calls.push(JSON.parse(b || "{}"));
     res.writeHead(200, { "Content-Type": "application/json" });
@@ -143,6 +151,7 @@ const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", 
     RESEND_API_URL: `http://127.0.0.1:${MAIL_PORT}/emails`,
     GEMINI_API_KEY: "e2e-gemini-key",
     GEMINI_API_BASE: `http://127.0.0.1:${GEMINI_PORT}`,
+    BTC_PRICE_API: `http://127.0.0.1:${GEMINI_PORT}`,
   },
   stdio: ["ignore", "pipe", "pipe"],
 });
@@ -1331,6 +1340,145 @@ try {
     } finally {
       await ctx.close(); await actx.close();
       for (const t of ["user_plans", "plan_payments", "payment_settings"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("bitcoin: the admin turns it on with an address list, a user gets a locked amount and pays, the admin confirms; an expired price asks again", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000); actx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage(); const ap = await actx.newPage();
+    const A1 = "bc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t4", A2 = "1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2", A3 = "3J98t1WpEZ73CNmQviecrnyiWrnqRhWNLy";
+    const TXID = "ab".repeat(32);
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // prices and one bank, Bitcoin still off: no Bitcoin tab for people
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByLabel("Monthly").fill("12");
+      await ap.getByLabel("Yearly").fill("120");
+      await ap.getByTestId("pay-add-account").click();
+      await ap.getByLabel("Bank").first().fill("Aruba Bank");
+      await ap.getByLabel("Account number").first().fill("1234567890");
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Saved\. People see this/).waitFor();
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-reference").waitFor();
+      assert((await page.getByTestId("pro-tab-bitcoin").count()) === 0, "no Bitcoin tab while it is off");
+      // a bad address, a seed phrase and a typo are refused, and nothing is added
+      await ap.getByTestId("btc-paste").fill(`${A1}\nabandon abandon abandon about\nbc1qw508d6qejxtdg4y5r3zarvary0c5xw7kv8f3t5`);
+      await ap.getByTestId("btc-add").click();
+      await ap.getByText(/do not look like Bitcoin addresses/).waitFor();
+      assert(fake.table("btc_addresses").length === 0, "nothing is added when one line is wrong");
+      // two good ones (one twice) are added
+      await ap.getByTestId("btc-paste").fill(`${A1}\n${A2}\n${A1}`);
+      await ap.getByTestId("btc-add").click();
+      await ap.getByText(/2 addresses added/).waitFor();
+      await ap.getByTestId("btc-count").getByText("2 free of 2").waitFor();
+      // on, with a 10 minute price and 3 confirmations
+      await ap.getByTestId("btc-toggle").click();
+      await ap.getByLabel("Price valid (minutes)").fill("10");
+      await ap.getByLabel("Confirmations").fill("3");
+      await ap.getByTestId("pay-save").click();
+      await ap.getByText(/Saved\. People see this/).waitFor();
+      const cfg = fake.table("payment_settings")[0];
+      assert(cfg.btc_enabled === true && Number(cfg.btc_quote_minutes) === 10 && Number(cfg.btc_confirmations) === 3, "Bitcoin settings are saved: " + JSON.stringify(cfg));
+      // the user sees the tab, picks yearly and asks for the amount
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-tab-bitcoin").waitFor();
+      await page.getByTestId("pro-yearly").click();
+      await page.getByTestId("pro-tab-bitcoin").click();
+      await page.getByTestId("btc-get").click();
+      await page.getByTestId("btc-quote").waitFor();
+      const want = Math.ceil(Math.round(((120 * (1 / 1.79)) / 54300) * 1e8 * 1000) / 1000) / 1e8;
+      const shown = (await page.getByTestId("btc-amount").innerText()).trim();
+      assert(shown === `${want.toFixed(8)} BTC`, `the amount is the price at the locked rate: ${shown} vs ${want.toFixed(8)}`);
+      const addr1 = (await page.getByTestId("btc-address").innerText()).trim();
+      assert(addr1 === A1, "the first free address is used: " + addr1);
+      assert(/^\d\d:\d\d$/.test((await page.getByTestId("btc-timer").innerText()).trim()), "a countdown shows");
+      await page.getByRole("img", { name: /QR code/ }).waitFor();
+      const row = fake.table("plan_payments").find((r) => r.user_id === PAT);
+      assert(row && row.method === "bitcoin" && row.status === "pending" && row.btc_address === A1 && Math.abs(Number(row.btc_amount) - want) < 1e-9 && Number(row.btc_rate_usd) === 54300, "the quote is saved: " + JSON.stringify(row));
+      assert(fake.table("btc_addresses").find((r) => r.address === A1).payment_id === row.id, "the address is marked used for this request");
+      // asking again gives the same quote and takes no second address
+      await page.reload();
+      await page.getByTestId("btc-quote").waitFor();
+      assert(fake.table("btc_addresses").filter((r) => r.payment_id).length === 1, "reloading does not use another address");
+      // the admin does not see it until the person says they paid
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("payment-settings-link").waitFor();
+      assert((await ap.getByTestId("pay-request").count()) === 0, "an unclaimed Bitcoin quote is not in Payments to check");
+      // a bad transaction id is refused, a good one is kept
+      await page.getByTestId("btc-txid").fill("not a txid");
+      await page.getByTestId("btc-paid").click();
+      await page.getByText(/does not look like a transaction ID/).waitFor();
+      await page.getByTestId("btc-txid").fill(`https://mempool.space/tx/${TXID}`);
+      await page.getByTestId("btc-paid").click();
+      await page.getByTestId("btc-waiting").waitFor();
+      assert(/We are waiting for the network/.test(await page.getByTestId("btc-waiting").innerText()) && /3 confirmations/.test(await page.getByTestId("btc-waiting").innerText()), "the waiting state names the confirmations");
+      const claimed = fake.table("plan_payments").find((r) => r.user_id === PAT);
+      assert(claimed.claimed_at && claimed.txid === TXID, "claimed with the transaction id: " + JSON.stringify(claimed));
+      // the admin sees the Bitcoin row with an explorer link and confirms
+      await ap.reload();
+      await ap.getByTestId("pay-btc").waitFor();
+      const t = await ap.getByTestId("pay-request").innerText();
+      assert(new RegExp(want.toFixed(8)).test(t) && t.includes(A1) && /Bitcoin/.test(t), "the row shows amount, address and Bitcoin");
+      assert((await ap.getByTestId("pay-btc-explorer").getAttribute("href")) === `https://mempool.space/tx/${TXID}`, "Open in explorer goes to the transaction");
+      await ap.getByTestId("pay-confirm").click();
+      await ap.getByText(/Payment confirmed/).waitFor();
+      assert(fake.table("user_plans").find((r) => r.user_id === PAT)?.period === "yearly", "Pro is on");
+      const trail = fake.table("audit_logs").filter((r) => /^(payment|bitcoin)/.test(r.action));
+      assert(trail.some((r) => r.action === "bitcoin.addresses_added") && trail.some((r) => r.action === "payment.confirmed" && r.details?.method === "bitcoin" && r.details?.txid === TXID), "Bitcoin steps are audited: " + trail.map((r) => r.action).join(","));
+      // a new request after the first: the price expires, the person asks again, the pool is empty (A2 is used by the expired one)
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-tab-bitcoin").click();
+      await page.getByTestId("btc-get").click();
+      await page.getByTestId("btc-quote").waitFor();
+      const second = fake.table("plan_payments").find((r) => r.user_id === PAT && r.status === "pending");
+      assert(second && second.btc_address === A2, "the second request takes the next address");
+      second.expires_at = new Date(Date.now() - 60_000).toISOString();
+      await page.reload();
+      await page.getByTestId("btc-expired").waitFor();
+      assert(/The Bitcoin price changed/.test(await page.getByTestId("btc-expired").innerText()), "the expired state explains it");
+      await page.getByTestId("btc-renew").click();
+      await page.getByText(/Bitcoin is not available right now/).waitFor();
+      assert(fake.table("plan_payments").find((r) => r.id === second.id).status === "expired", "the old quote is marked expired");
+      assert(!fake.table("plan_payments").some((r) => r.user_id === PAT && r.status === "pending"), "no pending row is left behind when no address is free");
+      await page.reload();
+      await page.getByTestId("pro-reference").waitFor();
+      assert((await page.getByTestId("pro-tab-bitcoin").count()) === 0, "Bitcoin hides when no address is free");
+      // the admin adds an address, and the person can pay again; "Tell my admin" works after the price ran out
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      await ap.getByTestId("btc-paste").fill(A3);
+      await ap.getByTestId("btc-add").click();
+      await ap.getByText(/1 address added/).waitFor();
+      await ap.getByTestId("btc-count").getByText("1 free of 3").waitFor();
+      await page.reload();
+      await page.getByTestId("pro-tab-bitcoin").click();
+      await page.getByTestId("btc-get").click();
+      await page.getByTestId("btc-quote").waitFor();
+      const third = fake.table("plan_payments").find((r) => r.user_id === PAT && r.status === "pending");
+      assert(third.btc_address === A3, "the new address is used");
+      third.expires_at = new Date(Date.now() - 60_000).toISOString();
+      await page.reload();
+      await page.getByTestId("btc-tell-admin").click();
+      await page.getByTestId("btc-waiting").waitFor();
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("pay-btc").waitFor();
+      await ap.getByTestId("pay-reject").click();
+      await ap.getByTestId("pay-pending").waitFor({ state: "detached" });
+      // only unused addresses can be removed
+      await ap.goto(`${BASE}/admin/payment-settings`);
+      assert((await ap.getByRole("button", { name: /^Remove / }).count()) === 0, "used addresses have no Remove button");
+      // Bitcoin cannot be sent for a bank-only person via the browser: the insert policy is closed by SQL, and the server route needs the setting on
+      fake.table("payment_settings")[0].btc_enabled = false;
+      const off = await page.request.post(`${BASE}/api/pro/bitcoin`, { data: { period: "monthly" } });
+      assert(off.status() === 400, "a quote is refused while Bitcoin is off: " + off.status());
+    } finally {
+      await ctx.close(); await actx.close();
+      for (const t of ["user_plans", "plan_payments", "payment_settings", "btc_addresses"]) fake.table(t).splice(0);
     }
   });
 
