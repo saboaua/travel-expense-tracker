@@ -19,6 +19,8 @@ export const FLIGHT_COLS =
 export const EXPENSE_COLS = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
 
 export const PERSONAL_PROJECT_COLS = "id, user_id, kind, name, destination, description, start_date, end_date, budget, currency, status, created_at";
+/** The type columns come from migration_project_types.sql, which an older database may not have yet. */
+export const PERSONAL_PROJECT_COLS_TYPED = `${PERSONAL_PROJECT_COLS}, project_type, type_label, type_icon, type_color`;
 export const PERSONAL_SPEND_COLS_BASE = "id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes";
 export const UTILITY_BILL_COLS = "id, kind, provider, bill_month, amount, currency, exchange_rate, amount_usd, paid_on, due_date, receipt_path, notes";
 /** source and needs_check come from migration_bill_emails.sql, which an older database may not have yet. */

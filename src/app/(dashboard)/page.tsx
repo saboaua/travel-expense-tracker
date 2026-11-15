@@ -124,7 +124,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     // Personal tiles: only when the section is on and the role has it (tables may not exist before the personal migration)
     wantsSummary ? withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", uid).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)) : null,
     wantsSummary ? supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("user_id", uid).eq("status", "active") : null,
-    // Active home projects and personal trips: places a scanned receipt can go
+    // Active projects and personal trips: places a scanned receipt can go
     wantsSummary ? supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("user_id", uid).eq("status", "active").order("created_at", { ascending: false }) : null,
     // Personal dashboard (analytics): the person's own personal expenses and grocery receipts, read under row-level security.
     wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
@@ -151,7 +151,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
   let personalSummary: ReturnType<typeof summarizePersonal> | null = null;
   if (groceryRes && summaryProjectsRes && !groceryRes.error && !summaryProjectsRes.error) {
-    // Quick spends attached to a home project count in that project's total too
+    // Quick spends attached to a project count in that project's total too
     const linked = await fetchLinkedSpends(supabase);
     personalSummary = summarizePersonal(groceryRes.data, withLinkedTotals((summaryProjectsRes.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], linked) as never);
   }

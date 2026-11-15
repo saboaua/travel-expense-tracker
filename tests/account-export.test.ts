@@ -26,6 +26,7 @@ const NOT_EXPORTED = new Set([
   "grocery_online_matches", "grocery_online_prefs", "grocery_price_matches", // rebuilt from your receipts
   "bill_email_addresses", "bill_email_senders", "bill_email_log", // private forwarding address, sender list and mail log
   "sharing_settings", "trip_flights", "iptv_clients", "iptv_customers", // separate features with their own data tools
+  "user_plans", // the plan an admin switched on for you, not data you entered
 ]);
 const sql = readdirSync("supabase").filter((f) => f.endsWith(".sql")).map((f) => readFileSync(`supabase/${f}`, "utf8")).join("\n");
 const owned: string[] = [];

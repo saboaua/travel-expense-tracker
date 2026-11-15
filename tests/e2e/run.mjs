@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -656,7 +656,7 @@ try {
       assert((await page.getByText("Waiting to sync").count()) >= 1, "the changed expense shows as waiting");
       assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Trip Cafe", "nothing was sent while offline");
 
-      // A trip, a home project and a grocery receipt can be created with no connection
+      // A trip, a project and a grocery receipt can be created with no connection
       await page.goto(`${BASE}/trips/new`);
       await page.locator("#name").fill("Offline Trip");
       await page.locator("#startDate").fill(today);
@@ -1743,6 +1743,97 @@ try {
     }
   });
 
+  await test("projects: pick a type or make your own, filter by type, and the Excel and PDF reports are Pro until an admin turns Pro on", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const actx = await browser.newContext({ viewport: { width: 1100, height: 800 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // the Personal tile and page say Projects
+      await page.goto(`${BASE}/personal`);
+      await page.getByRole("link", { name: /Projects/ }).first().waitFor();
+      assert((await page.getByText("Home Projects", { exact: true }).count()) === 0, "nothing still says Home Projects");
+      // a Car project
+      await page.goto(`${BASE}/personal/projects/new`);
+      for (const t of ["home", "car", "motorbike", "boat", "garden", "pets", "tech", "event", "business", "other"]) assert((await page.getByTestId(`type-${t}`).count()) === 1, `type ${t} is offered`);
+      await page.getByTestId("type-car").click();
+      await page.getByPlaceholder(/Kitchen renovation/).fill("Toyota Hilux service");
+      await page.getByRole("button", { name: /Create|Save/ }).first().click();
+      await page.waitForURL((u) => /\/personal\/projects\/[0-9a-f-]{36}$/.test(u.pathname));
+      const car = fake.table("personal_projects").find((r) => r.name === "Toyota Hilux service");
+      assert(car && car.project_type === "car" && car.kind === "home_project", "the Car type is saved: " + JSON.stringify(car));
+      assert(/Car/.test(await page.getByTestId("type-chip").first().textContent()), "the page shows the Car tag");
+      // a project of your own type
+      await page.goto(`${BASE}/personal/projects/new`);
+      await page.getByTestId("type-own").click();
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/proj-form.png", fullPage: true });
+      await page.locator("#own-type-name").fill("Wedding");
+      await page.getByRole("button", { name: "Color #c026d3" }).click();
+      await page.getByTestId("type-own-save").click();
+      await page.getByPlaceholder(/Kitchen renovation/).fill("Anna and Ray wedding");
+      await page.getByRole("button", { name: /Create|Save/ }).first().click();
+      await page.waitForURL((u) => /\/personal\/projects\/[0-9a-f-]{36}$/.test(u.pathname));
+      const wed = fake.table("personal_projects").find((r) => r.name === "Anna and Ray wedding");
+      assert(wed && wed.project_type === "custom" && wed.type_label === "Wedding" && wed.type_color === "#c026d3", "the own type is saved: " + JSON.stringify(wed));
+      // a project with no type chosen stays Home and sends no type columns
+      await page.goto(`${BASE}/personal/projects/new`);
+      await page.getByPlaceholder(/Kitchen renovation/).fill("Roof patch");
+      await page.getByRole("button", { name: /Create|Save/ }).first().click();
+      await page.waitForURL((u) => /\/personal\/projects\/[0-9a-f-]{36}$/.test(u.pathname));
+      const roof = fake.table("personal_projects").find((r) => r.name === "Roof patch");
+      assert(roof && roof.project_type === undefined, "Home sends no extra columns: " + JSON.stringify(roof));
+      // the list: types as chips, a type can be picked again, and the filter narrows
+      await page.goto(`${BASE}/personal/projects`);
+      await page.getByTestId("type-filter").waitFor();
+      assert((await page.locator("h3").count()) >= 3, "all three projects are listed");
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/proj-list.png", fullPage: true });
+      await page.getByTestId("type-filter").getByRole("button", { name: "Car", exact: true }).click();
+      assert((await page.locator("h3").count()) === 1 && /Hilux/.test(await page.locator("h3").first().textContent()), "the Car filter shows only the car project");
+      await page.goto(`${BASE}/personal/projects/new`);
+      await page.getByTestId("type-custom").waitFor();
+      assert((await page.getByTestId("type-custom").count()) === 1, "a type you made before is offered again");
+      // reports are Pro
+      await page.goto(`${BASE}/personal/projects/${car.id}`);
+      await page.getByTestId("export-excel-locked").waitFor();
+      if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/proj-detail.png", fullPage: true });
+      assert((await page.getByTestId("export-pdf-locked").count()) === 1 && /Pro feature/.test(await page.getByTestId("project-export").textContent()), "both reports show a Pro lock and the note");
+      const locked = await page.evaluate(async (id) => { const r = await fetch(`/api/export/project/${id}/excel`); return r.status; }, car.id);
+      assert(locked === 402, "the server refuses the report without Pro: " + locked);
+      // the admin turns Pro on
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("plan-person-pat@example.com").click();
+      await ap.getByRole("radio", { name: "Yearly" }).click();
+      await ap.getByTestId("plan-save").click();
+      await ap.getByText(/Pro is on for/).waitFor();
+      const plan = fake.table("user_plans").find((r) => r.user_id === PAT);
+      assert(plan && plan.period === "yearly" && /^\d{4}-\d{2}-\d{2}$/.test(plan.ends_on), "the plan is saved with an end date: " + JSON.stringify(plan));
+      await ap.getByTestId("plan-person-pat@example.com").getByText(/Pro, yearly/).waitFor();
+      if (process.env.E2E_SHOT) await ap.screenshot({ path: "/tmp/proj-plans.png", fullPage: true });
+      // now Pat can download both
+      await page.reload();
+      await page.getByTestId("export-excel").waitFor();
+      const got = await page.evaluate(async (id) => { const out = {}; for (const f of ["excel", "pdf"]) { const r = await fetch(`/api/export/project/${id}/${f}`); const b = new Uint8Array(await r.arrayBuffer()); out[f] = [r.status, r.headers.get("content-type"), String.fromCharCode(...b.slice(0, 4))]; } return out; }, car.id);
+      assert(got.pdf[0] === 200 && /pdf/.test(got.pdf[1]) && got.pdf[2] === "%PDF", "the PDF downloads: " + JSON.stringify(got));
+      assert(got.excel[0] === 200 && /spreadsheet/.test(got.excel[1]) && got.excel[2].startsWith("PK"), "the Excel file downloads: " + JSON.stringify(got));
+      // an ended plan is free again
+      plan.ends_on = "2020-01-01";
+      await page.reload();
+      await page.getByTestId("export-excel-locked").waitFor();
+      assert((await page.evaluate(async (id) => (await fetch(`/api/export/project/${id}/pdf`)).status, car.id)) === 402, "an ended plan is refused");
+    } finally {
+      await ctx.close();
+      await actx.close();
+      fake.table("user_plans").splice(0);
+      for (const n of ["Toyota Hilux service", "Anna and Ray wedding", "Roof patch"]) { const a = fake.table("personal_projects"); const i = a.findIndex((r) => r.name === n); if (i >= 0) a.splice(i, 1); }
+    }
+  });
+
   await test("quick spend: a purchase with no receipt is saved, listed, offered again as a chip, and a receipt can be typed in by hand", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
@@ -1773,7 +1864,7 @@ try {
       await page.getByTestId("recent-names").getByRole("button", { name: "Coffee" }).click();
       assert((await page.locator("#qs-what").inputValue()) === "Coffee" && (await page.locator("#qs-amount").inputValue()) === "4.5", "the chip fills in the name and last amount");
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
-      // House: a repair attached to a home project, then the House & repairs list
+      // House: a repair attached to a project, then the House & repairs list
       const HP = "9c000000-0000-4000-8000-00000000a0a1";
       fake.table("personal_projects").push({ id: HP, user_id: PAT, kind: "home_project", name: "Kitchen remodel", destination: null, description: null, start_date: null, end_date: null, budget: null, currency: "USD", status: "active", created_at: new Date().toISOString() });
       await page.goto(`${BASE}/personal/spend`);
@@ -1800,8 +1891,8 @@ try {
       await page.locator("#qs-what").fill("Tile grout");
       await page.getByRole("button", { name: "House", exact: true }).click();
       await page.locator("#qs-project optgroup[label='Areas of the house'] option").first().waitFor({ state: "attached" });
-      await page.locator("#qs-project optgroup[label='Your home projects'] option").first().waitFor({ state: "attached" });
-      assert((await page.locator("#qs-project optgroup[label='Your home projects'] option", { hasText: "Kitchen remodel" }).count()) === 1, "your project is in the first group");
+      await page.locator("#qs-project optgroup[label='Your projects'] option").first().waitFor({ state: "attached" });
+      assert((await page.locator("#qs-project optgroup[label='Your projects'] option", { hasText: "Kitchen remodel" }).count()) === 1, "your project is in the first group");
       await page.locator("#qs-project").selectOption("area:Bathroom");
       await page.getByTestId("quick-spend-save").click();
       await page.getByTestId("quick-spend-done").waitFor();
@@ -3481,7 +3572,7 @@ try {
         await x.page.waitForURL((u) => u.pathname === "/");
         await x.page.goto(`${BASE}/personal`);
         await x.page.getByRole("heading", { name: "Personal", level: 1 }).waitFor();
-        await x.page.getByRole("link", { name: /Groceries|Home Projects/ }).first().waitFor();
+        await x.page.getByRole("link", { name: /Groceries|Projects/ }).first().waitFor();
         if (shown) await x.page.getByRole("link", { name: /My IPTV subscription/ }).waitFor();
         else {
           await x.page.waitForTimeout(1500);

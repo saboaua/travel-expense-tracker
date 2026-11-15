@@ -10,7 +10,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw, CloudOff } from "lucide-react";
+import { Plus, Pencil, Trash2, Receipt, CheckCircle2, RotateCcw, CloudOff, FileSpreadsheet, FileText, Lock, Crown } from "lucide-react";
 import { KIND_META, type PersonalExpense, type PersonalKind } from "@/lib/personal/constants";
 import { useUsdRate } from "@/lib/personal/use-rate";
 import { Bars } from "@/components/personal/Bars";
@@ -21,6 +21,9 @@ import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, deleteRow, isRowSave, makeRowApi, saveRow, waitingRowIds } from "@/lib/row-outbox";
 import { browserOutbox } from "@/lib/outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { TypeChip, TypeTile } from "@/components/personal/ProjectType";
+import { resolveType } from "@/lib/personal/project-types";
+import { usePro } from "@/lib/use-pro";
 
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
@@ -30,6 +33,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
   const { data: bundle, loading, error: loadError, savedAt, userId } = useCachedQuery<ProjectBundle>((uid) => projectKey(uid, id), (sb) => fetchProjectBundle(sb, id), [id]);
   const { items: pending } = useOutbox(userId);
   const [error, setError] = useState<string | null>(null);
+  const pro = usePro();
   // Waiting changes show as if they were already saved
   const project = useMemo(() => (bundle ? (applyRows([bundle.project], pending, "personal_projects")[0] ?? null) : null), [bundle, pending]);
   const expenses = useMemo(
@@ -112,11 +116,13 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
+            {kind === "home_project" && <TypeTile type={resolveType(project)} size={40} />}
             <h1 className="text-2xl font-bold md:text-3xl">{project.name}</h1>
             <span className={`rounded-full border px-2.5 py-0.5 text-xs font-medium ${project.status === "active" ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "bg-muted text-muted-foreground"}`}>
               {project.status === "active" ? "Active" : "Completed"}
             </span>
           </div>
+          {kind === "home_project" && <div className="mt-1"><TypeChip type={resolveType(project)} /></div>}
           <p className="mt-1 text-sm text-muted-foreground">
             {[project.destination, project.start_date ? formatDate(project.start_date) + (project.end_date ? ` – ${formatDate(project.end_date)}` : "") : null].filter(Boolean).join(" · ")}
           </p>
@@ -165,6 +171,25 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
         <Card>
           <CardHeader><CardTitle className="text-base">Spending by category</CardTitle></CardHeader>
           <CardContent><Bars rows={byCategory} format={(n) => formatCurrency(n, "USD")} /></CardContent>
+        </Card>
+      )}
+
+      {kind === "home_project" && (
+        <Card data-testid="project-export">
+          <CardHeader className="pb-2"><CardTitle className="text-base">Reports</CardTitle><CardDescription>The project name, every expense and the totals.</CardDescription></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap gap-3">
+              {([["excel", "Excel report", FileSpreadsheet], ["pdf", "PDF report", FileText]] as const).map(([f, label, Icon]) => pro ? (
+                <a key={f} href={`/api/export/project/${id}/${f}`} download className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-card px-4 text-sm font-bold hover:bg-accent" data-testid={`export-${f}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</a>
+              ) : (
+                <span key={f} aria-disabled="true" className="inline-flex min-h-11 items-center gap-2 rounded-xl border bg-muted px-4 text-sm font-bold text-muted-foreground" data-testid={`export-${f}-locked`}>
+                  <Icon className="h-4 w-4" aria-hidden="true" />{label}
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200"><Lock className="h-3 w-3" aria-hidden="true" />Pro</span>
+                </span>
+              ))}
+            </div>
+            {pro === false && <p className="flex items-start gap-2 rounded-xl bg-amber-50 p-3 text-[13px] leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100"><Crown className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span><b>Reports are a Pro feature.</b> Ask your admin to turn Pro on for your account.</span></p>}
+          </CardContent>
         </Card>
       )}
 

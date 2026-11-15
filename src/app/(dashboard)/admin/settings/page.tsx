@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAccess } from "@/lib/use-access";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin, UserPlus } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin, UserPlus, Crown } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone }[] = [
   {
@@ -64,6 +64,14 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "Your IPTV customers: expiry dates, renewals and what each client can see.",
     icon: Tv,
     tone: "subscriptions",
+  },
+  {
+    href: "/admin/plans",
+    feature: "admin.only",
+    title: "Plans and access",
+    description: "Turn Pro on or off for a person, monthly, yearly or as a gift, with an end date.",
+    icon: Crown,
+    tone: "badges",
   },
   {
     href: "/admin/doit",

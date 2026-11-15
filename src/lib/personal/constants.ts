@@ -10,7 +10,7 @@ export const KIND_META: Record<
   PersonalKind,
   { label: string; plural: string; path: string; categories: string[]; noun: string }
 > = {
-  home_project: { label: "Home project", plural: "Home Projects", path: "/personal/projects", categories: PROJECT_CATEGORIES, noun: "project" },
+  home_project: { label: "Project", plural: "Projects", path: "/personal/projects", categories: PROJECT_CATEGORIES, noun: "project" },
   personal_trip: { label: "Personal trip", plural: "Personal Travel", path: "/personal/travel", categories: TRAVEL_CATEGORIES, noun: "trip" },
 };
 
@@ -27,6 +27,11 @@ export type PersonalProject = {
   currency: string;
   status: "active" | "completed";
   created_at: string;
+  /** From migration_project_types.sql: a ready type key, or "custom" with the three fields below. Missing means Home. */
+  project_type?: string | null;
+  type_label?: string | null;
+  type_icon?: string | null;
+  type_color?: string | null;
 };
 
 export type PersonalExpense = {

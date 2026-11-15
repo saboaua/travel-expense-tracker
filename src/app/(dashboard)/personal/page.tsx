@@ -127,7 +127,7 @@ export default function PersonalHubPage() {
       text: !stats ? "\u00a0" : stats.savings ? `${formatCurrency(stats.savings.saved, stats.savings.currency)} saved \u00b7 ${formatCurrency(stats.savings.monthly, stats.savings.currency)} a month` : "Put money aside every month" },
     { href: "/personal/utilities", title: "Utilities", icon: Zap, tone: "utilities", strong: !!stats?.utilities?.count,
       text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(stats.utilities.total, stats.currency)} paid this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
-    { href: "/personal/projects", title: "Home Projects", icon: Hammer, tone: "projects", strong: !!stats && stats.projects.count > 0,
+    { href: "/personal/projects", title: "Projects", icon: Hammer, tone: "projects", strong: !!stats && stats.projects.count > 0,
       text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, stats.currency)} spent` : "No active projects \u00b7 tap to start one" },
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, tone: "travel", strong: !!stats && stats.trips.count > 0,
       text: !stats ? "\u00a0" : stats.trips.count > 0 ? `${stats.trips.count} active \u00b7 ${formatCurrency(stats.trips.spent, stats.currency)} spent` : "No active trips \u00b7 tap to start one" },
@@ -144,7 +144,7 @@ export default function PersonalHubPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-8 lg:max-w-6xl">
-      <PageHeader title="Personal" description="Track groceries, home projects and personal trips, and keep your documents and loyalty cards in one place." />
+      <PageHeader title="Personal" description="Track groceries, projects and personal trips, and keep your documents and loyalty cards in one place." />
 
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:space-y-0">
       <div className="min-w-0 space-y-4">

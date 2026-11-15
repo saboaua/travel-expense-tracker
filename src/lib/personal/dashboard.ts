@@ -1,7 +1,7 @@
 /**
  * Numbers for the Personal dashboard. Pure functions, so they can be tested without a database.
  *
- * Base currency is the Aruban florin (AWG), because groceries and home projects are paid in it. Everything else is
+ * Base currency is the Aruban florin (AWG), because groceries and projects are paid in it. Everything else is
  * converted through US dollars: AWG is pegged at 1 USD = 1.79 AWG.
  *
  * Only the signed-in person's own rows are ever passed in (the page reads them under row-level security).
@@ -297,7 +297,7 @@ export function analyze(allRows: DashboardRow[], filtered: DashboardRow[], proje
   };
 }
 
-/** Tiles at the top of the Personal view: groceries this month, and active home projects / personal trips. All in AWG. */
+/** Tiles at the top of the Personal view: groceries this month, and active projects / personal trips. All in AWG. */
 export function tileSummary(rows: DashboardRow[], projects: DashboardProject[], today: string) {
   const monthStart = `${today.slice(0, 7)}-01`;
   const groc = rows.filter((r) => r.source === "grocery" && r.date >= monthStart && r.awg != null);

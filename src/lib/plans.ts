@@ -1,0 +1,36 @@
+/** Paid features. For now an admin switches Pro on by hand, for a month, a year or as a gift; it ends by itself on its end date. */
+
+export type PlanPeriod = "monthly" | "yearly" | "gift";
+export type PlanRow = { user_id: string; plan: "pro"; period: PlanPeriod; ends_on: string | null };
+
+export const PLAN_COLS = "user_id, plan, period, ends_on";
+export const PERIOD_LABEL: Record<PlanPeriod, string> = { monthly: "Pro, monthly", yearly: "Pro, yearly", gift: "Pro, gift" };
+
+/** Pro is on while the plan has no end date or the end date is today or later. */
+export function isProActive(row: Pick<PlanRow, "plan" | "ends_on"> | null | undefined, today: string): boolean {
+  if (!row || row.plan !== "pro") return false;
+  return !row.ends_on || row.ends_on >= today;
+}
+
+/** The same day next month or next year, kept inside short months (Jan 31 gives Feb 28). */
+export function defaultEndsOn(period: PlanPeriod, today: string): string | null {
+  if (period === "gift") return null;
+  const [y, m, d] = today.split("-").map(Number);
+  const months = period === "yearly" ? 12 : 1;
+  const total = (m - 1) + months;
+  const ny = y + Math.floor(total / 12);
+  const nm = total % 12;
+  const last = new Date(Date.UTC(ny, nm + 1, 0)).getUTCDate();
+  return `${ny}-${String(nm + 1).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+
+export const isPeriod = (v: unknown): v is PlanPeriod => v === "monthly" || v === "yearly" || v === "gift";
+export const isIsoDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
+
+/** What the admin list says under a name: the plan and when it ends. */
+export function planSummary(row: Pick<PlanRow, "period" | "ends_on"> | null | undefined, today: string): { title: string; sub: string; pro: boolean } {
+  if (!row) return { title: "Free", sub: "No plan", pro: false };
+  const active = isProActive({ plan: "pro", ends_on: row.ends_on }, today);
+  if (!active) return { title: "Free", sub: "Pro ended " + row.ends_on, pro: false };
+  return { title: PERIOD_LABEL[row.period] ?? "Pro", sub: row.ends_on ? `Until ${row.ends_on}` : "No end date", pro: true };
+}

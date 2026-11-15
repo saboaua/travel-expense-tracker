@@ -152,7 +152,7 @@ export function buildScanOptions(input: {
     out.push({ key: "grocery", kind: "grocery", label: "Groceries", sub: "Supermarket receipt", href: "/personal/groceries/new" });
     for (const p of input.projects) {
       if ((p.status || "active") !== "active") continue;
-      if (p.kind === "home_project") out.push({ key: `project:${p.id}`, kind: "project", id: p.id, label: p.name, sub: "Home project", href: `/personal/projects/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });
+      if (p.kind === "home_project") out.push({ key: `project:${p.id}`, kind: "project", id: p.id, label: p.name, sub: "Project", href: `/personal/projects/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });
       else if (p.kind === "personal_trip") out.push({ key: `ptrip:${p.id}`, kind: "ptrip", id: p.id, label: p.name, sub: ["Personal travel", p.destination].filter(Boolean).join(" · "), href: `/personal/travel/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });
     }
   }

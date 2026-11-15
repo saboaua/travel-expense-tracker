@@ -194,7 +194,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       </Link>
       {!expenseId && (
         <div className="mb-4 empty:hidden">
-          <ScanChip currentKey={scanKey} label={`${projectName || "This project"} \u00b7 ${kind === "home_project" ? "Home project" : "Personal travel"}`} />
+          <ScanChip currentKey={scanKey} label={`${projectName || "This project"} \u00b7 ${kind === "home_project" ? "Project" : "Personal travel"}`} />
         </div>
       )}
       <Card>

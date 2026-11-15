@@ -17,6 +17,8 @@ import { browserKv, loadWithCache } from "@/lib/offline-store";
 import { browserOutbox } from "@/lib/outbox";
 import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { TypePicker } from "@/components/personal/ProjectType";
+import { customTypesFrom, resolveType, typeColumns, typeId, type ProjectTypeInfo } from "@/lib/personal/project-types";
 
 
 export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId?: string }) {
@@ -31,9 +33,18 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
   const [budget, setBudget] = useState("");
   const [currency, setCurrency] = useState("USD");
   const [status, setStatus] = useState<"active" | "completed">("active");
+  const [ptype, setPtype] = useState<ProjectTypeInfo>(resolveType(null));
+  const [startType, setStartType] = useState<string>(typeId(null));
+  const [customs, setCustoms] = useState<ProjectTypeInfo[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
+
+  // Types this person made before, so a second project can pick them again (none when offline or before the migration)
+  useEffect(() => {
+    if (kind !== "home_project") return;
+    createClient().from("personal_projects").select("project_type, type_label, type_icon, type_color").eq("kind", "home_project").then(({ data }) => setCustoms(customTypesFrom((data as never[]) ?? [])), () => {});
+  }, [kind]);
 
   useEffect(() => {
     if (!projectId) return;
@@ -56,6 +67,8 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
       setBudget(data.budget != null ? String(data.budget) : "");
       setCurrency(data.currency ?? "USD");
       setStatus(data.status ?? "active");
+      setPtype(resolveType(data));
+      setStartType(typeId(data));
     })();
   }, [projectId]);
 
@@ -79,6 +92,8 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
         budget: budget ? Number(budget) : null,
         currency,
         status,
+        // Only sent when it changed (or is not Home), so a database without the types migration keeps saving
+        ...(kind === "home_project" && (projectId ? typeId({ project_type: ptype.key, type_label: ptype.label }) !== startType : true) ? typeColumns(ptype, !!projectId) : {}),
       };
       const api = makeRowApi(supabase);
 
@@ -111,8 +126,14 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
           <form onSubmit={submit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Name</label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} placeholder={kind === "home_project" ? "Kitchen renovation" : "Family trip to Curaçao"} />
+              <Input value={name} onChange={(e) => setName(e.target.value)} required maxLength={120} placeholder={kind === "home_project" ? "Kitchen renovation, car service" : "Family trip to Curaçao"} />
             </div>
+            {kind === "home_project" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium" id="project-type-label">Type</label>
+                <TypePicker value={ptype} onChange={setPtype} custom={customs} />
+              </div>
+            )}
             {kind === "personal_trip" && (
               <div className="space-y-2">
                 <label className="text-sm font-medium">Destination</label>

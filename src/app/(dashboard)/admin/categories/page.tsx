@@ -79,7 +79,7 @@ export default function AdminCategoriesPage() {
           <CategoryManager
             table="house_areas"
             noun="house area"
-            subtitle="Shown in the Quick spend dropdown when the category is House, next to the home projects. Disabled ones are hidden from new spends."
+            subtitle="Shown in the Quick spend dropdown when the category is House, next to the projects. Disabled ones are hidden from new spends."
             addTitle="Add a house area"
             addPlaceholder="e.g. Garage"
             deleteWarning="Delete this area? Spends you already saved keep the name."

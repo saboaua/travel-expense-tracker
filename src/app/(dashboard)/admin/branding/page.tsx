@@ -327,7 +327,7 @@ export default function AdminBrandingPage() {
         title="Personal section"
         icon={<User />} tone="profile"
         summary={personalEnabled ? "On for everyone" : "Off for everyone"}
-        description="Lets each person track their own groceries, home projects and personal trips. That data is private to the user: admins cannot see it. Turn this off to hide the section for everyone."
+        description="Lets each person track their own groceries, projects and personal trips. That data is private to the user: admins cannot see it. Turn this off to hide the section for everyone."
       >
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={personalEnabled} onChange={(e) => setPersonalEnabled(e.target.checked)} />

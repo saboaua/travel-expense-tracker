@@ -4,7 +4,7 @@ import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 import { Alert } from "@/components/ui/alert";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -16,6 +16,9 @@ import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { TypeChip, TypeTile } from "@/components/personal/ProjectType";
+import { resolveType, typeId } from "@/lib/personal/project-types";
+import { cn } from "@/lib/utils";
 
 
 type Row = ProjectRow;
@@ -35,8 +38,16 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
   const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "personal_projects" && i.isNew).map((i) => i.id)), [pending]);
 
   const total = (r: Row) => r.personal_expenses.reduce((s, e) => s + Number(e.amount_usd), 0);
-  const active = rows.filter((r) => r.status === "active");
-  const done = rows.filter((r) => r.status === "completed");
+  const [filter, setFilter] = useState("all");
+  // The type chips only appear once there is more than one type to tell apart
+  const typesHere = useMemo(() => {
+    const seen = new Map<string, ReturnType<typeof resolveType>>();
+    for (const r of rows) if (!seen.has(typeId(r))) seen.set(typeId(r), resolveType(r));
+    return [...seen.entries()];
+  }, [rows]);
+  const shown = kind === "home_project" && filter !== "all" ? rows.filter((r) => typeId(r) === filter) : rows;
+  const active = shown.filter((r) => r.status === "active");
+  const done = shown.filter((r) => r.status === "completed");
 
   const card = (r: Row) => {
     const spent = total(r);
@@ -46,7 +57,12 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
       <Wrap key={r.id}>
         <div className="h-full rounded-xl border bg-card p-5 shadow-sm transition-shadow group-hover:shadow-md">
           <div className="flex items-start justify-between gap-3">
-            <h3 className="font-semibold leading-snug">{r.name}</h3>
+            {kind === "home_project" ? (
+              <div className="flex min-w-0 items-center gap-3">
+                <TypeTile type={resolveType(r)} />
+                <div className="min-w-0"><h3 className="font-semibold leading-snug">{r.name}</h3><div className="mt-0.5"><TypeChip type={resolveType(r)} /></div></div>
+              </div>
+            ) : <h3 className="font-semibold leading-snug">{r.name}</h3>}
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
           </div>
           {waiting.has(r.id) && <p className="mt-1 flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
@@ -77,7 +93,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
         <div>
           <h1 className="text-2xl font-bold md:text-3xl">{meta.plural}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {kind === "home_project" ? "Scan tickets and see what each project is costing you" : "Scan receipts and see what a trip cost you"}
+            {kind === "home_project" ? "Home, car, boat or anything else: scan tickets and see what each project costs you" : "Scan receipts and see what a trip cost you"}
           </p>
         </div>
         <Link href={`${meta.path}/new`}>
@@ -96,6 +112,14 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
             <Link href={`${meta.path}/new`}><Button><Plus className="mr-2 h-4 w-4" /> Create your first {meta.noun}</Button></Link>
           </CardContent>
         </Card>
+      )}
+
+      {kind === "home_project" && typesHere.length > 1 && (
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by type" data-testid="type-filter">
+          {[["all", null] as const, ...typesHere].map(([id, t]) => (
+            <button key={id} type="button" onClick={() => setFilter(id)} aria-pressed={filter === id} className={cn("inline-flex min-h-[38px] items-center rounded-xl border px-3 text-[13.5px] font-bold", filter === id ? "border-primary bg-primary text-primary-foreground" : "bg-card")}>{t ? t.label : "All"}</button>
+          ))}
+        </div>
       )}
 
       {active.length > 0 && (

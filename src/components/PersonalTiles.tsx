@@ -18,7 +18,7 @@ export function PersonalTiles({ summary, currency = "USD" }: { summary: Personal
     },
     {
       href: "/personal/projects",
-      label: "Home Projects",
+      label: "Projects",
       icon: Hammer,
       tone: "projects",
       amount: summary.projects.spent, currency,

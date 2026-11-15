@@ -57,7 +57,7 @@ export type MonthInputs = {
   /** utility bills not paid yet: not counted, only mentioned (optional) */
   utilitiesDue?: { amount_usd: number | string | null }[];
   spends: { amount: number | string; currency: string; amount_usd?: number | string | null; category: string; project_id?: string | null; house_area?: string | null }[];
-  /** costs of your home projects this month */
+  /** costs of your projects this month */
   projects: { amount_usd: number | string | null }[];
   /** what your savings plans put aside this month (optional: older callers have none) */
   savings?: { amount: number; currency: string }[];
@@ -67,7 +67,7 @@ export type MonthInputs = {
   fixed?: FixedLine[];
 };
 
-/** A quick spend that belongs to the house: the House category, a home project or an area of the house. */
+/** A quick spend that belongs to the house: the House category, a project or an area of the house. */
 export const isHouseSpend = (s: { category: string; project_id?: string | null; house_area?: string | null }) => s.category === HOUSE_CATEGORY || !!s.project_id || !!s.house_area;
 
 /** What each area added this month, in the budget's currency. Amounts that cannot be converted are left out. */

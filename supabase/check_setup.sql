@@ -21,6 +21,10 @@ need_cols(tbl, col, fix) as (values
   ('utility_bills','dedupe_key','migration_bill_emails.sql'),
   ('utility_bills','needs_check','migration_bill_emails.sql'),
   ('utility_bills','payment_ref','migration_utility_payment_ref.sql'),
+  ('personal_projects','project_type','migration_project_types_plans.sql'),
+  ('personal_projects','type_label','migration_project_types_plans.sql'),
+  ('personal_projects','type_icon','migration_project_types_plans.sql'),
+  ('personal_projects','type_color','migration_project_types_plans.sql'),
   ('bill_email_log','status','migration_bill_emails.sql'),
   ('bill_email_senders','accounts','migration_bill_email_accounts.sql'),
   ('profiles','welcome_seen_at','migration_welcome_tour.sql'),
@@ -82,6 +86,7 @@ col_checks as (
 ),
 need_tables(tbl, fix) as (values
   ('house_areas','migration_house_areas.sql'),
+  ('user_plans','migration_project_types_plans.sql'),
   ('utility_bills','migration_utilities.sql'),
   ('bill_email_addresses','migration_bill_emails.sql'),
   ('bill_email_senders','migration_bill_emails.sql'),

@@ -113,7 +113,7 @@ export async function saveBusiness(supabase: SupabaseClient, userId: string, tri
   };
 }
 
-/* ---------------- home project / personal travel ---------------- */
+/* ---------------- project / personal travel ---------------- */
 
 export async function savePersonalExpense(supabase: SupabaseClient, userId: string, projectId: string, file: TgFile): Promise<Saved> {
   const { data: project } = await supabase.from("personal_projects").select("name, kind, currency").eq("id", projectId).eq("user_id", userId).single();

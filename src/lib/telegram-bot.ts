@@ -33,7 +33,7 @@ export type TgCallback = { id: string; data?: string; from: { id: number }; mess
 
 const HELP = [
   "Send a photo or PDF and I will file it for you:",
-  "• a business trip, groceries, a home project, personal travel, or your documents",
+  "• a business trip, groceries, a project, personal travel, or your documents",
   "• add a word to the caption to choose, for example \"groceries\" or \"passport\"",
   "",
   "/trips — pick a default trip",

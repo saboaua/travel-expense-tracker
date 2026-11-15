@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS } from "@/lib/columns";
+import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, withColumnFallback } from "@/lib/columns";
 import type { PersonalExpense, PersonalKind, PersonalProject } from "@/lib/personal/constants";
 
 /** What the personal screens load, and the key each is kept under on the phone. Shared with the background warm-up. */
@@ -14,7 +14,7 @@ export const projectKey = (userId: string, id: string) => `${userId}:project:${i
 
 export type LinkedSpend = { id: string; project_id: string; merchant: string | null; amount: number; currency: string; exchange_rate: number; amount_usd: number; category: string; expense_date: string; receipt_path: string | null };
 
-/** Quick spends attached to home projects. Any error (the House migration is not run yet) just means none. */
+/** Quick spends attached to projects. Any error (the House migration is not run yet) just means none. */
 export async function fetchLinkedSpends(supabase: SupabaseClient, projectId?: string): Promise<LinkedSpend[]> {
   let q = supabase.from("personal_spends").select("id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, receipt_path").not("project_id", "is", null);
   if (projectId) q = q.eq("project_id", projectId);
@@ -33,11 +33,11 @@ export function withLinkedTotals<T extends { id?: string; personal_expenses?: { 
 }
 
 export async function fetchProjects(supabase: SupabaseClient, kind: PersonalKind): Result<ProjectRow[]> {
-  const { data, error } = await supabase
+  const { data, error } = await withColumnFallback((cols) => supabase
     .from("personal_projects")
-    .select(`${PERSONAL_PROJECT_COLS}, personal_expenses(amount_usd)`)
+    .select(`${cols}, personal_expenses(amount_usd)`)
     .eq("kind", kind)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }), PERSONAL_PROJECT_COLS_TYPED, PERSONAL_PROJECT_COLS);
   if (error) return { data: null, error };
   const rows = (data as unknown as ProjectRow[]) ?? [];
   return { data: kind === "home_project" ? withLinkedTotals(rows, await fetchLinkedSpends(supabase)) : rows, error };
@@ -45,7 +45,7 @@ export async function fetchProjects(supabase: SupabaseClient, kind: PersonalKind
 
 export async function fetchProjectBundle(supabase: SupabaseClient, id: string): Result<ProjectBundle> {
   const [p, e] = await Promise.all([
-    supabase.from("personal_projects").select(PERSONAL_PROJECT_COLS).eq("id", id).single(),
+    withColumnFallback((cols) => supabase.from("personal_projects").select(cols).eq("id", id).single(), PERSONAL_PROJECT_COLS_TYPED, PERSONAL_PROJECT_COLS),
     supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("project_id", id).order("expense_date", { ascending: false }),
   ]);
   if (p.error || !p.data) return { data: null, error: p.error ?? new Error("Not found") };

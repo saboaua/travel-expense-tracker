@@ -10,7 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
-import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
+import { resolveType } from "@/lib/personal/project-types";
+import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { useHouseAreas } from "@/lib/use-categories";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
 import { toUsd } from "@/lib/currencies";
@@ -53,16 +54,19 @@ export function QuickSpend() {
   const [photoGone, setPhotoGone] = useState(false);
   const [rateTouched, setRateTouched] = useState(false);
   const { rate, setRate } = useUsdRate(currency);
-  // House extras: an optional home project and a photo of the invoice
+  // House extras: an optional project and a photo of the invoice
   const [projectId, setProjectId] = useState("");
-  const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
+  const [projects, setProjects] = useState<{ id: string; name: string; project_type?: string | null; type_label?: string | null }[]>([]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const isHouse = category === "House";
   const areas = useHouseAreas();
   useEffect(() => {
-    createClient().from("personal_projects").select("id, name").eq("kind", "home_project").eq("status", "active").order("created_at", { ascending: false }).limit(50)
-      .then(({ data }) => setProjects((data ?? []) as { id: string; name: string }[]));
+    const sb = createClient();
+    const list = (cols: string) => sb.from("personal_projects").select(cols).eq("kind", "home_project").eq("status", "active").order("created_at", { ascending: false }).limit(50);
+    // The type is shown next to the name; a database without the types migration just shows the name
+    withColumnFallback(list, "id, name, project_type, type_label", "id, name")
+      .then(({ data }) => setProjects(((data ?? []) as unknown) as { id: string; name: string; project_type?: string | null; type_label?: string | null }[]));
   }, []);
 
   const load = useCallback(async () => {
@@ -220,7 +224,7 @@ export function QuickSpend() {
               <label htmlFor="qs-project" className={label}>Part of a project or an area <span className="font-normal text-muted-foreground">(optional)</span></label>
               <Select id="qs-project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                 <option value="">None: just a repair</option>
-                {projects.length > 0 && <optgroup label="Your home projects">{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}
+                {projects.length > 0 && <optgroup label="Your projects">{projects.map((p) => <option key={p.id} value={p.id}>{p.project_type && p.project_type !== "home" ? `${p.name} (${resolveType(p).label})` : p.name}</option>)}</optgroup>}
                 {areas.length > 0 && <optgroup label="Areas of the house">{areas.map((a) => <option key={a.name} value={`${AREA_PREFIX}${a.name}`}>{a.name}</option>)}</optgroup>}
               </Select>
             </div>

@@ -28,7 +28,7 @@ export const FEATURES: Feature[] = [
   { key: "subscriptions", label: "Subscriptions", description: "Track your own subscriptions: what you pay, what is due next, free trials and price rises.", group: "App", paths: ["/personal/subscriptions"], defaultRoles: ["user", "assistant"] },
   // For people who buy IPTV from the admin: one page with their own service and renewal history. Never part of a normal role.
   { key: "iptv.mine", label: "My IPTV subscription", description: "Sees only their own IPTV service, dates and renewal history.", group: "App", paths: ["/my-subscription"], defaultRoles: [] },
-  { key: "personal", label: "Personal", description: "Groceries, home projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
+  { key: "personal", label: "Personal", description: "Groceries, projects and personal travel.", group: "App", paths: ["/personal"], defaultRoles: ["user", "assistant"] },
   { key: "personal.dashboard", label: "Personal dashboard", description: "Business / Personal switch on the home page, with spending charts for personal receipts.", group: "App", paths: [], defaultRoles: ["user", "assistant"] },
   { key: "sharing", label: "Partner sharing", description: "Share loyalty cards (view only) and a trip's destination and dates with an approved partner.", group: "App", paths: [], defaultRoles: [] },
   { key: "documents", label: "Documents & passport", description: "Passport, visas and trip documents.", group: "App", paths: ["/documents"], defaultRoles: ["user", "assistant"] },

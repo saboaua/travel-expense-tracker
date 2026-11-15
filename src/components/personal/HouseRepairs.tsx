@@ -17,7 +17,7 @@ import { formatDate, todayISO } from "@/lib/utils";
 const pill = (on: boolean) =>
   `inline-flex min-h-10 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
 
-/** Everything spent on the house this year: quick spends categorised House, or attached to a home project. */
+/** Everything spent on the house this year: quick spends categorised House, or attached to a project. */
 export function HouseRepairs() {
   const year = todayISO().slice(0, 4);
   const [rows, setRows] = useState<SpendRow[] | null>(null);

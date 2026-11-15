@@ -99,7 +99,7 @@ export async function warmTrips(supabase: SupabaseClient, userId: string): Promi
   await warmPages(pages);
 }
 
-/** Home projects and personal trips: the lists, the latest ones with their expenses, and their pages. */
+/** Projects and personal trips: the lists, the latest ones with their expenses, and their pages. */
 export async function warmProjects(supabase: SupabaseClient, userId: string): Promise<void> {
   const pages: string[] = [];
   for (const kind of ["home_project", "personal_trip"] as const) {
