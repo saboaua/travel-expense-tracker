@@ -8,8 +8,9 @@ import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Mail, Check, Trash2, RotateCcw, RefreshCw } from "lucide-react";
-import { SUPPORT_REQUEST_COLS } from "@/lib/columns";
+import { Mail, Check, Trash2, RotateCcw, RefreshCw, Sparkles } from "lucide-react";
+import { SUPPORT_REQUEST_AI_COLS, SUPPORT_REQUEST_COLS, withColumnFallback } from "@/lib/columns";
+import { CATEGORY_LABEL, PRIORITY_LABEL, type SupportCategory, type SupportPriority } from "@/lib/support-ai";
 
 type SupportRequest = {
   id: string;
@@ -19,6 +20,11 @@ type SupportRequest = {
   message: string;
   status: "new" | "resolved";
   created_at: string;
+  ai_status?: "done" | "failed" | null;
+  ai_summary?: string | null;
+  ai_category?: SupportCategory | null;
+  ai_priority?: SupportPriority | null;
+  ai_steps?: string[] | null;
 };
 
 const fmt = formatDateTime;
@@ -29,14 +35,15 @@ export default function AdminSupportPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"new" | "resolved" | "all">("new");
+  const [summarizing, setSummarizing] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from("support_requests")
-      .select(SUPPORT_REQUEST_COLS)
-      .order("created_at", { ascending: false })
-      .limit(200);
+    const { data, error } = await withColumnFallback(
+      (cols) => supabase.from("support_requests").select(cols).order("created_at", { ascending: false }).limit(200),
+      SUPPORT_REQUEST_AI_COLS,
+      SUPPORT_REQUEST_COLS,
+    );
     if (error) {
       setError(
         /relation|does not exist|schema cache/i.test(error.message)
@@ -45,7 +52,7 @@ export default function AdminSupportPage() {
       );
     } else {
       setError(null);
-      setRows((data as SupportRequest[]) || []);
+      setRows((data as unknown as SupportRequest[]) || []);
     }
     setLoading(false);
   }, [supabase]);
@@ -53,6 +60,15 @@ export default function AdminSupportPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const summarize = async (id: string) => {
+    setSummarizing(id); setError(null);
+    const res = await fetch("/api/admin/support/summary", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+    const json = await res.json().catch(() => ({}));
+    setSummarizing(null);
+    if (!res.ok) return setError(json.error || "Could not make the summary.");
+    setRows((rs) => rs.map((r) => (r.id === id ? { ...r, ...(json.ai ?? { ai_status: "failed" }) } : r)));
+  };
 
   const setStatus = async (id: string, status: "new" | "resolved") => {
     const { error } = await supabase.from("support_requests").update({ status }).eq("id", id);
@@ -118,6 +134,27 @@ export default function AdminSupportPage() {
                   </span>
                 </div>
                 <p className="text-sm whitespace-pre-wrap break-words">{r.message}</p>
+                {summarizing === r.id ? (
+                  <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40" data-testid="ai-summarizing"><p className="text-xs font-extrabold tracking-wide text-indigo-700 dark:text-indigo-300">AI SUMMARY</p><p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">Summarizing…</p></div>
+                ) : r.ai_status === "done" && r.ai_summary ? (
+                  <div className="space-y-2 rounded-xl border border-indigo-200 bg-indigo-50 p-3 dark:border-indigo-900 dark:bg-indigo-950/40" data-testid="ai-summary">
+                    <div className="flex items-center gap-2"><p className="text-xs font-extrabold tracking-wide text-indigo-700 dark:text-indigo-300">AI SUMMARY</p><span className="flex-1" />
+                      {r.ai_category && <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[11.5px] font-extrabold text-rose-800 dark:bg-rose-950 dark:text-rose-200">{CATEGORY_LABEL[r.ai_category] ?? r.ai_category}</span>}
+                      {r.ai_priority && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11.5px] font-extrabold text-amber-900 dark:bg-amber-950 dark:text-amber-200">{PRIORITY_LABEL[r.ai_priority] ?? r.ai_priority}</span>}
+                    </div>
+                    <p className="text-sm font-semibold leading-snug">{r.ai_summary}</p>
+                    {(r.ai_steps ?? []).length > 0 && (<><p className="text-xs font-extrabold tracking-wide text-indigo-700 dark:text-indigo-300">NEXT STEPS</p><ol className="list-decimal space-y-0.5 pl-5 text-sm">{(r.ai_steps ?? []).map((st, i) => <li key={i}>{st}</li>)}</ol></>)}
+                    <p className="text-[11.5px] text-indigo-600 dark:text-indigo-400">Written by AI from the message. Check it before you act.</p>
+                  </div>
+                ) : r.ai_status === "failed" ? (
+                  <div className="space-y-2 rounded-xl border bg-muted/50 p-3" data-testid="ai-failed">
+                    <p className="text-xs font-extrabold tracking-wide text-indigo-700 dark:text-indigo-300">AI SUMMARY</p>
+                    <p className="text-sm text-muted-foreground">The summary could not be made. The request is saved and nothing is lost.</p>
+                    <Button size="sm" variant="outline" className="gap-2" onClick={() => summarize(r.id)} data-testid="ai-retry"><RotateCcw className="h-4 w-4" />Try again</Button>
+                  </div>
+                ) : (
+                  <Button size="sm" variant="outline" className="gap-2" onClick={() => summarize(r.id)} data-testid="ai-make"><Sparkles className="h-4 w-4" />Summarize with AI</Button>
+                )}
                 <div className="flex flex-wrap gap-2 pt-1">
                   <a
                     href={`mailto:${r.email}?subject=${encodeURIComponent(`Re: ${r.subject || "Your support request"}`)}`}

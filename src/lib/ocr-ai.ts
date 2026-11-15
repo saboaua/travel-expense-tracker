@@ -14,6 +14,12 @@ import { askGroq, groqConfigured, groqModels } from "@/lib/ocr-groq";
 const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
 const MONTH_FIRST = new Set(["USD", "CAD", "PHP"]);
 
+/** Where Gemini lives. GEMINI_API_BASE points tests at a stand-in. */
+export const geminiBase = () => process.env.GEMINI_API_BASE || "https://generativelanguage.googleapis.com";
+
+/** The Gemini model in use: OCR_MODEL when it names a Gemini model, otherwise the default. */
+export const geminiModel = () => { const o = process.env.OCR_MODEL; return o && /^gemini/i.test(o) ? o : DEFAULT_MODEL; };
+
 export function aiOcrConfigured() {
   return !!process.env.GEMINI_API_KEY || groqConfigured();
 }
@@ -114,9 +120,9 @@ export function fallbackModels(models: ModelInfo[]): string[] {
     .map((m) => m.id);
 }
 
-async function discoverModels(key: string): Promise<string[]> {
+export async function discoverModels(key: string): Promise<string[]> {
   try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(4000) });
+    const res = await fetch(`${geminiBase()}/v1beta/models?pageSize=200`, { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(4000) });
     if (!res.ok) return [];
     const json = (await res.json()) as { models?: ModelInfo[] };
     return fallbackModels(json.models || []);
@@ -150,7 +156,7 @@ async function probe(key: string, model: string, setting: string, extra: Record<
   const t0 = Date.now();
   let status: number | string = "error", error: string | null = null;
   try {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    const res = await fetch(`${geminiBase()}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({ contents: [{ role: "user", parts: [{ text: 'Reply with the JSON {"ok":true}' }] }], generationConfig: { responseMimeType: "application/json", maxOutputTokens: 64, temperature: 0, ...extra } }),
@@ -204,7 +210,7 @@ async function diagnoseGemini(): Promise<AiCheck> {
   }
   let models: ModelInfo[] = [];
   try {
-    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=200", { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(`${geminiBase()}/v1beta/models?pageSize=200`, { headers: { "x-goog-api-key": key }, signal: AbortSignal.timeout(8000) });
     out.listStatus = res.status;
     if (res.ok) models = ((await res.json()) as { models?: ModelInfo[] }).models || [];
   } catch (e) {
@@ -285,7 +291,7 @@ async function askGemini(image: AiImage, prompt: string, maxTokens: number, opts
   // With a backup reader, Gemini stops at `until` so the backup still has time inside the route's limit
   const cap = (ms: number) => (opts.until ? Math.max(1000, Math.min(ms, opts.until - Date.now())) : ms);
   const call = (model: string, ms: number, tokens: number) =>
-    fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    fetch(`${geminiBase()}/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
       method: "POST",
       headers: { "x-goog-api-key": key, "content-type": "application/json" },
       body: JSON.stringify({

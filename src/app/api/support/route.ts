@@ -1,11 +1,13 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 import { notifySupportRequest } from "@/lib/telegram-alerts";
+import { CATEGORY_LABEL, PRIORITY_LABEL, summarizeSupport, supportAiConfigured } from "@/lib/support-ai";
 import { sendPush } from "@/lib/push";
 import { scanFields } from "@/lib/suspicious-input";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 const esc = (s: string) =>
   s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -91,8 +93,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not send your message. Please try again." }, { status: 500 });
   }
 
-  // Tell the admins on Telegram (never blocks or fails the request)
-  if (created?.id) await notifySupportRequest(db, name, subject || null, String(created.id));
+  // Tell the admins on Telegram, with an AI summary when Gemini is set up (never blocks or fails the request).
+  // With AI the summary is made after the reply is sent, so the person never waits for it.
+  if (created?.id) {
+    const id = String(created.id);
+    const notify = async () => {
+      let sum = null;
+      if (supportAiConfigured()) {
+        sum = await summarizeSupport({ name, subject: subject || null, message }).catch(() => null);
+        // an older database without the AI columns just skips saving it
+        await db.from("support_requests").update(sum ? { ai_status: "done", ai_summary: sum.summary, ai_category: sum.category, ai_priority: sum.priority, ai_steps: sum.steps } : { ai_status: "failed" }).eq("id", id);
+      }
+      await notifySupportRequest(db, name, subject || null, id, sum ? { summary: sum.summary, category: CATEGORY_LABEL[sum.category], priority: PRIORITY_LABEL[sum.priority] } : null);
+    };
+    if (supportAiConfigured()) after(() => notify().catch((e) => console.error("support summary failed:", e)));
+    else await notify();
+  }
 
   // Phone alert to each admin who has "Support requests" switched on (never blocks or fails the request)
   try {

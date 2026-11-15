@@ -65,6 +65,7 @@ export const AUDIT_LOG_COLS = "id, created_at, action, entity_type, entity_id, a
 export const HELP_TOPIC_COLS = "id, slug, title, category, summary, body, sort_order, published, updated_at";
 
 export const SUPPORT_REQUEST_COLS = "id, name, email, subject, message, status, created_at";
+export const SUPPORT_REQUEST_AI_COLS = "id, name, email, subject, message, status, created_at, ai_status, ai_summary, ai_category, ai_priority, ai_steps";
 
 export const TELEGRAM_PENDING_COLS = "telegram_id, file_id, file_name, mime";
 /** saved_ref and saved_path come from migration_telegram_v2.sql */

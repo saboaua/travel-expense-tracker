@@ -52,9 +52,9 @@ export function alertForAudit(a: AuditLike, now: Date = new Date()): Alert | nul
   return { text, urgent: false, dedupeKey: `audit:${a.action}:${now.getTime()}:${String(d.email || "")}` };
 }
 
-export function supportAlert(name: string, subject: string | null, id: string): Alert {
+export function supportAlert(name: string, subject: string | null, id: string, ai?: { summary: string; category: string; priority: string } | null): Alert {
   return {
-    text: `📩 <b>New support request</b>\nFrom: ${escapeHtml(cut(name, 60))}${subject ? `\nSubject: ${escapeHtml(cut(subject, 100))}` : ""}\nOpen Admin → Support to answer.`,
+    text: `📩 <b>New support request</b>\nFrom: ${escapeHtml(cut(name, 60))}${subject ? `\nSubject: ${escapeHtml(cut(subject, 100))}` : ""}${ai ? `\n<b>Summary:</b> ${escapeHtml(cut(ai.summary, 160))} <i>(${escapeHtml(ai.category)}, ${escapeHtml(ai.priority)})</i>` : ""}\nOpen Admin → Support to answer.`,
     urgent: false,
     dedupeKey: `support:${id}`,
   };
@@ -72,6 +72,6 @@ async function deliver(supabase: SupabaseClient, alert: Alert | null, excludeUse
 
 export const notifySecurityEvent = (supabase: SupabaseClient, e: SecurityEventLike) => deliver(supabase, alertForSecurityEvent(e));
 export const alertAdminsOfAudit = (supabase: SupabaseClient, a: AuditLike) => deliver(supabase, alertForAudit(a), a.actorId);
-export const notifySupportRequest = (supabase: SupabaseClient, name: string, subject: string | null, id: string) => deliver(supabase, supportAlert(name, subject, id));
+export const notifySupportRequest = (supabase: SupabaseClient, name: string, subject: string | null, id: string, ai?: { summary: string; category: string; priority: string } | null) => deliver(supabase, supportAlert(name, subject, id, ai));
 export const notifyJobFailure = (supabase: SupabaseClient, job: string) =>
   deliver(supabase, { text: `🚨 <b>Scheduled job failed</b>: ${escapeHtml(job)}\nCheck the Vercel logs.`, urgent: true, dedupeKey: `job:${job}:${hourKey()}` });

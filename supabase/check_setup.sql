@@ -4,6 +4,9 @@
 
 with
 need_cols(tbl, col, fix) as (values
+  -- Support: AI summary
+  ('support_requests','ai_summary','migration_support_ai.sql'),
+  ('support_requests','ai_steps','migration_support_ai.sql'),
   -- Personal: quick spends and house
   ('personal_spends','project_id','migration_personal.sql / migration_house_spend.sql'),
   ('personal_spends','receipt_path','migration_house_spend.sql'),

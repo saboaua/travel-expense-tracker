@@ -75,6 +75,7 @@ check("SECURITY_EVENT_COLS", "security_events", C.SECURITY_EVENT_COLS);
 check("AUDIT_LOG_COLS", "audit_logs", C.AUDIT_LOG_COLS);
 check("HELP_TOPIC_COLS", "help_topics", C.HELP_TOPIC_COLS);
 check("SUPPORT_REQUEST_COLS", "support_requests", C.SUPPORT_REQUEST_COLS);
+check("SUPPORT_REQUEST_AI_COLS", "support_requests", C.SUPPORT_REQUEST_AI_COLS);
 check("TELEGRAM_PENDING_COLS", "telegram_pending", C.TELEGRAM_PENDING_COLS);
 check("BRANDING_COLS", "app_settings", C.BRANDING_COLS);
 check("PROFILE_HOME_COLS", "profiles", C.PROFILE_HOME_COLS);
