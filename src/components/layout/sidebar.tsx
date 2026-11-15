@@ -14,6 +14,8 @@ import { adminNavItems, IPTV_CLIENT_ROLE } from "@/lib/access";
 import { resetAccessCache, useAccess } from "@/lib/use-access";
 import { resetSharingCache } from "@/lib/use-sharing";
 import { resetBrandCache, useBrand } from "@/lib/use-brand";
+import { toneStyle, type IconTone } from "@/lib/icon-tones";
+import { IconTile } from "@/components/ui/icon-tile";
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -33,17 +35,18 @@ export function Sidebar() {
     router.refresh();
   };
 
-  const userNav = role === IPTV_CLIENT_ROLE ? [{ href: "/my-subscription", label: "My subscription", icon: Tv }] : [
-    { href: "/", label: "Dashboard", icon: Home },
+  const userNav = role === IPTV_CLIENT_ROLE ? [{ href: "/my-subscription", label: "My subscription", icon: Tv, tone: "subscriptions" as IconTone }] : [
+    { href: "/", label: "Dashboard", icon: Home, tone: "home" as IconTone },
     // Trips and Reports share one Business link; the switch between them is at the top of each page
-    ...(perms.has("trips") || perms.has("reports") ? [{ href: perms.has("trips") ? "/trips" : "/reports", label: "Business", icon: Briefcase }] : []),
-    ...(personalEnabled && perms.has("personal") ? [{ href: "/personal", label: "Personal", icon: Wallet }] : []),
+    ...(perms.has("trips") || perms.has("reports") ? [{ href: perms.has("trips") ? "/trips" : "/reports", label: "Business", icon: Briefcase, tone: "travel" as IconTone }] : []),
+    ...(personalEnabled && perms.has("personal") ? [{ href: "/personal", label: "Personal", icon: Wallet, tone: "spend" as IconTone }] : []),
     // Documents live inside Personal; a role that has Documents but not Personal still gets its own link
-    ...(perms.has("documents") && !(personalEnabled && perms.has("personal")) ? [{ href: "/documents", label: "Documents", icon: FolderOpen }] : []),
+    ...(perms.has("documents") && !(personalEnabled && perms.has("personal")) ? [{ href: "/documents", label: "Documents", icon: FolderOpen, tone: "documents" as IconTone }] : []),
   ];
 
   const NAV_ICONS = { security: Activity, users: Users, settings: SettingsIcon, other: SettingsIcon } as const;
-  const adminNav = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind] }));
+  const NAV_TONES: Record<string, IconTone> = { security: "security", users: "people", settings: "admin", other: "admin" };
+  const adminNav = adminNavItems(role, perms).map((i) => ({ href: i.href, label: i.label, icon: NAV_ICONS[i.kind], tone: NAV_TONES[i.kind] ?? ("admin" as IconTone) }));
 
   return (
     <aside className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r bg-card">
@@ -63,8 +66,8 @@ export function Sidebar() {
             const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
-                <Icon className="h-5 w-5" /> {item.label}
+              <Link key={item.href} href={item.href} style={toneStyle(item.tone)} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "tone-tile font-semibold" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
+                <IconTile tone={item.tone} className="h-8 w-8 rounded-lg"><Icon className="h-[18px] w-[18px]" /></IconTile> {item.label}
               </Link>
             );
           })}
@@ -77,8 +80,8 @@ export function Sidebar() {
                 const isActive = pathname.startsWith(item.href);
                 const Icon = item.icon;
                 return (
-                  <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
-                    <Icon className="h-5 w-5" /> {item.label}
+                  <Link key={item.href} href={item.href} style={toneStyle(item.tone)} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "tone-tile font-semibold" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>
+                    <IconTile tone={item.tone} className="h-8 w-8 rounded-lg"><Icon className="h-[18px] w-[18px]" /></IconTile> {item.label}
                   </Link>
                 );
               })}
@@ -91,22 +94,24 @@ export function Sidebar() {
           <Link
             href="/profile"
             title="Your profile"
+            style={toneStyle("profile")}
             className={cn(
               "flex h-10 w-full items-center justify-start gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-              pathname.startsWith("/profile") ? "bg-primary text-primary-foreground" : "hover:bg-accent hover:text-accent-foreground"
+              pathname.startsWith("/profile") ? "tone-tile font-semibold" : "hover:bg-accent hover:text-accent-foreground"
             )}
           >
-            <User className="h-5 w-5 shrink-0" />
+            <IconTile tone="profile" className="h-8 w-8 rounded-lg"><User className="h-[18px] w-[18px]" /></IconTile>
             <span className="truncate">Profile</span>
           </Link>
           <Link
             href="/help"
+            style={toneStyle("help")}
             className={cn(
               "flex h-10 w-full items-center justify-start gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
-              pathname.startsWith("/help") ? "bg-primary text-primary-foreground" : "hover:bg-accent hover:text-accent-foreground"
+              pathname.startsWith("/help") ? "tone-tile font-semibold" : "hover:bg-accent hover:text-accent-foreground"
             )}
           >
-            <CircleHelp className="h-5 w-5 shrink-0" />
+            <IconTile tone="help" className="h-8 w-8 rounded-lg"><CircleHelp className="h-[18px] w-[18px]" /></IconTile>
             <span className="truncate">Help</span>
           </Link>
           <ThemeToggle className="w-full justify-start gap-3" />

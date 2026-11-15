@@ -74,7 +74,7 @@ export default function AdminTelegramPage() {
       <AccordionSection
         id="bot"
         title="Bot setup"
-        icon={<Send />}
+        icon={<Send />} tone="telegram"
         summary={loading ? "Loading…" : tokenConfigured ? `Token saved${botUsername ? ` · @${botUsername.replace(/^@/, "")}` : ""}` : "No token yet"}
         badge={loading ? null : enabled && tokenConfigured ? { text: "On", tone: "good" } : { text: "Off", tone: "neutral" }}
         description="Paste the token from @BotFather. It is stored on the server and is never shown again."
@@ -150,7 +150,7 @@ export default function AdminTelegramPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="how" title="How this is set up" icon={<BookOpen />} summary="Four steps">
+      <AccordionSection id="how" title="How this is set up" icon={<BookOpen />} tone="help" summary="Four steps">
         <div className="text-sm text-muted-foreground space-y-2">
           <p>1. Create the bot with @BotFather and copy the token.</p>
           <p>2. Paste it here. The server checks it with Telegram before saving.</p>

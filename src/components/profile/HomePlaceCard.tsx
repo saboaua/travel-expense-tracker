@@ -98,7 +98,7 @@ export function HomePlaceCard() {
     <AccordionSection
       id="home-place"
       title="Home place"
-      icon={<Home />}
+      icon={<Home />} tone="place"
       summary={[city.trim(), country.trim()].filter(Boolean).join(", ") || "Not set"}
       description="Where you live. When you scan a receipt here, it is suggested as personal (like groceries) instead of a business trip."
     >

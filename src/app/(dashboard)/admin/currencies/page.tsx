@@ -81,7 +81,7 @@ export default function AdminCurrenciesPage() {
       {error && <Alert>{error}</Alert>}
 
       <AccordionGroup>
-      <AccordionSection id="available" title="Available currencies" icon={<Coins />} summary={loading ? "Loading…" : `${rows.filter((r) => r.enabled).length} of ${rows.length} turned on`} description="Rate is USD per 1 unit. Leave it empty to use the live market rate.">
+      <AccordionSection id="available" title="Available currencies" icon={<Coins />} tone="money" summary={loading ? "Loading…" : `${rows.filter((r) => r.enabled).length} of ${rows.length} turned on`} description="Rate is USD per 1 unit. Leave it empty to use the live market rate.">
         <div className="space-y-3">
           {loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
@@ -122,7 +122,7 @@ export default function AdminCurrenciesPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="add" title="Add a currency" icon={<Plus />} summary="Code, name and rate">
+      <AccordionSection id="add" title="Add a currency" icon={<Plus />} tone="money" summary="Code, name and rate">
           <form onSubmit={add} className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <Input placeholder="Code" value={code} onChange={(e) => setCode(e.target.value)} required maxLength={3} />
             <Input placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} required className="sm:col-span-2" />

@@ -105,7 +105,7 @@ export function YourDataCard() {
     <AccordionSection
       id="your-data"
       title="Your data"
-      icon={<DatabaseBackup />}
+      icon={<DatabaseBackup />} tone="data"
       summary={scheduled ? `Deletion on ${niceDate(scheduled)}` : "Download a copy, or delete your account"}
       badge={scheduled ? { text: "Deletion scheduled", tone: "attention" } : null}
       description="Take a copy of everything you have stored here, or remove it for good."

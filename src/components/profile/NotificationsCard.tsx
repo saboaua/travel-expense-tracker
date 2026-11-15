@@ -129,7 +129,7 @@ export function NotificationsCard() {
   const status = !support ? "" : support === "ok" ? (on ? "On for this device" : "Off") : support === "needs-install" ? "Add to Home Screen first" : "Not available here";
 
   return (
-    <AccordionSection id="notifications" title="Notifications" icon={<Bell />} summary={configured === false ? "Not set up yet" : status} description="Get a message on this device when something needs you, even when the app is closed.">
+    <AccordionSection id="notifications" title="Notifications" icon={<Bell />} tone="notifications" summary={configured === false ? "Not set up yet" : status} description="Get a message on this device when something needs you, even when the app is closed.">
       <div className="space-y-4" data-testid="notifications-card">
         {configured === false && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100">Alerts are not set up on the server yet, so they cannot be turned on. An admin needs to add the push keys.</p>}
         {support === "needs-install" && <p className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-100"><strong className="font-semibold">On iPhone or iPad,</strong> add the app to your Home Screen first, then open it from there and turn alerts on.</p>}

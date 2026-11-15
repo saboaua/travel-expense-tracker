@@ -89,7 +89,7 @@ export function TelegramCard() {
       <AccordionSection
         id="telegram"
         title="Telegram"
-        icon={<Send />}
+        icon={<Send />} tone="telegram"
         summary={status?.linked ? "Send receipts and documents from your phone" : "Not connected"}
         badge={status?.linked ? { text: "Connected", tone: "good" } : null}
         description="Enable it to send receipts and documents from Telegram: business trips, groceries, home projects, personal travel and documents"

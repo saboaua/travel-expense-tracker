@@ -1,6 +1,7 @@
 "use client";
 
 import { PageHeader } from "@/components/ui/page-header";
+import { IconTile } from "@/components/ui/icon-tile";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CloudOff, CreditCard, Loader2, MoreVertical, Pencil, Plus, ScanBarcode, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -108,7 +109,7 @@ export function LoyaltyWallet() {
         <p className="flex items-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Loading your cards…</p>
       ) : visible.length === 0 ? (
         <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-5 py-10 text-center">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary"><CreditCard className="h-7 w-7" aria-hidden="true" /></span>
+          <IconTile tone="loyalty" className="h-14 w-14 rounded-2xl"><CreditCard className="h-7 w-7" /></IconTile>
           <h2 className="text-base font-semibold">No loyalty cards yet</h2>
           <p className="max-w-xs text-sm text-muted-foreground">Add your first card and keep it on your phone, ready to scan.</p>
           <Button type="button" className="h-11 px-5" onClick={() => setEditing("new")} disabled={!userId}><Plus className="h-4 w-4" /> Add your first card</Button>

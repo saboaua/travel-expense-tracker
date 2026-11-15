@@ -19,8 +19,8 @@ export function BusinessTabs({ title, description, actions }: { title: string; d
   const pathname = usePathname();
   const { perms, loaded } = useAccess(pathname);
   const tabs = [
-    { href: "/trips", label: "Trips", icon: Plane, on: perms.has("trips") },
-    { href: "/reports", label: "Reports", icon: FileText, on: perms.has("reports") },
+    { href: "/trips", label: "Trips", icon: Plane, iconTone: "travel" as const, on: perms.has("trips") },
+    { href: "/reports", label: "Reports", icon: FileText, iconTone: "reports" as const, on: perms.has("reports") },
   ].filter((t) => t.on);
 
   const active = tabs.find((t) => pathname === t.href || pathname.startsWith(`${t.href}/`));
@@ -29,7 +29,7 @@ export function BusinessTabs({ title, description, actions }: { title: string; d
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         {/* Reserve the height while the role loads so the page does not jump; nothing to switch with only one section */}
         {!loaded ? <div className="h-14" aria-hidden="true" /> : tabs.length < 2 ? <span /> : (
-          <Tabs semantics="nav" label="Business sections" size="lg" value={active?.href ?? ""} options={tabs.map((t) => ({ id: t.href, label: t.label, icon: t.icon, href: t.href }))} />
+          <Tabs semantics="nav" label="Business sections" size="lg" value={active?.href ?? ""} options={tabs.map((t) => ({ id: t.href, label: t.label, icon: t.icon, iconTone: t.iconTone, href: t.href }))} />
         )}
         {actions && <div className="flex flex-wrap items-center gap-3 [&>*]:max-sm:w-full">{actions}</div>}
       </div>

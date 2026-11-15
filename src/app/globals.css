@@ -145,3 +145,9 @@ textarea,
 .dark .text-amber-600:not([class*="dark:text-"]) { color: rgb(252 211 77); }
 .dark :is(.text-green-600, .text-emerald-600):not([class*="dark:text-"]) { color: rgb(134 239 172); }
 .dark .text-blue-600:not([class*="dark:text-"]) { color: rgb(147 197 253); }
+
+/* Colored icons: one color per feature (see src/lib/icon-tones.ts). A soft tint of the color behind the icon, the icon in full color. */
+.tone-tile { background: color-mix(in srgb, var(--tone) 12%, transparent); color: var(--tone); }
+.tone-ink { color: var(--tone); }
+.dark .tone-tile { background: color-mix(in srgb, var(--tone-dk) 22%, transparent); color: var(--tone-dk); }
+.dark .tone-ink { color: var(--tone-dk); }

@@ -66,7 +66,7 @@ export function EmailCard() {
   };
 
   return (
-    <AccordionSection id="email" title="Sign-in email" icon={<Mail />} summary={current} description="The email you sign in with and where Lifolio writes to you.">
+    <AccordionSection id="email" title="Sign-in email" icon={<Mail />} tone="mail" summary={current} description="The email you sign in with and where Lifolio writes to you.">
       <form onSubmit={submit} noValidate className="space-y-4" data-testid="email-card">
         {err && <Alert variant="error">{err}</Alert>}
         {msg && <Alert variant="success">{msg}</Alert>}

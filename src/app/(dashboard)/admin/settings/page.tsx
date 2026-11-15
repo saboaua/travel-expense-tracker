@@ -4,15 +4,18 @@ import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
+import { IconTile } from "@/components/ui/icon-tile";
+import type { IconTone } from "@/lib/icon-tones";
 import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin, UserPlus } from "lucide-react";
 
-const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette }[] = [
+const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone }[] = [
   {
     href: "/admin/branding",
     feature: "branding.manage",
     title: "Branding",
     description: "App name, logo and size, primary color, privacy policy, and support email.",
     icon: Palette,
+    tone: "brand",
   },
   {
     href: "/admin/currencies",
@@ -20,6 +23,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Currencies",
     description: "Enable, disable, and order available currencies.",
     icon: Coins,
+    tone: "money",
   },
   {
     href: "/admin/categories",
@@ -27,6 +31,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Categories",
     description: "Travel receipts and trip types, and grocery items.",
     icon: Tag,
+    tone: "projects",
   },
   {
     href: "/admin/help",
@@ -34,6 +39,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Help Topics",
     description: "Write the guides users see under Help in the menu.",
     icon: CircleHelp,
+    tone: "help",
   },
   {
     href: "/admin/support",
@@ -41,6 +47,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Support Requests",
     description: "Messages sent from the login screen contact form.",
     icon: LifeBuoy,
+    tone: "support",
   },
   {
     href: "/admin/telegram",
@@ -48,6 +55,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Telegram",
     description: "Bot token and notification settings.",
     icon: Send,
+    tone: "telegram",
   },
   {
     href: "/admin/iptv",
@@ -55,6 +63,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "IPTV Clients",
     description: "Your IPTV customers: expiry dates, renewals and what each client can see.",
     icon: Tv,
+    tone: "subscriptions",
   },
   {
     href: "/admin/doit",
@@ -62,6 +71,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Do it Aruba Prices",
     description: "Import the Do it price list from an exported Excel file for the Price tracker.",
     icon: FileSpreadsheet,
+    tone: "shop",
   },
   {
     href: "/admin/supermarkets",
@@ -69,6 +79,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Supermarket Places",
     description: "Import supermarket GPS points from Excel so they show on the Best store map.",
     icon: MapPin,
+    tone: "place",
   },
   {
     href: "/admin/account-requests",
@@ -76,6 +87,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "Account Requests",
     description: "People who asked for an account on the sign-in screen, with how to reach them.",
     icon: UserPlus,
+    tone: "invite",
   },
   {
     href: "/admin/users",
@@ -83,6 +95,7 @@ const sections: { href: string; feature: string; title: string; description: str
     title: "User Roles & Users",
     description: "Create users, create roles and choose what each role can use.",
     icon: Users,
+    tone: "people",
   },
 ];
 
@@ -102,7 +115,7 @@ export default function AdminSettingsPage() {
             <Link key={s.href} href={s.href}>
               <Card className="h-full hover:border-primary/50 transition-colors">
                 <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
-                  <Icon className="h-6 w-6 text-muted-foreground" />
+                  <IconTile tone={s.tone} className="h-11 w-11"><Icon className="h-6 w-6" /></IconTile>
                   <CardTitle className="text-lg">{s.title}</CardTitle>
                 </CardHeader>
                 <CardContent>

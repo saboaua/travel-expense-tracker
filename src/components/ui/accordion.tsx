@@ -3,6 +3,7 @@
 import * as React from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toneStyle, type IconTone } from "@/lib/icon-tones";
 
 /**
  * Setup and profile pages are long. Each block is a closed row (icon, title, one line saying what is inside, and a status
@@ -26,6 +27,8 @@ export type AccordionSectionProps = {
   id: string;
   title: string;
   icon?: React.ReactNode;
+  /** The feature's color, so the icon matches the same feature everywhere in the app. */
+  tone?: IconTone;
   /** One line shown under the title while closed (and open) */
   summary?: React.ReactNode;
   /** A small status chip on the right, for example "Connected" or "1 invite waiting" */
@@ -44,7 +47,7 @@ const TONES = {
   neutral: "bg-muted text-muted-foreground",
 } as const;
 
-export function AccordionSection({ id, title, icon, summary, badge, description, defaultOpen = false, children, className }: AccordionSectionProps) {
+export function AccordionSection({ id, title, icon, tone, summary, badge, description, defaultOpen = false, children, className }: AccordionSectionProps) {
   const group = React.useContext(Group);
   const [own, setOwn] = React.useState(defaultOpen);
   const isOpen = group ? group.open === id : own;
@@ -78,7 +81,7 @@ export function AccordionSection({ id, title, icon, summary, badge, description,
           onClick={() => set(!isOpen)}
           className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
         >
-          {icon && <span aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] bg-primary/10 text-primary [&>svg]:h-5 [&>svg]:w-5">{icon}</span>}
+          {icon && <span aria-hidden="true" style={tone ? toneStyle(tone) : undefined} className={cn("flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] [&>svg]:h-5 [&>svg]:w-5", tone ? "tone-tile" : "bg-primary/10 text-primary")}>{icon}</span>}
           <span className="flex min-w-0 flex-1 flex-col gap-0.5">
             <span className="text-[15px] font-semibold leading-snug">{title}</span>
             {summary ? <span className="truncate text-[13px] text-muted-foreground">{summary}</span> : null}

@@ -60,13 +60,13 @@ export function RecommendCard() {
 
   if (!available) {
     return (
-      <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} summary="Not set up yet" description="Share a link with a friend.">
+      <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} tone="invite" summary="Not set up yet" description="Share a link with a friend.">
         <Alert variant="info">Recommend is not set up yet. An admin needs to run supabase/migration_invites.sql.</Alert>
       </AccordionSection>
     );
   }
   return (
-    <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} summary={invite ? (invite.friends ? `${invite.friends} friend${invite.friends === 1 ? "" : "s"} asked` : "Share a link") : ""} description="Send your link. Your friend sees what Lifolio does and can ask for an account.">
+    <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} tone="invite" summary={invite ? (invite.friends ? `${invite.friends} friend${invite.friends === 1 ? "" : "s"} asked` : "Share a link") : ""} description="Send your link. Your friend sees what Lifolio does and can ask for an account.">
       <div className="space-y-4" data-testid="recommend-card">
         {err && <Alert variant="error">{err}</Alert>}
         {msg && <Alert variant="success">{msg}</Alert>}

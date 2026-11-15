@@ -6,6 +6,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
+import { IconTile } from "@/components/ui/icon-tile";
+import type { IconTone } from "@/lib/icon-tones";
 import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
@@ -115,29 +117,28 @@ export default function PersonalHubPage() {
 
   const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
   const grocery = stats?.grocery ?? null;
-  const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; text: string; strong: boolean }[] = [
-    { href: "/personal/spend", title: "Quick spend", icon: Coins, strong: !!stats?.spends,
+  const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; tone: IconTone; text: string; strong: boolean }[] = [
+    { href: "/personal/spend", title: "Quick spend", icon: Coins, tone: "spend", strong: !!stats?.spends,
       text: !stats ? "\u00a0" : stats.spends ? `${formatCurrency(stats.spends.total, stats.spends.currency)} this month \u00b7 ${plural(stats.spends.count, "spend")}` : "Coffee, street food, anything with no receipt" },
-    { href: "/personal/house", title: "House & repairs", icon: Home, strong: !!stats?.house?.count,
+    { href: "/personal/house", title: "House & repairs", icon: Home, tone: "house", strong: !!stats?.house?.count,
       text: !stats ? "\u00a0" : stats.house?.count ? `${formatCurrency(stats.house.total, stats.currency)} this month \u00b7 ${plural(stats.house.count, "item")}` : "Repairs and fixes for the house" },
-    { href: "/personal/savings", title: "Savings", icon: PiggyBank, strong: !!stats?.savings,
+    { href: "/personal/savings", title: "Savings", icon: PiggyBank, tone: "savings", strong: !!stats?.savings,
       text: !stats ? "\u00a0" : stats.savings ? `${formatCurrency(stats.savings.saved, stats.savings.currency)} saved \u00b7 ${formatCurrency(stats.savings.monthly, stats.savings.currency)} a month` : "Put money aside every month" },
-    { href: "/personal/utilities", title: "Utilities", icon: Zap, strong: !!stats?.utilities?.count,
+    { href: "/personal/utilities", title: "Utilities", icon: Zap, tone: "utilities", strong: !!stats?.utilities?.count,
       text: !stats ? "\u00a0" : stats.utilities?.count ? `${formatCurrency(stats.utilities.total, stats.currency)} paid this month \u00b7 ${plural(stats.utilities.count, "bill")}` : "Water, electricity, phone and more" },
-    { href: "/personal/projects", title: "Home Projects", icon: Hammer, strong: !!stats && stats.projects.count > 0,
+    { href: "/personal/projects", title: "Home Projects", icon: Hammer, tone: "projects", strong: !!stats && stats.projects.count > 0,
       text: !stats ? "\u00a0" : stats.projects.count > 0 ? `${stats.projects.count} active \u00b7 ${formatCurrency(stats.projects.spent, stats.currency)} spent` : "No active projects \u00b7 tap to start one" },
-    { href: "/personal/travel", title: "Personal Travel", icon: Plane, strong: !!stats && stats.trips.count > 0,
+    { href: "/personal/travel", title: "Personal Travel", icon: Plane, tone: "travel", strong: !!stats && stats.trips.count > 0,
       text: !stats ? "\u00a0" : stats.trips.count > 0 ? `${stats.trips.count} active \u00b7 ${formatCurrency(stats.trips.spent, stats.currency)} spent` : "No active trips \u00b7 tap to start one" },
   ];
-  const handy: { href: string; title: string; icon: typeof ShoppingCart; stat: string; right?: string }[] = [
-    ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
-    ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, stat: "Track what you pay and what is due" }] : []),
+  const handy: { href: string; title: string; icon: typeof ShoppingCart; tone: IconTone; stat: string; right?: string }[] = [
+    ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, tone: "documents" as const, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
+    ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, tone: "subscriptions" as const, stat: "Track what you pay and what is due" }] : []),
     // Only people who manage IPTV clients (the admin, or a role given "IPTV clients") see this tile, and they do not also get the client tile below
-    ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, stat: "See your service and when it ends" }] : []),
-    ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
+    ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, tone: "subscriptions" as const, stat: "See your service and when it ends" }] : []),
+    ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, tone: "loyalty" as const, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
   ];
 
-  const iconBox = "flex shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary";
   const label = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
 
   return (
@@ -159,7 +160,7 @@ export default function PersonalHubPage() {
         <Card className="flex flex-col justify-between rounded-2xl lg:col-span-2 lg:flex-row lg:items-center lg:gap-6">
           <div className="flex flex-col justify-between gap-1 lg:min-w-0 lg:flex-1">
           <Link href="/personal/groceries" className="group flex items-center gap-3 p-4 pb-2 md:p-5 md:pb-2">
-            <span className={`${iconBox} h-11 w-11`}><ShoppingCart className="h-[22px] w-[22px]" aria-hidden="true" /></span>
+            <IconTile tone="groceries" className="h-11 w-11"><ShoppingCart className="h-[22px] w-[22px]" /></IconTile>
             <span className="min-w-0 flex-1">
               <h2 className="text-[17px] font-semibold leading-snug">Groceries</h2>
               <span className="block text-[13px] text-muted-foreground">Receipts, item prices, monthly spending</span>
@@ -191,7 +192,7 @@ export default function PersonalHubPage() {
           {rowTiles.map((t) => (
             <Link key={t.href} href={t.href} className="group block md:flex-1">
               <Card className="flex min-h-[72px] items-center gap-3 rounded-2xl px-4 py-3 transition-shadow group-hover:shadow-md md:h-full md:px-5">
-                <span className={`${iconBox} h-11 w-11`}><t.icon className="h-[22px] w-[22px]" aria-hidden="true" /></span>
+                <IconTile tone={t.tone} className="h-11 w-11"><t.icon className="h-[22px] w-[22px]" /></IconTile>
                 <span className="min-w-0 flex-1">
                   <h2 className="text-base font-semibold leading-snug">{t.title}</h2>
                   <span className={`block text-[13px] ${t.strong ? "font-medium" : "text-muted-foreground"}`}>{t.text}</span>
@@ -211,7 +212,7 @@ export default function PersonalHubPage() {
               <Link key={t.href} href={t.href} className="group block">
                 <Card className="flex h-full min-h-[104px] flex-col justify-between gap-2.5 rounded-2xl p-3.5 transition-shadow group-hover:shadow-md md:min-h-[72px] md:flex-row md:items-center md:gap-3 md:px-5 md:py-3">
                   <span className="flex items-center justify-between md:contents">
-                    <span className={`${iconBox} h-10 w-10`}><t.icon className="h-5 w-5" aria-hidden="true" /></span>
+                    <IconTile tone={t.tone} className="h-10 w-10"><t.icon className="h-5 w-5" /></IconTile>
                     <ChevronRight className="h-4 w-4 text-muted-foreground md:order-last" aria-hidden="true" />
                   </span>
                   <span className="min-w-0 md:flex-1">

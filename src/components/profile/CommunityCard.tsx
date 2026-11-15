@@ -113,7 +113,7 @@ export function CommunityCard() {
 
   if (!available) {
     return (
-      <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary="Not set up yet" description="Help everyone find cheaper groceries.">
+      <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} tone="badges" summary="Not set up yet" description="Help everyone find cheaper groceries.">
         <Alert variant="info">Community prices are not set up yet. An admin needs to run supabase/migration_shared_prices.sql.</Alert>
       </AccordionSection>
     );
@@ -121,7 +121,7 @@ export function CommunityCard() {
   return (
     <>
     <LevelUpNotice check={check} />
-    <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
+    <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} tone="badges" summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
       <div className="space-y-4" data-testid="community-card">
         {err && <Alert variant="error">{err}</Alert>}
         {msg && <Alert variant="success">{msg}</Alert>}

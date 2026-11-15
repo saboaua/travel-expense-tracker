@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { IconTile } from "@/components/ui/icon-tile";
 import Link from "next/link";
 import { BadgeCheck, Car, Download, Eye, FileText, IdCard, Plane, Plus, ShieldCheck, Stamp, Syringe, Hotel, Loader2 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -104,9 +105,9 @@ export function DocumentTiles({ tiles, total, idPrefix = "doc-tiles", gridClass 
             return (
               <Card key={t.id} className="p-3.5">
                 <div className="flex items-start gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
+                  <IconTile tone="documents" className="h-9 w-9 rounded-lg">
+                    <Icon className="h-5 w-5" />
+                  </IconTile>
                   <div className="min-w-0 flex-1">
                     <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
                       <p className="truncate text-sm font-bold" title={t.kindLabel}>{t.kindLabel}</p>

@@ -151,7 +151,7 @@ export default function AdminBrandingPage() {
 
       <form onSubmit={handleSave} className="space-y-6">
       <AccordionGroup>
-      <AccordionSection id="logo" title="Logo" icon={<ImageIcon />} summary={logoUrl ? `Custom logo · ${logoSize}px on the login screen` : "Default logo"} description="Appears on the login screen and next to the app name in the sidebar">
+      <AccordionSection id="logo" title="Logo" icon={<ImageIcon />} tone="brand" summary={logoUrl ? `Custom logo · ${logoSize}px on the login screen` : "Default logo"} description="Appears on the login screen and next to the app name in the sidebar">
         <div className="space-y-4">
           <div className="flex items-center gap-4">
             <div className="h-16 w-16 rounded-xl border bg-muted flex items-center justify-center overflow-hidden">
@@ -222,7 +222,7 @@ export default function AdminBrandingPage() {
         </div>
       </AccordionSection>
 
-      <AccordionSection id="name-color" title="App name & color" icon={<Palette />} summary={`${appName || "No name"} · ${primaryColor}`}>
+      <AccordionSection id="name-color" title="App name & color" icon={<Palette />} tone="brand" summary={`${appName || "No name"} · ${primaryColor}`}>
           <div className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">App name</label>
@@ -285,7 +285,7 @@ export default function AdminBrandingPage() {
       <AccordionSection
         id="privacy"
         title="Privacy policy & support"
-        icon={<FileText />}
+        icon={<FileText />} tone="brand"
         summary={[privacyPolicy.trim() ? "Policy published" : "No policy yet", supportEmail.trim()].filter(Boolean).join(" · ")}
         description={<>Shown from the login screen. &quot;Privacy Policy&quot; opens /privacy with the text below, and &quot;Contact Support&quot; opens /contact, a form whose messages appear under Global Settings &rarr; Support Requests.</>}
       >
@@ -325,7 +325,7 @@ export default function AdminBrandingPage() {
       <AccordionSection
         id="personal-section"
         title="Personal section"
-        icon={<User />}
+        icon={<User />} tone="profile"
         summary={personalEnabled ? "On for everyone" : "Off for everyone"}
         description="Lets each person track their own groceries, home projects and personal trips. That data is private to the user: admins cannot see it. Turn this off to hide the section for everyone."
       >

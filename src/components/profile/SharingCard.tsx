@@ -112,7 +112,7 @@ export function SharingCard() {
     <AccordionSection
       id="sharing"
       title="Sharing"
-      icon={<Share2 />}
+      icon={<Share2 />} tone="sharing"
       summary={!o.enabled ? "Off" : `${active.length} of ${SHARING_LIMITS.partners} partners`}
       badge={o.incoming.length > 0 ? { text: o.incoming.length === 1 ? "1 invite waiting" : `${o.incoming.length} invites waiting`, tone: "attention" } : null}
       description="Show a loyalty card or a trip to someone you trust. They can only look: they cannot change or delete anything, and they never see expenses, receipts or notes. Nothing is shared unless you pick it."

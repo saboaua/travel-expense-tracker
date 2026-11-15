@@ -3,8 +3,9 @@
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toneStyle, type IconTone } from "@/lib/icon-tones";
 
-export type TabOption = { id: string; label: React.ReactNode; icon?: LucideIcon; count?: number; href?: string };
+export type TabOption = { id: string; label: React.ReactNode; icon?: LucideIcon; count?: number; href?: string; /** Colors the icon with its feature's color */ iconTone?: IconTone };
 
 /**
  * The one tab control: a soft track with a raised selected tab. `lg` switches between views (Business / Personal,
@@ -32,7 +33,7 @@ export function Tabs({ options, value, onChange, label, size = "md", fullWidth =
   const tone = (on: boolean) => (on ? "bg-raised text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground");
   const inner = (o: TabOption, on: boolean) => (
     <>
-      {o.icon && <o.icon className={cn(size === "lg" ? "h-5 w-5" : "h-4 w-4", on && "text-primary")} aria-hidden="true" />}
+      {o.icon && <o.icon style={o.iconTone ? toneStyle(o.iconTone) : undefined} className={cn(size === "lg" ? "h-5 w-5" : "h-4 w-4", o.iconTone ? "tone-ink" : on && "text-primary")} aria-hidden="true" />}
       {o.label}
       {o.count !== undefined && <span className="text-xs font-normal opacity-70">{o.count}</span>}
     </>

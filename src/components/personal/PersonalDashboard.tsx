@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { IconTile } from "@/components/ui/icon-tile";
 import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { TripWeather } from "@/components/TripWeather";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
@@ -303,7 +304,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
             const spent = spentOn(p.id);
             return (
               <Link key={p.id} href={`/personal/projects/${p.id}`} data-testid="personal-project-row" className="flex min-h-[72px] items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Hammer className="h-5 w-5" aria-hidden="true" /></span>
+                <IconTile tone="projects" className="h-11 w-11"><Hammer className="h-5 w-5" /></IconTile>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-base font-semibold">{p.name}</span>
                   <span className="block text-[13px] text-muted-foreground">{spent.count ? plural(spent.count, "expense") : "No expenses yet"}</span>

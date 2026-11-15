@@ -26,7 +26,7 @@ export default function AdminCategoriesPage() {
       <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts, trips and the house.</>} />
 
       <AccordionGroup>
-        <AccordionSection id="travel" title="Travel" icon={<Briefcase />} summary={travelSummary}>
+        <AccordionSection id="travel" title="Travel" icon={<Briefcase />} tone="travel" summary={travelSummary}>
           <Tabs
             semantics="group"
             label="Travel lists"
@@ -62,7 +62,7 @@ export default function AdminCategoriesPage() {
           </div>
         </AccordionSection>
 
-        <AccordionSection id="groceries" title="Groceries" icon={<ShoppingBasket />} summary={n(counts.grocery, "item category", "item categories") ?? "Item categories"}>
+        <AccordionSection id="groceries" title="Groceries" icon={<ShoppingBasket />} tone="groceries" summary={n(counts.grocery, "item category", "item categories") ?? "Item categories"}>
           <CategoryManager
             table="grocery_categories"
             noun="item category"
@@ -75,7 +75,7 @@ export default function AdminCategoriesPage() {
           />
         </AccordionSection>
 
-        <AccordionSection id="house" title="House areas" icon={<Home />} summary={n(counts.house, "area", "areas") ?? "Areas of the house"}>
+        <AccordionSection id="house" title="House areas" icon={<Home />} tone="house" summary={n(counts.house, "area", "areas") ?? "Areas of the house"}>
           <CategoryManager
             table="house_areas"
             noun="house area"

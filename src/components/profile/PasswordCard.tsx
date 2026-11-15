@@ -50,7 +50,7 @@ export function PasswordCard() {
   };
 
   return (
-    <AccordionSection id="password" title="Password" icon={<Key />} summary="Change how you sign in" description="Update your account password">
+    <AccordionSection id="password" title="Password" icon={<Key />} tone="security" summary="Change how you sign in" description="Update your account password">
         <form onSubmit={handlePasswordChange} noValidate className="space-y-4">
           <div className="space-y-2">
             <label htmlFor="newPassword" className="text-sm font-medium">

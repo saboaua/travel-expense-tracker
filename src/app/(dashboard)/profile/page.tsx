@@ -255,7 +255,7 @@ export default function ProfilePage() {
       <AccordionSection
         id="personal"
         title="Personal information"
-        icon={<User />}
+        icon={<User />} tone="profile"
         summary={[displayName, title].filter(Boolean).join(" · ") || "Your name, title and company"}
         description="Update your profile details"
       >
