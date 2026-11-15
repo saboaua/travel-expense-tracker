@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { Readable } from "node:stream";
 import { requireAdminService } from "@/lib/admin-roles-api";
+import { logAudit } from "@/lib/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { parsePlaces } from "@/lib/personal/supermarket-import";
 
@@ -86,5 +87,6 @@ export async function POST(request: Request) {
     if (error) return NextResponse.json({ error: /relation|schema cache/i.test(error.message) ? "Run supabase/migration_supermarket_places.sql first." : error.message }, { status: 500 });
   }
   const { data: gone } = await a.admin.from("supermarket_places").delete().lt("imported_at", stamp).select("id");
+  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "supermarket_places", entityId: "places", details: { kept: summary.kept, removed: gone?.length ?? 0 } }).catch(() => {});
   return NextResponse.json({ mode, ...summary, removed: gone?.length ?? 0, importedAt: stamp });
 }

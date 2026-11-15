@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { requireAdminService } from "@/lib/admin-roles-api";
+import { logAudit } from "@/lib/audit";
 import { rateLimit } from "@/lib/rate-limit";
 import { mapDoit } from "@/lib/store-prices";
 
@@ -74,5 +75,6 @@ export async function POST(request: Request) {
   }
   // Items missing from the new file are removed, so the saved list is exactly this file
   const { data: gone } = await a.admin.from("store_catalog").delete().eq("store", "doit").lt("fetched_at", stamp).select("item_id");
+  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "store_catalog", entityId: "doit", details: { store: "doit", kept: summary.kept, removed: gone?.length ?? 0 } }).catch(() => {});
   return NextResponse.json({ mode, ...summary, removed: gone?.length ?? 0, importedAt: stamp });
 }

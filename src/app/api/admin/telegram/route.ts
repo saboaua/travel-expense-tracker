@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { loadPermissions } from "@/lib/access-server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createService } from "@supabase/supabase-js";
@@ -128,6 +129,9 @@ export async function POST(request: Request) {
   if (settingsErr) {
     return NextResponse.json({ error: settingsErr.message }, { status: 400 });
   }
+
+  // the bot token is never written to the trail, only that the settings changed
+  await logAudit({ actorId: auth.user!.id, actorEmail: auth.user!.email ?? null, action: "telegram.settings_updated", entityType: "settings", entityId: "telegram", details: { enabled: !!body.enabled, bot_username: username, webhook_requested: !!body.setWebhook } }).catch(() => {});
 
   let webhook: string | null = null;
   if (body.setWebhook) {

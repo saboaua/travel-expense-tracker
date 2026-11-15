@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logAudit } from "@/lib/audit";
 import { requireAdminService, isMissingTable } from "@/lib/admin-roles-api";
 
 export const dynamic = "force-dynamic";
@@ -30,5 +31,6 @@ export async function PATCH(request: Request) {
   if (!body?.id || !["done", "dismissed", "new"].includes(body.status ?? "")) return NextResponse.json({ error: "Bad request." }, { status: 400 });
   const { error } = await a.admin.from("account_requests").update({ status: body.status, handled_at: body.status === "new" ? null : new Date().toISOString() }).eq("id", body.id);
   if (error) return NextResponse.json({ error: isMissingTable(error.message) ? NOT_SET_UP : error.message }, { status: 500 });
+  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: `account_request.${body.status}`, entityType: "account_request", entityId: body.id, details: { status: body.status } }).catch(() => {});
   return NextResponse.json({ ok: true });
 }

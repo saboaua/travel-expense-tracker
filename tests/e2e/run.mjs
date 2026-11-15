@@ -19,7 +19,7 @@ const BASE = `http://localhost:${APP_PORT}`;
 let failed = 0;
 const results = [];
 async function test(name, fn) {
-  if (process.env.E2E_ONLY && !name.includes(process.env.E2E_ONLY)) return; // run just the tests whose name contains this text
+  if (process.env.E2E_ONLY && !process.env.E2E_ONLY.split("|").some((s) => name.includes(s))) return; // run just the tests whose name contains this text ("a|b" runs both)
   const started = Date.now();
   try {
     await fn();
@@ -1295,6 +1295,12 @@ try {
       await ap.getByText(/Pro is on for/).waitFor();
       const kept = fake.table("plan_payments").filter((r) => r.user_id === PAT && r.method === "cmb");
       assert(kept.length === 1 && kept[0].status === "confirmed" && Number(kept[0].amount) === 12 && kept[0].note === "Paid at the counter", "the payment received is kept: " + JSON.stringify(kept));
+      // every admin step above is in the audit trail, with the actor, and never with a bank number
+      const trail = fake.table("audit_logs").filter((r) => /^(payment|plan)/.test(r.action) || r.action === "payment_settings.updated");
+      const acts = trail.map((r) => r.action);
+      assert(acts.includes("payment_settings.updated") && acts.includes("payment.confirmed") && acts.includes("payment.recorded") && acts.includes("plan.set"), "payment steps are audited: " + acts.join(","));
+      assert(trail.every((r) => r.actor_email === "admin@example.com"), "each entry names the admin");
+      assert(!JSON.stringify(trail).includes("1234567890"), "bank account numbers are not in the trail");
       // the Profile page says which plan this is
       fake.table("user_plans").splice(0);
       await page.goto(`${BASE}/profile`);
@@ -1537,6 +1543,7 @@ try {
       await ap.getByRole("button", { name: "Dismiss" }).click();
       await list.getByText("Dismissed").waitFor();
       assert(fake.table("account_requests")[0].status === "dismissed", "dismissing is saved");
+      assert(fake.table("audit_logs").some((r) => r.action === "account_request.dismissed" && r.actor_email === "admin@example.com"), "dismissing a request is in the audit trail");
       const anon = await page.evaluate(async () => (await (await fetch("/api/admin/account-requests")).text()));
       assert(!anon.includes("Lisa") && !anon.includes("593 1234"), "someone who is not signed in cannot read the requests");
     } finally {
