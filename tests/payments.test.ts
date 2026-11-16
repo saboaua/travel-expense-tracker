@@ -1,5 +1,5 @@
 import { planCardText } from "../src/lib/plans";
-import { userReference, priceFor, monthsFree, parseSettings, renewedEndsOn, parseReceived } from "../src/lib/payments";
+import { userReference, priceFor, monthsFree, offeredPeriods, parseSettings, renewedEndsOn, parseReceived } from "../src/lib/payments";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -34,6 +34,11 @@ eq("card pro", planCardText({ isAdmin: false, row: { period: "yearly", ends_on: 
 eq("card no end", planCardText({ isAdmin: false, row: { period: "gift", ends_on: null }, today: "2026-11-15" }).sub, "No end date");
 eq("card ended", planCardText({ isAdmin: false, row: { period: "monthly", ends_on: "2026-10-01" }, today: "2026-11-15" }).title, "Free plan");
 eq("card admin", planCardText({ isAdmin: true, row: null, today: "2026-11-15" }).title, "Pro, admin access");
+
+eq("both plans offered", offeredPeriods({ monthly_price: 12, yearly_price: 120 }), ["monthly", "yearly"]);
+eq("no yearly price", offeredPeriods({ monthly_price: 12, yearly_price: 0 }), ["monthly"]);
+eq("no monthly price", offeredPeriods({ monthly_price: 0, yearly_price: 120 }), ["yearly"]);
+eq("no prices", offeredPeriods({ monthly_price: 0, yearly_price: 0 }), []);
 
 console.log(fail ? `${fail} FAILED` : "payments: all checks passed");
 process.exit(fail ? 1 : 0);

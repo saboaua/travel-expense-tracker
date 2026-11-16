@@ -31,8 +31,6 @@ export function bip21(address: string, amount: number, label = "Lifolio Pro"): s
 export const explorerAddress = (address: string) => `https://mempool.space/address/${encodeURIComponent(address)}`;
 export const explorerTx = (txid: string) => `https://mempool.space/tx/${encodeURIComponent(txid)}`;
 
-export const isTxid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-fA-F]{64}$/.test(v.trim());
-
 /** Pull a transaction id out of what people paste (a bare id, or an explorer link). Null if there is none. */
 export function parseTxid(v: unknown): string | null {
   if (typeof v !== "string") return null;

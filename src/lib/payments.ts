@@ -27,6 +27,11 @@ export function priceFor(s: Pick<PaymentSettings, "monthly_price" | "yearly_pric
   return period === "yearly" ? s.yearly_price : s.monthly_price;
 }
 
+/** The plans people can pick: a plan with no price is not offered. */
+export function offeredPeriods(s: Pick<PaymentSettings, "monthly_price" | "yearly_price">): PayPeriod[] {
+  return (["monthly", "yearly"] as PayPeriod[]).filter((p) => priceFor(s, p) > 0);
+}
+
 /** Whole months free when paying yearly, shown as "2 months free". */
 export function monthsFree(s: Pick<PaymentSettings, "monthly_price" | "yearly_price">): number {
   if (!(s.monthly_price > 0) || !(s.yearly_price > 0)) return 0;

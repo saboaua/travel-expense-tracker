@@ -1287,6 +1287,14 @@ try {
       assert(/^LIF-[0-9A-F]{5}$/.test(ref), "a reference like LIF-4821: " + ref);
       assert((await page.getByTestId("pro-account").count()) === 2, "both bank accounts show");
       assert(/Best value/.test(await page.getByTestId("pro-yearly").innerText()) && /2 months free/.test(await page.getByTestId("pro-yearly").innerText()), "yearly shows 2 months free");
+      // a plan with no price is not offered, and the other one is picked
+      cfg.yearly_price = 0;
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-only-plan").waitFor();
+      assert(/Monthly/.test(await page.getByTestId("pro-only-plan").innerText()) && (await page.getByTestId("pro-yearly").count()) === 0 && (await page.getByTestId("pro-monthly").count()) === 0, "only the monthly plan is offered");
+      cfg.yearly_price = 120;
+      await page.goto(`${BASE}/personal/pro`);
+      await page.getByTestId("pro-yearly").waitFor();
       await page.getByTestId("pro-yearly").click();
       await page.getByTestId("pro-paid").click();
       await page.getByTestId("pro-pending").waitFor();

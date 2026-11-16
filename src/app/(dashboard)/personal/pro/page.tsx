@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Money } from "@/components/ui/money";
 import { createClient } from "@/lib/supabase/client";
-import { PAYMENT_BASE_COLS, PAYMENT_BASE_SETTINGS_COLS, PAYMENT_COLS, PAYMENT_SETTINGS_COLS, monthsFree, priceFor, userReference, type PayPeriod, type PaymentSettings, type PlanPayment } from "@/lib/payments";
+import { PAYMENT_BASE_COLS, PAYMENT_BASE_SETTINGS_COLS, PAYMENT_COLS, PAYMENT_SETTINGS_COLS, monthsFree, offeredPeriods, priceFor, userReference, type PayPeriod, type PaymentSettings, type PlanPayment } from "@/lib/payments";
 import { PLAN_COLS, isProActive, type PlanRow } from "@/lib/plans";
 import { cn, formatDate, todayISO } from "@/lib/utils";
 
@@ -63,7 +63,11 @@ export default function GetProPage() {
   const reference = uid ? userReference(uid) : "";
   const today = todayISO();
   const proNow = isProActive(plan, today);
-  const hasPrice = !!settings && priceFor(settings, "monthly") > 0;
+  const periods = settings ? offeredPeriods(settings) : [];
+  const hasPrice = periods.length > 0;
+  // a plan without a price is not offered: start on one that is
+  const wanted = periods.includes(period) ? period : periods[0];
+  useEffect(() => { if (wanted && wanted !== period) setPeriod(wanted); }, [wanted, period]);
   const bankReady = hasPrice && !!settings && settings.accounts.length > 0;
   const btcReady = hasPrice && btc.available;
   const btcOpen = pending?.method === "bitcoin";
@@ -73,7 +77,7 @@ export default function GetProPage() {
   const copy = async () => { try { await navigator.clipboard.writeText(reference); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* the code is on screen to copy by hand */ } };
 
   const iPaid = async () => {
-    if (!settings) return;
+    if (!settings || !(priceFor(settings, period) > 0)) return;
     setBusy(true); setError(null);
     const { error: err } = await createClient().from("plan_payments").insert({ user_id: uid, period, amount: priceFor(settings, period), currency: settings.currency, method: "other", reference, status: "pending" });
     setBusy(false);
@@ -117,7 +121,7 @@ export default function GetProPage() {
                 </CardContent></Card>
               )}
               <div className="flex gap-3" role="radiogroup" aria-label="Plan">
-                {(["monthly", "yearly"] as PayPeriod[]).map((p) => (
+                {periods.length > 1 && (["monthly", "yearly"] as PayPeriod[]).map((p) => (
                   <button key={p} type="button" role="radio" aria-checked={period === p} onClick={() => setPeriod(p)} data-testid={`pro-${p}`} className={cn(pick, period === p ? "border-primary bg-primary/5" : "bg-card")}>
                     <span className="flex items-center justify-between gap-2"><span className="text-sm font-extrabold">{p === "yearly" ? "Yearly" : "Monthly"}</span>{p === "yearly" && monthsFree(settings) > 0 && <span className="rounded-full bg-green-100 px-2 py-0.5 text-[11px] font-extrabold text-green-800 dark:bg-green-950 dark:text-green-200">Best value</span>}</span>
                     <span className="mt-1 block"><Money amount={priceFor(settings, p)} currency={settings.currency} className="text-xl" /></span>
@@ -125,6 +129,7 @@ export default function GetProPage() {
                   </button>
                 ))}
               </div>
+              {periods.length === 1 && <p className="text-sm font-semibold" data-testid="pro-only-plan">{periods[0] === "yearly" ? "Yearly" : "Monthly"} Pro: <Money amount={priceFor(settings, periods[0])} currency={settings.currency} className="text-sm" /></p>}
               {bankReady && btcReady && (
                 <div className="flex gap-1 rounded-2xl bg-muted p-1" role="tablist" aria-label="How to pay">
                   <button type="button" role="tab" aria-selected={!showBtc} onClick={() => setTab("bank")} data-testid="pro-tab-bank" className={cn("flex min-h-[44px] flex-1 items-center justify-center gap-2 rounded-xl text-sm font-extrabold", !showBtc ? "bg-card shadow-sm" : "text-muted-foreground")}><Landmark className="h-4 w-4" aria-hidden="true" />Bank transfer</button>

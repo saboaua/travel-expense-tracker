@@ -16,5 +16,3 @@ export async function getBtcUsd(now = Date.now()): Promise<number | null> {
   } catch { return null; }
 }
 
-/** Tests only. */
-export const resetBtcPriceCache = () => { cache = null; };

@@ -111,10 +111,11 @@ export default function PaymentSettingsPage() {
               <div className="space-y-1.5"><label htmlFor="pay-monthly" className="text-sm font-medium">Monthly</label><Input id="pay-monthly" inputMode="decimal" value={monthly} onChange={(e) => setMonthly(e.target.value)} /></div>
               <div className="space-y-1.5"><label htmlFor="pay-yearly" className="text-sm font-medium">Yearly</label><Input id="pay-yearly" inputMode="decimal" value={yearly} onChange={(e) => setYearly(e.target.value)} /></div>
             </div>
+            <p className="text-xs leading-relaxed text-muted-foreground">A plan at 0 is not offered. Set both to give a choice.</p>
           </CardContent></Card>
           <Card><CardContent className="space-y-4 py-4">
             <p className="font-semibold">Bank accounts</p>
-            {accounts.length === 0 && <p className="text-sm text-muted-foreground">No bank account yet. People cannot pay until you add one.</p>}
+            {accounts.length === 0 && <p className="text-sm text-muted-foreground">No bank account yet. People can only pay by Bitcoin, and only if it is on and has an address.</p>}
             {accounts.map((a, i) => (
               <div key={i} className="space-y-2 rounded-xl border p-3" data-testid="pay-account">
                 <div className="grid grid-cols-2 gap-2">
