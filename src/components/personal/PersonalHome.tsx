@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
-import dynamic from "next/dynamic";
-import { useEffect, useMemo, useState } from "react";
-import { Coins, CreditCard, Hammer, Landmark, Plus, Repeat, FileBarChart } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Camera, Coins, CreditCard, Plus, Repeat, Tv, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
@@ -14,11 +13,9 @@ import { cn, formatCurrency, formatDate } from "@/lib/utils";
 import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
-import { WhereItGoes } from "@/components/personal/WhereItGoes";
-const PersonalDashboard = dynamic(() => import("@/components/personal/PersonalDashboard"), {
-  ssr: false,
-  loading: () => <p className="py-10 text-center text-sm text-muted-foreground">Loading your personal dashboard…</p>,
-});
+import { BudgetCard } from "@/components/personal/BudgetCard";
+import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
+import { IconTile } from "@/components/ui/icon-tile";
 
 const CARD = "rounded-2xl border bg-card p-4 shadow-sm";
 const heading = "text-lg font-bold";
@@ -32,24 +29,22 @@ function duePill(days: number): { text: string; cls: string } {
   return { text, cls: "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200" };
 }
 
-/** Quick doors, only the ones this role has. Shown at the top on a phone and in the side rail on a desktop. */
+/** Quick doors, only the ones this role has. */
 function KeepHandy({ testId }: { testId: string }) {
   const { perms } = useAccess();
   const tile = "flex min-h-[56px] items-center justify-start gap-2.5 rounded-xl border text-left bg-card px-3.5 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
   const items = [
     // Scan and Upload already sit at the top of the home page, so the first door here is Quick spend
     { href: "/personal/spend", label: "Quick spend", icon: Coins, primary: true, show: perms.has("personal") },
+    { href: "/personal/groceries/new", label: "Scan receipt", icon: Camera, primary: false, show: perms.has("personal") },
     { href: "/personal/subscriptions", label: "Add subscription", icon: Repeat, primary: false, show: perms.has("subscriptions") },
     { href: "/personal/loyalty", label: "Loyalty cards", icon: CreditCard, primary: false, show: perms.has("loyalty") },
-    { href: "/personal/projects", label: "Projects", icon: Hammer, primary: false, show: perms.has("personal") },
-    { href: "/personal/fixed", label: "Fixed costs", icon: Landmark, primary: false, show: perms.has("personal") },
-    { href: "/personal/reports", label: "Reports", icon: FileBarChart, primary: false, show: perms.has("personal") },
   ].filter((i) => i.show);
   if (items.length === 0) return null;
   return (
     <section aria-label="Keep handy" data-testid={testId} className="space-y-2">
       <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Keep handy</h2>
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
         {items.map((i) => (
           <Link key={i.href + i.label} href={i.href} className={cn(tile, i.primary && "border-primary bg-primary text-primary-foreground hover:bg-primary/90")}>
             <i.icon className={cn("h-5 w-5 shrink-0", !i.primary && "text-primary")} aria-hidden="true" />
@@ -111,9 +106,34 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
   );
 }
 
+/** The IPTV service an admin assigned to this account. Nothing when there is none. */
+function MyIptv() {
+  const { perms, loaded } = useAccess();
+  const [n, setN] = useState(0);
+  const want = loaded && perms.has("iptv.mine");
+  useEffect(() => {
+    if (!want) return;
+    let alive = true;
+    createClient().rpc("my_iptv_subscriptions").then(({ data, error }) => { if (alive) setN(!error && Array.isArray(data) ? data.length : 0); });
+    return () => { alive = false; };
+  }, [want]);
+  if (!want || n === 0) return null;
+  return (
+    <section aria-labelledby="home-iptv-h" data-testid="home-iptv" className="space-y-2">
+      <h2 id="home-iptv-h" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">IPTV</h2>
+      <Link href="/my-subscription" className="flex min-h-[72px] items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+        <IconTile tone="subscriptions" className="h-11 w-11"><Tv className="h-5 w-5" /></IconTile>
+        <span className="min-w-0 flex-1"><span className="block text-base font-semibold">My IPTV subscription</span><span className="block text-[13px] text-muted-foreground">See your service and when it ends</span></span>
+        <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden="true" />
+      </Link>
+    </section>
+  );
+}
+
 /**
- * The Personal dashboard: on a phone one column (keep handy, spending, trips, subscriptions, documents, then the detail);
- * from 1024px a main column and a side rail (subscriptions and keep handy).
+ * The Personal dashboard: what is worth a daily look, in this order: Keep handy, the month budget, Active trips and their
+ * travel advice, Projects, Documents, Subscriptions, and the IPTV service when an admin assigned one. A section with nothing
+ * in it hides itself. Everything is set up in Personal > Organizer; the numbers and exports are in Personal > Reports.
  */
 export default function PersonalHome({ rows, projects, today, docs, docTotal, canDocuments }: {
   rows: DashboardRow[];
@@ -136,27 +156,21 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
     return () => { alive = false; };
   }, [wantSubs]);
 
-  const afterTrips = useMemo(
-    () => (
-      <>
-        <div className="lg:hidden"><SubscriptionsCard subs={subs} today={today} testId="subs-card-mobile" /></div>
-        {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2 lg:grid-cols-3" />}
-      </>
-    ),
-    [subs, today, docs, docTotal, canDocuments],
-  );
-
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-6">
-      <div className="min-w-0 space-y-4">
-        <div className="lg:hidden"><KeepHandy testId="keep-handy-mobile" /></div>
-        <WhereItGoes />
-        <PersonalDashboard rows={rows} projects={projects} today={today} afterTrips={afterTrips} />
+    <div className="space-y-4">
+      <KeepHandy testId="keep-handy" />
+      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
+        <div className="min-w-0 space-y-4">
+          <BudgetCard />
+          <ActiveTrips rows={rows} projects={projects} today={today} />
+          <HomeProjects rows={rows} projects={projects} />
+        </div>
+        <div className="min-w-0 space-y-4">
+          {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2" />}
+          <SubscriptionsCard subs={subs} today={today} testId="subs-card" />
+          <MyIptv />
+        </div>
       </div>
-      <aside aria-label="Subscriptions and shortcuts" className="hidden space-y-4 lg:sticky lg:top-6 lg:block">
-        <SubscriptionsCard subs={subs} today={today} testId="subs-card-desktop" />
-        <KeepHandy testId="keep-handy-desktop" />
-      </aside>
     </div>
   );
 }

@@ -529,7 +529,7 @@ try {
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
     await page.goto(`${BASE}/personal`);
-    await page.getByRole("heading", { name: "Loyalty cards" }).waitFor();
+    await page.getByRole("link", { name: /Loyalty cards/ }).first().waitFor();
     await page.goto(`${BASE}/personal/loyalty`);
     await page.getByText("No loyalty cards yet").waitFor();
     await page.getByRole("button", { name: "Add your first card" }).click();
@@ -1666,7 +1666,7 @@ try {
       await page.getByTestId("gambling-over").waitFor();
       assert(/35/.test(await page.getByTestId("gambling-over").innerText()), "it says by how much the limit is passed");
       // the budget card counts them, each in its own row
-      await page.goto(`${BASE}/personal`);
+      await page.goto(`${BASE}/`);
       await page.getByTestId("budget-card").waitFor();
       const loansRow = await page.getByTestId("budget-area-loans").innerText();
       assert(loansRow.includes("1,660"), "Loans row: " + loansRow);
@@ -2306,8 +2306,8 @@ try {
       assert(String(prof.business_logo_path || "").startsWith(`${PAT}/logo/`), "the logo path is saved on the profile: " + prof.business_logo_path);
       if (process.env.E2E_SHOT) await page.screenshot({ path: "/tmp/rep-profile.png", fullPage: true });
       // the Reports page
-      await page.goto(`${BASE}/`);
-      await page.getByTestId("keep-handy-mobile").getByRole("link", { name: "Reports" }).click();
+      await page.goto(`${BASE}/personal`);
+      await page.getByRole("navigation", { name: "Personal sections" }).getByRole("link", { name: /Reports/ }).click();
       await page.waitForURL((u) => u.pathname === "/personal/reports");
       await page.getByTestId("report-excel").waitFor();
       await page.getByTestId("logo-preview").waitFor();
@@ -2511,7 +2511,7 @@ try {
       for (const t of ["grocery_receipts", "personal_spends", "utility_bills", "personal_expenses"]) { stash[t] = fake.table(t).splice(0); }
       fake.table("grocery_receipts").push({ id: "7c000000-0000-4000-8000-00000000c001", user_id: PAT, store: "Budget Market", purchase_date: today, total: 179, currency: "AWG", prices_only: false, created_at: new Date().toISOString() });
       fake.table("personal_spends").push({ id: "7c000000-0000-4000-8000-00000000c002", user_id: PAT, merchant: "Hinge", amount: 90, currency: "AWG", exchange_rate: 0.558659, amount_usd: 50.28, category: "House", expense_date: today, created_at: new Date().toISOString() });
-      await page.goto(`${BASE}/personal`);
+      await page.goto(`${BASE}/`);
       await page.getByTestId("budget-empty").waitFor();
       await page.getByTestId("budget-empty").click();
       await page.waitForURL((u) => u.pathname === "/personal/budget");
@@ -2521,7 +2521,7 @@ try {
       await page.locator("#bg-limit-house").fill("500");
       await page.getByRole("switch", { name: "Tell me at 80%" }).click();
       await page.getByTestId("budget-save").click();
-      await page.waitForURL((u) => u.pathname === "/personal");
+      await page.waitForURL((u) => u.pathname === "/");
       await page.getByTestId("budget-card").waitFor();
       const saved = fake.table("personal_budgets").find((r) => r.user_id === PAT);
       assert(saved && saved.amount === 1000 && saved.currency === "AWG" && saved.month == null && saved.alert_at_80 === true && saved.limits.groceries === 150 && saved.limits.house === 500 && saved.limits.utilities == null, "the budget is saved for every month with its limits: " + JSON.stringify(saved));
@@ -2537,25 +2537,30 @@ try {
       await page.getByRole("button", { name: /^Only / }).click();
       await page.locator("#bg-amount").fill("200");
       await page.getByTestId("budget-save").click();
-      await page.waitForURL((u) => u.pathname === "/personal");
+      await page.waitForURL((u) => u.pathname === "/");
       await page.waitForFunction(() => document.querySelector("[data-testid=budget-card]")?.getAttribute("data-state") === "over");
       assert(fake.table("personal_budgets").length === 2 && fake.table("personal_budgets").some((r) => r.month), "a second budget is kept for this month only");
       assert(/69/.test(await page.getByTestId("budget-headline").textContent()), "69 over is shown: " + (await page.getByTestId("budget-headline").textContent()));
       assert(/Over by/.test(await page.getByTestId("budget-headline").textContent()), "the headline says how far over");
       await page.getByTestId("budget-legend").waitFor();
       assert((await page.getByTestId("budget-area-groceries").getAttribute("href")) === "/personal/groceries", "an area row opens that area");
+      await page.goto(`${BASE}/personal`);
       const houseTile = page.getByRole("link", { name: /House & repairs/ }).first();
+      await page.waitForFunction(() => /90/.test([...document.querySelectorAll("a")].find((x) => /House & repairs/.test(x.textContent || ""))?.textContent || ""));
       assert(/90/.test(await houseTile.textContent()) && (await houseTile.getAttribute("href")) === "/personal/house", "the House & repairs tile shows this month's house spending: " + (await houseTile.textContent()));
+      const quickTile = page.getByRole("link", { name: /Quick spend/ }).first();
+      assert(!/90/.test(await quickTile.textContent()), "the Quick spend tile does not repeat the house cost: " + (await quickTile.textContent()));
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+      await page.goto(`${BASE}/personal/reports`);
       await page.getByTestId("where-pie").waitFor();
       assert((await page.getByTestId("where-groceries").getAttribute("href")) === "/personal/groceries" && (await page.getByTestId("where-house").getAttribute("href")) === "/personal/house", "Where it goes lists each part and opens it");
       const wTotal = await page.getByTestId("where-total").textContent(), wList = await page.getByTestId("where-list").textContent();
       assert(/AWG/.test(wTotal) && /House & repairs/.test(wList) && /%/.test(wList), "Where it goes shows the month total, the parts and their shares: " + wTotal);
-      const quickTile = page.getByRole("link", { name: /Quick spend/ }).first();
-      assert(!/90/.test(await quickTile.textContent()), "the Quick spend tile does not repeat the house cost: " + (await quickTile.textContent()));
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
     } finally {
       await ctx.close();
       fake.table("personal_budgets").splice(0);
+      fake.table("user_plans").splice(0);
       for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
     }
   });
@@ -2606,9 +2611,10 @@ try {
       await page.waitForFunction(() => /1,650/.test(document.querySelector("[data-testid=plan-saved]")?.textContent ?? ""));
       assert(fake.table("savings_events").some((r) => r.kind === "extra" && r.amount === 50), "the extra deposit is saved");
       // the budget counts this month's 200 and the extra 50 in its own Savings line, and Personal has the tile
-      await page.goto(`${BASE}/personal`);
+      await page.goto(`${BASE}/`);
       await page.getByTestId("budget-area-savings").waitFor();
       assert(/250/.test(await page.getByTestId("budget-area-savings").textContent()), "Savings in the budget is 250: " + (await page.getByTestId("budget-area-savings").textContent()));
+      await page.goto(`${BASE}/personal`);
       assert(/1,650\.00 saved/.test(await page.locator("a[href='/personal/savings']").filter({ hasText: "a month" }).first().textContent()), "the Savings tile shows the total saved");
       // pause stops deposits
       await page.goto(`${BASE}/personal/savings`);
@@ -3686,15 +3692,14 @@ try {
   await test("admin: the Personal view of the home page opens", async () => {
     await admin.page.goto(`${BASE}/`);
     await admin.page.getByRole("tab", { name: "Personal" }).click();
-    await admin.page.getByTestId("personal-total").waitFor();
+    await admin.page.getByTestId("keep-handy").waitFor();
     await admin.page.getByRole("tab", { name: "Business" }).click();
     await admin.page.getByRole("heading", { name: "Active Trips" }).waitFor();
     assert((await admin.page.getByText("This Month").count()) === 0, "spending tiles should no longer be on the business view");
   });
 
-  await test("personal dashboard: range chips and a Filters sheet replace the filter card, and the page follows what is tapped", async () => {
-    await admin.page.goto(`${BASE}/`);
-    await admin.page.getByRole("tab", { name: "Personal" }).click();
+  await test("personal reports: range chips and a Filters sheet replace the filter card, and the page follows what is tapped", async () => {
+    await admin.page.goto(`${BASE}/personal/reports`);
     await admin.page.getByTestId("personal-total").waitFor();
     assert((await admin.page.getByLabel("Date range", { exact: true }).evaluate((el) => el.tagName)) !== "SELECT", "the date range is a row of chips, not a select");
     assert((await admin.page.getByRole("button", { name: "30 days", exact: true }).getAttribute("aria-pressed")) === "true", "30 days is on by default");
@@ -3713,9 +3718,8 @@ try {
       await admin.page.getByRole("button", { name: "Clear filter" }).click();
       await admin.page.getByTestId("active-filters").waitFor({ state: "detached" });
     }
-    await admin.page.getByRole("heading", { name: "Active now" }).waitFor();
     await admin.page.getByTestId("where-it-goes").waitFor();
-    assert((await admin.page.getByRole("heading", { name: "Groceries by category" }).count()) <= 1 && (await admin.page.getByRole("heading", { name: "Where it goes" }).count()) === 1, "the home Personal view has the all-parts Where it goes, and the grocery chart is named Groceries by category");
+    assert((await admin.page.getByRole("heading", { name: "Groceries by category" }).count()) <= 1 && (await admin.page.getByRole("heading", { name: "Where it goes" }).count()) >= 1, "the Personal reports have the all-parts Where it goes, and the grocery chart is named Groceries by category");
     // the ring chart and its percent-only legend
     if ((await admin.page.getByRole("region", { name: "Where it goes" }).count()) > 0) {
       await admin.page.getByTestId("where-donut").waitFor();
@@ -3725,7 +3729,6 @@ try {
       assert((await admin.page.getByRole("button", { name: "Breakdown", exact: true }).count()) === 0, "the spending card has no Breakdown switch: the ring shows it");
       assert((await admin.page.getByRole("region", { name: "Where it goes" }).getByText(/AWG/).count()) === 0, "the legend shows percentages, not amounts");
     }
-    await admin.page.getByRole("tab", { name: "Business" }).click();
   });
 
   await test("personal on a desktop: a Coming up side panel lists what is due soonest; phones do not get it", async () => {
@@ -3773,19 +3776,17 @@ try {
       const tabs = await page.getByRole("tab").allInnerTexts();
       assert(tabs.slice(0, 2).join("|") === "Personal|Business", `tabs were: ${tabs.join("|")}`);
       assert((await page.getByRole("tab", { name: "Personal" }).getAttribute("aria-selected")) === "true", "Personal is the tab that is open first");
-      await page.getByTestId("personal-total").waitFor();
+      await page.getByTestId("keep-handy").waitFor();
       const strip = page.getByTestId("personal-docs");
       await strip.getByText("Passport", { exact: true }).waitFor();
       await strip.getByText("Driver's license", { exact: true }).waitFor();
       assert((await strip.getByText("Visa / e-visa", { exact: true }).count()) === 0, "a Business-only document is not listed on Personal");
       assert((await strip.getByTestId("doc-scope").count()) === 0 && !(await strip.innerText()).includes("Both"), "the document tiles do not show a Both badge");
-      const rail = page.getByTestId("subs-card-desktop");
+      const rail = page.getByTestId("subs-card");
       await rail.getByText("Rail Streaming").waitFor();
-      assert(await page.getByTestId("keep-handy-desktop").isVisible(), "Keep handy is in the side rail on a desktop");
-      assert(!(await page.getByTestId("keep-handy-mobile").isVisible()), "the phone's Keep handy row is hidden on a desktop");
-      const total = await page.getByTestId("personal-total").boundingBox();
+      const left = await page.locator("[data-testid=budget-card],[data-testid=budget-empty]").first().boundingBox();
       const railBox = await rail.boundingBox();
-      assert(total && railBox && railBox.x > total.x + total.width, "the side rail sits to the right of the spending");
+      assert(left && railBox && railBox.x > left.x + left.width - 1, "the second column sits to the right of the budget");
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a desktop");
       // Business lists what is set to Business or Both
       await page.getByRole("tab", { name: "Business" }).click();
@@ -3803,7 +3804,7 @@ try {
     }
   });
 
-  await test("home on a phone: Keep handy comes first, then spending, subscriptions and documents in one column", async () => {
+  await test("home on a phone: Keep handy comes first, then the budget, documents and subscriptions in one column", async () => {
     const now = new Date().toISOString();
     const docs = fake.table("travel_documents");
     docs.push({ id: "d0c00000-0000-4000-8000-0000000007c1", user_id: ADMIN, kind: "id", title: "Phone ID", issuing_country: "Aruba", document_number: null, expiry_date: addDays(today, 800), trip_id: null, file_path: null, show_on: "personal", created_at: now });
@@ -3816,15 +3817,14 @@ try {
       await page.waitForURL((u) => u.pathname === "/");
       await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
       await page.goto(`${BASE}/`);
-      await page.getByTestId("personal-total").waitFor();
-      const y = async (id) => (await page.getByTestId(id).boundingBox())?.y ?? -1;
-      const handy = await y("keep-handy-mobile"), spend = await y("personal-total"), subs = await y("subs-card-mobile"), pdocs = await y("personal-docs");
-      assert(handy > 0 && handy < spend && spend < subs && subs < pdocs, `order was handy ${handy}, spending ${spend}, subscriptions ${subs}, documents ${pdocs}`);
-      assert(!(await page.getByTestId("subs-card-desktop").isVisible()), "the desktop rail is hidden on a phone");
-      await page.getByTestId("subs-card-mobile").getByText("Phone Music").waitFor();
+      await page.getByTestId("keep-handy").waitFor();
+      await page.getByTestId("subs-card").getByText("Phone Music").waitFor();
+      const y = async (sel) => (await page.locator(sel).first().boundingBox())?.y ?? -1;
+      const handy = await y("[data-testid=keep-handy]"), budget = await y("[data-testid=budget-card],[data-testid=budget-empty]"), pdocs = await y("[data-testid=personal-docs]"), subs = await y("[data-testid=subs-card]");
+      assert(handy > 0 && handy < budget && budget < pdocs && pdocs < subs, `order was handy ${handy}, budget ${budget}, documents ${pdocs}, subscriptions ${subs}`);
       await page.getByTestId("personal-docs").getByText("ID card", { exact: true }).waitFor();
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling on a phone");
-      for (const el of await page.getByTestId("keep-handy-mobile").getByRole("link").all()) {
+      for (const el of await page.getByTestId("keep-handy").getByRole("link").all()) {
         const b = await el.boundingBox();
         assert(b && b.height >= 44, "Keep handy buttons are at least 44px tall");
       }
@@ -3901,18 +3901,19 @@ try {
     await sub.getByText("Your spending, subscriptions and documents").waitFor();
   });
 
-  await test("personal: Groceries leads with Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Keep handy", async () => {
+  await test("personal Organizer: Groceries has Scan receipt, empty rows say what is missing, and Documents and Loyalty sit under Things you track", async () => {
     await admin.page.goto(`${BASE}/personal`);
-    await admin.page.getByRole("heading", { name: "Groceries" }).waitFor();
+    await admin.page.getByRole("link", { name: /^Groceries/ }).first().waitFor();
     assert((await admin.page.getByText("Only you can see this").count()) === 0, "the intro describes the page, it does not say who can see it");
-    await admin.page.getByText("keep your documents and loyalty cards in one place").waitFor();
+    await admin.page.getByText("Set up everything here. Your dashboard shows what you add.").waitFor();
+    await admin.page.getByRole("navigation", { name: "Personal sections" }).waitFor();
     assert((await admin.page.getByRole("link", { name: "Scan receipt" }).getAttribute("href")) === "/personal/groceries/new", "Scan receipt opens the grocery form");
     assert((await admin.page.getByRole("link", { name: "Price tracker" }).getAttribute("href")) === "/personal/groceries/prices", "Price tracker opens the prices page");
     // earlier tests may have left a project or trip: either an empty message or a count with money is right, never "0 active"
     await admin.page.getByText(/No active projects|\d+ active \u00b7 /).first().waitFor();
     await admin.page.getByText(/No active trips|\d+ active \u00b7 /).first().waitFor();
     assert((await admin.page.getByText("0 active").count()) === 0, "empty tiles no longer read '0 active'");
-    await admin.page.getByText("Keep handy").waitFor();
+    await admin.page.getByRole("heading", { name: "Things you track" }).waitFor();
     assert((await admin.page.getByRole("link", { name: /Documents/ }).count()) > 0 && (await admin.page.getByRole("link", { name: /Loyalty cards/ }).count()) > 0, "Documents and Loyalty cards are listed");
     // on a phone the tiles (now with Savings, House & repairs, and Subscriptions for an admin) are within about one and a half screens: the last one starts above 1500px
     await admin.page.setViewportSize({ width: 390, height: 844 });

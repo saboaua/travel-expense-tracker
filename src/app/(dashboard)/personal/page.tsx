@@ -1,7 +1,6 @@
 "use client";
 
 import { shiftMonth } from "@/lib/personal/utilities";
-import { Money } from "@/components/ui/money";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -9,7 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, Camera, TrendingUp, Repeat, Coins, Zap } from "lucide-react";
+import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet } from "lucide-react";
+import { PersonalTabs } from "@/components/layout/PersonalTabs";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
 import { summarizePersonal } from "@/lib/personal/summary";
@@ -19,8 +19,6 @@ import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
-import { BudgetCard } from "@/components/personal/BudgetCard";
-import { WhereItGoes } from "@/components/personal/WhereItGoes";
 import { fetchSavings } from "@/lib/personal/savings-data";
 import { savingsSummary } from "@/lib/personal/savings";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
@@ -132,103 +130,74 @@ export default function PersonalHubPage() {
     { href: "/personal/travel", title: "Personal Travel", icon: Plane, tone: "travel", strong: !!stats && stats.trips.count > 0,
       text: !stats ? "\u00a0" : stats.trips.count > 0 ? `${stats.trips.count} active \u00b7 ${formatCurrency(stats.trips.spent, stats.currency)} spent` : "No active trips \u00b7 tap to start one" },
   ];
-  const handy: { href: string; title: string; icon: typeof ShoppingCart; tone: IconTone; stat: string; right?: string }[] = [
-    ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, tone: "documents" as const, stat: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0" }] : []),
-    ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, tone: "subscriptions" as const, stat: "Track what you pay and what is due" }] : []),
-    // Only people who manage IPTV clients (the admin, or a role given "IPTV clients") see this tile, and they do not also get the client tile below
-    ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Repeat, tone: "subscriptions" as const, stat: "See your service and when it ends" }] : []),
-    ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, tone: "loyalty" as const, stat: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "" }] : []),
+  const label = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  type Row = { href: string; title: string; icon: typeof ShoppingCart; tone: IconTone; text: string; strong?: boolean; add?: { href: string; label: string; aria?: string }; right?: string; testId?: string };
+  const money: Row[] = [
+    { href: "/personal/budget", title: "Monthly budget", icon: Wallet, tone: "spend", text: "Set or change what you plan to spend each month" },
+    { href: "/personal/fixed", title: "Fixed costs", icon: Landmark, tone: "fixed", text: "Loans, insurance, credit card and more, every month" },
+    { href: "/personal/groceries", title: "Groceries", icon: ShoppingCart, tone: "groceries", strong: !!grocery,
+      text: !stats ? "\u00a0" : grocery ? `${formatCurrency(grocery.total, grocery.currency)} this month \u00b7 ${plural(grocery.count, "receipt")}` : "Receipts and item prices", add: { href: "/personal/groceries/new", label: "Scan", aria: "Scan receipt" } },
+    { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
+    ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
+  ];
+  const track: Row[] = [
+    ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, tone: "subscriptions" as const, text: "Track what you pay and what is due", add: { href: "/personal/subscriptions", label: "Add" } }] : []),
+    ...rowTiles.filter((t) => t.href === "/personal/projects").map((t) => ({ ...t, add: { href: "/personal/projects/new", label: "Add" } })),
+    ...rowTiles.filter((t) => t.href === "/personal/travel").map((t) => ({ ...t, add: { href: "/personal/travel/new", label: "Add" } })),
+    ...(perms.has("loyalty") ? [{ href: "/personal/loyalty", title: "Loyalty cards", icon: CreditCard, tone: "loyalty" as const, text: stats?.cards != null ? plural(stats.cards, "card") : "\u00a0", right: sharedCards != null && sharedCards > 0 ? `${sharedCards} shared` : "", add: { href: "/personal/loyalty", label: "Add" } }] : []),
+    ...(perms.has("documents") ? [{ href: "/documents", title: "Documents", icon: FolderOpen, tone: "documents" as const, text: stats?.documents != null ? plural(stats.documents, "document") : "\u00a0", add: { href: "/documents", label: "Add" } }] : []),
+    ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Tv, tone: "subscriptions" as const, text: "See your service and when it ends" }] : []),
+  ];
+  const auto: Row[] = [
+    { href: "/personal/utilities/emails", title: "Bills by email", icon: Mail, tone: "utilities", text: "Add your bills from your inbox (Pro)" },
+    { href: "/settings", title: "Telegram", icon: Send, tone: "notifications", text: "Reminders, and saving by chat (Pro)" },
   ];
 
-  const label = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
+  const group = (name: string, rows: Row[], id: string) => rows.length === 0 ? null : (
+    <section aria-labelledby={id} className="space-y-2" data-testid={id}>
+      <h2 id={id} className={`${label} pt-2`}>{name}</h2>
+      <Card className="rounded-2xl px-4 py-1 md:px-5">
+        <ul className="divide-y">
+          {rows.map((t) => (
+            <li key={t.href + t.title} className="flex items-center gap-2">
+              <Link href={t.href} className="group flex min-h-[64px] min-w-0 flex-1 items-center gap-3 py-2.5">
+                <IconTile tone={t.tone} className="h-11 w-11"><t.icon className="h-[22px] w-[22px]" /></IconTile>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[15px] font-semibold leading-snug">{t.title}</span>
+                  <span className={`block text-[13px] ${t.strong ? "font-medium" : "text-muted-foreground"}`}>
+                    {t.text}
+                    {t.right ? <> {"\u00b7"} <span className="font-semibold text-primary" data-testid="tile-shared">{t.right}</span></> : null}
+                  </span>
+                </span>
+                {!t.add && <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />}
+              </Link>
+              {t.add && <Link href={t.add.href} aria-label={t.add.aria ?? `${t.add.label} ${t.title.toLowerCase()}`} className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border bg-card px-3 text-[13px] font-bold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"><Plus className="h-3.5 w-3.5" aria-hidden="true" />{t.add.label}</Link>}
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
+  );
 
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-8 lg:max-w-6xl">
-      <PageHeader title="Personal" description="Track groceries, projects and personal trips, and keep your documents and loyalty cards in one place." />
+      <PageHeader title="Personal" description="Set up everything here. Your dashboard shows what you add." />
+      <PersonalTabs />
+      <h2 className="sr-only">Organizer</h2>
 
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start lg:gap-8 lg:space-y-0">
       <div className="min-w-0 space-y-4">
-      <p className={`${label} pt-2`}>Spending</p>
+      <p className="rounded-xl bg-blue-50 px-3 py-2 text-[13px] leading-snug text-blue-900 dark:bg-blue-950 dark:text-blue-100" data-testid="organizer-note">
+        Your dashboard reads from these lists. Add a project and it appears there. Remove the last one and it hides itself.
+      </p>
       {stats && stats.converted > 0 && (
         <p className="flex gap-2 rounded-xl bg-blue-50 px-3 py-2 text-[13px] leading-snug text-blue-900 dark:bg-blue-950 dark:text-blue-100" data-testid="hub-currency-note">
           Amounts in {stats.currency === "AWG" ? "USD" : "AWG"} are shown in {stats.currency} at the fixed rate, 1 USD = 1.79 AWG.
         </p>
       )}
-      <div className="grid gap-4 md:grid-cols-2">
-        <BudgetCard />
-        <WhereItGoes currency={stats?.currency ?? null} />
-        {/* Groceries leads: the month total is the number, with the two things done most often one tap away */}
-        <Card className="flex flex-col justify-between rounded-2xl lg:col-span-2 lg:flex-row lg:items-center lg:gap-6">
-          <div className="flex flex-col justify-between gap-1 lg:min-w-0 lg:flex-1">
-          <Link href="/personal/groceries" className="group flex items-center gap-3 p-4 pb-2 md:p-5 md:pb-2">
-            <IconTile tone="groceries" className="h-11 w-11"><ShoppingCart className="h-[22px] w-[22px]" /></IconTile>
-            <span className="min-w-0 flex-1">
-              <h2 className="text-[17px] font-semibold leading-snug">Groceries</h2>
-              <span className="block text-[13px] text-muted-foreground">Receipts, item prices, monthly spending</span>
-            </span>
-            <ChevronRight className="h-[18px] w-[18px] text-muted-foreground transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
-          </Link>
-          <div className="flex items-baseline justify-between gap-3 px-4 pb-3.5 md:px-5">
-            {grocery ? (
-              <>
-                <p className="text-[26px] font-bold tabular-nums tracking-tight"><Money amount={grocery.total} currency={grocery.currency} /> <span className="text-sm font-medium text-muted-foreground">this month</span></p>
-                <p className="shrink-0 text-[13px] text-muted-foreground">{plural(grocery.count, "receipt")}</p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">{stats ? "Nothing this month yet" : "\u00a0"}</p>
-            )}
-          </div>
-          </div>
-          <div className="flex gap-2 px-4 pb-4 md:px-5 md:pb-5 lg:w-64 lg:shrink-0 lg:flex-col lg:pl-0">
-            <Link href="/personal/groceries/new" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 md:flex-none">
-              <Camera className="h-4 w-4" aria-hidden="true" /> Scan receipt
-            </Link>
-            <Link href="/personal/groceries/prices" className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border bg-card px-4 text-sm font-semibold transition-colors hover:bg-accent md:flex-none">
-              <TrendingUp className="h-4 w-4" aria-hidden="true" /> Price tracker
-            </Link>
-          </div>
-        </Card>
-
-        <div className="flex flex-col gap-4 lg:contents">
-          {rowTiles.map((t) => (
-            <Link key={t.href} href={t.href} className="group block md:flex-1">
-              <Card className="flex min-h-[72px] items-center gap-3 rounded-2xl px-4 py-3 transition-shadow group-hover:shadow-md md:h-full md:px-5">
-                <IconTile tone={t.tone} className="h-11 w-11"><t.icon className="h-[22px] w-[22px]" /></IconTile>
-                <span className="min-w-0 flex-1">
-                  <h2 className="text-base font-semibold leading-snug">{t.title}</h2>
-                  <span className={`block text-[13px] ${t.strong ? "font-medium" : "text-muted-foreground"}`}>{t.text}</span>
-                </span>
-                <ChevronRight className="h-[18px] w-[18px] shrink-0 text-muted-foreground" aria-hidden="true" />
-              </Card>
-            </Link>
-          ))}
-        </div>
-      </div>
-
-      {handy.length > 0 && (
-        <>
-          <p className={`${label} pt-2`}>Keep handy</p>
-          <div className="grid grid-cols-2 gap-3 md:gap-4">
-            {handy.map((t) => (
-              <Link key={t.href} href={t.href} className="group block">
-                <Card className="flex h-full min-h-[104px] flex-col justify-between gap-2.5 rounded-2xl p-3.5 transition-shadow group-hover:shadow-md md:min-h-[72px] md:flex-row md:items-center md:gap-3 md:px-5 md:py-3">
-                  <span className="flex items-center justify-between md:contents">
-                    <IconTile tone={t.tone} className="h-10 w-10"><t.icon className="h-5 w-5" /></IconTile>
-                    <ChevronRight className="h-4 w-4 text-muted-foreground md:order-last" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 md:flex-1">
-                    <h2 className="text-[15px] font-semibold leading-snug">{t.title}</h2>
-                    <span className="block text-[13px] text-muted-foreground">
-                      {t.stat}
-                      {t.right ? <> {"\u00b7"} <span className="font-semibold text-primary" data-testid="tile-shared">{t.right}</span></> : null}
-                    </span>
-                  </span>
-                </Card>
-              </Link>
-            ))}
-          </div>
-        </>
-      )}
+      {group("Money", money, "org-money")}
+      {group("Things you track", track, "org-track")}
+      {group("Automatic", auto, "org-auto")}
       </div>
 
       {/* Desktop only: what is coming up soonest. Phones and tablets keep the page as it is. */}

@@ -86,7 +86,7 @@ export function BudgetForm() {
     const { error: err } = existing?.id ? await supabase.from("personal_budgets").update(body).eq("id", existing.id) : await supabase.from("personal_budgets").insert(body);
     setBusy(false);
     if (err) return setError(/relation|schema cache|does not exist/i.test(err.message) ? setupNeeded("The monthly budget", "migration_budget.sql") : "Could not save the budget. Check your connection.");
-    router.push("/personal");
+    router.push("/");
   };
 
   const remove = async () => {
@@ -96,7 +96,7 @@ export function BudgetForm() {
     const { error: err } = await createClient().from("personal_budgets").delete().eq("id", existing.id);
     setBusy(false);
     if (err) return setError("Could not remove the budget. Check your connection.");
-    router.push("/personal");
+    router.push("/");
   };
 
   const hasSaved = rows.some((x) => (x.month ?? null) === (onlyThisMonth ? thisMonth : null));

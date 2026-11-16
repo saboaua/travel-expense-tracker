@@ -2,13 +2,11 @@
 
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
-import { IconTile } from "@/components/ui/icon-tile";
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { TripWeather } from "@/components/TripWeather";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip } from "recharts";
-import { ArrowDown, ArrowUp, Camera, ChevronRight, Hammer, MapPin, Plane, Plus, SlidersHorizontal, X } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronRight, Crown, Hammer, Plane, Plus, SlidersHorizontal, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { cn, daysBetween, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency } from "@/lib/utils";
 import {
   BASE_CURRENCY,
   DEFAULT_FILTER,
@@ -43,26 +41,6 @@ function longDate(d: string, withYear = true) {
 function shortDay(d: string) {
   return new Date(`${d}T00:00:00Z`).toLocaleDateString("en-US", { weekday: "short", day: "numeric", timeZone: "UTC" });
 }
-function dateSpan(a: string | null, b: string | null) {
-  if (a && b) return `${longDate(a, false)} – ${longDate(b)}`;
-  if (a) return `From ${longDate(a)}`;
-  return "No dates yet";
-}
-
-/** Where a trip stands today, for the badge on its card. */
-function tripBadge(p: DashboardProject, today: string): { text: string; tone: "green" | "blue" | "grey" } {
-  if (p.start_date && p.start_date > today) {
-    const n = daysBetween(today, p.start_date);
-    return { text: `Upcoming · ${plural(n, "day")} left`, tone: "green" };
-  }
-  if (p.end_date && p.end_date < today) return { text: "Dates passed", tone: "grey" };
-  if (p.start_date) {
-    const day = daysBetween(p.start_date, today) + 1;
-    return { text: p.end_date ? `Day ${day} of ${daysBetween(p.start_date, p.end_date) + 1}` : `Day ${day}`, tone: "blue" };
-  }
-  return { text: "In progress", tone: "blue" };
-}
-
 /** Ring chart of the category shares, with the total in the middle. The legend beside it is what filters the page. */
 function Donut({ parts, total, caption }: { parts: { label: string; value: number; color: string }[]; total: number; caption: string }) {
   const R = 62;
@@ -112,7 +90,8 @@ const chipBase = "inline-flex min-h-[44px] items-center justify-center whitespac
 const chipOn = "border-primary bg-primary font-semibold text-primary-foreground";
 const chipOff = "border-input bg-card hover:bg-accent";
 
-export default function PersonalDashboard({ rows, projects, today, afterTrips }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; /** Cards shown right after the trips (subscriptions, documents) */ afterTrips?: ReactNode }) {
+/** The spending numbers. Spent in the last 30 days is free; the date ranges, filters, categories and stores are Pro (`pro`). */
+export default function PersonalDashboard({ rows, projects, today, pro }: { rows: DashboardRow[]; projects: DashboardProject[]; today: string; pro: boolean }) {
   const [filter, setFilter] = useState<DashboardFilter>(DEFAULT_FILTER);
   const [sheet, setSheet] = useState(false);
 
@@ -143,20 +122,12 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
   const anyFilter = !!(filter.category || filter.store || filter.project);
   const projectName = projects.find((p) => p.id === filter.project)?.name;
 
-  const active = projects.filter((p) => (p.status || "active") === "active");
-  const trips = active.filter((p) => p.kind === "personal_trip");
-  const homeProjects = active.filter((p) => p.kind === "home_project");
-  const spentOn = (id: string) => {
-    const mine = rows.filter((r) => r.projectId === id && r.awg != null);
-    return { total: mine.reduce((s, r) => s + (r.awg as number), 0), count: mine.length };
-  };
-
   const clearFilters = () => set({ category: "", store: "", project: "" });
   const toggleCategory = (c: string) => set({ category: filter.category === c ? "" : c });
 
   return (
     <div className="space-y-4">
-      {/* Range + filters */}
+      {pro && (
       <div className="flex items-center gap-2">
         <div role="group" aria-label="Date range" className="flex min-w-0 flex-1 gap-1.5 overflow-x-auto py-0.5">
           {RANGES.map((r) => (
@@ -181,6 +152,7 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
           {sheetFilters > 0 && <span className="absolute -right-1.5 -top-1.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-1 text-[11px] font-bold text-primary-foreground">{sheetFilters}</span>}
         </button>
       </div>
+      )}
 
       {anyFilter && (
         <div className="flex items-center justify-between gap-2" data-testid="active-filters">
@@ -258,180 +230,127 @@ export default function PersonalDashboard({ rows, projects, today, afterTrips }:
         </dl>
       </section>
 
-      {/* Active now: personal trips look like the Business trip card */}
-      {!anyFilter && (
-        <>
-          <h2 className={cn(sectionLabel, "pt-1")}>Active now</h2>
-          {trips.length === 0 && homeProjects.length === 0 && (
-            <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
-              <span>No active trips or projects.</span>
-              <span className="flex gap-3 font-semibold text-primary">
-                <Link href="/personal/travel/new" className="min-h-[44px] content-center">Start a trip</Link>
-                <Link href="/personal/projects/new" className="min-h-[44px] content-center">Start a project</Link>
-              </span>
-            </div>
-          )}
-          {trips.map((t) => {
-            const spent = spentOn(t.id);
-            const badge = tripBadge(t, today);
-            return (
-              <Fragment key={t.id}>
-              <div data-testid="personal-trip-card" className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <Link href={`/personal/travel/${t.id}`} className="relative block h-40 bg-gradient-to-b from-sky-500 via-sky-300 to-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" aria-label={`Open ${t.name}`}>
-                  <Plane className="absolute right-4 top-12 h-16 w-16 text-white/30" aria-hidden="true" />
-                  <div className="absolute inset-0 bg-gradient-to-b from-slate-900/10 via-transparent to-slate-900/75" />
-                  <span className={cn("absolute right-3 top-3 rounded-full px-2.5 py-1 text-xs font-semibold text-white", badge.tone === "green" ? "bg-green-700" : badge.tone === "blue" ? "bg-blue-700" : "bg-slate-600")}>{badge.text}</span>
-                  <div className="absolute inset-x-4 bottom-3.5 space-y-0.5 text-white">
-                    {t.destination && <p className="flex items-center gap-1 text-[13px]"><MapPin className="h-3.5 w-3.5" aria-hidden="true" />{t.destination}</p>}
-                    <p className="truncate text-xl font-bold tracking-tight">{t.name}</p>
-                    <p className="text-sm">{dateSpan(t.start_date, t.end_date)}</p>
-                  </div>
-                </Link>
-                <div className="flex items-center justify-between gap-3 p-4">
-                  <div>
-                    <p className="text-xl font-bold tabular-nums">{money(spent.total)}</p>
-                    <p className="text-[13px] text-muted-foreground">spent · {plural(spent.count, "expense")}</p>
-                  </div>
-                  <Link href={`/personal/travel/${t.id}/expense`} className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
-                    <Camera className="h-4 w-4" aria-hidden="true" /> Add expense
-                  </Link>
-                </div>
-              </div>
-              {t.start_date && <TripWeather destination={t.destination ?? null} start={t.start_date} end={t.end_date ?? null} today={today} editHref={`/personal/travel/${t.id}/edit`} />}
-              </Fragment>
-            );
-          })}
-          {homeProjects.map((p) => {
-            const spent = spentOn(p.id);
-            return (
-              <Link key={p.id} href={`/personal/projects/${p.id}`} data-testid="personal-project-row" className="flex min-h-[72px] items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                <IconTile tone="projects" className="h-11 w-11"><Hammer className="h-5 w-5" /></IconTile>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-base font-semibold">{p.name}</span>
-                  <span className="block text-[13px] text-muted-foreground">{spent.count ? plural(spent.count, "expense") : "No expenses yet"}</span>
-                </span>
-                <span className="text-[15px] font-semibold tabular-nums">{money(spent.total)}</span>
-                <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden="true" />
-              </Link>
-            );
-          })}
-          {(trips.length > 0 || homeProjects.length > 0) && (
-            <div className="flex gap-4 text-sm font-semibold text-primary">
-              <Link href="/personal/travel" className="min-h-[44px] content-center">All trips</Link>
-              <Link href="/personal/projects" className="min-h-[44px] content-center">All projects</Link>
-            </div>
-          )}
-        </>
-      )}
 
-      {afterTrips}
-
-      {a.count === 0 ? (
-        <div className="rounded-2xl border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
-          No personal spending found for these filters. Try a wider date range.
+      {!pro ? (
+        <div className="space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950" data-testid="reports-locked">
+          <p className="flex items-center gap-2 text-base font-bold text-amber-950 dark:text-amber-100"><Crown className="h-5 w-5" aria-hidden="true" />The rest of the numbers are part of Pro</p>
+          <ul className="list-disc space-y-1 pl-5 text-[13.5px] text-amber-950 dark:text-amber-100">
+            <li>Other date ranges and filters by store and project</li>
+            <li>Groceries by category and your top stores</li>
+            <li>Excel and PDF for any month or project, with your logo</li>
+          </ul>
+          <Link href="/personal/pro" data-testid="reports-get-pro" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground">Get Pro</Link>
         </div>
       ) : (
         <>
-          {/* Where it goes: every row filters the page */}
-          <h2 className={cn(sectionLabel, "pt-1")}>Groceries by category</h2>
-          <section aria-label="Where it goes" className="rounded-2xl border bg-card p-2">
-            <div className="flex flex-col items-center gap-2 p-2 md:flex-row md:gap-6">
-              <Donut
-                parts={[...heads.map((c, i) => ({ label: c.label, value: c.value, color: PALETTE[i % PALETTE.length] })), ...(restTotal > 0 ? [{ label: "Everything else", value: restTotal, color: PALETTE[5] }] : [])]}
-                total={forList.total}
-                caption={`${filter.range === "custom" ? "Custom" : RANGES.find((r) => r.id === filter.range)!.label} \u00b7 ${BASE_CURRENCY}`}
-              />
-              <div className="w-full min-w-0 md:max-w-[22rem] md:flex-1">
-            <ul>
-              {heads.map((c, i) => {
-                const on = filter.category === c.label;
-                return (
-                  <li key={c.label}>
-                    <button type="button" aria-pressed={on} onClick={() => toggleCategory(c.label)} className={cn("flex min-h-[52px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", on && "bg-primary/10")}>
-                      <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} aria-hidden="true" />
-                      <span className={cn("min-w-0 flex-1 truncate text-[15px]", on ? "font-semibold" : "font-medium")}>{c.label}</span>
-                      <span className="text-[15px] font-semibold tabular-nums text-muted-foreground">{Math.round((c.value / listTotal) * 100)}%</span>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                    </button>
+      {a.count === 0 ? (
+          <div className="rounded-2xl border bg-card px-4 py-10 text-center text-sm text-muted-foreground">
+            No personal spending found for these filters. Try a wider date range.
+          </div>
+        ) : (
+          <>
+            {/* Where it goes: every row filters the page */}
+            <h2 className={cn(sectionLabel, "pt-1")}>Groceries by category</h2>
+            <section aria-label="Where it goes" className="rounded-2xl border bg-card p-2">
+              <div className="flex flex-col items-center gap-2 p-2 md:flex-row md:gap-6">
+                <Donut
+                  parts={[...heads.map((c, i) => ({ label: c.label, value: c.value, color: PALETTE[i % PALETTE.length] })), ...(restTotal > 0 ? [{ label: "Everything else", value: restTotal, color: PALETTE[5] }] : [])]}
+                  total={forList.total}
+                  caption={`${filter.range === "custom" ? "Custom" : RANGES.find((r) => r.id === filter.range)!.label} \u00b7 ${BASE_CURRENCY}`}
+                />
+                <div className="w-full min-w-0 md:max-w-[22rem] md:flex-1">
+              <ul>
+                {heads.map((c, i) => {
+                  const on = filter.category === c.label;
+                  return (
+                    <li key={c.label}>
+                      <button type="button" aria-pressed={on} onClick={() => toggleCategory(c.label)} className={cn("flex min-h-[52px] w-full items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", on && "bg-primary/10")}>
+                        <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[i % PALETTE.length] }} aria-hidden="true" />
+                        <span className={cn("min-w-0 flex-1 truncate text-[15px]", on ? "font-semibold" : "font-medium")}>{c.label}</span>
+                        <span className="text-[15px] font-semibold tabular-nums text-muted-foreground">{Math.round((c.value / listTotal) * 100)}%</span>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                      </button>
+                    </li>
+                  );
+                })}
+                {restTotal > 0 && (
+                  <li className="flex min-h-[44px] items-center gap-2.5 px-2.5 py-1.5 text-muted-foreground">
+                    <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[5] }} aria-hidden="true" />
+                    <span className="flex-1 text-[15px]">Everything else</span>
+                    <span className="text-[15px] font-semibold tabular-nums">{Math.round((restTotal / listTotal) * 100)}%</span>
+                    <span className="w-4" />
                   </li>
-                );
-              })}
-              {restTotal > 0 && (
-                <li className="flex min-h-[44px] items-center gap-2.5 px-2.5 py-1.5 text-muted-foreground">
-                  <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: PALETTE[5] }} aria-hidden="true" />
-                  <span className="flex-1 text-[15px]">Everything else</span>
-                  <span className="text-[15px] font-semibold tabular-nums">{Math.round((restTotal / listTotal) * 100)}%</span>
-                  <span className="w-4" />
-                </li>
-              )}
-            </ul>
+                )}
+              </ul>
+                </div>
               </div>
-            </div>
-          </section>
-
-          <h2 className={cn(sectionLabel, "pt-1")}>Top stores</h2>
-          <section aria-label="Top stores" className="rounded-2xl border bg-card p-2">
-            <ul>
-              {a.topMerchants.map((m, i) => {
-                const tone = STORE_TONES[i % STORE_TONES.length];
-                const share = (m.value / (a.total || 1)) * 100;
-                return (
-                  <li key={m.label}>
-                    <button type="button" aria-pressed={filter.store === m.label} onClick={() => set({ store: filter.store === m.label ? "" : m.label })} className={cn("w-full rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", filter.store === m.label && "bg-primary/10")}>
-                      <span className="flex min-h-[44px] items-center gap-3">
-                        <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold", tone.badge)} aria-hidden="true">{initials(m.label)}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="flex items-center gap-2">
-                            <span className="truncate text-[15px] font-semibold">{m.label}</span>
-                            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{plural(m.visits, "visit")}</span>
+            </section>
+  
+            <h2 className={cn(sectionLabel, "pt-1")}>Top stores</h2>
+            <section aria-label="Top stores" className="rounded-2xl border bg-card p-2">
+              <ul>
+                {a.topMerchants.map((m, i) => {
+                  const tone = STORE_TONES[i % STORE_TONES.length];
+                  const share = (m.value / (a.total || 1)) * 100;
+                  return (
+                    <li key={m.label}>
+                      <button type="button" aria-pressed={filter.store === m.label} onClick={() => set({ store: filter.store === m.label ? "" : m.label })} className={cn("w-full rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", filter.store === m.label && "bg-primary/10")}>
+                        <span className="flex min-h-[44px] items-center gap-3">
+                          <span className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-xs font-bold", tone.badge)} aria-hidden="true">{initials(m.label)}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-[15px] font-semibold">{m.label}</span>
+                              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">{plural(m.visits, "visit")}</span>
+                            </span>
+                            {m.kinds && <span className="block truncate text-[13px] text-muted-foreground">{m.kinds}</span>}
                           </span>
-                          {m.kinds && <span className="block truncate text-[13px] text-muted-foreground">{m.kinds}</span>}
+                          <span className="text-right">
+                            <span className="block text-[15px] font-bold tabular-nums">{money(m.value)}</span>
+                            <span className={cn("block text-[13px] font-semibold tabular-nums", tone.text)}>{Math.round(share * 10) / 10}% of spend</span>
+                          </span>
                         </span>
-                        <span className="text-right">
-                          <span className="block text-[15px] font-bold tabular-nums">{money(m.value)}</span>
-                          <span className={cn("block text-[13px] font-semibold tabular-nums", tone.text)}>{Math.round(share * 10) / 10}% of spend</span>
-                        </span>
-                      </span>
-                      <span className="mt-2 block h-1.5 rounded-full bg-muted" aria-hidden="true"><span className={cn("block h-1.5 rounded-full", tone.bar)} style={{ width: `${Math.min(100, share)}%` }} /></span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-
-          <details className="rounded-2xl border bg-card px-4 py-1">
-            <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold">More detail</summary>
-            <div className="space-y-5 pb-4 pt-1">
-              <div>
-                <h3 className="mb-1 text-sm font-semibold">Average daily spend per trip</h3>
-                {a.perProject.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No project or trip spending in this range.</p>
-                ) : (
+                        <span className="mt-2 block h-1.5 rounded-full bg-muted" aria-hidden="true"><span className={cn("block h-1.5 rounded-full", tone.bar)} style={{ width: `${Math.min(100, share)}%` }} /></span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+  
+            <details className="rounded-2xl border bg-card px-4 py-1">
+              <summary className="flex min-h-[44px] cursor-pointer items-center text-sm font-semibold">More detail</summary>
+              <div className="space-y-5 pb-4 pt-1">
+                <div>
+                  <h3 className="mb-1 text-sm font-semibold">Average daily spend per trip</h3>
+                  {a.perProject.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No project or trip spending in this range.</p>
+                  ) : (
+                    <table className="w-full text-sm">
+                      <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 pr-2 font-medium">Name</th><th className="py-1 pr-2 font-medium">Days</th><th className="py-1 text-right font-medium">Per day</th></tr></thead>
+                      <tbody>
+                        {a.perProject.map((p) => (
+                          <tr key={p.id} className="border-t"><td className="max-w-[10rem] truncate py-2 pr-2">{p.name}</td><td className="py-2 pr-2 tabular-nums">{p.days}</td><td className="py-2 text-right font-semibold tabular-nums">{money(p.perDay)}</td></tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+                <div>
+                  <h3 className="mb-1 text-sm font-semibold">Totals by currency</h3>
                   <table className="w-full text-sm">
-                    <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 pr-2 font-medium">Name</th><th className="py-1 pr-2 font-medium">Days</th><th className="py-1 text-right font-medium">Per day</th></tr></thead>
+                    <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 pr-2 font-medium">Currency</th><th className="py-1 pr-2 text-right font-medium">Original</th><th className="py-1 text-right font-medium">In {BASE_CURRENCY}</th></tr></thead>
                     <tbody>
-                      {a.perProject.map((p) => (
-                        <tr key={p.id} className="border-t"><td className="max-w-[10rem] truncate py-2 pr-2">{p.name}</td><td className="py-2 pr-2 tabular-nums">{p.days}</td><td className="py-2 text-right font-semibold tabular-nums">{money(p.perDay)}</td></tr>
+                      {a.byCurrency.map((c) => (
+                        <tr key={c.currency} className="border-t"><td className="py-2 pr-2">{c.currency}</td><td className="py-2 pr-2 text-right tabular-nums"><Money amount={c.original} currency={c.currency} /></td><td className="py-2 text-right font-semibold tabular-nums">{c.awg == null ? "no rate" : money(c.awg)}</td></tr>
                       ))}
+                      <tr className="border-t-2"><td className="py-2 font-semibold">Total</td><td /><td className="py-2 text-right font-bold tabular-nums">{money(a.total)}</td></tr>
                     </tbody>
                   </table>
-                )}
+                </div>
               </div>
-              <div>
-                <h3 className="mb-1 text-sm font-semibold">Totals by currency</h3>
-                <table className="w-full text-sm">
-                  <thead><tr className="text-left text-xs text-muted-foreground"><th className="py-1 pr-2 font-medium">Currency</th><th className="py-1 pr-2 text-right font-medium">Original</th><th className="py-1 text-right font-medium">In {BASE_CURRENCY}</th></tr></thead>
-                  <tbody>
-                    {a.byCurrency.map((c) => (
-                      <tr key={c.currency} className="border-t"><td className="py-2 pr-2">{c.currency}</td><td className="py-2 pr-2 text-right tabular-nums"><Money amount={c.original} currency={c.currency} /></td><td className="py-2 text-right font-semibold tabular-nums">{c.awg == null ? "no rate" : money(c.awg)}</td></tr>
-                    ))}
-                    <tr className="border-t-2"><td className="py-2 font-semibold">Total</td><td /><td className="py-2 text-right font-bold tabular-nums">{money(a.total)}</td></tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </details>
+            </details>
+          </>
+        )}
         </>
       )}
       <p className="text-xs text-muted-foreground">Only your own personal receipts are counted. Trip expenses stay in the business view.</p>
