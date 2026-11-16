@@ -2794,6 +2794,78 @@ try {
     }
   });
 
+  await test("free Pro month: the admin turns it on, off or for a promotion, and a new account sees days left, a reminder in the last week and one note after it ends", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000); actx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage(); const ap = await actx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/plans`);
+      await ap.getByTestId("pro-trial-link").click();
+      await ap.waitForURL((u) => u.pathname === "/admin/pro-trial");
+      await ap.getByTestId("trial-summary").waitFor();
+      assert(/Every new account gets 30 days/.test(await ap.getByTestId("trial-summary").textContent()), "on by default: " + (await ap.getByTestId("trial-summary").textContent()));
+      // a promotion for one month
+      await ap.getByTestId("trial-mode-dates").click();
+      await ap.getByTestId("trial-from").fill(addDays(today, 10));
+      await ap.getByTestId("trial-to").fill(addDays(today, 40));
+      await ap.getByTestId("trial-days").fill("14");
+      await ap.getByTestId("trial-save").click();
+      for (let i = 0; i < 40 && !fake.table("pro_trial_settings").length; i++) await new Promise((ok) => setTimeout(ok, 250));
+      const row = fake.table("pro_trial_settings")[0];
+      assert(row && row.mode === "dates" && row.from_date === addDays(today, 10) && row.to_date === addDays(today, 40) && Number(row.days) === 14, "the promotion is saved: " + JSON.stringify(row));
+      await ap.getByText(/Closed today/).waitFor();
+      // a last day before the first is refused
+      await ap.getByTestId("trial-to").fill(addDays(today, 1));
+      await ap.getByTestId("trial-save").click();
+      await ap.getByText(/before the first day/).waitFor();
+      // off
+      await ap.getByTestId("trial-mode-off").click();
+      await ap.getByTestId("trial-save").click();
+      await ap.getByText(/Saved\./).waitFor().catch(async (e) => { throw new Error((await ap.locator("main, body").first().innerText()).slice(0, 600)); });
+      assert(fake.table("pro_trial_settings")[0].mode === "off" && fake.table("pro_trial_settings")[0].from_date == null, "off is saved and the dates are cleared");
+      await ap.getByText(/Off\. New accounts start on Free/).waitFor();
+
+      // what a new account sees
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      assert((await page.getByTestId("trial-banner").count()) === 0, "no banner without a free month");
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "trial", ends_on: addDays(today, 20) });
+      await page.goto(`${BASE}/`);
+      const b = page.getByTestId("trial-banner");
+      await b.waitFor();
+      assert((await b.getAttribute("data-state")) === "active" && /20 days left/.test(await page.getByTestId("trial-days-left").textContent()), "day-one banner with 20 days left");
+      fake.table("user_plans")[0].ends_on = addDays(today, 5);
+      await page.goto(`${BASE}/`);
+      await page.waitForFunction(() => document.querySelector("[data-testid=trial-banner]")?.getAttribute("data-state") === "ending");
+      assert(/in 5 days/.test(await b.textContent()), "the reminder says 5 days");
+      assert((await page.getByTestId("trial-keep-pro").getAttribute("href")) === "/personal/pro", "Keep Pro opens the Pro page");
+      assert((await page.getByTestId("trial-keep-pro").boundingBox()).height >= 44, "Keep Pro is at least 44px tall");
+      fake.table("user_plans")[0].ends_on = addDays(today, -1);
+      await page.goto(`${BASE}/`);
+      await page.waitForFunction(() => document.querySelector("[data-testid=trial-banner]")?.getAttribute("data-state") === "ended");
+      assert(/Your free Pro month has ended/.test(await b.textContent()) && /Still free/.test(await b.textContent()), "the ended note says what stays free");
+      await page.getByTestId("trial-close").click();
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("keep-handy").waitFor();
+      await page.waitForTimeout(800);
+      assert((await page.getByTestId("trial-banner").count()) === 0, "the ended note is shown once");
+      // paying turns it into a normal plan: no banner
+      fake.table("user_plans")[0].period = "monthly"; fake.table("user_plans")[0].ends_on = addDays(today, 30);
+      await page.evaluate(() => localStorage.clear());
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("keep-handy").waitFor();
+      await page.waitForTimeout(800);
+      assert((await page.getByTestId("trial-banner").count()) === 0, "a paid plan has no free-month banner");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+    } finally {
+      await ctx.close(); await actx.close();
+      fake.table("user_plans").splice(0); fake.table("pro_trial_settings").splice(0);
+    }
+  });
+
   await test("pro limits: the admin sets them, Free sees the AI scan meter and the used-up notice, the documents limit and locked features, and bills held for Pro arrive when Pro comes on", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

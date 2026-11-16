@@ -16,6 +16,7 @@ import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 import { BudgetCard } from "@/components/personal/BudgetCard";
 import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
 import { IconTile } from "@/components/ui/icon-tile";
+import { TrialBanner } from "@/components/personal/TrialBanner";
 
 const CARD = "rounded-2xl border bg-card p-4 shadow-sm";
 const heading = "text-lg font-bold";
@@ -158,6 +159,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
 
   return (
     <div className="space-y-4">
+      <TrialBanner />
       <KeepHandy testId="keep-handy" />
       <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
         <div className="min-w-0 space-y-4">

@@ -8,14 +8,14 @@ import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Crown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { defaultEndsOn, planSummary, type PlanPeriod, type PlanRow } from "@/lib/plans";
+import { defaultEndsOn, planSummary, type ManualPeriod, type PlanRow } from "@/lib/plans";
 import { explorerAddress, explorerTx, formatBtc } from "@/lib/bitcoin";
 import { METHOD_LABEL, priceFor, userReference, type PayMethod, type PaymentSettings } from "@/lib/payments";
 import { Money } from "@/components/ui/money";
 import Link from "next/link";
 
 type Person = { id: string; email: string | null; name: string; role: string; plan: PlanRow | null };
-type Choice = PlanPeriod | "free";
+type Choice = ManualPeriod | "free";
 type Pending = { id: string; name: string; period: "monthly" | "yearly"; amount: number; currency: string; reference: string; created_at: string; method?: string; btc_address?: string | null; btc_amount?: number | null; btc_rate_usd?: number | null; txid?: string | null };
 
 const chip = "inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border px-3 text-[13.5px] font-bold";
@@ -92,6 +92,7 @@ export default function AdminPlansPage() {
       {notice && <Alert variant="success">{notice}</Alert>}
       <Link href="/admin/payment-settings" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="payment-settings-link">Prices and bank accounts</Link>
       <Link href="/admin/pro-limits" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="pro-limits-link">Pro plan limits</Link>
+      <Link href="/admin/pro-trial" className="inline-flex min-h-11 items-center text-sm font-bold text-primary underline" data-testid="pro-trial-link">Free Pro month for new accounts</Link>
 
       {pending.length > 0 && (
         <section className="space-y-2" data-testid="pay-pending">

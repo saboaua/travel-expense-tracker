@@ -90,6 +90,14 @@ const sections: { href: string; feature: string; title: string; description: str
     tone: "badges",
   },
   {
+    href: "/admin/pro-trial",
+    feature: "admin.only",
+    title: "Free Pro month",
+    description: "Give new accounts Pro for a month. Turn it on, off, or open it only for a promotion between two dates.",
+    icon: Crown,
+    tone: "badges",
+  },
+  {
     href: "/admin/doit",
     feature: "admin.only",
     title: "Do it Aruba Prices",
