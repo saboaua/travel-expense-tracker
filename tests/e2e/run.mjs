@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -98,6 +98,7 @@ fake.setRpcHook(async (name, body, uid, bearer) => {
   if (name === "claim_badge_alert") { if (badgeBest <= badgePushed) return { status: 200, body: 0 }; badgePushed = badgeBest; return { status: 200, body: badgeBest }; }
   if (name === "my_shared_count") return { status: 200, body: sharedCount };
   if (name === "unshare_my_prices") { const n = sharedCount; sharedCount = 0; return { status: 200, body: n }; }
+  if (name === "import_prices") { const t = fake.table("shared_prices"); for (const r of body.rows) t.push({ contributor: `import:${body.batch}`, ...r, month: "2026-11-01" }); return { status: 200, body: body.rows.length }; }
   if (name === "community_search") return { status: 200, body: /coca/i.test(String(body.q)) ? [
     { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "New Ten Sing", price: 1.59, reporters: 7, last_month: "2026-11-01" },
     { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "Ling & Sons", price: 1.45, reporters: 12, last_month: "2026-11-01" },
@@ -1195,7 +1196,7 @@ try {
       const offers = page.getByTestId("price-offer");
       await offers.first().waitFor();
       const text = await page.getByTestId("price-search-results").innerText();
-      assert(text.includes("Your receipt") && text.includes("Community, 12 people") && text.includes("New Ten Sing"), "own receipt and community prices are listed together: " + text);
+      assert(text.includes("Your receipt") && text.includes("Community, confirmed by 12 shoppers") && text.includes("New Ten Sing"), "own receipt and community prices are listed together: " + text);
       assert((await offers.first().innerText()).includes("Best price"), "the cheapest price is marked Best price");
       assert(!text.includes("pat@example.com"), "nobody is named");
       await page.goto(`${BASE}/profile`);
@@ -2064,6 +2065,52 @@ try {
       await page.goto(`${BASE}/admin/supermarkets`);
       await page.waitForURL((u) => !u.pathname.startsWith("/admin"));
     } finally { await ctx.close(); await actx.close(); }
+  });
+
+  await test("community import: an admin downloads the template, previews, imports (typos left out), the same file is refused, and a price already there counts as one more shopper", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    actx.setDefaultTimeout(60_000); ctx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage(); const page = await ctx.newPage();
+    const SP = fake.table("shared_prices"); const IM = fake.table("price_imports");
+    const csv1 = ["Store,Product,Price,Currency,Unit", "EXAMPLE Ling & Sons,Coca-Cola 330 ml can,1.85,AWG,", "Ling & Sons,Coca-Cola 330 ml can,1.85,AWG,", "Super Food Plaza,Coca-Cola 330 ml can,1.95,AWG,", "Cost-U-Less,Coca-Cola 330 ml can,1.79,AWG,", "New Ten Sing,Coca-Cola 330 ml can,18.5,AWG,", "Super Food Plaza,Tomatoes,4.95,AWG,kg", "Super Food Plaza,Milk 1 L,abc,AWG,", ",Bread,2,AWG,"].join("\n");
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/settings`);
+      await ap.getByRole("link", { name: /Community Prices Import/ }).waitFor();
+      await ap.goto(`${BASE}/admin/community-prices`);
+      await ap.getByRole("heading", { name: "Community prices import" }).waitFor();
+      const r = await ap.evaluate(async () => { const x = await fetch("/api/admin/community-import?template=1"); const b = new Uint8Array(await x.arrayBuffer()); return { ok: x.ok, head: String.fromCharCode(b[0], b[1]) }; });
+      assert(r.ok && r.head === "PK", "the template is a real .xlsx");
+      await ap.getByTestId("prices-file").setInputFiles({ name: "p.csv", mimeType: "text/csv", buffer: Buffer.from(csv1) });
+      const prev = ap.getByTestId("prices-preview");
+      await prev.waitFor();
+      const t = await prev.innerText();
+      assert(/Rows in the file\s*8/.test(t) && /Will be added\s*4/.test(t) && /far from the usual price[^\n]*\s*1/.test(t) && /EXAMPLE rows\s*1/.test(t), "preview counts: " + t);
+      assert(SP.length === 0, "a preview saves nothing");
+      await ap.getByTestId("prices-import").click();
+      await ap.getByTestId("prices-done").waitFor();
+      assert(SP.length === 4 && !SP.some((x) => x.price === 18.5), "four prices stored, the typo is not: " + JSON.stringify(SP.map((x) => x.price)));
+      assert(new Set(SP.map((x) => x.contributor)).size === 1 && SP[0].product_key.startsWith("AWG|"), "one upload is one shopper, with the app's product key");
+      assert(IM.length === 1, "the file is remembered");
+      // the same file again is refused
+      await ap.getByTestId("prices-file").setInputFiles({ name: "p2.csv", mimeType: "text/csv", buffer: Buffer.from(csv1) });
+      await ap.getByText(/already imported/).waitFor();
+      assert(SP.length === 4 && IM.length === 1, "nothing was counted twice");
+      // a price already there is one more shopper
+      await ap.getByTestId("prices-file").setInputFiles({ name: "p3.csv", mimeType: "text/csv", buffer: Buffer.from("Store,Product,Price,Currency\nLing & Sons,Coca-Cola 33CL,1.85,AWG") });
+      const t2 = await ap.getByTestId("prices-preview").innerText();
+      assert(/Already there, counted as one more shopper\s*1/.test(t2) && /New prices\s*0/.test(t2), "already there: " + t2);
+      await ap.getByTestId("prices-import").click();
+      await ap.getByTestId("prices-done").waitFor();
+      assert(SP.length === 5 && new Set(SP.map((x) => x.contributor)).size === 2, "a second upload is a second shopper, nothing removed");
+      // a regular person cannot reach it
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const code = await page.evaluate(async () => (await fetch("/api/admin/community-import")).status);
+      assert(code === 403 || code === 401, `a regular user is refused by the API (got ${code})`);
+    } finally { SP.splice(0, SP.length); IM.splice(0, IM.length); await ctx.close(); await actx.close(); }
   });
 
   await test("supermarket places: an admin finds a wrong point, fixes it, removes a duplicate, and a later import keeps the fix and does not bring the removed one back", async () => {

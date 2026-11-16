@@ -1,11 +1,11 @@
 /**
  * Best Prices: one search over three sources, so the cheapest place is easy to see.
  *  - your own receipts (latest price at each store)
- *  - community prices (the middle price 3 or more people reported; works whether or not you share)
+ *  - community prices (the middle price shoppers paid, from the first shopper; Confirmed from 3; works whether or not you share)
  *  - online shop prices Lifolio keeps (store websites and the admin's imported price lists)
  * Pure, so it is unit-tested.
  */
-import { groupCommunity, productKey, type CommunityRow } from "@/lib/personal/community";
+import { groupCommunity, productKey, shopperLabel, type CommunityRow } from "@/lib/personal/community";
 import { productWords, type Product } from "@/lib/personal/price-compare";
 import type { OnlineMatch } from "@/lib/store-prices";
 import type { ExternalPrice } from "@/lib/personal/basket";
@@ -46,7 +46,7 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
 
   for (const c of groupCommunity(community.filter((r) => r.currency === currency))) {
     const g = put(c.key, c.name, c.size);
-    for (const s of c.stores) g.offers.push({ store: s.store, price: s.price, source: "community", note: `Community, ${s.reporters} people` });
+    for (const s of c.stores) g.offers.push({ store: s.store, price: s.price, source: "community", note: `Community, ${shopperLabel(s.reporters, s.confirmed).toLowerCase()}` });
   }
 
   for (const m of online) {
@@ -74,7 +74,7 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
 
 /**
  * Community and online prices for the products on a list, as real prices to fill the gaps in the basket totals. Community rows are only
- * ones 3 or more people reported (the database already filters those); online matches only when the shop item is the same product.
+ * ones the database returns (the last 3 months, from one shopper up); online matches only when the shop item is the same product.
  */
 export function externalPrices(community: CommunityRow[], online: Record<string, OnlineMatch[]>, currency: string): ExternalPrice[] {
   const out: ExternalPrice[] = [];

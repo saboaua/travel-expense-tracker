@@ -18,7 +18,7 @@ import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/li
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
-import { groupCommunity, productKey, type CommunityRow } from "@/lib/personal/community";
+import { groupCommunity, productKey, shopperLabel, type CommunityRow } from "@/lib/personal/community";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -100,12 +100,12 @@ export function GroceryPrices() {
     return () => { off = true; };
   }, [online, commKeys]);
   const community = useMemo(() => {
-    const m = new Map<string, { store: string; price: number; reporters: number }>();
+    const m = new Map<string, { store: string; price: number; reporters: number; confirmed: boolean }>();
     const by = new Map(groupCommunity(commRows).map((g) => [g.key, g]));
     for (const p of inCur) {
       const low = by.get(productKey(p))?.stores[0];
       const paid = p.stores[0]?.latest.price ?? p.stats.last;
-      if (low && low.price < paid) m.set(p.key, { store: low.store, price: low.price, reporters: low.reporters });
+      if (low && low.price < paid) m.set(p.key, { store: low.store, price: low.price, reporters: low.reporters, confirmed: low.confirmed });
     }
     return m;
   }, [commRows, inCur]);
@@ -338,7 +338,7 @@ function StoreRow({ s, i, max, fmt, cur, unit }: { s: StoreSummary; i: number; m
   );
 }
 
-function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; cur: string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
+function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; cur: string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number; confirmed: boolean } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
   const multi = p.stores.length > 1;
   const best = p.stores[0];
   const max = Math.max(...p.stores.map((s) => s.latest.price));
@@ -365,7 +365,7 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
           {multi && <p className="mt-1.5 text-[13px] text-muted-foreground sm:hidden" data-testid="price-best-store">Best price at {best.store}</p>}
           {community && (
             <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1.5" data-testid="community-line">
-              <span className={`${chipBase} bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200`}>Community</span><span className="text-sm font-semibold">{community.store} {fmt(community.price)}</span><span className="text-[13px] text-muted-foreground">{community.reporters} people</span>
+              <span className={`${chipBase} bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200`}>Community</span><span className="text-sm font-semibold">{community.store} {fmt(community.price)}</span><span className={`text-[13px] ${community.confirmed ? "font-semibold text-emerald-700 dark:text-emerald-400" : "text-muted-foreground"}`} data-testid="community-shoppers">{community.confirmed ? "✓ " : ""}{shopperLabel(community.reporters, community.confirmed)}</span>
             </div>
           )}
           {onlineReady && (

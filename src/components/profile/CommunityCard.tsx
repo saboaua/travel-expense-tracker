@@ -23,6 +23,7 @@ export function CommunityCard() {
   const [last, setLast] = useState<{ at: string | null; count: number | null; error: boolean } | null>(null);
   const [badge, setBadge] = useState<BadgeState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [ruleNote, setRuleNote] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -102,6 +103,13 @@ export function CommunityCard() {
     setBusy(false);
   };
 
+  // People who were already sharing under the old rule (a price showed only after 3 people) see the new rule once
+  useEffect(() => {
+    if (on !== true) return;
+    try { setRuleNote(localStorage.getItem("community-rule-v2") !== "seen"); } catch { /* storage can be blocked: just no note */ }
+  }, [on]);
+  const dismissRule = () => { setRuleNote(false); try { localStorage.setItem("community-rule-v2", "seen"); } catch { /* fine */ } };
+
   const withdraw = async () => {
     setBusy(true); setErr(null); setMsg(null);
     const { data, error } = await createClient().rpc("unshare_my_prices");
@@ -135,6 +143,12 @@ export function CommunityCard() {
             <span className="sr-only">{on ? "On" : "Off"}</span>
           </button>
         </div>
+        {on && ruleNote && (
+          <Alert variant="info">
+            <span data-testid="community-rule-note"><b>Sharing changed.</b> Before, a price showed only after 3 people reported it. Now it shows right away, and 3 shoppers at about the same price earn the Confirmed badge. Your sharing stays as it is. Switch it off here if you prefer.</span>
+            <Button variant="outline" className="mt-2 h-10" onClick={dismissRule} data-testid="community-rule-ok">Got it</Button>
+          </Alert>
+        )}
         {on && <NightlyStatus last={last} />}
         {badge && <BadgePanel badge={badge} on={on === true} />}
         <p className="text-sm text-muted-foreground">Your prices join a shared price list that nobody can trace back to you, so others can see when an item is cheaper somewhere else.</p>
@@ -143,7 +157,8 @@ export function CommunityCard() {
           <li><b className="text-emerald-600">✓</b> Read each night: if sharing is on, Lifolio reads your latest prices on the server to build that list. Receipts are never copied or stored by it.</li>
           <li><b className="text-red-600">✕</b> Never shared: your name, email, receipts, dates, location or totals.</li>
           <li><b className="text-emerald-600">✓</b> Only prices from the last 60 days are shared.</li>
-          <li><b className="text-emerald-600">✓</b> A price shows to others only after 3 or more people report it.</li>
+          <li><b className="text-emerald-600">✓</b> A price shows to others after the first shopper. It gets a Confirmed badge once 3 shoppers paid about the same price.</li>
+          <li><b className="text-emerald-600">✓</b> Prices older than 3 months are not shown.</li>
           <li><b className="text-emerald-600">✓</b> Turn it off any time and delete what you shared.</li>
         </ul>
         {on && (

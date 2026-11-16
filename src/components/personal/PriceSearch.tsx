@@ -59,7 +59,7 @@ export function PriceSearch({ products, currency }: { products: Product[]; curre
         <Button type="submit" className="h-10" disabled={busy || q.trim().length < 2}>{busy ? "…" : "Search"}</Button>
       </form>
       {err && <Alert variant="info">{err}</Alert>}
-      {groups && groups.length === 0 && <p className="text-sm text-muted-foreground" data-testid="price-search-empty">No price found for “{asked}”. Community prices appear once 3 people have reported them.</p>}
+      {groups && groups.length === 0 && <p className="text-sm text-muted-foreground" data-testid="price-search-empty">No price found for “{asked}”. Community prices appear as soon as one shopper has paid for the item.</p>}
       <div className="space-y-4" data-testid="price-search-results">
         {groups?.map((g) => (
           <div key={g.key} className="space-y-1.5">
@@ -73,7 +73,7 @@ export function PriceSearch({ products, currency }: { products: Product[]; curre
           </div>
         ))}
       </div>
-      <p className="text-xs text-muted-foreground">Includes your receipts, community prices (the middle price of 3 or more people, nobody can be identified) and online price lists. Works whether or not you share your own prices.</p>
+      <p className="text-xs text-muted-foreground">Includes your receipts, community prices (the middle price shoppers paid, nobody can be identified) and online price lists. Works whether or not you share your own prices.</p>
     </CardContent></Card>
   );
 }

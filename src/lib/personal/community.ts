@@ -39,15 +39,25 @@ export function oldPriceCount(products: Product[], now: Date): number {
   return n;
 }
 
-export type CommunityRow = { product_key: string; product_name: string; size_label: string | null; currency: string; store_name: string; price: number; reporters: number; last_month: string };
-export type CommunityProduct = { key: string; name: string; size: string | null; currency: string; stores: { store: string; price: number; reporters: number; lowest: boolean }[] };
+/** `reporters` is how many different shoppers paid about that price. `confirmed` is true when 3 or more paid within 5% of the middle price. */
+export type CommunityRow = { product_key: string; product_name: string; size_label: string | null; currency: string; store_name: string; price: number; reporters: number; last_month: string; confirmed?: boolean };
+/** Confirmed before the database said so (an older database): 3 or more shoppers. */
+export const isConfirmed = (r: { reporters: number; confirmed?: boolean }) => r.confirmed ?? r.reporters >= 3;
+/** What a price shows under it: "Seen by 1 shopper", "Seen by 2 shoppers", "Confirmed by 5 shoppers", or "3 shoppers, prices differ". */
+export function shopperLabel(reporters: number, confirmed: boolean): string {
+  const n = Math.max(1, Math.round(reporters));
+  if (confirmed) return `Confirmed by ${n} shoppers`;
+  if (n >= 3) return `${n} shoppers, prices differ`;
+  return `Seen by ${n} shopper${n === 1 ? "" : "s"}`;
+}
+export type CommunityProduct = { key: string; name: string; size: string | null; currency: string; stores: { store: string; price: number; reporters: number; confirmed: boolean; lowest: boolean }[] };
 
 /** Group the rows the database returned by product, cheapest store first; the lowest is marked. */
 export function groupCommunity(rows: CommunityRow[]): CommunityProduct[] {
   const by = new Map<string, CommunityProduct>();
   for (const r of rows) {
     const g = by.get(`${r.product_key}`) ?? { key: r.product_key, name: r.product_name, size: r.size_label, currency: r.currency, stores: [] };
-    g.stores.push({ store: r.store_name, price: Number(r.price), reporters: r.reporters, lowest: false });
+    g.stores.push({ store: r.store_name, price: Number(r.price), reporters: r.reporters, confirmed: isConfirmed(r), lowest: false });
     by.set(r.product_key, g);
   }
   const out = [...by.values()];

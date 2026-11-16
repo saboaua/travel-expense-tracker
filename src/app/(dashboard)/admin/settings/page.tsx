@@ -91,6 +91,14 @@ const sections: { href: string; feature: string; title: string; description: str
     tone: "place",
   },
   {
+    href: "/admin/community-prices",
+    feature: "admin.only",
+    title: "Community Prices Import",
+    description: "Add supermarket prices from an Excel file so people can see the best price. Each upload counts as one more shopper.",
+    icon: FileSpreadsheet,
+    tone: "shop",
+  },
+  {
     href: "/admin/account-requests",
     feature: "admin.only",
     title: "Account Requests",

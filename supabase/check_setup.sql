@@ -61,6 +61,7 @@ need_cols(tbl, col, fix) as (values
   ('profiles','share_prices','migration_shared_prices.sql'),
   ('shared_prices','price','migration_shared_prices.sql'),
   ('shared_prices','contributor','migration_shared_prices.sql'),
+  ('price_imports','file_hash','migration_community_confirm.sql'),
   ('price_share_secret','salt','migration_shared_prices.sql'),
   ('account_requests','phone','migration_account_requests.sql'),
   ('account_requests','status','migration_account_requests.sql'),
@@ -132,6 +133,7 @@ need_tables(tbl, fix) as (values
   ('supermarket_places','migration_supermarket_places.sql'),
   ('supermarket_places_removed','migration_places_fix.sql'),
   ('shared_prices','migration_shared_prices.sql'),
+  ('price_imports','migration_community_confirm.sql'),
   ('price_share_secret','migration_shared_prices.sql'),
   ('account_requests','migration_account_requests.sql'),
   ('invite_links','migration_invites.sql'),
@@ -201,12 +203,16 @@ other_checks as (
   select 'function', f.fn,
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = f.fn) then 'OK' else 'MISSING' end,
          f.fix
-  from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('my_shared_count','migration_shared_prices.sql'),
+  from (values ('share_prices','migration_shared_prices.sql'), ('community_search','migration_shared_prices.sql'), ('import_prices','migration_community_confirm.sql'), ('my_shared_count','migration_shared_prices.sql'),
                ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
                ('sharing_activity_export','migration_sharing_safety.sql'),
                ('share_prices_for','migration_nightly_share.sql'), ('share_failed_for','migration_nightly_share.sql'), ('claim_badge_alert_for','migration_nightly_share.sql'), ('my_badge_for','migration_nightly_share.sql'),
                ('my_badge','migration_badges.sql'), ('ack_badge','migration_badges.sql'), ('claim_badge_alert','migration_badges.sql'), ('_badge_level','migration_badges.sql'),
                ('my_invite','migration_invites.sql'), ('reset_my_invite','migration_invites.sql'), ('set_invite_show_name','migration_invites.sql')) as f(fn, fix)
+  union all
+  select 'function', 'community_search shows Confirmed',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and pg_get_function_result(p.oid) like '%confirmed%') then 'OK' else 'MISSING' end,
+         'migration_community_confirm.sql'
   union all
   select 'privacy', 'shared_prices: nobody can read it directly',
          case when to_regclass('public.shared_prices') is null then 'MISSING'
