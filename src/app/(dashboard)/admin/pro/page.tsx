@@ -34,7 +34,7 @@ export default function AdminProPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
-      <BackLink href="/admin/settings">Admin</BackLink>
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Pro plan" description="Who has Pro, how they pay, and what Free gets" />
       {error && <Alert>{error}</Alert>}
       {!o && !error && <p className="text-sm text-muted-foreground">Loading…</p>}

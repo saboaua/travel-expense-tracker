@@ -121,7 +121,7 @@ export function IptvList() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 pb-28 md:p-8">
-      <BackLink href="/admin/settings">Admin</BackLink>
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">IPTV clients</h1>
       <p className="text-sm text-muted-foreground">Only admins see this page. You add and renew clients here; clients never see each other.</p>
       {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</p>}

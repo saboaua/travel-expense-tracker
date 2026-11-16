@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Eye, Pencil, Plus, Trash2, ExternalLink } from "lucide-react";
@@ -104,6 +104,7 @@ export default function AdminHelpPage() {
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-24 md:p-8">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader
         title="Help topics"
         description="Write the guides every user sees under Help in the menu."

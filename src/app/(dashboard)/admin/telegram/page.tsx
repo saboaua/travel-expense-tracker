@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { Send, BookOpen } from "lucide-react";
@@ -68,6 +68,7 @@ export default function AdminTelegramPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Telegram" description={<>Connect the bot here. Nothing needs to be set in Vercel.</>} />
 
       <AccordionGroup>

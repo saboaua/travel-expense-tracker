@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FileSpreadsheet } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -61,6 +61,7 @@ export default function AdminDoitPage() {
   const sk = preview?.skipped;
   return (
     <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Do it Aruba prices" description={<>Imported from the exported Excel file, not read live. Shown in the Price tracker as an online store.</>} />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success">{done}</Alert>}

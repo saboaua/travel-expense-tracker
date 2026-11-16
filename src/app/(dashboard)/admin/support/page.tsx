@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { formatDateTime } from "@/lib/utils";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
@@ -89,6 +89,7 @@ export default function AdminSupportPage() {
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Support Requests" description={<>Messages sent from the Contact Support form on the login screen.</>} />
 
       {error && <Alert>{error}</Alert>}

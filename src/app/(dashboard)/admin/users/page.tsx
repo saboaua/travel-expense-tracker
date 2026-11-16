@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs } from "@/components/ui/tabs";
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { scrollAreaOrWindow } from "@/components/layout/ScrollArea";
 import { formatDateTime } from "@/lib/utils";
 import { Select } from "@/components/ui/select";
@@ -261,6 +261,7 @@ export default function AdminUsersPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="User Roles & Users" description="Create accounts, choose each person's role, and decide what each role can use. Public signup is disabled." />
 
       {canAssignRole(myRole) && (

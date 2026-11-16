@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
@@ -76,6 +76,7 @@ export default function AdminCurrenciesPage() {
 
   return (
     <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Currencies" description={<>Turn currencies on or off. Only enabled ones appear when adding a trip or expense.</>} />
 
       {error && <Alert>{error}</Alert>}

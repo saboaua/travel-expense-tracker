@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, MapPin } from "lucide-react";
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -58,6 +58,7 @@ export default function AdminSupermarketsPage() {
   const sk = preview?.skipped;
   return (
     <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Supermarket places" description={<>Shops with their GPS point, shown on the Best store map for everyone. A receipt shows at the shop with the same name.</>} />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success">{done}</Alert>}

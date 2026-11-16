@@ -1,6 +1,6 @@
 "use client";
 
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { applyBrandColor } from "@/lib/brand-color";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
@@ -147,6 +147,7 @@ export default function AdminBrandingPage() {
 
   return (
     <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Branding" description={<>Logo and colors shown on login and in the app header</>} />
 
       <form onSubmit={handleSave} className="space-y-6">

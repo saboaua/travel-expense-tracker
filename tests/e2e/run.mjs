@@ -2867,6 +2867,25 @@ try {
     }
   });
 
+  await test("global settings: every page opened from it has a Global Settings link at the top that goes back", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      for (const path of ["branding", "currencies", "categories", "help", "support", "telegram", "iptv", "pro", "doit", "supermarkets", "account-requests", "users"]) {
+        await ap.goto(`${BASE}/admin/${path}`);
+        const back = ap.getByRole("link", { name: "Global Settings" }).first();
+        await back.waitFor();
+        const box = await back.boundingBox();
+        assert(box && box.y < 160, `${path}: the link is at the top (y ${box && box.y})`);
+        await back.click();
+        await ap.waitForURL((u) => u.pathname === "/admin/settings");
+      }
+    } finally { await actx.close(); }
+  });
+
   await test("admin Pro plan: one tile with payments waiting, an overview with live numbers, chips between the four parts, and the old addresses still work", async () => {
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     actx.setDefaultTimeout(60_000);

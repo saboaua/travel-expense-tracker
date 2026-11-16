@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { PageHeader } from "@/components/ui/page-header";
+import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -38,6 +38,7 @@ export default function AccountRequestsPage() {
   const waiting = rows?.filter((r) => r.status === "new").length ?? 0;
   return (
     <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-4">
+      <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Account requests" description={rows ? `${waiting} waiting` : "People who asked for an account on the sign-in screen"} />
       {error && <Alert variant="error">{error}</Alert>}
       {rows?.length === 0 && <Alert variant="info">No requests yet. They appear here when someone uses Request one on the sign-in screen.</Alert>}
