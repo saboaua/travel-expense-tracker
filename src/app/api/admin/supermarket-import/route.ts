@@ -81,12 +81,24 @@ export async function POST(request: Request) {
   const summary = { total: parsed.total, kept: parsed.rows.length, skipped: parsed.skipped, sample: parsed.rows.slice(0, 5).map((r) => ({ name: r.name, lat: r.lat, lng: r.lng })) };
   if (mode === "preview") return NextResponse.json({ mode, ...summary });
 
+  // Places fixed by hand keep their fixed point, and places removed by hand stay removed. Before migration_places_fix.sql there is nothing to keep.
+  const keep = new Set<string>();
+  const gone = new Set<string>();
+  const at = (k: string, lat: number, lng: number) => `${k}|${lat.toFixed(5)}|${lng.toFixed(5)}`;
+  let handled = true;
+  const fx = await a.admin.from("supermarket_places").select("name_key, lat, lng, orig_key, orig_lat, orig_lng").eq("fixed", true);
+  if (fx.error) handled = false;
+  else for (const r of fx.data ?? []) { keep.add(at(r.name_key, r.lat, r.lng)); if (r.orig_key && r.orig_lat != null && r.orig_lng != null) keep.add(at(r.orig_key, r.orig_lat, r.orig_lng)); }
+  const rm = await a.admin.from("supermarket_places_removed").select("name_key, lat, lng");
+  if (!rm.error) for (const r of rm.data ?? []) gone.add(at(r.name_key, r.lat, r.lng));
+  const rows = handled ? parsed.rows.filter((r) => { const k = at(r.name_key, r.lat, r.lng); return !keep.has(k) && !gone.has(k); }) : parsed.rows;
   const stamp = new Date().toISOString();
-  for (let i = 0; i < parsed.rows.length; i += 500) {
-    const { error } = await a.admin.from("supermarket_places").upsert(parsed.rows.slice(i, i + 500).map((r) => ({ ...r, imported_at: stamp })), { onConflict: "name_key,lat,lng" });
+  for (let i = 0; i < rows.length; i += 500) {
+    const { error } = await a.admin.from("supermarket_places").upsert(rows.slice(i, i + 500).map((r) => ({ ...r, imported_at: stamp })), { onConflict: "name_key,lat,lng" });
     if (error) return NextResponse.json({ error: /relation|schema cache/i.test(error.message) ? "Run supabase/migration_supermarket_places.sql first." : error.message }, { status: 500 });
   }
-  const { data: gone } = await a.admin.from("supermarket_places").delete().lt("imported_at", stamp).select("id");
-  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "supermarket_places", entityId: "places", details: { kept: summary.kept, removed: gone?.length ?? 0 } }).catch(() => {});
-  return NextResponse.json({ mode, ...summary, removed: gone?.length ?? 0, importedAt: stamp });
+  const old = a.admin.from("supermarket_places").delete().lt("imported_at", stamp);
+  const { data: gone2 } = await (handled ? old.eq("fixed", false) : old).select("id");
+  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "supermarket_places", entityId: "places", details: { kept: summary.kept, removed: gone2?.length ?? 0 } }).catch(() => {});
+  return NextResponse.json({ mode, ...summary, removed: gone2?.length ?? 0, importedAt: stamp });
 }

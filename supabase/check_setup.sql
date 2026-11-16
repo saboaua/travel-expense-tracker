@@ -81,6 +81,9 @@ need_cols(tbl, col, fix) as (values
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
   ('supermarket_places','name_key','migration_supermarket_places.sql'),
+  ('supermarket_places','fixed','migration_places_fix.sql'),
+  ('supermarket_places','orig_lat','migration_places_fix.sql'),
+  ('supermarket_places','orig_key','migration_places_fix.sql'),
   -- Price tracker
   ('price_checks','product','migration_price_notes.sql'),
   ('price_checks','photo_path','migration_price_notes.sql')
@@ -123,6 +126,7 @@ need_tables(tbl, fix) as (values
   ('grocery_item_rules','migration_shopping_categories.sql'),
   ('store_locations','migration_basket.sql'),
   ('supermarket_places','migration_supermarket_places.sql'),
+  ('supermarket_places_removed','migration_places_fix.sql'),
   ('shared_prices','migration_shared_prices.sql'),
   ('price_share_secret','migration_shared_prices.sql'),
   ('account_requests','migration_account_requests.sql'),

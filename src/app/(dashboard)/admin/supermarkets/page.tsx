@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PlacesFix } from "@/components/admin/PlacesFix";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
 
@@ -68,6 +69,8 @@ export default function AdminSupermarketsPage() {
         </CardContent>
       </Card>
 
+      <PlacesFix onChanged={load} />
+
       <Card>
         <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden="true" />How to do it</CardTitle></CardHeader>
         <CardContent className="space-y-3 text-sm">
@@ -78,7 +81,7 @@ export default function AdminSupermarketsPage() {
             <li>Get the numbers from <b>openstreetmap.org</b> (right-click the shop, Show address) or from your phone&apos;s GPS while standing at the shop.</li>
             <li>Delete the two EXAMPLE rows (they are skipped anyway), save as .xlsx or .csv, and choose it below.</li>
           </ol>
-          <p className="text-xs text-muted-foreground">Do not copy coordinates from Google Maps: its terms do not allow keeping them. Importing replaces the whole saved list, so keep every shop in the file.</p>
+          <p className="text-xs text-muted-foreground">Do not copy coordinates from Google Maps: its terms do not allow keeping them. Importing replaces the saved list, so keep every shop in the file. Places you fixed by hand are kept, and places you removed stay removed.</p>
           <a href="/api/admin/supermarket-import?template=1" download className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold hover:bg-muted" data-testid="places-template"><Download className="h-4 w-4" aria-hidden="true" />Download the example file</a>
         </CardContent>
       </Card>

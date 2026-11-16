@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -2055,6 +2055,78 @@ try {
       await page.goto(`${BASE}/admin/supermarkets`);
       await page.waitForURL((u) => !u.pathname.startsWith("/admin"));
     } finally { await ctx.close(); await actx.close(); }
+  });
+
+  await test("supermarket places: an admin finds a wrong point, fixes it, removes a duplicate, and a later import keeps the fix and does not bring the removed one back", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    actx.setDefaultTimeout(60_000); ctx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage(); const page = await ctx.newPage();
+    const P = fake.table("supermarket_places");
+    const mk = (n, name, lat, lng, extra = {}) => ({ id: `5a000000-0000-4000-8000-00000000000${n}`, name, name_key: name.toLowerCase(), address: null, lat, lng, fixed: false, imported_at: "2026-11-01T00:00:00.000Z", ...extra });
+    P.push(mk(1, "Super Food Plaza", 12.5301, -70.0261, { fixed: true, orig_lat: 12.53, orig_lng: -70.02, orig_key: "super food plaza" }), mk(2, "Ling & Sons Noord", 52.5186, -70.0358, { address: "Noord" }), mk(3, "Cost-U-Less", 12.5186, -70.0358), mk(4, "Ling & Sons Sasaki", 12.5186, -70.0358));
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/supermarkets`);
+      await ap.getByTestId("places-list").waitFor();
+      assert((await ap.getByTestId("place-row").count()) === 4, "all four places are listed");
+      await ap.getByTestId("place-flag-outside").waitFor();
+      assert((await ap.getByTestId("place-flag-same").count()) === 2, "both shops on one point are flagged");
+      assert(/Same point as Ling/.test(await ap.getByTestId("place-flag-same").first().textContent()), "the flag names the other shop");
+      // the filters and the search
+      await ap.getByTestId("places-filter-outside").click();
+      await ap.getByText("Showing 1 of 1").waitFor();
+      await ap.getByTestId("places-filter-all").click();
+      await ap.getByTestId("places-search").fill("cost");
+      await ap.getByText("Showing 1 of 1").waitFor();
+      await ap.getByTestId("places-search").fill("");
+      await ap.getByTestId("places-filter-fixed").click();
+      await ap.getByText("Showing 1 of 1").waitFor();
+      await ap.getByTestId("places-filter-all").click();
+      // fix the one outside Aruba: bad numbers are refused, a pasted pair fills both boxes
+      await ap.getByTestId("place-row").filter({ hasText: "Noord" }).getByTestId("place-fix").click();
+      await ap.getByTestId("place-edit").waitFor();
+      await ap.getByTestId("fix-map").waitFor();
+      await ap.locator("#fix-lat").fill("95");
+      await ap.getByText("Latitude must be between -90 and 90.").waitFor();
+      assert(await ap.getByTestId("place-save").isDisabled(), "Save is off while the numbers are wrong");
+      await ap.locator("#fix-lat").fill("12.5412, -70.0268");
+      await ap.waitForFunction(() => document.querySelector("#fix-lng")?.value === "-70.0268");
+      assert((await ap.locator("#fix-lat").inputValue()) === "12.5412", "a pasted pair is split into both boxes");
+      await ap.getByTestId("place-save").click();
+      await ap.getByText("Ling & Sons Noord was fixed.").waitFor();
+      const fixedRow = P.find((r) => r.id.endsWith("2"));
+      assert(fixedRow.lat === 12.5412 && fixedRow.lng === -70.0268 && fixedRow.fixed === true && fixedRow.orig_lat === 52.5186 && fixedRow.orig_key === "ling & sons noord", "the point is saved and the file's own point is remembered: " + JSON.stringify(fixedRow));
+      await ap.getByTestId("place-row").filter({ hasText: "Noord" }).getByTestId("place-fixed").waitFor();
+      assert((await ap.getByTestId("place-flag-outside").count()) === 0, "the warning is gone");
+      assert(fake.table("audit_logs").some((r) => r.action === "places.fixed" && r.details.to === "12.5412, -70.0268"), "the fix is in the audit trail");
+      // remove a duplicate: it asks first
+      await ap.getByTestId("place-row").filter({ has: ap.getByText("Ling & Sons Sasaki", { exact: true }) }).getByTestId("place-remove").click();
+      await ap.getByRole("alertdialog").getByRole("button", { name: "Keep it" }).click();
+      assert(P.length === 4, "Keep it removes nothing");
+      await ap.getByTestId("place-row").filter({ has: ap.getByText("Ling & Sons Sasaki", { exact: true }) }).getByTestId("place-remove").click();
+      await ap.getByRole("alertdialog").getByRole("button", { name: "Remove" }).click();
+      await ap.getByText("Ling & Sons Sasaki was removed.").waitFor();
+      assert(P.length === 3 && fake.table("supermarket_places_removed").some((r) => r.name_key === "ling & sons sasaki" && r.lat === 12.5186), "the place is gone and remembered as removed");
+      await ap.waitForFunction(() => document.querySelectorAll("[data-testid=place-flag-same]").length === 0); // the other shop is no longer on a shared point
+      // a later import keeps the fix, does not bring the removed one back, adds a new shop and drops an old one
+      const csv = "Name,Latitude,Longitude\nLing & Sons Noord,52.5186,-70.0358\nLing & Sons Sasaki,12.5186,-70.0358\nNewmart,12.51,-70.03\n";
+      await ap.getByTestId("places-file").setInputFiles({ name: "p.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
+      await ap.getByTestId("places-import").click();
+      await ap.getByText(/Imported 3 supermarket places/).waitFor();
+      const names = P.map((r) => r.name).sort();
+      assert(JSON.stringify(names) === JSON.stringify(["Ling & Sons Noord", "Newmart", "Super Food Plaza"]), "the import keeps fixed places, adds Newmart, drops Cost-U-Less and does not bring Sasaki back: " + names.join(" | "));
+      assert(P.find((r) => r.name === "Ling & Sons Noord").lat === 12.5412, "the fixed point survived the import");
+      // only an admin can use the API
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const codes = await page.evaluate(async () => (await Promise.all([fetch("/api/admin/supermarket-places"), fetch("/api/admin/supermarket-places", { method: "PUT", headers: { "Content-Type": "application/json" }, body: "{}" }), fetch("/api/admin/supermarket-places", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: "{}" })])).map((r) => r.status));
+      assert(codes.every((c) => c === 401 || c === 403), "a regular user is refused: " + codes.join(","));
+    } finally {
+      await ctx.close(); await actx.close();
+      for (const t of ["supermarket_places", "supermarket_places_removed"]) fake.table(t).splice(0);
+    }
   });
 
   await test("online: shop prices sit beside what you paid, an unsure match asks once, and nothing is added to spending", async () => {
