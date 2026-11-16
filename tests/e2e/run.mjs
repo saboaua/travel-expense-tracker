@@ -1294,7 +1294,7 @@ try {
       assert(req && req.status === "pending" && req.period === "yearly" && Number(req.amount) === 120 && req.reference === ref, "a pending request is saved: " + JSON.stringify(req));
       assert(fake.table("user_plans").length === 0, "Pro is not on yet");
       // the admin sees it and confirms
-      await ap.goto(`${BASE}/admin/plans`);
+      await ap.goto(`${BASE}/admin/pro/payments`);
       await ap.getByTestId("pay-request").waitFor();
       assert(/Pat Tester/.test(await ap.getByTestId("pay-request").innerText()) && new RegExp(ref).test(await ap.getByTestId("pay-request").innerText()), "the request shows the name and reference");
       await ap.getByTestId("pay-confirm").click();
@@ -1307,6 +1307,7 @@ try {
       await page.getByTestId("pro-active").waitFor();
       // adding a plan by hand with the money received is kept in the ledger
       fake.table("user_plans").splice(0);
+      await ap.goto(`${BASE}/admin/pro/people`);
       await ap.getByTestId("plan-person-pat@example.com").click();
       await ap.getByRole("radio", { name: "Monthly" }).click();
       await ap.getByTestId("plan-got-paid").check();
@@ -1408,8 +1409,8 @@ try {
       await page.getByTestId("btc-quote").waitFor();
       assert(fake.table("btc_addresses").filter((r) => r.payment_id).length === 1, "reloading does not use another address");
       // the admin does not see it until the person says they paid
-      await ap.goto(`${BASE}/admin/plans`);
-      await ap.getByTestId("payment-settings-link").waitFor();
+      await ap.goto(`${BASE}/admin/pro/payments`);
+      await ap.getByTestId("pro-chip-payments").waitFor();
       assert((await ap.getByTestId("pay-request").count()) === 0, "an unclaimed Bitcoin quote is not in Payments to check");
       // a bad transaction id is refused, a good one is kept
       await page.getByTestId("btc-txid").fill("not a txid");
@@ -1466,7 +1467,7 @@ try {
       await page.reload();
       await page.getByTestId("btc-tell-admin").click();
       await page.getByTestId("btc-waiting").waitFor();
-      await ap.goto(`${BASE}/admin/plans`);
+      await ap.goto(`${BASE}/admin/pro/payments`);
       await ap.getByTestId("pay-btc").waitFor();
       await ap.getByTestId("pay-reject").click();
       await ap.getByTestId("pay-pending").waitFor({ state: "detached" });
@@ -1542,7 +1543,7 @@ try {
       // paying it counts: the person says they paid and the admin confirms
       const paid = await page.request.post(`${BASE}/api/pro/bitcoin/paid`, { data: { id: q5.body.payment.id } });
       assert(paid.status() === 200, "I have paid works");
-      await ap.goto(`${BASE}/admin/plans`);
+      await ap.goto(`${BASE}/admin/pro/payments`);
       await ap.getByTestId("pay-btc").waitFor();
       await ap.getByTestId("pay-confirm").click();
       await ap.getByText(/Payment confirmed/).waitFor();
@@ -2802,9 +2803,9 @@ try {
     try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
-      await ap.goto(`${BASE}/admin/plans`);
-      await ap.getByTestId("pro-trial-link").click();
-      await ap.waitForURL((u) => u.pathname === "/admin/pro-trial");
+      await ap.goto(`${BASE}/admin/pro`);
+      await ap.getByTestId("pro-row-trial").click();
+      await ap.waitForURL((u) => u.pathname === "/admin/pro/trial");
       await ap.getByTestId("trial-summary").waitFor();
       assert(/Every new account gets 30 days/.test(await ap.getByTestId("trial-summary").textContent()), "on by default: " + (await ap.getByTestId("trial-summary").textContent()));
       // a promotion for one month
@@ -2863,6 +2864,58 @@ try {
     } finally {
       await ctx.close(); await actx.close();
       fake.table("user_plans").splice(0); fake.table("pro_trial_settings").splice(0);
+    }
+  });
+
+  await test("admin Pro plan: one tile with payments waiting, an overview with live numbers, chips between the four parts, and the old addresses still work", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    const OTHER = "00000000-0000-4000-8000-0000000000aa";
+    try {
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: addDays(today, 3) }, { user_id: OTHER, plan: "pro", period: "trial", ends_on: addDays(today, 20) });
+      fake.table("plan_payments").push({ id: "00000000-0000-4000-8000-0000000000bb", user_id: PAT, period: "monthly", amount: 10, currency: "AWG", method: "aruba_bank", reference: "LIF-TEST", status: "pending", created_at: new Date().toISOString() });
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/settings`);
+      await ap.getByRole("link", { name: /Pro plan/ }).first().waitFor();
+      await ap.getByTestId("pro-tile-waiting").waitFor();
+      assert(/1 waiting/.test(await ap.getByTestId("pro-tile-waiting").textContent()), "the tile shows 1 waiting");
+      for (const old of ["Plans and access", "Pro payments", "Pro plan limits"]) assert((await ap.getByRole("heading", { name: old }).count()) === 0 && (await ap.getByText(old, { exact: true }).count()) === 0, `${old} is no longer its own tile`);
+      await ap.getByRole("link", { name: /Pro plan/ }).first().click();
+      await ap.waitForURL((u) => u.pathname === "/admin/pro");
+      await ap.getByTestId("pro-waiting").waitFor();
+      assert(/1 payment waiting/.test(await ap.getByTestId("pro-waiting").textContent()), "the red card says 1 payment waiting");
+      assert((await ap.getByTestId("n-pro").textContent()).startsWith("2") && (await ap.getByTestId("n-ending").textContent()).startsWith("1") && (await ap.getByTestId("n-trial").textContent()).startsWith("1"), "2 Pro, 1 ending, 1 on the free month: " + (await ap.getByTestId("pro-numbers").textContent()));
+      assert(/2 Pro/.test(await ap.getByTestId("pro-status-people").textContent()) && /1 ending/.test(await ap.getByTestId("pro-status-people").textContent()), "People row status");
+      assert(/1 waiting/.test(await ap.getByTestId("pro-status-payments").textContent()), "Payments row status");
+      assert(/On/.test(await ap.getByTestId("pro-status-trial").textContent()) && /30 days/.test(await ap.getByTestId("pro-status-trial").textContent()), "Free month row status");
+      assert((await ap.getByTestId("pro-row-people").boundingBox()).height >= 44, "rows are at least 44px tall");
+      assert((await ap.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll on the overview");
+      // review goes to the payments page, which carries the red count and the payment
+      await ap.getByTestId("pro-review").click();
+      await ap.waitForURL((u) => u.pathname === "/admin/pro/payments");
+      await ap.getByTestId("pay-request").waitFor();
+      await ap.getByTestId("pro-chip-waiting").waitFor();
+      assert((await ap.getByTestId("pro-chip-payments").getAttribute("aria-current")) === "page", "Payments is the current chip");
+      // chips jump between the parts
+      for (const [id, path, title] of [["limits", "/admin/pro/limits", "Free plan limits"], ["trial", "/admin/pro/trial", "Free Pro month"], ["people", "/admin/pro/people", "People and access"]]) {
+        await ap.getByTestId(`pro-chip-${id}`).click();
+        await ap.waitForURL((u) => u.pathname === path);
+        await ap.getByRole("heading", { name: title }).waitFor();
+        assert((await ap.getByTestId(`pro-chip-${id}`).boundingBox()).height >= 44, `the ${id} chip is at least 44px tall`);
+      }
+      assert((await ap.getByTestId("pay-pending").count()) === 0, "payments to check are on the Payments page, not on People");
+      await ap.getByRole("link", { name: "Pro plan" }).first().click();
+      await ap.waitForURL((u) => u.pathname === "/admin/pro");
+      // the old addresses still land in the right place
+      for (const [old, now] of [["/admin/plans", "/admin/pro/people"], ["/admin/payment-settings", "/admin/pro/payments"], ["/admin/pro-limits", "/admin/pro/limits"], ["/admin/pro-trial", "/admin/pro/trial"]]) {
+        await ap.goto(`${BASE}${old}`);
+        await ap.waitForURL((u) => u.pathname === now);
+      }
+    } finally {
+      await actx.close();
+      fake.table("user_plans").splice(0); fake.table("plan_payments").splice(0);
     }
   });
 

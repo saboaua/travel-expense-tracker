@@ -1,5 +1,5 @@
 import { DEFAULT_TRIAL, parseTrial, readTrial, trialOpenOn, trialSummary } from "../src/lib/pro-trial";
-import { defaultEndsOn, isPeriod, planCardText, planSummary, trialState } from "../src/lib/plans";
+import { defaultEndsOn, isPeriod, planCardText, planSummary, proOverview, trialState } from "../src/lib/plans";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -45,6 +45,13 @@ eq("trial ends the next month by default", defaultEndsOn("trial", "2026-11-16"),
 eq("an admin cannot hand out a trial", isPeriod("trial"), false);
 eq("plan card ended", planCardText({ isAdmin: false, row: { period: "trial", ends_on: "2026-11-10" }, today: "2026-11-16" }).sub, "Your free month ended 2026-11-10. Get Pro to keep reports.");
 eq("plan card free", planCardText({ isAdmin: false, row: null, today: "2026-11-16" }).sub, "Excel and PDF reports are a Pro feature");
+
+// the admin overview numbers
+eq("overview", proOverview([
+  { period: "monthly", ends_on: "2026-11-19" }, { period: "trial", ends_on: "2026-12-06" }, { period: "yearly", ends_on: "2027-05-01" },
+  { period: "gift", ends_on: null }, { period: "monthly", ends_on: "2026-11-10" }, { period: "trial", ends_on: "2026-11-23" },
+], "2026-11-16"), { proNow: 5, ending: 2, onTrial: 2 });
+eq("overview empty", proOverview([], "2026-11-16"), { proNow: 0, ending: 0, onTrial: 0 });
 
 if (fail) { console.error(`${fail} failed`); process.exit(1); }
 console.log("PASS pro-trial");

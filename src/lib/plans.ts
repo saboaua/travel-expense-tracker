@@ -60,3 +60,18 @@ export function trialState(row: Pick<PlanRow, "period" | "ends_on"> | null | und
   if (daysLeft < 0) return { state: "ended", daysLeft: 0, endsOn: row.ends_on };
   return { state: daysLeft <= TRIAL_ENDING_DAYS ? "ending" : "active", daysLeft, endsOn: row.ends_on };
 }
+
+/** The three numbers on the admin Pro plan page: who has Pro now, whose Pro ends within a week, and who is on the free month. Admins are not counted. */
+export function proOverview(plans: Pick<PlanRow, "period" | "ends_on">[], today: string): { proNow: number; ending: number; onTrial: number } {
+  let proNow = 0, ending = 0, onTrial = 0;
+  for (const p of plans) {
+    if (!planSummary(p, today).pro) continue;
+    proNow++;
+    if (p.period === "trial") onTrial++;
+    if (p.ends_on) {
+      const left = Math.round((Date.parse(p.ends_on) - Date.parse(today)) / 86400000);
+      if (left >= 0 && left <= TRIAL_ENDING_DAYS) ending++;
+    }
+  }
+  return { proNow, ending, onTrial };
+}

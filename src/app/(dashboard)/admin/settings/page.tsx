@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/ui/page-header";
 import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -66,34 +67,10 @@ const sections: { href: string; feature: string; title: string; description: str
     tone: "subscriptions",
   },
   {
-    href: "/admin/plans",
+    href: "/admin/pro",
     feature: "admin.only",
-    title: "Plans and access",
-    description: "Turn Pro on or off for a person, monthly, yearly or as a gift, with an end date.",
-    icon: Crown,
-    tone: "badges",
-  },
-  {
-    href: "/admin/payment-settings",
-    feature: "admin.only",
-    title: "Pro payments",
-    description: "The Pro prices, the bank accounts and Bitcoin, and the instructions people see when they pay.",
-    icon: Crown,
-    tone: "badges",
-  },
-  {
-    href: "/admin/pro-limits",
-    feature: "admin.only",
-    title: "Pro plan limits",
-    description: "How many AI scans and documents Free gets, which features are Pro only, and the day the limits start.",
-    icon: Crown,
-    tone: "badges",
-  },
-  {
-    href: "/admin/pro-trial",
-    feature: "admin.only",
-    title: "Free Pro month",
-    description: "Give new accounts Pro for a month. Turn it on, off, or open it only for a promotion between two dates.",
+    title: "Pro plan",
+    description: "People and access, prices and payments, Free limits and the free month for new accounts.",
     icon: Crown,
     tone: "badges",
   },
@@ -133,6 +110,13 @@ const sections: { href: string; feature: string; title: string; description: str
 
 export default function AdminSettingsPage() {
   const { role, perms, loaded } = useAccess();
+  const [waiting, setWaiting] = useState(0);
+  useEffect(() => {
+    if (role !== "admin") return;
+    let live = true;
+    fetch("/api/admin/payments").then((r) => r.json()).then((j) => { if (live && Array.isArray(j.pending)) setWaiting(j.pending.length); }).catch(() => {});
+    return () => { live = false; };
+  }, [role]);
   const visible = sections.filter((s) => role === "admin" || (s.feature !== "admin.only" && perms.has(s.feature)));
   return (
     <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
@@ -148,7 +132,8 @@ export default function AdminSettingsPage() {
               <Card className="h-full hover:border-primary/50 transition-colors">
                 <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
                   <IconTile tone={s.tone} className="h-11 w-11"><Icon className="h-6 w-6" /></IconTile>
-                  <CardTitle className="text-lg">{s.title}</CardTitle>
+                  <CardTitle className="min-w-0 flex-1 text-lg">{s.title}</CardTitle>
+                  {s.href === "/admin/pro" && waiting > 0 && <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white" data-testid="pro-tile-waiting">{waiting} waiting</span>}
                 </CardHeader>
                 <CardContent>
                   <CardDescription>{s.description}</CardDescription>
