@@ -25,6 +25,10 @@
       "schedule": "40 8 * * *"
     },
     {
+      "path": "/api/cron/trip-papers",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/cron/community",
       "schedule": "30 4 * * *"
     }

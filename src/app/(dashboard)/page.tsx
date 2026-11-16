@@ -33,6 +33,7 @@ import { GettingStarted } from "@/components/welcome/GettingStarted";
 import { cleanTracks, shouldShowWelcome } from "@/lib/welcome";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { hotelOf } from "@/lib/hotel";
+import { PAPER_COLS, latestPapers, type TripPaper } from "@/lib/trip-papers";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PROFILE_HOME_WELCOME_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
@@ -53,7 +54,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const uid = user?.id;
 
   // Wave 1: everything that only needs to know who is signed in, asked together
-  const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes] = await Promise.all([
+  const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes, papersRes] = await Promise.all([
     withColumnFallback3(
       (cols) => supabase.from("profiles").select(cols).eq("id", uid).single(),
       PROFILE_HOME_WELCOME_COLS,
@@ -76,9 +77,13 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     supabase.from("roles").select("key, label, permissions, known_features"),
     // Flights on the trips (a database without the flights table just gives none)
     supabase.from("trip_flights").select(FLIGHT_COLS).eq("user_id", uid),
+    // Trip papers (a database without the table just gives none)
+    supabase.from("trip_papers").select(PAPER_COLS).eq("user_id", uid),
   ]);
   const flightsByTrip = new Map<string, TripFlight[]>();
   for (const f of (flightsRes.data ?? []) as unknown as TripFlight[]) flightsByTrip.set(f.trip_id, [...(flightsByTrip.get(f.trip_id) ?? []), f]);
+  const papersByTrip = new Map<string, TripPaper[]>();
+  for (const p of (papersRes.error ? [] : (papersRes.data ?? [])) as unknown as TripPaper[]) papersByTrip.set(p.trip_id, [...(papersByTrip.get(p.trip_id) ?? []), p]);
   const lineFor = (tripId: string) => flightLine(flightsByTrip.get(tripId) ?? [], Date.now());
   const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null; welcome_seen_at?: string | null; welcome_tracks?: string[] | null } | null;
   type TripRow = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string; expenses: Expense[] | null; hotel_name?: string | null; hotel_address?: string | null };
@@ -272,6 +277,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     flight={fNext}
                     hotel={hotelOf(featured as { hotel_name?: string | null; hotel_address?: string | null })}
                     moreFlights={fNext ? fFlights.length - 1 : 0}
+                    papers={papersRes.error ? null : { count: (papersByTrip.get(featured.id) ?? []).length, latest: latestPapers(papersByTrip.get(featured.id) ?? []) }}
                     total={fTotal}
                     count={featured.expenses?.length || 0}
                   />

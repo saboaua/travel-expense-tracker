@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
-import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, RefreshCw } from "lucide-react";
+import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, Plus, RefreshCw, Ticket } from "lucide-react";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { StatusChip } from "@/components/flights/FlightPanel";
 import { formatDate } from "@/lib/utils";
 import { BADGE_CLASS, type TripBadge } from "@/lib/trip-card";
 import { directionsUrl, type Hotel } from "@/lib/hotel";
+import { paperSub, type TripPaper } from "@/lib/trip-papers";
 import { clock, durationMinutes, durationText, shownArrival, shownDeparture, type TripFlight } from "@/lib/flights";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null };
@@ -110,14 +111,45 @@ function HotelStrip({ hotel }: { hotel: Hotel }) {
   );
 }
 
+/** Transfers, tickets and booking details kept with the trip: the two added last, and a way to the rest. Shown under Add expense. */
+function PapersStrip({ tripId, count, latest }: { tripId: string; count: number; latest: TripPaper[] }) {
+  const base = `/trips/${tripId}/papers`;
+  const dashed = "flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-400 px-3 text-sm font-bold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  if (count === 0) return (
+    <div className="border-t pt-3" data-testid="trip-papers">
+      <Link href={`${base}/new`} className={`${dashed} min-h-[52px] justify-start`} data-testid="trip-papers-add"><Ticket className="h-5 w-5" aria-hidden="true" /><span className="flex-1">Add transfer, tickets, booking</span><Plus className="h-4 w-4" aria-hidden="true" /></Link>
+    </div>
+  );
+  return (
+    <div className="border-t pt-3" data-testid="trip-papers">
+      <div className="flex items-baseline justify-between"><h4 className="text-[15px] font-extrabold">Trip papers <span className="font-bold text-muted-foreground" data-testid="trip-papers-count">{count}</span></h4><span className="text-[13px] font-bold text-muted-foreground">Only you</span></div>
+      <ul className="mt-1 divide-y">
+        {latest.map((p) => (
+          <li key={p.id}>
+            <Link href={`${base}?open=${p.id}`} data-testid="trip-paper" className="flex min-h-14 items-center gap-3 py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300" aria-hidden="true"><Ticket className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-extrabold">{p.title}</span>{paperSub(p) && <span className="block truncate text-[12.5px] text-muted-foreground">{paperSub(p)}</span>}</span>
+              <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+      {count > latest.length
+        ? <Link href={base} className={`${dashed} mt-1.5 border-solid border-slate-300 bg-card`} data-testid="trip-papers-all">See all {count} papers<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
+        : <Link href={`${base}/new`} className={`${dashed} mt-1.5`} data-testid="trip-papers-add"><Plus className="h-4 w-4" aria-hidden="true" />Add paper</Link>}
+    </div>
+  );
+}
+
 /** The trip the dashboard features: photo, dates, the next flight and what has been spent. */
-export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, hotel = null, total, count }: {
+export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, hotel = null, papers = null, total, count }: {
   trip: Trip;
   imageUrl: string | null;
   badge: TripBadge;
   flight: TripFlight | null;
   moreFlights: number;
   hotel?: Hotel | null;
+  papers?: { count: number; latest: TripPaper[] } | null;
   total: number;
   count: number;
 }) {
@@ -182,6 +214,8 @@ export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, h
             </Link>
           </div>
         </div>
+
+        {papers && <PapersStrip tripId={trip.id} count={papers.count} latest={papers.latest} />}
       </div>
     </div>
   );

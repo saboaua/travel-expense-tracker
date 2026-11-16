@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -4638,6 +4638,49 @@ try {
     } finally {
       trip.hotel_name = null; trip.hotel_address = null;
       await ctx.close();
+    }
+  });
+
+  await test("papers: transfers and tickets sit under Add expense (2 shown, See all), are added on their own page and carry a removal date", async () => {
+    const { ctx, page } = await newPage();
+    const papers = fake.table("trip_papers");
+    const mkp = (title, n, extra = {}) => papers.push({ id: crypto.randomUUID(), trip_id: TRIP_ID, user_id: PAT, title, note: null, file_path: null, created_at: new Date(Date.now() + n * 1000).toISOString(), ...extra });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const open = async () => { await page.goto(`${BASE}/`); await page.getByRole("tab", { name: "Business" }).click(); await page.getByTestId("featured-trip").waitFor({ timeout: 30000 }); return page.getByTestId("trip-papers"); };
+      let strip = await open();
+      assert(/Add transfer, tickets, booking/.test(await strip.innerText()), "none: dashed row to add");
+      mkp("Airport transfer", 1, { note: "Pickup 9:30", file_path: "x/papers/t/a.pdf" });
+      strip = await open();
+      let text = await strip.innerText();
+      assert(/Trip papers/.test(text) && /Only you/.test(text) && /Airport transfer/.test(text) && /Pickup 9:30 · PDF/.test(text), "one paper shown: " + text);
+      assert(/Add paper/.test(text) && (await page.getByTestId("trip-papers-all").count()) === 0, "one paper: Add paper, no See all");
+      mkp("Bus ticket", 2); mkp("Hotel shuttle", 3);
+      strip = await open();
+      const rows = await page.getByTestId("trip-paper").allInnerTexts();
+      assert(rows.length === 2 && /Hotel shuttle/.test(rows[0]) && /Bus ticket/.test(rows[1]), "newest two: " + rows.join("|"));
+      assert(/See all 3 papers/.test(await strip.innerText()), "See all 3 papers");
+      await page.getByTestId("trip-papers-all").click();
+      await page.waitForURL(new RegExp(`/trips/${TRIP_ID}/papers$`), { timeout: 30000 });
+      await page.getByTestId("paper-removal").waitFor({ timeout: 30000 });
+      assert(/Only you see these/.test(await page.getByTestId("paper-removal").innerText()), "page explains who sees them and the removal");
+      assert((await page.getByTestId("paper-row").count()) === 3, "all three listed");
+      await page.getByTestId("paper-add").click();
+      await page.waitForURL(new RegExp(`/trips/${TRIP_ID}/papers/new$`), { timeout: 30000 });
+      await page.getByTestId("paper-title").fill("Ferry booking");
+      await page.getByTestId("paper-note").fill("Ref 4821");
+      await page.getByTestId("paper-save").click();
+      await page.waitForURL(new RegExp(`/trips/${TRIP_ID}/papers$`), { timeout: 30000 });
+      const saved = papers.find((x) => x.title === "Ferry booking");
+      assert(saved && saved.user_id === PAT && saved.note === "Ref 4821" && !saved.file_path, "saved for the owner: " + JSON.stringify(saved));
+      await page.getByTestId("paper-delete").first().click();
+      await page.getByTestId("paper-delete-yes").click();
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="paper-row"]').length === 3, null, { timeout: 30000 });
+      assert(papers.length === 3, "one paper deleted from the database");
+    } finally {
+      await ctx.close();
+      papers.splice(0, papers.length);
     }
   });
 

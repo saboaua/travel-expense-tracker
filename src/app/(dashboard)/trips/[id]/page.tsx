@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
-import { Camera, CalendarDays, Clock, MapPin, Pencil, Plus, Tag } from "lucide-react";
+import { Camera, CalendarDays, ChevronRight, Clock, MapPin, Pencil, Plus, Tag, Ticket } from "lucide-react";
 import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
@@ -57,6 +57,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   // Flights are optional: an older database without the table simply shows none
   const { data: flightRows } = await supabase.from("trip_flights").select(FLIGHT_COLS).eq("trip_id", id).eq("user_id", user.id);
   const flights = (flightRows ?? []) as unknown as TripFlight[];
+  const { count: paperRows } = await supabase.from("trip_papers").select("id", { count: "exact", head: true }).eq("trip_id", id);
+  const paperCount = paperRows ?? 0;
 
   const today = todayISO();
   const endDate: string = trip.end_date || trip.start_date;
@@ -192,6 +194,12 @@ export default async function TripDetailPage({ params, searchParams }: { params:
           <CategoryDonut slices={slices} total={usdTotal} fmt={(n) => formatCurrency(n, "USD")} />
         </section>
       )}
+
+      <Link href={`/trips/${id}/papers`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-papers-link">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300" aria-hidden="true"><Ticket className="h-5 w-5" /></span>
+        <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Trip papers{paperCount > 0 && <span className="ml-1.5 text-muted-foreground">{paperCount}</span>}</span><span className="block text-xs text-muted-foreground">Transfers, tickets and booking details. Removed a week after the trip ends.</span></span>
+        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </Link>
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-3">

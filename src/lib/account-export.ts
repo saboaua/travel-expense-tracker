@@ -28,6 +28,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "grocery_item_rules", owner: "user_id", cols: "user_id, normalized_name, category, updated_at", order: "normalized_name" },
   { table: "loyalty_cards", owner: "user_id", bucket: "loyalty-cards", cols: LOYALTY_CARD_COLS, base: LOYALTY_CARD_COLS_BASE },
   { table: "travel_documents", owner: "user_id", bucket: "documents", cols: DOCUMENT_COLS, base: DOCUMENT_COLS_BASE },
+  { table: "trip_papers", owner: "user_id", bucket: "documents", cols: "id, trip_id, title, note, file_path, created_at" },
 ];
 
 /** Only files inside my own folder are ever fetched, whatever a row says. */
