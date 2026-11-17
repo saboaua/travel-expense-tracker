@@ -172,7 +172,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
       {byCategory.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Spending by category</CardTitle></CardHeader>
-          <CardContent><Bars rows={byCategory} format={(n) => formatCurrency(n, "USD")} /></CardContent>
+          <CardContent><Bars rows={byCategory} currency="USD" /></CardContent>
         </Card>
       )}
 

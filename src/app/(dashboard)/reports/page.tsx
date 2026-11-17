@@ -165,7 +165,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               <CategoryDonut slices={s.categories} total={s.total} fmt={fmt} />
             </Section>
             <Section title="Top merchants" subtitle={`Where the most money went in ${year}`} className="lg:col-span-2">
-              {s.merchants.length === 0 ? <p className="text-sm text-muted-foreground">No merchant names recorded yet.</p> : <Bars rows={s.merchants.map((m) => ({ label: `${m.name}${m.count > 1 ? ` (${m.count}x)` : ""}`, value: m.total }))} format={fmt} />}
+              {s.merchants.length === 0 ? <p className="text-sm text-muted-foreground">No merchant names recorded yet.</p> : <Bars rows={s.merchants.map((m) => ({ label: `${m.name}${m.count > 1 ? ` (${m.count}x)` : ""}`, value: m.total }))} currency="USD" />}
             </Section>
           </div>
         </>

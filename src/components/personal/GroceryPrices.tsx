@@ -385,7 +385,7 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
         <div className="hidden shrink-0 sm:block"><Sparkline values={[...p.history].reverse().map((h) => h.price)} width={96} /></div>
         <div className="shrink-0 text-right">
           {multi ? <p className="text-xs text-muted-foreground">Best price</p> : onlineReady && verdict ? <p className="text-xs text-muted-foreground">you paid</p> : null}
-          <p className={`text-lg font-bold tabular-nums ${multi ? "text-emerald-800 dark:text-emerald-300" : ""}`}>{fmt(shownPrice)}{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</p>
+          <p className={`text-lg font-bold tabular-nums ${multi ? "text-emerald-800 dark:text-emerald-300" : ""}`}><Money amount={shownPrice} currency={cur} />{p.unit && <span className="text-xs font-normal text-muted-foreground">/{p.unit}</span>}</p>
           <div className="mt-1">{multi ? <span className="hidden text-xs text-muted-foreground sm:inline">{best.store}</span> : <Change pct={p.changePct} />}</div>
         </div>
         {isOpen ? <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />}

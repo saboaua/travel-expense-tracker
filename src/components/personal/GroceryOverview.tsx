@@ -143,16 +143,16 @@ export function GroceryOverview() {
               {change == null ? <p className="text-3xl font-bold">—</p> : <p className={`text-3xl font-bold ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
               <p className="text-xs text-muted-foreground">{prevMonth ? `Last month ${fmt(prevMonth.total)}` : "No data last month"}</p>
             </CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardDescription>Average per shop</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? fmt(thisMonth.total / thisMonth.count) : "—"}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardDescription>Average per shop</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? <Money amount={thisMonth.total / thisMonth.count} currency={cur} /> : "—"}</p></CardContent></Card>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card><CardHeader><CardTitle className="text-base">Spending by category</CardTitle></CardHeader><CardContent><Bars rows={catRows} format={fmt} /></CardContent></Card>
-            <Card><CardHeader><CardTitle className="text-base">Last months</CardTitle></CardHeader><CardContent><Bars rows={trend} format={fmt} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">Spending by category</CardTitle></CardHeader><CardContent><Bars rows={catRows} currency={cur} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">Last months</CardTitle></CardHeader><CardContent><Bars rows={trend} currency={cur} /></CardContent></Card>
           </div>
 
           {top.length > 0 && (
-            <Card><CardHeader><CardTitle className="text-base">Where the money went (top items)</CardTitle></CardHeader><CardContent><Bars rows={top.map((t) => ({ label: `${t.name} (${t.count}x)`, value: t.total }))} format={fmt} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">Where the money went (top items)</CardTitle></CardHeader><CardContent><Bars rows={top.map((t) => ({ label: `${t.name} (${t.count}x)`, value: t.total }))} currency={cur} /></CardContent></Card>
           )}
 
           <Card>
