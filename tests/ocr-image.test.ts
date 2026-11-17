@@ -39,6 +39,7 @@ eq(ocrScale(1600, 1200) === 1, true, "mid-size photo kept");
 eq(ocrScale(800, 600) > 2, true, "small photo enlarged");
 eq(ocrScale(4000, 3000) < 1, true, "huge photo shrunk");
 eq(ocrScale(600, 2400) >= 1.5, true, "narrow tall slip gets enough width");
+eq(ocrScale(1000, 6000) >= 0.9, true, "a joined long receipt keeps about 900 px of width");
 eq(ocrScale(5000, 5000) * 5000 * ocrScale(5000, 5000) * 5000 <= 6_000_001, true, "never above 6 million pixels");
 
 // model JSON, also when the answer was cut off

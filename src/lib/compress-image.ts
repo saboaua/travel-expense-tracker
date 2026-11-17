@@ -6,9 +6,24 @@ export const RECEIPT_JPEG_QUALITY = 0.8;
 /** A picture already this small is kept as it is: shrinking it again would only lose quality. */
 export const ALREADY_SMALL_BYTES = 120 * 1024;
 
-/** Size to save at: never larger than the photo, never more than `maxSide` on the long side. */
+/** A photo this much taller than wide is a long strip (a long receipt): it is sized by its width, not its length. */
+export const STRIP_RATIO = 2.2;
+export const STRIP_MAX_WIDTH = 1000;
+export const STRIP_MAX_HEIGHT = 6000;
+
+/**
+ * Size to save at: never larger than the photo, never more than `maxSide` on the long side.
+ * A long strip is the exception: squeezing a receipt five times taller than wide into 1600 px would leave it 300 px wide and unreadable,
+ * so it is kept up to 1000 px wide and 6000 px tall.
+ */
 export function targetSize(width: number, height: number, maxSide = RECEIPT_MAX_SIDE): { width: number; height: number } {
   const longer = Math.max(width, height);
+  const shorter = Math.max(1, Math.min(width, height));
+  if (longer / shorter > STRIP_RATIO) {
+    const scale = Math.min(1, STRIP_MAX_WIDTH / shorter, STRIP_MAX_HEIGHT / longer);
+    if (scale >= 1) return { width, height };
+    return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+  }
   if (!(longer > maxSide)) return { width, height };
   const scale = maxSide / longer;
   return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
@@ -17,7 +32,8 @@ export function targetSize(width: number, height: number, maxSide = RECEIPT_MAX_
 /** True when the picture is already small enough in both bytes and pixels that saving it again would not help. */
 export function keepAsIs(type: string, bytes: number, width: number, height: number, maxSide = RECEIPT_MAX_SIDE): boolean {
   if (type !== "image/jpeg" && type !== "image/webp") return false;
-  return bytes <= ALREADY_SMALL_BYTES && Math.max(width, height) <= maxSide;
+  const t = targetSize(width, height, maxSide);
+  return bytes <= ALREADY_SMALL_BYTES && t.width === width && t.height === height;
 }
 
 const EXT_OF: Record<string, string> = { "image/webp": "webp", "image/jpeg": "jpg" };
@@ -59,17 +75,23 @@ export async function compressReceiptImage(
   ctx.drawImage(bitmap, 0, 0, targetW, targetH);
   bitmap.close();
 
+  const base = file.name.replace(/\.[^.]+$/, "") || "receipt";
+  const out = await encodeReceiptCanvas(canvas, base, options.quality);
+  if (!out) return file;
+  // Never save something bigger than what was picked (a small, already-tight picture).
+  if (out.size >= file.size && (file.type === "image/jpeg" || file.type === "image/webp") && targetW === width && targetH === height) return file;
+  return out;
+}
+
+/** Saves a canvas as WebP where the browser can, otherwise JPEG. Used for receipt photos and for joined long receipts. */
+export async function encodeReceiptCanvas(canvas: HTMLCanvasElement, baseName: string, quality?: number): Promise<File | null> {
   const encode = (type: string, q: number) => new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, type, q));
   // Some browsers quietly hand back a PNG when they cannot make WebP, so the type that comes back is what counts.
-  let blob = await encode("image/webp", options.quality ?? RECEIPT_WEBP_QUALITY);
-  if (!blob || blob.type !== "image/webp") blob = await encode("image/jpeg", options.quality ?? RECEIPT_JPEG_QUALITY);
-  if (!blob) return file;
-  // Never save something bigger than what was picked (a small, already-tight picture).
-  if (blob.size >= file.size && (file.type === "image/jpeg" || file.type === "image/webp") && targetW === width && targetH === height) return file;
-
+  let blob = await encode("image/webp", quality ?? RECEIPT_WEBP_QUALITY);
+  if (!blob || blob.type !== "image/webp") blob = await encode("image/jpeg", quality ?? RECEIPT_JPEG_QUALITY);
+  if (!blob) return null;
   const type = blob.type === "image/webp" ? "image/webp" : "image/jpeg";
-  const base = file.name.replace(/\.[^.]+$/, "") || "receipt";
-  return new File([blob], `${base}.${EXT_OF[type]}`, { type, lastModified: Date.now() });
+  return new File([blob], `${baseName || "receipt"}.${EXT_OF[type]}`, { type, lastModified: Date.now() });
 }
 
 /**

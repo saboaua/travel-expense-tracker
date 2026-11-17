@@ -797,6 +797,64 @@ try {
     await ctx.close();
   });
 
+  await test("long receipt: the arrow next to Scan offers it, parts are joined into one image, and parts that do not match can be retaken or joined anyway", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.waitForLoadState("networkidle");
+    // A made-up receipt, 900 x 2400, in the same shape as a long till slip: dark words on lines
+    const [a, b, other] = await page.evaluate(() => {
+      let seed = 11;
+      const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 2 ** 32);
+      const make = (h) => {
+        const c = document.createElement("canvas"); c.width = 900; c.height = h;
+        const x = c.getContext("2d"); x.fillStyle = "#f4f1e8"; x.fillRect(0, 0, 900, h);
+        for (let line = 0; line < h / 34; line++) {
+          let px = 40 + rnd() * 40;
+          while (px < 820) { const len = 20 + rnd() * 110; x.fillStyle = `rgb(${30 + rnd() * 40},${30 + rnd() * 40},${30 + rnd() * 40})`; x.fillRect(px, line * 34 + 8, len, 16); px += len + 18 + rnd() * 20; }
+        }
+        return c;
+      };
+      const full = make(2400);
+      const part = (from, to) => { const c = document.createElement("canvas"); c.width = 900; c.height = to - from; c.getContext("2d").drawImage(full, 0, from, 900, to - from, 0, 0, 900, to - from); return c.toDataURL("image/jpeg", 0.9).split(",")[1]; };
+      const unrelated = make(1400).toDataURL("image/jpeg", 0.9).split(",")[1];
+      return [part(0, 1400), part(1000, 2400), unrelated];
+    });
+    const file = (n, b64) => ({ name: n, mimeType: "image/jpeg", buffer: Buffer.from(b64, "base64") });
+    const open = async () => {
+      await page.getByTestId("scan-more").click();
+      await page.getByRole("dialog", { name: "How do you want to scan?" }).waitFor();
+      await page.getByTestId("scan-mode-long").click();
+      await page.getByTestId("long-receipt").waitFor();
+    };
+    await open();
+    await page.getByTestId("lr-gallery-input").setInputFiles([file("p1.jpg", a), file("p2.jpg", b)]);
+    await page.getByTestId("lr-part").nth(1).waitFor();
+    await page.getByTestId("lr-join").click();
+    await page.getByTestId("lr-joined").waitFor({ timeout: 30_000 });
+    if (!(await page.getByTestId("lr-joined").innerText()).includes("Joined 2 parts into 1 image")) throw new Error("the joined message is missing");
+    const h = await page.getByTestId("lr-joined-image").evaluate((img) => img.naturalHeight);
+    if (Math.abs(h - 2400) > 40) throw new Error(`joined height ${h}, expected about 2400 (two 1400 px parts sharing 400 rows)`);
+    await page.getByTestId("lr-done").click();
+    await Promise.race([
+      page.waitForURL((u) => u.pathname === `/trips/${TRIP_ID}/add-expense`, { timeout: 60_000 }),
+      page.getByRole("dialog", { name: "Where does this go?" }).waitFor({ timeout: 60_000 }),
+    ]);
+    // Parts with nothing in common: asked to retake, or joined one under the other
+    await page.goto(page.url().replace(/\/trips\/.*/, "/"));
+    await page.waitForLoadState("networkidle");
+    await open();
+    await page.getByTestId("lr-gallery-input").setInputFiles([file("p1.jpg", a), file("p3.jpg", other)]);
+    await page.getByTestId("lr-part").nth(1).waitFor();
+    await page.getByTestId("lr-join").click();
+    await page.getByTestId("lr-nomatch").waitFor({ timeout: 30_000 });
+    await page.getByTestId("lr-force").click();
+    await page.getByTestId("lr-joined").waitFor({ timeout: 30_000 });
+    const h2 = await page.getByTestId("lr-joined-image").evaluate((img) => img.naturalHeight);
+    if (Math.abs(h2 - 2800) > 40) throw new Error(`joined anyway height ${h2}, expected about 2800`);
+    await ctx.close();
+  });
+
   await test("a PDF can only be kept as a document: the sheet offers just that", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

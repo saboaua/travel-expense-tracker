@@ -78,8 +78,8 @@ export function ocrScale(width: number, height: number): number {
   const longer = Math.max(width, height);
   const shorter = Math.min(width, height);
   let scale = longer < 1400 ? 1800 / longer : longer > 2600 ? 2600 / longer : 1;
-  // A narrow, tall receipt strip (a long grocery slip) needs its width, not its length, to be generous
-  if (shorter * scale < 900 && longer * (900 / shorter) <= 4200) scale = Math.max(scale, 900 / shorter);
+  // A narrow, tall receipt strip (a long grocery slip, or several photos joined into one) needs its width, not its length, to be generous
+  if (shorter * scale < 900 && longer * (900 / shorter) <= 7000) scale = Math.max(scale, 900 / shorter);
   const pixels = width * height * scale * scale;
   if (pixels > 6_000_000) scale *= Math.sqrt(6_000_000 / pixels);
   return scale;

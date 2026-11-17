@@ -11,12 +11,14 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Camera, Upload, X, ScanText, Loader2 } from "lucide-react";
+import { Camera, Upload, X, ScanText, Loader2, ScrollText, ChevronRight } from "lucide-react";
 import { CategoryButtons } from "@/components/ui/category-buttons";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { extractReceipt, howRead } from "@/lib/receipt-extract";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { ReceiptCropper } from "@/components/ReceiptCropper";
+import { LongReceiptFlow } from "@/components/scan/LongReceiptFlow";
+import { isJoinedReceipt } from "@/lib/long-receipt";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { ScanChip } from "@/components/scan/ScanChip";
 import { toUsd } from "@/lib/currencies";
@@ -40,6 +42,7 @@ export default function AddExpensePage() {
   const [preview, setPreview] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [pendingCrop, setPendingCrop] = useState<File | null>(null);
+  const [longOpen, setLongOpen] = useState(false);
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState("USD");
@@ -74,7 +77,9 @@ export default function AddExpensePage() {
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
     takeQuickScan(`trip:${tripId}`).then((f) => {
       if (!f) return;
-      setPendingCrop(f);
+      // A long receipt joined from parts needs no crop
+      if (isJoinedReceipt(f)) void onCropped(f);
+      else setPendingCrop(f);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [tripReady]);
@@ -312,6 +317,13 @@ export default function AddExpensePage() {
                   </button>
                 </div>
               )}
+              {!preview && (
+                <button type="button" data-testid="long-receipt-link" onClick={() => setLongOpen(true)} className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2 text-left dark:border-violet-900 dark:bg-violet-950/30">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-900/50 dark:text-violet-300"><ScrollText className="h-5 w-5" aria-hidden="true" /></span>
+                  <span className="min-w-0 flex-1"><span className="block text-[15px] font-bold text-violet-900 dark:text-violet-200">Long receipt?</span><span className="block text-[13px] text-violet-800 dark:text-violet-300">Take it in parts. We join them for you.</span></span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-violet-700 dark:text-violet-300" aria-hidden="true" />
+                </button>
+              )}
               <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
               <AiScanMeter />
               {ocrNote && <p className="text-xs text-muted-foreground flex items-start gap-1.5"><ScanText className="h-3.5 w-3.5 mt-0.5 shrink-0" />{ocrNote}</p>}
@@ -385,6 +397,7 @@ export default function AddExpensePage() {
         </CardContent>
       </Card>
 
+      {longOpen && <LongReceiptFlow onCancel={() => setLongOpen(false)} onDone={(f) => { setLongOpen(false); void onCropped(f); }} />}
       {pendingCrop && (
         <ReceiptCropper
           file={pendingCrop}

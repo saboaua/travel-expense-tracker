@@ -3,12 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Camera, Loader2, Plus, Upload } from "lucide-react";
+import { Camera, ChevronDown, ChevronUp, Loader2, Plus, Upload } from "lucide-react";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { getLastScanChoice, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
 import { currentPlace } from "@/lib/scan-place";
 import { suggestDestination, type HomePlace, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
+import { ScanModeSheet } from "@/components/scan/ScanModeSheet";
+import { LongReceiptFlow } from "@/components/scan/LongReceiptFlow";
 import { todayISO } from "@/lib/utils";
 
 type Pending = { file: File; options: ScanOption[]; pick: string; reason: string | null; preview: string | null };
@@ -30,6 +32,7 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
   const [busy, setBusy] = useState<"scan" | "upload" | "save" | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [mode, setMode] = useState<"menu" | "long" | null>(null);
 
   // Free the preview URL when the sheet closes
   useEffect(() => () => { if (pending?.preview) URL.revokeObjectURL(pending.preview); }, [pending]);
@@ -62,12 +65,24 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
       mode === "scan" ? currentPlace() : Promise.resolve(null),
       compressReceiptImage(selected).catch(() => selected),
     ]);
+    await choose(processed, mode, placeResult, mode === "upload" ? localDate(selected.lastModified) : null);
+  };
+
+  /** A joined long receipt is already prepared; it goes the same way as a scanned photo. */
+  const longDone = async (file: File) => {
+    setMode(null);
+    setNotice(null);
+    setBusy("scan");
+    await choose(file, "scan", await currentPlace(), null);
+  };
+
+  const choose = async (processed: File, mode: "scan" | "upload", placeResult: Awaited<ReturnType<typeof currentPlace>> | null, photoDate: string | null) => {
     const sug = suggestDestination({
       mode,
       options,
       place: placeResult,
       home,
-      photoDate: mode === "upload" ? localDate(selected.lastModified) : null,
+      photoDate,
       today: todayISO(),
       last: getLastScanChoice(),
     });
@@ -90,10 +105,15 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
     <>
       <div className={`mt-4 grid gap-3 md:max-w-xl ${showNewTrip ? "grid-cols-3" : "grid-cols-2"}`}>
         {canScan && (
-          <button type="button" disabled={!!busy} onClick={() => camera.current?.click()} className={`${btn} bg-primary text-primary-foreground shadow-sm hover:bg-primary/90`}>
-            {busy === "scan" ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Camera className="h-5 w-5" aria-hidden="true" />}
-            Scan
-          </button>
+          <div className="flex h-12 overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-sm">
+            <button type="button" disabled={!!busy} onClick={() => camera.current?.click()} className="inline-flex flex-1 items-center justify-center gap-2 text-[15px] font-semibold transition-colors hover:bg-primary/90 disabled:opacity-70">
+              {busy === "scan" ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Camera className="h-5 w-5" aria-hidden="true" />}
+              Scan
+            </button>
+            <button type="button" data-testid="scan-more" disabled={!!busy} aria-haspopup="dialog" aria-expanded={mode === "menu"} aria-label="More options" onClick={() => setMode("menu")} className="flex w-11 items-center justify-center border-l border-white/35 transition-colors hover:bg-primary/90 disabled:opacity-70">
+              {mode === "menu" ? <ChevronUp className="h-[18px] w-[18px]" aria-hidden="true" /> : <ChevronDown className="h-[18px] w-[18px]" aria-hidden="true" />}
+            </button>
+          </div>
         )}
         {canUpload && (
           <button type="button" disabled={!!busy} onClick={() => gallery.current?.click()} className={`${btn} bg-primary/10 text-primary hover:bg-primary/15`}>
@@ -116,6 +136,9 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
       )}
       <input ref={camera} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handle("scan", e)} />
       <input ref={gallery} type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handle("upload", e)} />
+
+      {mode === "menu" && <ScanModeSheet onClose={() => setMode(null)} onScan={() => { setMode(null); camera.current?.click(); }} onLong={() => setMode("long")} />}
+      {mode === "long" && <LongReceiptFlow onCancel={() => setMode(null)} onDone={longDone} />}
 
       {pending && (
         <ScanSheet
