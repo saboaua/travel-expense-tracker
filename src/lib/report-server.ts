@@ -1,3 +1,4 @@
+import { PROJECT_COLS, RECEIPT_COLS, bizProjectReport, type BizProject, type BizReceipt } from "@/lib/business-projects";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, withColumnFallback } from "@/lib/columns";
 import { convert } from "@/lib/personal/money";
@@ -35,6 +36,15 @@ export async function loadBranding(supabase: SupabaseClient, userId: string, wan
 export async function buildReport(supabase: SupabaseClient, userId: string, q: ReportParams): Promise<ReportResult> {
   const brand = await loadBranding(supabase, userId, q.logo);
   const base = { company: brand.company, logo: brand.logo };
+
+  if (q.scope === "bproject") {
+    if (!q.id || !/^[0-9a-f-]{36}$/i.test(q.id)) return { error: "Choose a project.", status: 400 };
+    const { data: bp } = await supabase.from("business_projects").select(PROJECT_COLS).eq("id", q.id).eq("user_id", userId).maybeSingle();
+    if (!bp) return { error: "Project not found", status: 404 };
+    const { data: rec } = await supabase.from("business_project_receipts").select(RECEIPT_COLS).eq("project_id", q.id).eq("user_id", userId).limit(2000);
+    const proj = bp as unknown as BizProject;
+    return { data: bizProjectReport({ ...proj, budget: proj.budget != null ? Number(proj.budget) : null }, (rec ?? []) as unknown as BizReceipt[], { company: brand.company, logo: brand.logo, ownerName: brand.ownerName }), file: "expenses|" + proj.name };
+  }
 
   if (q.scope === "project") {
     if (!q.id || !/^[0-9a-f-]{36}$/i.test(q.id)) return { error: "Choose a project.", status: 400 };

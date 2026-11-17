@@ -1,18 +1,18 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { FileText, Plane } from "lucide-react";
+import { FileText, FolderKanban, Plane } from "lucide-react";
 import { Tabs } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/ui/page-header";
 import { useAccess } from "@/lib/use-access";
 
-/** The title of the Business area, like the Personal page has: shown above the Trips / Reports switch. */
+/** The title of the Business area, like the Personal page has: shown above the Trips / Projects / Reports switch. */
 export function BusinessHeader() {
   return <PageHeader title="Business" description="Plan business trips, track their expenses and export your travel reports." />;
 }
 
 /**
- * Switch between the two business sections, with the page's main action beside it (below it on a phone).
+ * Switch between the business sections (Trips, Projects, Reports), with the page's main action beside it (below it on a phone).
  * `title` and `description` name the section for screen readers: the visible heading stays "Business".
  */
 export function BusinessTabs({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
@@ -20,6 +20,7 @@ export function BusinessTabs({ title, description, actions }: { title: string; d
   const { perms, loaded } = useAccess(pathname);
   const tabs = [
     { href: "/trips", label: "Trips", icon: Plane, iconTone: "travel" as const, on: perms.has("trips") },
+    { href: "/projects", label: "Projects", icon: FolderKanban, iconTone: "projects" as const, on: perms.has("trips") },
     { href: "/reports", label: "Reports", icon: FileText, iconTone: "reports" as const, on: perms.has("reports") },
   ].filter((t) => t.on);
 

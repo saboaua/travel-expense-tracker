@@ -7,7 +7,8 @@ const starts = (d: string | null, only?: LimitKey[]) => Object.fromEntries(LIMIT
 const on: Limits = { ...DEFAULT_LIMITS, starts: starts("2026-12-01") };
 
 // Off until the start day
-eq("off with no date", limitsActive(DEFAULT_LIMITS, "2026-12-05"), false);
+eq("off with no date", limitsActive({ ...DEFAULT_LIMITS, starts: starts("2099-01-01", []) }, "2026-12-05"), false);
+eq("projects are limited from the start", limitOn(DEFAULT_LIMITS, "projects", "2026-12-05"), true);
 eq("off before the date", limitsActive(on, "2026-11-30"), false);
 eq("on from the date", limitsActive(on, "2026-12-01"), true);
 eq("nothing locked before", featureLocked(on, FREE, "bills_email", "2026-11-30"), false);
@@ -58,7 +59,7 @@ eq("papers: pro full at 50", papersStatus(on, PRO, 50, "2026-12-10").full, true)
 eq("papers: off when its start is empty", papersStatus({ ...on, starts: starts("2026-12-01", ["ai_scans"]) }, FREE, 9, "2026-12-10").limit, null);
 
 // Admin input
-const base = { free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50 };
+const base = { free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, free_projects: 2, pro_projects: 50 };
 const ok = parseLimits({ ...base, starts: { ai_scans: "2026-12-01", card_sharing: "2026-12-15" } });
 eq("parse ok", ok.ok && [ok.value.starts.ai_scans, ok.value.starts.card_sharing, ok.value.starts.documents, ok.value.free_shared_cards, ok.value.pro_trip_papers], ["2026-12-01", "2026-12-15", null, 1, 50]);
 eq("no starts means everything off", parseLimits(base).ok && LIMIT_KEYS.every((k) => (parseLimits(base) as { value: Limits }).value.starts[k] === null), true);
@@ -74,15 +75,27 @@ eq("missing shared cards refused", parseLimits({ ...base, free_shared_cards: "" 
 eq("zero free documents is allowed", parseLimits({ ...base, free_ai_scans: 0, free_documents: 0, pro_documents: 10 }).ok, true);
 eq("zero shared cards is allowed", parseLimits({ ...base, free_shared_cards: 0 }).ok, true);
 
+// Business projects: active ones only, Free 2, Pro set by the admin
+import { projectsStatus } from "../src/lib/limits";
+eq("projects: free holds 2", projectsStatus(DEFAULT_LIMITS, FREE, 2, "2026-12-10"), { limit: 2, count: 2, full: true });
+eq("projects: free with 1 can add", projectsStatus(DEFAULT_LIMITS, FREE, 1, "2026-12-10").full, false);
+eq("projects: pro holds the number set", projectsStatus({ ...DEFAULT_LIMITS, pro_projects: 7 }, PRO, 6, "2026-12-10"), { limit: 7, count: 6, full: false });
+eq("projects: pro full at the number", projectsStatus({ ...DEFAULT_LIMITS, pro_projects: 7 }, PRO, 7, "2026-12-10").full, true);
+eq("projects: admin never held", projectsStatus(DEFAULT_LIMITS, ADMIN, 99, "2026-12-10").full, false);
+eq("projects: admin can switch it off", projectsStatus({ ...DEFAULT_LIMITS, starts: { ...DEFAULT_LIMITS.starts, projects: null } }, FREE, 9, "2026-12-10").limit, null);
+eq("projects: parse numbers", (parseLimits({ ...base, free_projects: 3, pro_projects: 20 }) as { value: Limits }).value.pro_projects, 20);
+eq("projects: pro below free refused", parseLimits({ ...base, free_projects: 5, pro_projects: 3 }).ok, false);
+eq("projects: table row", proComparison(DEFAULT_LIMITS).find((r) => r.label === "Active business projects"), { label: "Active business projects", free: "2", pro: "50" });
+
 // Rows from the database
-eq("strings from the database", readLimits({ starts_ai_scans: "2026-12-01", free_ai_scans: "7", free_documents: "3", pro_documents: "50", free_trip_papers: "4" }), { ...DEFAULT_LIMITS, starts: { ...DEFAULT_LIMITS.starts, ai_scans: "2026-12-01" }, free_ai_scans: 7, free_documents: 3, pro_documents: 50, free_trip_papers: 4 });
+eq("strings from the database", readLimits({ starts_ai_scans: "2026-12-01", free_ai_scans: "7", free_documents: "3", pro_documents: "50", free_trip_papers: "4" }), { ...DEFAULT_LIMITS, starts: { ...DEFAULT_LIMITS.starts, ai_scans: "2026-12-01", projects: null }, free_ai_scans: 7, free_documents: 3, pro_documents: 50, free_trip_papers: 4 });
 eq("a missing row gives the defaults", readLimits(null), DEFAULT_LIMITS);
 eq("a junk date is ignored", readLimits({ starts_documents: "soon" }).starts.documents, null);
 eq("row round trip", readLimits(limitsRow(on)), on);
 
 // The table on the Get Pro page follows the limits that have a start day
 eq("table follows the starts", proComparison({ ...on, starts: starts("2026-12-01", ["ai_scans", "documents"]) }).map((r) => r.label), ["AI receipt scans", "Documents", "Excel and PDF reports"]);
-eq("full table", proComparison(on).length, 9);
+eq("full table", proComparison(on).length, 10);
 eq("table numbers", proComparison(on)[0], { label: "AI receipt scans", free: "10 a month", pro: "No limit" });
 eq("new rows", proComparison({ ...on, starts: starts("2026-12-01", ["card_sharing", "trip_papers"]) }).slice(0, 2), [{ label: "Shared loyalty cards", free: "1", pro: "No limit" }, { label: "Papers per trip", free: "3", pro: "50" }]);
 

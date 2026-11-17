@@ -63,7 +63,7 @@ export function Sidebar() {
 
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {userNav.map((item) => {
-            const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
+            const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") || pathname.startsWith("/projects") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} style={toneStyle(item.tone)} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors", isActive ? "tone-tile font-semibold" : "text-muted-foreground hover:bg-accent hover:text-accent-foreground")}>

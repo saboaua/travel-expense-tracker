@@ -115,7 +115,7 @@ export function MobileNav() {
       <nav className="relative z-50 shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
         <div className="flex items-center justify-around h-16">
           {mainItems.map((item) => {
-            const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
+            const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") || pathname.startsWith("/projects") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
             const Icon = item.icon;
             return (
               <Link key={item.href} href={item.href} style={toneStyle(item.tone)} className={cn("flex flex-col items-center justify-center flex-1 h-full gap-0.5 text-xs transition-colors", isActive ? "tone-ink font-semibold" : "text-muted-foreground hover:text-foreground")}>

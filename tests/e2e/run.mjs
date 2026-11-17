@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -965,6 +965,59 @@ try {
     await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
     assert((await page.locator("#gr-total").inputValue()) === "5.59", "the photo was still read");
     assert((await page.getByRole("button", { name: "Use full image" }).count()) === 0, "the crop screen is gone, not stuck");
+    await ctx.close();
+  });
+
+  await test("business projects: create one with a client, scan a receipt into it, see the totals and the report, and Free holds 2 active projects", async () => {
+    const { ctx, page } = await newPage();
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { merchant: "Ace Hardware", amount: 182.4, date: "2026-11-12", currency: "USD", category: "Other", source: "ai" } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/projects`);
+    await page.getByRole("link", { name: "Create your first project" }).waitFor();
+    // create with client details
+    await page.goto(`${BASE}/projects/new`);
+    await page.getByTestId("project-name").fill("Harbour rebrand");
+    await page.getByTestId("project-budget").fill("400");
+    await page.getByTestId("project-client").fill("Blue Wave Co.");
+    await page.getByTestId("project-save").click();
+    await page.waitForURL((u) => /^\/projects\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 15_000 });
+    const proj = fake.table("business_projects").find((r) => r.name === "Harbour rebrand");
+    assert(proj && proj.client_name === "Blue Wave Co." && Number(proj.budget) === 400 && proj.status === "active", "the project is saved with its client: " + JSON.stringify(proj));
+    // scan a receipt into it
+    await page.getByTestId("add-project-receipt").click();
+    await page.waitForURL((u) => u.pathname.endsWith("/add"));
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    await page.waitForFunction(() => document.querySelector("#pr-amount")?.value === "182.40", null, { timeout: 20_000 });
+    assert((await page.locator("#pr-store").inputValue()) === "Ace Hardware", "the store was read");
+    await page.getByTestId("project-receipt-save").click();
+    await page.waitForURL((u) => /^\/projects\/[0-9a-f-]{36}$/.test(u.pathname), { timeout: 15_000 });
+    const rec = fake.table("business_project_receipts").find((r) => r.project_id === proj.id);
+    assert(rec && Number(rec.amount) === 182.4 && Number(rec.amount_usd) === 182.4 && rec.receipt_path, "the receipt is saved with its photo: " + JSON.stringify(rec));
+    await page.getByTestId("project-receipt").waitFor();
+    assert(/182\.40/.test(await page.getByTestId("project-summary").innerText()), "the project shows the total");
+    // the Reports page lists the project after the trips
+    await page.goto(`${BASE}/reports`);
+    await page.getByTestId("project-reports").waitFor();
+    assert(/Harbour rebrand/.test(await page.getByTestId("project-reports").innerText()), "the project is on the Reports page");
+    // the report: Free is sent to Pro, an admin or Pro gets the file with the client on it
+    const res = await page.request.get(`${BASE}/api/export/report?scope=bproject&id=${proj.id}&format=excel`);
+    assert(res.status() === 402, "the Excel report is a Pro feature: " + res.status());
+    // Free holds 2 active projects
+    fake.table("business_projects").push({ id: "d0c00000-0000-4000-8000-0000000005a1", user_id: PAT, name: "Second", status: "active", currency: "USD", created_at: new Date().toISOString() });
+    await page.goto(`${BASE}/projects`);
+    await page.getByTestId("project-limit").waitFor();
+    await page.getByTestId("project-get-pro").waitFor();
+    assert((await page.getByTestId("new-project").count()) === 0, "no New project when the Free limit is reached");
+    // finishing one makes room
+    await page.goto(`${BASE}/projects/${proj.id}`);
+    await page.getByTestId("project-finish").click();
+    for (let i = 0; i < 40 && fake.table("business_projects").find((r) => r.id === proj.id)?.status !== "done"; i++) await new Promise((ok) => setTimeout(ok, 250));
+    await page.goto(`${BASE}/projects`);
+    await page.getByTestId("new-project").waitFor();
+    fake.table("business_project_receipts").length = 0;
+    fake.table("business_projects").length = 0;
     await ctx.close();
   });
 

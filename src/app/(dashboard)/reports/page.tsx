@@ -12,6 +12,9 @@ import { Bars } from "@/components/personal/Bars";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import { MONTH_LONG, summarize, type ExpenseRow } from "@/lib/reports";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { ProjectReportList, type ProjectReportRow } from "@/components/reports/ProjectReportList";
+import { PROJECT_COLS, projectTotals, type BizProject } from "@/lib/business-projects";
+import { whoIs } from "@/lib/limits-server";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarRange, Download, FileSpreadsheet, Plane, Receipt, TrendingUp, Wallet } from "lucide-react";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string };
@@ -83,6 +86,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   ]);
 
   const allTrips = (tripsRes.data || []) as Trip[];
+
+  // Projects come after trips: each with its client, what was spent and the report downloads
+  const projRes = await supabase.from("business_projects").select(PROJECT_COLS).eq("user_id", user.id).order("created_at", { ascending: false });
+  const projects = (projRes.error ? [] : projRes.data ?? []) as unknown as BizProject[];
+  const projRecs = projects.length ? await supabase.from("business_project_receipts").select("project_id, amount, currency, amount_usd, category").eq("user_id", user.id).limit(20000) : { data: [] };
+  const projRows: ProjectReportRow[] = projects.map((p) => {
+    const mine = ((projRecs.data ?? []) as { project_id: string; amount: number; currency: string | null; amount_usd: number | null; category: string | null }[]).filter((r) => r.project_id === p.id);
+    const t = projectTotals(mine, p.budget != null ? Number(p.budget) : null);
+    return { id: p.id, name: p.name, client: p.client_name, status: p.status, total: t.total, count: t.count, budget: p.budget != null ? Number(p.budget) : null };
+  });
+  const proAccess = projects.length ? (await whoIs(supabase, user.id)).pro : false;
   const s = summarize(expenses, year, today.slice(0, 7));
 
   // Trips that overlap the year or have expenses in it
@@ -181,6 +195,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <Section title="Trip reports" subtitle={`Trips in ${year}. Download Excel, or a ZIP with the Excel and receipt images`}>
         <TripReportList trips={tripRows} year={year} />
       </Section>
+
+      {projRows.length > 0 && (
+        <Section title="Project reports" subtitle="Each project with its client, receipts and budget. Excel and PDF are part of Pro">
+          <ProjectReportList projects={projRows} pro={proAccess} />
+        </Section>
+      )}
     </div>
   );
 }

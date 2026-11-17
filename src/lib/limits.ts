@@ -1,7 +1,7 @@
 /** What the Free plan allows and what only Pro has. The admin sets every number and switch; nothing here removes what people already saved. */
 
-export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers";
-export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers"];
+export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects";
+export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers", "projects"];
 export type Limits = {
   /** The day each limit begins. Empty: that limit is off and everything works as before. */
   starts: Record<LimitKey, string | null>;
@@ -11,14 +11,18 @@ export type Limits = {
   free_shared_cards: number;
   free_trip_papers: number;
   pro_trip_papers: number;
+  /** Business projects that are active at the same time. */
+  free_projects: number;
+  pro_projects: number;
 };
 export type ProFeature = "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders";
 
 const NO_STARTS = Object.fromEntries(LIMIT_KEYS.map((k) => [k, null])) as Record<LimitKey, string | null>;
-export const DEFAULT_LIMITS: Limits = { starts: NO_STARTS, free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50 };
+/** Business projects are limited from the start (2 active on Free); the admin can switch it off or move the day. */
+export const DEFAULT_LIMITS: Limits = { starts: { ...NO_STARTS, projects: "2026-01-01" }, free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, free_projects: 2, pro_projects: 50 };
 export const startCol = (k: LimitKey) => `starts_${k}`;
-export const LIMITS_COLS = [...LIMIT_KEYS.map(startCol), "free_ai_scans", "free_documents", "pro_documents", "free_shared_cards", "free_trip_papers", "pro_trip_papers"].join(", ");
-export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers" };
+export const LIMITS_COLS = [...LIMIT_KEYS.map(startCol), "free_ai_scans", "free_documents", "pro_documents", "free_shared_cards", "free_trip_papers", "pro_trip_papers", "free_projects", "pro_projects"].join(", ");
+export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers", projects: "Business projects" };
 export const FEATURE_LABEL: Record<ProFeature, string> = { bills_email: LIMIT_LABEL.bills_email, telegram_save: LIMIT_LABEL.telegram_save, telegram_summary: LIMIT_LABEL.telegram_summary, doc_reminders: LIMIT_LABEL.doc_reminders };
 
 /** Who is asking: Pro and admins have everything the Free limits would hold back. */
@@ -28,17 +32,18 @@ const isIso = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2
 
 /** Read rows from the database (numbers may arrive as strings; a missing row means the defaults). */
 export function readLimits(row: Record<string, unknown> | null | undefined): Limits {
-  const r = row ?? {};
+  if (!row) return DEFAULT_LIMITS;
+  const r = row;
   const n = (v: unknown, d: number) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Math.max(0, Math.floor(Number(v))) : d);
   const D = DEFAULT_LIMITS;
   const starts = { ...NO_STARTS };
   for (const k of LIMIT_KEYS) { const v = r[startCol(k)]; starts[k] = isIso(v) ? v : null; }
-  return { starts, free_ai_scans: n(r.free_ai_scans, D.free_ai_scans), free_documents: n(r.free_documents, D.free_documents), pro_documents: n(r.pro_documents, D.pro_documents), free_shared_cards: n(r.free_shared_cards, D.free_shared_cards), free_trip_papers: n(r.free_trip_papers, D.free_trip_papers), pro_trip_papers: n(r.pro_trip_papers, D.pro_trip_papers) };
+  return { starts, free_ai_scans: n(r.free_ai_scans, D.free_ai_scans), free_documents: n(r.free_documents, D.free_documents), pro_documents: n(r.pro_documents, D.pro_documents), free_shared_cards: n(r.free_shared_cards, D.free_shared_cards), free_trip_papers: n(r.free_trip_papers, D.free_trip_papers), pro_trip_papers: n(r.pro_trip_papers, D.pro_trip_papers), free_projects: n(r.free_projects, D.free_projects), pro_projects: n(r.pro_projects, D.pro_projects) };
 }
 
 /** What goes into the table: the start columns and the numbers. */
 export function limitsRow(l: Limits): Record<string, unknown> {
-  const out: Record<string, unknown> = { free_ai_scans: l.free_ai_scans, free_documents: l.free_documents, pro_documents: l.pro_documents, free_shared_cards: l.free_shared_cards, free_trip_papers: l.free_trip_papers, pro_trip_papers: l.pro_trip_papers };
+  const out: Record<string, unknown> = { free_ai_scans: l.free_ai_scans, free_documents: l.free_documents, pro_documents: l.pro_documents, free_shared_cards: l.free_shared_cards, free_trip_papers: l.free_trip_papers, pro_trip_papers: l.pro_trip_papers, free_projects: l.free_projects, pro_projects: l.pro_projects };
   for (const k of LIMIT_KEYS) out[startCol(k)] = l.starts[k];
   return out;
 }
@@ -55,6 +60,7 @@ export function parseLimits(body: Record<string, unknown>): { ok: true; value: L
   }
   const scans = whole(body.free_ai_scans, 0, 1000), free = whole(body.free_documents, 0, 1000), pro = whole(body.pro_documents, 1, 10000);
   const shared = whole(body.free_shared_cards, 0, 1000), pfree = whole(body.free_trip_papers, 0, 1000), ppro = whole(body.pro_trip_papers, 1, 10000);
+  const jfree = whole(body.free_projects ?? DEFAULT_LIMITS.free_projects, 0, 1000), jpro = whole(body.pro_projects ?? DEFAULT_LIMITS.pro_projects, 1, 10000);
   if (scans == null) return { ok: false, error: "AI scans for Free must be a whole number from 0 to 1000." };
   if (free == null) return { ok: false, error: "Documents on Free must be a whole number from 0 to 1000." };
   if (pro == null) return { ok: false, error: "Documents on Pro must be a whole number from 1 to 10000." };
@@ -63,7 +69,10 @@ export function parseLimits(body: Record<string, unknown>): { ok: true; value: L
   if (pfree == null) return { ok: false, error: "Trip papers on Free must be a whole number from 0 to 1000." };
   if (ppro == null) return { ok: false, error: "Trip papers on Pro must be a whole number from 1 to 10000." };
   if (ppro < pfree) return { ok: false, error: "Pro must hold at least as many trip papers as Free." };
-  return { ok: true, value: { starts, free_ai_scans: scans, free_documents: free, pro_documents: pro, free_shared_cards: shared, free_trip_papers: pfree, pro_trip_papers: ppro } };
+  if (jfree == null) return { ok: false, error: "Projects on Free must be a whole number from 0 to 1000." };
+  if (jpro == null) return { ok: false, error: "Projects on Pro must be a whole number from 1 to 10000." };
+  if (jpro < jfree) return { ok: false, error: "Pro must hold at least as many projects as Free." };
+  return { ok: true, value: { starts, free_ai_scans: scans, free_documents: free, pro_documents: pro, free_shared_cards: shared, free_trip_papers: pfree, pro_trip_papers: ppro, free_projects: jfree, pro_projects: jpro } };
 }
 
 /** True when this one limit is on today. */
@@ -121,6 +130,9 @@ export const sharingStatus = (l: Limits, who: Who, shared: number, today: string
 /** Papers on one trip. */
 export const papersStatus = (l: Limits, who: Who, papers: number, today: string): CountStatus => countStatus(limitOn(l, "trip_papers", today), who, papers, l.free_trip_papers, l.pro_trip_papers);
 
+/** Active business projects. Finished ones do not count. */
+export const projectsStatus = (l: Limits, who: Who, active: number, today: string): CountStatus => countStatus(limitOn(l, "projects", today), who, active, l.free_projects, l.pro_projects);
+
 /** The "What you get" table on the Get Pro page: one row for each limit that has a start day. */
 export function proComparison(l: Limits): { label: string; free: string; pro: string }[] {
   const has = (k: LimitKey) => !!l.starts[k];
@@ -133,6 +145,7 @@ export function proComparison(l: Limits): { label: string; free: string; pro: st
   if (has("doc_reminders")) rows.push({ label: "Expiry reminders", free: "No", pro: "Yes" });
   if (has("card_sharing")) rows.push({ label: "Shared loyalty cards", free: String(l.free_shared_cards), pro: "No limit" });
   if (has("trip_papers")) rows.push({ label: "Papers per trip", free: String(l.free_trip_papers), pro: String(l.pro_trip_papers) });
+  if (has("projects")) rows.push({ label: "Active business projects", free: String(l.free_projects), pro: String(l.pro_projects) });
   rows.push({ label: "Excel and PDF reports", free: "No", pro: "Yes" });
   return rows;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Check, ChevronDown, ChevronUp, Mail, Plane, Send, Share2, Sparkles, FileText, type LucideIcon } from "lucide-react";
+import { Bell, Briefcase, Check, ChevronDown, ChevronUp, Mail, Plane, Send, Share2, Sparkles, FileText, type LucideIcon } from "lucide-react";
 import { ProSubHeader } from "@/components/admin/ProSubHeader";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,11 +11,11 @@ import { cn, formatDate, todayISO } from "@/lib/utils";
 import { DEFAULT_LIMITS, LIMIT_KEYS, LIMIT_LABEL, limitOn, type LimitKey, type Limits } from "@/lib/limits";
 
 type Mode = "off" | "now" | "date";
-type Num = { scans: string; free: string; pro: string; shared: string; pfree: string; ppro: string };
+type Num = { scans: string; free: string; pro: string; shared: string; pfree: string; ppro: string; jfree: string; jpro: string };
 const addDay = (iso: string) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + 1); return d.toISOString().slice(0, 10); };
 
 const FREE_LIMITS: { key: LimitKey; icon: LucideIcon }[] = [
-  { key: "ai_scans", icon: Sparkles }, { key: "documents", icon: FileText }, { key: "card_sharing", icon: Share2 }, { key: "trip_papers", icon: Plane },
+  { key: "ai_scans", icon: Sparkles }, { key: "documents", icon: FileText }, { key: "card_sharing", icon: Share2 }, { key: "trip_papers", icon: Plane }, { key: "projects", icon: Briefcase },
 ];
 const PRO_ONLY: { key: LimitKey; icon: LucideIcon; hint: string }[] = [
   { key: "bills_email", icon: Mail, hint: "Free people see Get Pro" },
@@ -33,12 +33,12 @@ export default function ProLimitsPage() {
   const [l, setL] = useState<Limits>(DEFAULT_LIMITS);
   const [modes, setModes] = useState<Record<LimitKey, Mode>>(() => Object.fromEntries(LIMIT_KEYS.map((k) => [k, "off"])) as Record<LimitKey, Mode>);
   const [open, setOpen] = useState<LimitKey | null>(null);
-  const [num, setNum] = useState<Num>({ scans: "10", free: "2", pro: "100", shared: "1", pfree: "3", ppro: "50" });
+  const [num, setNum] = useState<Num>({ scans: "10", free: "2", pro: "100", shared: "1", pfree: "3", ppro: "50", jfree: "2", jpro: "50" });
 
   const apply = (lim: Limits) => {
     setL(lim);
     setModes(Object.fromEntries(LIMIT_KEYS.map((k) => [k, !lim.starts[k] ? "off" : (lim.starts[k] as string) <= today ? "now" : "date"])) as Record<LimitKey, Mode>);
-    setNum({ scans: String(lim.free_ai_scans), free: String(lim.free_documents), pro: String(lim.pro_documents), shared: String(lim.free_shared_cards), pfree: String(lim.free_trip_papers), ppro: String(lim.pro_trip_papers) });
+    setNum({ scans: String(lim.free_ai_scans), free: String(lim.free_documents), pro: String(lim.pro_documents), shared: String(lim.free_shared_cards), pfree: String(lim.free_trip_papers), ppro: String(lim.pro_trip_papers), jfree: String(lim.free_projects), jpro: String(lim.pro_projects) });
   };
   useEffect(() => {
     (async () => {
@@ -66,7 +66,7 @@ export default function ProLimitsPage() {
     const starts = Object.fromEntries(LIMIT_KEYS.map((k) => [k, modes[k] === "off" ? null : l.starts[k]]));
     const missing = LIMIT_KEYS.find((k) => modes[k] === "date" && !l.starts[k]);
     if (missing) { setSaving(false); return setError(`Choose a start day for ${LIMIT_LABEL[missing]}.`); }
-    const res = await fetch("/api/admin/pro-limits", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ starts, free_ai_scans: num.scans, free_documents: num.free, pro_documents: num.pro, free_shared_cards: num.shared, free_trip_papers: num.pfree, pro_trip_papers: num.ppro }) });
+    const res = await fetch("/api/admin/pro-limits", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ starts, free_ai_scans: num.scans, free_documents: num.free, pro_documents: num.pro, free_shared_cards: num.shared, free_trip_papers: num.pfree, pro_trip_papers: num.ppro, free_projects: num.jfree, pro_projects: num.jpro }) });
     const json = await res.json().catch(() => ({}));
     setSaving(false);
     if (!res.ok) return setError(json.error || "Could not save.");
@@ -79,6 +79,7 @@ export default function ProLimitsPage() {
     if (k === "documents") return `Free: ${num.free} · Pro: ${num.pro}`;
     if (k === "card_sharing") return `Free: ${num.shared} card${num.shared === "1" ? "" : "s"} shared`;
     if (k === "trip_papers") return `Free: ${num.pfree} per trip`;
+    if (k === "projects") return `Free: ${num.jfree} active · Pro: ${num.jpro}`;
     return "Pro only";
   };
   const chip = (k: LimitKey) => {
@@ -95,6 +96,7 @@ export default function ProLimitsPage() {
     if (k === "documents") return <>{f("lim-free-docs", "Free", num.free, (s) => setNum((n) => ({ ...n, free: s })))}{f("lim-pro-docs", "Pro", num.pro, (s) => setNum((n) => ({ ...n, pro: s })))}</>;
     if (k === "card_sharing") return f("lim-shared", "Free can share", num.shared, (s) => setNum((n) => ({ ...n, shared: s })));
     if (k === "trip_papers") return <>{f("lim-free-papers", "Free: papers per trip", num.pfree, (s) => setNum((n) => ({ ...n, pfree: s })))}{f("lim-pro-papers", "Pro: papers per trip", num.ppro, (s) => setNum((n) => ({ ...n, ppro: s })))}</>;
+    if (k === "projects") return <>{f("lim-free-projects", "Free: active projects", num.jfree, (s) => setNum((n) => ({ ...n, jfree: s })))}{f("lim-pro-projects", "Pro: active projects", num.jpro, (s) => setNum((n) => ({ ...n, jpro: s })))}</>;
     return null;
   };
   const help: Partial<Record<LimitKey, string>> = {
@@ -102,6 +104,7 @@ export default function ProLimitsPage() {
     documents: "People over the limit keep what they have and cannot add more.",
     card_sharing: "Free people can keep this many cards shared. Pro and admins share as many as they like. Cards already shared stay shared.",
     trip_papers: "Trips that already hold more keep everything; they just cannot add more.",
+    projects: "Only active projects count. Finished ones do not. People over the limit keep every project and can still edit them; they just cannot start another.",
   };
 
   const Row = ({ k, icon: Icon, first, hint }: { k: LimitKey; icon: LucideIcon; first: boolean; hint?: string }) => {
