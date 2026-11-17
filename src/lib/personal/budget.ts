@@ -12,6 +12,7 @@ export const BUDGET_AREAS = [
   { key: "groceries", label: "Groceries" },
   { key: "utilities", label: "Utilities" },
   { key: "quick", label: "Quick spend" },
+  { key: "fuel", label: "Fuel" },
   { key: "house", label: "House" },
 ] as const;
 export type BudgetArea = (typeof BUDGET_AREAS)[number]["key"];
@@ -57,6 +58,8 @@ export type MonthInputs = {
   /** utility bills not paid yet: not counted, only mentioned (optional) */
   utilitiesDue?: { amount_usd: number | string | null }[];
   spends: { amount: number | string; currency: string; amount_usd?: number | string | null; category: string; project_id?: string | null; house_area?: string | null }[];
+  /** fill-ups of the car this month (optional: older callers have none) */
+  fuel?: { amount: number | string; currency: string; amount_usd?: number | string | null }[];
   /** costs of your projects this month */
   projects: { amount_usd: number | string | null }[];
   /** what your savings plans put aside this month (optional: older callers have none) */
@@ -72,12 +75,13 @@ export const isHouseSpend = (s: { category: string; project_id?: string | null; 
 
 /** What each area added this month, in the budget's currency. Amounts that cannot be converted are left out. */
 export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): ByArea {
-  const out: ByArea = { groceries: 0, utilities: 0, quick: 0, house: 0, savings: 0, shopping: 0 };
+  const out: ByArea = { groceries: 0, utilities: 0, quick: 0, fuel: 0, house: 0, savings: 0, shopping: 0 };
   const add = (k: SpentArea, v: number | null) => { if (v != null && Number.isFinite(v)) out[k] += v; };
   for (const g of inp.groceries) add("groceries", convert(Number(g.total), g.currency, currency));
   for (const x of inp.shopping ?? []) { const v = convert(Number(x.amount), x.currency, currency); add("shopping", v); add("groceries", v == null ? null : -v); }
   for (const u of inp.utilities) add("utilities", convert(Number(u.amount_usd) || 0, "USD", currency));
   for (const s of inp.spends) add(isHouseSpend(s) ? "house" : "quick", convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)));
+  for (const f of inp.fuel ?? []) add("fuel", convert(Number(f.amount), f.currency, currency, f.amount_usd == null ? null : Number(f.amount_usd)));
   for (const p of inp.projects) add("house", convert(Number(p.amount_usd) || 0, "USD", currency));
   for (const x of inp.savings ?? []) add("savings", convert(Number(x.amount), x.currency, currency));
   const fx = totalsByCategory(inp.fixed ?? [], currency);
@@ -96,6 +100,7 @@ export function uncountedEntries(inp: MonthInputs, currency: BudgetCurrency): nu
   let n = 0;
   for (const g of inp.groceries) if (convert(Number(g.total), g.currency, currency) == null) n++;
   for (const s of inp.spends) if (convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)) == null) n++;
+  for (const f of inp.fuel ?? []) if (convert(Number(f.amount), f.currency, currency, f.amount_usd == null ? null : Number(f.amount_usd)) == null) n++;
   return n;
 }
 
@@ -124,7 +129,7 @@ export function daysInMonthOf(today: string): number {
 }
 
 export function budgetView(setting: BudgetSetting, byArea: ByArea, today: string, uncounted = 0): BudgetView {
-  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + byArea[a.key], 0) + (byArea.savings ?? 0) + (byArea.shopping ?? 0) + FIXED_AREAS.reduce((t, k) => t + (byArea[k] ?? 0), 0));
+  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + (byArea[a.key] ?? 0), 0) + (byArea.savings ?? 0) + (byArea.shopping ?? 0) + FIXED_AREAS.reduce((t, k) => t + (byArea[k] ?? 0), 0));
   const dim = daysInMonthOf(today), day = Number(today.slice(8, 10));
   const daysLeft = dim - day + 1;
   const left = round2(Math.max(0, setting.amount - spent));

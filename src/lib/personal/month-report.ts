@@ -15,6 +15,8 @@ export type MonthRaw = {
   shopItems: { receipt_id: string; name: string; category: string | null; line_total: number | string; purchase_date: string; store: string | null; currency: string }[];
   utilities: { kind: string; provider: string | null; paid_on: string; amount_usd: number | string | null }[];
   spends: { merchant: string | null; category: string; expense_date: string; amount: number | string; currency: string; amount_usd?: number | string | null; project_id?: string | null; house_area?: string | null }[];
+  /** fill-ups of the car (optional: older callers have none) */
+  fuel?: { fill_date: string; station: string | null; amount: number | string; currency: string; amount_usd?: number | string | null }[];
   projectExpenses: { merchant: string | null; category: string | null; expense_date: string; amount_usd: number | string | null; project_name: string }[];
   savings: { amount: number; currency: string }[];
   fixed: FixedLine[];
@@ -23,7 +25,7 @@ export type MonthRaw = {
 export type MonthLine = { date: string; area: string; name: string; category: string; amount: number };
 
 export const AREA_NAME: Record<SpentArea | "loans" | "insurances" | "cards" | "gambling", string> = {
-  groceries: "Groceries", shopping: "Shopping", utilities: "Utilities", quick: "Quick spend", house: "House & repairs", savings: "Savings",
+  groceries: "Groceries", shopping: "Shopping", utilities: "Utilities", quick: "Quick spend", fuel: "Fuel", house: "House & repairs", savings: "Savings",
   loans: CATEGORY_LABEL.loans, insurances: CATEGORY_LABEL.insurances, cards: CATEGORY_LABEL.cards, gambling: CATEGORY_LABEL.gambling,
 };
 
@@ -47,6 +49,7 @@ export function monthReport(raw: MonthRaw, currency: BudgetCurrency, month: stri
   }
   for (const u of raw.utilities) add("utilities", u.paid_on, [kindLabel(u.kind), u.provider].filter(Boolean).join(" - "), "Utilities", convert(Number(u.amount_usd) || 0, "USD", currency));
   for (const s of raw.spends) add(isHouseSpend(s) ? "house" : "quick", s.expense_date, s.merchant || s.category, s.category, convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)));
+  for (const f of raw.fuel ?? []) add("fuel", f.fill_date, f.station || "Fuel fill-up", "Fuel", convert(Number(f.amount), f.currency, currency, f.amount_usd == null ? null : Number(f.amount_usd)));
   for (const p of raw.projectExpenses) add("house", p.expense_date, p.merchant || p.project_name, p.project_name, convert(Number(p.amount_usd) || 0, "USD", currency));
   for (const s of raw.savings) add("savings", month, "Savings plan", "Savings", convert(Number(s.amount), s.currency, currency));
   for (const f of raw.fixed) add(f.category, month, KIND_LABEL[f.kind], CATEGORY_LABEL[f.category], convert(f.amount, f.currency, currency));
@@ -69,11 +72,12 @@ export async function fetchMonthRaw(supabase: SupabaseClient, monthStart: string
   const end = monthEnd(monthStart);
   const inputs = await fetchMonthInputs(supabase, monthStart, userId);
   const shopNames = await fetchShoppingList(supabase);
-  const [rc, ut, sp, pr] = await Promise.all([
+  const [rc, ut, sp, pr, fu] = await Promise.all([
     withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", userId).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000), "id, store, purchase_date, total, currency, prices_only", "id, store, purchase_date, total, currency"),
     supabase.from("utility_bills").select("kind, provider, paid_on, amount_usd").eq("user_id", userId).gte("paid_on", monthStart).lte("paid_on", end).limit(500),
     withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).eq("user_id", userId).gte("expense_date", monthStart).lte("expense_date", end).limit(2000), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE),
     supabase.from("personal_projects").select("id, name").eq("user_id", userId).eq("kind", "home_project").limit(500),
+    supabase.from("fuel_fillups").select("fill_date, station, amount, currency, amount_usd").eq("user_id", userId).gte("fill_date", monthStart).lte("fill_date", end).limit(500),
   ]);
   const receipts = ((rc.data ?? []) as unknown as (MonthRaw["receipts"][number] & { prices_only?: boolean | null })[]).filter((r) => !r.prices_only);
   const names = new Map(((pr.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
@@ -94,6 +98,7 @@ export async function fetchMonthRaw(supabase: SupabaseClient, monthStart: string
     receipts, shopItems,
     utilities: ut.error ? [] : ((ut.data ?? []) as MonthRaw["utilities"]),
     spends: sp.error ? [] : ((sp.data ?? []) as unknown as MonthRaw["spends"]),
+    fuel: fu.error ? [] : ((fu.data ?? []) as unknown as NonNullable<MonthRaw["fuel"]>),
     projectExpenses,
     savings: inputs.savings ?? [],
     fixed: inputs.fixed ?? [],

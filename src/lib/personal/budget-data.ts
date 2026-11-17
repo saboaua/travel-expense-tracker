@@ -30,13 +30,15 @@ export async function fetchFixedCosts(supabase: SupabaseClient): Promise<{ costs
 export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: string, userId?: string): Promise<MonthInputs> {
   const end = monthEnd(monthStart);
   const mine = <T,>(q: T): T => (userId ? (q as unknown as { eq: (c: string, v: string) => T }).eq("user_id", userId) : q);
-  const [g, u, ud, s, pr] = await Promise.all([
+  const [g, u, ud, s, pr, fu] = await Promise.all([
     withColumnFallback((cols) => mine(supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000)), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
     // utilities count in the month they were PAID; bills not paid yet are only reported as "still due"
     mine(supabase.from("utility_bills").select("amount_usd").gte("paid_on", monthStart).lte("paid_on", end).limit(200)),
     mine(supabase.from("utility_bills").select("amount_usd").is("paid_on", null).limit(200)),
     withColumnFallback3((cols) => mine(supabase.from("personal_spends").select(cols).gte("expense_date", monthStart).lte("expense_date", end).limit(2000)), "amount, currency, amount_usd, category, project_id, house_area", "amount, currency, amount_usd, category, project_id", "amount, currency, amount_usd, category"),
     mine(supabase.from("personal_projects").select("id").eq("kind", "home_project").limit(500)),
+    // fuel fill-ups (nothing when the table is missing)
+    mine(supabase.from("fuel_fillups").select("amount, currency, amount_usd").gte("fill_date", monthStart).lte("fill_date", end).limit(500)),
   ]);
   // receipt lines in a shopping category (notebooks, clothes...) count under Shopping, not Groceries
   const shopNames = await fetchShoppingList(supabase);
@@ -72,6 +74,7 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
     utilities: u.error ? [] : ((u.data ?? []) as MonthInputs["utilities"]),
     utilitiesDue: ud.error ? [] : ((ud.data ?? []) as MonthInputs["utilities"]),
     spends: s.error ? [] : ((s.data ?? []) as unknown as MonthInputs["spends"]),
+    fuel: fu.error ? [] : ((fu.data ?? []) as unknown as NonNullable<MonthInputs["fuel"]>),
     projects,
   };
 }

@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet } from "lucide-react";
+import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet } from "lucide-react";
 import { PersonalTabs } from "@/components/layout/PersonalTabs";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
@@ -21,6 +21,7 @@ import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { fetchSavings } from "@/lib/personal/savings-data";
 import { savingsSummary } from "@/lib/personal/savings";
+import { fuelSummary, type FuelRow } from "@/lib/personal/fuel";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
 type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; currency: BudgetCurrency; converted: number; house: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
@@ -30,6 +31,12 @@ export default function PersonalHubPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const { perms, loaded } = useAccess();
   const [comingUp, setComingUp] = useState<ComingUpItem[] | null>(null);
+  // This month's fuel fill-ups (null when the table is not there yet)
+  const [fuel, setFuel] = useState<ReturnType<typeof fuelSummary> | null | undefined>(undefined);
+  useEffect(() => {
+    const monthStart = `${todayISO().slice(0, 7)}-01`;
+    createClient().from("fuel_fillups").select("id, fill_date, unit, quantity, price_per_unit, amount, currency, amount_usd, station").gte("fill_date", monthStart).limit(500).then(({ data, error }) => setFuel(error ? null : fuelSummary((data ?? []) as unknown as FuelRow[], "AWG", "L")), () => setFuel(null));
+  }, []);
   // How many IPTV subscriptions an admin has assigned to this account. The tile is only shown when there is one.
   const [myIptv, setMyIptv] = useState(0);
   const wantsMyIptv = loaded && perms.has("iptv.mine"); // admins too: an admin can be a client of someone else's provider account
@@ -119,6 +126,8 @@ export default function PersonalHubPage() {
   const rowTiles: { href: string; title: string; icon: typeof ShoppingCart; tone: IconTone; text: string; strong: boolean }[] = [
     { href: "/personal/spend", title: "Quick spend", icon: Coins, tone: "spend", strong: !!stats?.spends,
       text: !stats ? "\u00a0" : stats.spends ? `${formatCurrency(stats.spends.total, stats.spends.currency)} this month \u00b7 ${plural(stats.spends.count, "spend")}` : "Coffee, street food, anything with no receipt" },
+    { href: "/personal/fuel", title: "Fuel", icon: Fuel, tone: "projects", strong: !!fuel,
+      text: fuel === undefined ? "\u00a0" : fuel ? `${formatCurrency(fuel.total, fuel.currency)} this month \u00b7 ${plural(fuel.count, "fill-up")}` : "What you spend each time you fill the tank" },
     { href: "/personal/house", title: "House & repairs", icon: Home, tone: "house", strong: !!stats?.house?.count,
       text: !stats ? "\u00a0" : stats.house?.count ? `${formatCurrency(stats.house.total, stats.currency)} this month \u00b7 ${plural(stats.house.count, "item")}` : "Repairs and fixes for the house" },
     { href: "/personal/savings", title: "Savings", icon: PiggyBank, tone: "savings", strong: !!stats?.savings,
@@ -138,7 +147,7 @@ export default function PersonalHubPage() {
     { href: "/personal/groceries", title: "Groceries", icon: ShoppingCart, tone: "groceries", strong: !!grocery,
       text: !stats ? "\u00a0" : grocery ? `${formatCurrency(grocery.total, grocery.currency)} this month \u00b7 ${plural(grocery.count, "receipt")}` : "Receipts and item prices", add: { href: "/personal/groceries/new", label: "Scan", aria: "Scan receipt" } },
     { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
-    ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
+    ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/fuel" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
   ];
   const track: Row[] = [
     ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, tone: "subscriptions" as const, text: "Track what you pay and what is due", add: { href: "/personal/subscriptions", label: "Add" } }] : []),

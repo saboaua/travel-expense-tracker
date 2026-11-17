@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -4729,6 +4729,65 @@ try {
       await ctx.close();
       papers.splice(0, papers.length);
     }
+  });
+
+  await test("fuel: a fill-up is entered any way you like (two of three, gallons, total only), shown with the month's total, changed and deleted", async () => {
+    const { ctx, page } = await newPage();
+    const F = fake.table("fuel_fillups");
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/fuel`);
+      await page.getByTestId("fuel-empty").waitFor({ timeout: 30000 });
+      // total and price: the litres are worked out
+      await page.getByTestId("fuel-add").click();
+      await page.waitForURL(/\/personal\/fuel\/new$/, { timeout: 30000 });
+      await page.getByTestId("fuel-total").fill("50");
+      await page.getByTestId("fuel-price").fill("2.15");
+      assert((await page.getByTestId("fuel-qty").inputValue()) === "23.26", "litres worked out: " + await page.getByTestId("fuel-qty").inputValue());
+      await page.getByTestId("fuel-worked-out").waitFor();
+      await page.getByTestId("fuel-station").fill("Texaco");
+      await page.getByTestId("fuel-save").click();
+      await page.waitForURL(/\/personal\/fuel$/, { timeout: 30000 });
+      await page.getByTestId("fuel-row").first().waitFor();
+      // gallons: price and amount give the total
+      await page.getByTestId("fuel-add").click();
+      await page.waitForURL(/\/personal\/fuel\/new$/, { timeout: 30000 });
+      await page.getByTestId("fuel-unit-gal").click();
+      await page.getByTestId("fuel-price").fill("4.89");
+      await page.getByTestId("fuel-qty").fill("10.2");
+      assert((await page.getByTestId("fuel-total").inputValue()) === "49.88", "total worked out: " + await page.getByTestId("fuel-total").inputValue());
+      await page.getByTestId("fuel-save").click();
+      await page.waitForURL(/\/personal\/fuel$/, { timeout: 30000 });
+      // only the total
+      await page.getByTestId("fuel-add").click();
+      await page.waitForURL(/\/personal\/fuel\/new$/, { timeout: 30000 });
+      await page.getByTestId("fuel-total").fill("80");
+      await page.getByTestId("fuel-save").click();
+      await page.waitForURL(/\/personal\/fuel$/, { timeout: 30000 });
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="fuel-row"]').length === 3, null, { timeout: 30000 });
+      const rows = F.map((r) => [r.unit, r.quantity == null ? null : Number(r.quantity), r.price_per_unit == null ? null : Number(r.price_per_unit), Number(r.amount), r.user_id === PAT].join("|")).sort();
+      assert(JSON.stringify(rows) === JSON.stringify(["L|23.26|2.15|50|true", "gal|||80|true", "gal|10.2|4.89|49.88|true"].sort()), "stored as entered, for the owner: " + JSON.stringify(rows));
+      const text = await page.getByTestId("fuel-summary").innerText();
+      assert(/179\.88/.test(text) && /3 fill-ups/.test(text), "month total and count: " + text);
+      const list = await page.getByTestId("fuel-row").allInnerTexts();
+      assert(list.some((t) => /Texaco/.test(t) && /23\.26 L · AWG 2\.15 per L/.test(t)) && list.some((t) => /10\.2 gal/.test(t)) && list.some((t) => /Total only/.test(t)), "each row says how it was entered: " + list.join(" | "));
+      // change one
+      await page.getByTestId("fuel-row").filter({ hasText: "Texaco" }).click();
+      await page.waitForURL(/\/personal\/fuel\/[0-9a-f-]{36}$/, { timeout: 30000 });
+      await page.getByTestId("fuel-station").fill("Shell Noord");
+      await page.getByTestId("fuel-save").click();
+      await page.waitForURL(/\/personal\/fuel$/, { timeout: 30000 });
+      await page.getByTestId("fuel-row").filter({ hasText: "Shell Noord" }).waitFor();
+      assert(F.length === 3 && F.some((r) => r.station === "Shell Noord"), "changed, not duplicated");
+      // delete one
+      await page.getByTestId("fuel-row").filter({ hasText: "Total only" }).click();
+      await page.getByTestId("fuel-delete").click();
+      await page.getByRole("button", { name: /^Delete$/ }).click();
+      await page.waitForURL(/\/personal\/fuel$/, { timeout: 30000 });
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="fuel-row"]').length === 2, null, { timeout: 30000 });
+      assert(F.length === 2, "deleted from the database");
+    } finally { F.splice(0, F.length); await ctx.close(); }
   });
 
   await test("tripweather: the trip's forecast sits under the Active trip card, with its states", async () => {

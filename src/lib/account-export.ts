@@ -17,6 +17,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "savings_plans", owner: "user_id", cols: SAVINGS_PLAN_COLS },
   { table: "savings_events", owner: "user_id", cols: SAVINGS_EVENT_COLS },
   { table: "personal_spends", owner: "user_id", bucket: "receipts", cols: PERSONAL_SPEND_COLS, mid: PERSONAL_SPEND_COLS_MID, base: PERSONAL_SPEND_COLS_BASE },
+  { table: "fuel_fillups", owner: "user_id", cols: "id, fill_date, unit, quantity, price_per_unit, amount, currency, amount_usd, station, created_at" },
   { table: "utility_prefs", owner: "user_id", cols: "user_id, remind_day", order: "user_id" },
   { table: "subscriptions", owner: "user_id", cols: SUBSCRIPTION_COLS },
   { table: "grocery_receipts", owner: "user_id", bucket: "receipts", cols: GROCERY_RECEIPT_COLS, base: GROCERY_RECEIPT_COLS_BASE },

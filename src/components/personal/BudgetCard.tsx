@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Money } from "@/components/ui/money";
 import Link from "next/link";
-import { ChevronRight, Coins, Dices, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingBag, ShoppingCart, Zap, Check } from "lucide-react";
+import { ChevronRight, Coins, Dices, Fuel, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingBag, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
@@ -16,11 +16,12 @@ export const AREA_STYLE: Record<SpentArea, { color: string; icon: typeof Zap }> 
   groceries: { color: "#2563eb", icon: ShoppingCart },
   utilities: { color: "#d97706", icon: Zap },
   quick: { color: "#16a34a", icon: Coins },
+  fuel: { color: "#ea580c", icon: Fuel },
   house: { color: "#7c3aed", icon: Home },
   savings: { color: "#0d9488", icon: PiggyBank },
   shopping: { color: "#c026d3", icon: ShoppingBag },
 };
-const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", house: "/personal/house", savings: "/personal/savings" };
+const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
 const BAR_AREAS: SpentArea[] = [...BUDGET_AREAS.map((a) => a.key), "shopping", "savings"];
 /** Fixed costs: loans, insurances, credit card and gambling each get a row and a colour in the bar */
 const FIXED_STYLE: Record<FixedCategory, { color: string; icon: typeof Zap; href: string }> = {
