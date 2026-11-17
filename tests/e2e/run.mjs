@@ -929,6 +929,30 @@ try {
     await ctx.close();
   });
 
+  await test("groceries: the Scan receipt button on the Groceries page reads the photo and keeps the image, like Scan on the dashboard", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Super Food", date: null, total: 5.59, currency: "USD", source: "ai", items: [item("Milk", 2.49), item("Bread", 3.1)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/groceries`);
+    await page.getByRole("link", { name: "Scan receipt" }).click();
+    await page.waitForURL((u) => u.pathname === "/personal/groceries/new");
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+    assert((await page.locator("#gr-total").inputValue()) === "5.59", "the total was read");
+    assert(await page.locator('img[alt*="eceipt"]').first().isVisible().catch(() => false), "the photo is shown");
+    const before = fake.table("grocery_receipts").length;
+    await page.getByRole("button", { name: "Save receipt" }).click();
+    for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const saved = fake.table("grocery_receipts").find((r) => r.store === "Super Food" && Number(r.total) === 5.59);
+    assert(saved, "the receipt is saved");
+    assert(saved.receipt_path, "the photo is kept with the receipt: " + JSON.stringify(saved));
+    assert(fake.table("grocery_items").filter((x) => x.receipt_id === saved.id).length === 2, "the items are saved");
+    await ctx.close();
+  });
+
   await test("scan: when nothing can be read a blank row is ready to type into", async () => {
     const { ctx, page } = await newPage();
     await page.route("**/api/ocr", (route) => route.fulfill({ status: 502, json: { error: "AI OCR failed", reason: "ai_failed" } }));
