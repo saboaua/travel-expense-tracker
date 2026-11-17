@@ -26,6 +26,8 @@ import { addDaysISO, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
 import { deleteRow, isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
+import { DestinationTiles, QuickFuel, QuickGroceries, QuickUtilities } from "@/components/personal/QuickDestinations";
+import { DEST_KEY, isDest, type Dest } from "@/lib/personal/quick-targets";
 
 type Listed = SpendRow & { waiting?: boolean };
 
@@ -36,6 +38,10 @@ const chip = (on: boolean) =>
 export function QuickSpend() {
   const currencies = useCurrencies();
   const confirm = useConfirm();
+  const [dest, setDest] = useState<Dest>("everyday");
+  // The tile you used last comes back next time
+  useEffect(() => { try { const v = localStorage.getItem(DEST_KEY); if (isDest(v)) setDest(v); } catch { /* private mode */ } }, []);
+  const pickDest = (d: Dest) => { setDest(d); try { localStorage.setItem(DEST_KEY, d); } catch { /* private mode */ } };
   const [amount, setAmount] = useState("");
   const [currency, setCurrency] = useState(QUICK_DEFAULT_CURRENCY);
   const [what, setWhat] = useState("");
@@ -188,7 +194,10 @@ export function QuickSpend() {
       <h1 className="text-xl font-bold">{editing ? "Change spend" : "Quick spend"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">For purchases with no receipt. It counts toward your personal spending and never goes to a business trip, which still needs a receipt or invoice.</p>
 
+      {!editing && <div className="mt-4"><DestinationTiles value={dest} onChange={pickDest} /></div>}
       </div>
+      {dest === "everyday" || editing ? (
+      <>
       <form onSubmit={submit} className="mt-4 space-y-4 self-start rounded-2xl border bg-card p-4 lg:col-start-1 lg:row-start-2" data-testid="quick-spend-form">
         <div>
           <label htmlFor="qs-amount" className={label}>Amount</label>
@@ -299,6 +308,10 @@ export function QuickSpend() {
         )}
       </div>
       </div>
+      </>
+      ) : (
+        <div className="mt-4 lg:col-start-1" data-testid="quick-panel">{dest === "groceries" ? <QuickGroceries /> : dest === "fuel" ? <QuickFuel /> : <QuickUtilities />}</div>
+      )}
     </div>
   );
 }

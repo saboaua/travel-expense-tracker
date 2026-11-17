@@ -82,6 +82,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
           <p className="text-sm text-muted-foreground">{formatDate(receipt.purchase_date)}</p>
           <p className={`mt-2 text-3xl font-bold ${receipt.prices_only ? "text-muted-foreground" : ""}`}><Money amount={receipt.total} currency={receipt.currency} /></p>
           {receipt.prices_only && <p className="mt-1 text-xs text-muted-foreground" data-testid="prices-only-detail"><span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold">Prices only</span>Kept for its prices. Not counted in your spending.</p>}
+          {items.length === 0 && !receipt.prices_only && <p className="mt-1 text-xs text-muted-foreground" data-testid="total-only-detail"><span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold">Total only</span>A store and a total, no items. It counts in your budget and never goes to community prices.</p>}
           {items.length > 0 && Math.abs(receipt.total - itemsSum) > 0.05 && (
             <p className="text-xs text-muted-foreground">Items add up to {fmt(itemsSum)}; the difference is tax, discounts or items not listed.</p>
           )}

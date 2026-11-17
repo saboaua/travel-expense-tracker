@@ -4849,6 +4849,61 @@ try {
     }
   });
 
+  await test("quick spend: the tiles save a grocery total with its store, a fuel fill-up and a paid bill, each in its own place, and a waiting bill is marked paid", async () => {
+    const { ctx, page } = await newPage();
+    const stash = {};
+    try {
+      for (const t of ["grocery_receipts", "grocery_items", "fuel_fillups", "utility_bills", "personal_spends"]) stash[t] = fake.table(t).splice(0);
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // groceries: a store and a total, no items
+      await page.goto(`${BASE}/personal/spend`);
+      await page.getByTestId("dest-groceries").click();
+      await page.locator("#qg-amount").fill("220");
+      await page.getByTestId("store-name").fill("Super Food Plaza");
+      await page.getByTestId("quick-dest-save").click();
+      await page.getByTestId("quick-dest-done").waitFor();
+      for (let i = 0; i < 40 && !fake.table("grocery_receipts").length; i++) await new Promise((ok) => setTimeout(ok, 250));
+      const g = fake.table("grocery_receipts")[0];
+      assert(g && g.store === "Super Food Plaza" && Number(g.total) === 220 && fake.table("grocery_items").length === 0 && fake.table("personal_spends").length === 0, "a grocery total is saved with its store and no items: " + JSON.stringify(g));
+      await page.goto(`${BASE}/personal/groceries`);
+      await page.getByTestId("total-only-tag").first().waitFor();
+      // fuel: the amount and the station
+      await page.goto(`${BASE}/personal/spend`);
+      await page.getByTestId("dest-fuel").click();
+      await page.locator("#qf-amount").fill("60");
+      await page.getByLabel("Station name").fill("Delta");
+      await page.getByTestId("quick-dest-save").click();
+      await page.getByTestId("quick-dest-done").waitFor();
+      for (let i = 0; i < 40 && !fake.table("fuel_fillups").length; i++) await new Promise((ok) => setTimeout(ok, 250));
+      const f = fake.table("fuel_fillups")[0];
+      assert(f && Number(f.amount) === 60 && f.station === "Delta" && f.quantity == null, "a fill-up is saved: " + JSON.stringify(f));
+      // utilities: a waiting bill is marked paid; another utility is a new paid bill
+      const nextWeek = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+      fake.table("utility_bills").push({ id: "7b000000-0000-4000-8000-00000000c001", user_id: PAT, kind: "electricity", provider: "Elmar", bill_month: today.slice(0, 8) + "01", amount: 183.28, currency: "AWG", exchange_rate: 0.558659, amount_usd: 102.4, paid_on: null, due_date: nextWeek, receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/personal/spend`);
+      await page.getByTestId("dest-utilities").click();
+      await page.getByTestId("quick-bill").click();
+      await page.getByTestId("mark-paid").waitFor();
+      await page.getByTestId("mark-paid-save").click();
+      for (let i = 0; i < 40 && !fake.table("utility_bills")[0].paid_on; i++) await new Promise((ok) => setTimeout(ok, 250));
+      assert(fake.table("utility_bills").length === 1 && fake.table("utility_bills")[0].paid_on === today, "the waiting bill is marked paid, not duplicated");
+      await page.getByTestId("quick-another").click();
+      await page.getByRole("button", { name: "Water", exact: true }).click();
+      await page.locator("#qu-amount").fill("64.10");
+      await page.getByTestId("quick-dest-save").click();
+      for (let i = 0; i < 40 && fake.table("utility_bills").length < 2; i++) await new Promise((ok) => setTimeout(ok, 250));
+      const w = fake.table("utility_bills").find((b) => b.kind === "water");
+      assert(w && Number(w.amount) === 64.1 && w.paid_on === today, "another utility is saved as a paid bill: " + JSON.stringify(w));
+      // the tile you used last comes back
+      await page.goto(`${BASE}/personal/spend`);
+      await page.getByTestId("quick-utilities").waitFor();
+    } finally {
+      for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0, a.length, ...stash[t]); }
+      await ctx.close();
+    }
+  });
+
   await test("fuel: a fill-up is entered any way you like (two of three, gallons, total only), shown with the month's total, changed and deleted", async () => {
     const { ctx, page } = await newPage();
     const F = fake.table("fuel_fillups");

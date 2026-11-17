@@ -12,6 +12,7 @@ import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCar
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
+import { isTotalOnly } from "@/lib/personal/quick-targets";
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
@@ -59,6 +60,7 @@ export function GroceryOverview() {
   // Receipts kept only for their prices are listed, but never counted in the totals, categories or top items
   const receipts = useMemo(() => allReceipts.filter(isSpending), [allReceipts]);
   const items = useMemo(() => overviewItemsWithWaiting(data?.items ?? [], pending), [data, pending]);
+  const withItems = useMemo(() => new Set(items.map((x) => x.receipt_id)), [items]);
   const waitingReceipts = useMemo(() => waitingRowIds(pending, "grocery_receipts"), [pending]);
   // A receipt that has not reached the server has no page of its own yet
   const unsent = useMemo(() => new Set(pending.filter((i) => isRowSave(i) && i.table === "grocery_receipts" && i.isNew).map((i) => i.id)), [pending]);
@@ -160,7 +162,7 @@ export function GroceryOverview() {
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} unsent={unsent.has(r.id)}>
-                  <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
+                  <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
                   <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}><Money amount={r.total} currency={cur} /></p>
                 </ReceiptRow>
               ))}
