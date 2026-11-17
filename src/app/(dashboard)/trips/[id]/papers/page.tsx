@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Clock, Crown, FileText, Plus, Ticket, Trash2 } from "lucide-react";
@@ -9,8 +9,11 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
+import { OfflineNotice } from "@/components/OfflineNotice";
+import { browserKv, loadWithCache } from "@/lib/offline-store";
+import { cacheFile, fetchTripPapers, paperTripKey, papersKey, savedFileUrls } from "@/lib/offline-data";
 import { createClient } from "@/lib/supabase/client";
-import { PAPER_BUCKET, PAPER_COLS, paperRemovalDay, paperSub, type TripPaper } from "@/lib/trip-papers";
+import { PAPER_BUCKET, paperRemovalDay, paperSub, type TripPaper } from "@/lib/trip-papers";
 import { formatDate, todayISO } from "@/lib/utils";
 import { papersStatus } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
@@ -27,26 +30,56 @@ function Papers() {
   const lim = useLimits();
   const cap = lim ? papersStatus(lim.limits, lim.who, papers.length, todayISO()) : null;
 
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const local = useRef<Record<string, string>>({});
+
   const load = useCallback(async () => {
     const supabase = createClient();
+    // The session is read from the phone, so this also works with no connection
+    const { data: { session } } = await supabase.auth.getSession();
+    const uid = session?.user.id;
+    if (!uid) { setError("Sign in again to see your trip papers."); setState("ready"); return; }
     const [t, p] = await Promise.all([
-      supabase.from("trips").select("name, end_date").eq("id", id).maybeSingle(),
-      supabase.from("trip_papers").select(PAPER_COLS).eq("trip_id", id).order("created_at", { ascending: false }),
+      loadWithCache(browserKv, paperTripKey(uid, id), () => supabase.from("trips").select("name, end_date").eq("id", id).maybeSingle()),
+      loadWithCache(browserKv, papersKey(uid, id), () => fetchTripPapers(supabase, id)),
     ]);
-    setTrip((t.data as { name: string; end_date: string | null } | null) ?? null);
-    if (p.error) return setState("setup");
-    setPapers((p.data ?? []) as unknown as TripPaper[]);
+    if (t.ok && t.data) setTrip(t.data as unknown as { name: string; end_date: string | null });
+    if (!p.ok) {
+      const message = (p.error as { message?: string } | null)?.message || "";
+      if (/relation|schema cache/i.test(message)) return setState("setup");
+      setError("Could not load the trip papers. Check your connection and try again.");
+      return setState("ready");
+    }
+    setPapers(p.data);
+    setSavedAt(p.fromCache ? p.savedAt : null);
+    const paths = p.data.map((x) => x.file_path).filter(Boolean) as string[];
+    Object.values(local.current).forEach((u) => URL.revokeObjectURL(u));
+    local.current = {};
+    if (p.fromCache) local.current = await savedFileUrls(PAPER_BUCKET, paths);
+    else (async () => { for (const path of paths.slice(0, 25)) await cacheFile(supabase, PAPER_BUCKET, path); })(); // kept for the plane
     setState("ready");
   }, [id]);
   useEffect(() => { load(); }, [load]);
+  useEffect(() => () => { Object.values(local.current).forEach((u) => URL.revokeObjectURL(u)); }, []);
 
   const open = useCallback(async (p: TripPaper) => {
     setError(null);
     if (!p.file_path) return; // a note has nothing to open
+    const saved = local.current[p.file_path];
+    if (savedAt !== null || !navigator.onLine) {
+      if (saved) return setViewing({ title: p.title, url: saved, path: p.file_path });
+      const blob = await savedFileUrls(PAPER_BUCKET, [p.file_path]);
+      if (blob[p.file_path]) { local.current[p.file_path] = blob[p.file_path]; return setViewing({ title: p.title, url: blob[p.file_path], path: p.file_path }); }
+      return setError("This file is not saved on the phone. Open it once with a connection and it will be kept.");
+    }
     const { data, error: err } = await createClient().storage.from(PAPER_BUCKET).createSignedUrl(p.file_path, 600);
-    if (err || !data?.signedUrl) return setError("Could not open the file. Check your connection and try again.");
+    if (err || !data?.signedUrl) {
+      const blob = await savedFileUrls(PAPER_BUCKET, [p.file_path]);
+      if (blob[p.file_path]) return setViewing({ title: p.title, url: blob[p.file_path], path: p.file_path });
+      return setError("Could not open the file. Check your connection and try again.");
+    }
     setViewing({ title: p.title, url: data.signedUrl, path: p.file_path });
-  }, []);
+  }, [savedAt]);
   // A paper tapped on the dashboard card opens straight away
   useEffect(() => { if (openId && state === "ready") { const p = papers.find((x) => x.id === openId); if (p) open(p); } }, [openId, state, papers, open]);
 
@@ -66,6 +99,7 @@ function Papers() {
       <BackLink href={`/trips/${id}`}>{trip?.name ?? "Trip"}</BackLink>
       <PageHeader title="Trip papers" description="Transfers, tickets and booking details for this trip" />
       {state === "setup" && <Alert>Trip papers are not set up yet. Run supabase/migration_trip_papers.sql in the Supabase SQL Editor.</Alert>}
+      <OfflineNotice savedAt={savedAt} />
       {error && <Alert>{error}</Alert>}
       {state === "ready" && (
         <>

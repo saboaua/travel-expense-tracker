@@ -5,11 +5,11 @@ import { createClient } from "@/lib/supabase/client";
 import { warmOffline } from "@/lib/offline-data";
 import { clearOfflineData, WARM_KEY } from "@/lib/offline-store";
 
-const EVERY_MS = 12 * 3_600_000;
+const EVERY_MS = 4 * 3_600_000;
 
 /**
  * While online and signed in, keeps the offline copies fresh in the background: the pages that open offline, the
- * loyalty cards and documents with their photos. Runs once per build, per person, per half day, after the screen is
+ * loyalty cards and documents with their photos. Runs once per build, per person, every few hours, after the screen is
  * usable. If a different person signs in on this phone, the previous person's copies are removed first.
  */
 export function OfflineWarm() {

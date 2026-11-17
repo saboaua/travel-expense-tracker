@@ -614,6 +614,13 @@ try {
       { id: "1c000000-0000-4000-8000-000000000002", user_id: PAT, store_name: "Blue Bottle", holder_name: null, category: null, card_number: "99887766", barcode_format: "CODE128", color: null, image_path: null, back_image_path: null, created_at: new Date().toISOString() }
     );
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000000aa", user_id: PAT, kind: "passport", title: "Offline Passport", issuing_country: "Aruba", document_number: "P1234567", expiry_date: addDays(today, 900), trip_id: null, file_path: null, created_at: new Date().toISOString() });
+    // What you need at the airport: a ticket and a booking note in the trip papers, and a document attached to the trip
+    fake.storage.set(`sign/documents/${PAT}/ticket.png`, PNG);
+    fake.table("trip_papers").push(
+      { id: "7a000000-0000-4000-8000-0000000000a1", trip_id: TRIP_ID, user_id: PAT, title: "Boarding pass", note: null, file_path: `${PAT}/ticket.png`, created_at: new Date().toISOString() },
+      { id: "7a000000-0000-4000-8000-0000000000a2", trip_id: TRIP_ID, user_id: PAT, title: "Hotel booking", note: "Confirmation 8841", file_path: null, created_at: new Date().toISOString() },
+    );
+    fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000000bb", user_id: PAT, kind: "other", title: "Trip Voucher", issuing_country: null, document_number: null, expiry_date: addDays(today, 30), trip_id: TRIP_ID, file_path: `${PAT}/ticket.png`, created_at: new Date().toISOString() });
     const EXP_ID = "e0000000-0000-4000-8000-0000000000e1";
     fake.table("expenses").push({ id: EXP_ID, trip_id: TRIP_ID, user_id: PAT, merchant: "Trip Cafe", amount: 12, currency: "USD", exchange_rate: 1, amount_usd: 12, category: "Meals", expense_date: today, notes: null, receipt_path: null, created_at: new Date().toISOString() });
     const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -667,6 +674,17 @@ try {
       await page.getByText("Offline Ticket").first().waitFor();
       assert(!fake.table("travel_documents").some((d) => d.title === "Offline Ticket"), "nothing was sent while offline");
 
+      // Trip papers and the documents attached to a trip open with no connection, files included (the plane test)
+      await page.goto(`${BASE}/trips/${TRIP_ID}/papers`);
+      await page.getByText("Boarding pass").first().waitFor({ timeout: 30000 });
+      assert((await page.getByTestId("paper-row").count()) === 2, "both papers show with no connection");
+      assert(/offline/i.test(await page.getByTestId("offline-notice").innerText()), "the papers page says it is showing the saved copy");
+      await page.getByText("Boarding pass").first().click();
+      await page.getByRole("dialog", { name: /Viewing Boarding pass/ }).locator("img").waitFor({ timeout: 15000 });
+      await page.keyboard.press("Escape");
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByText("Trip Voucher").first().waitFor({ timeout: 30000 });
+
       // A trip, and an expense on it, can be changed with no connection
       await page.goto(`${BASE}/trips/${TRIP_ID}`);
       await page.getByText("Trip Cafe").first().waitFor({ timeout: 30000 });
@@ -708,6 +726,8 @@ try {
       await page.reload();
       await page.getByTestId("loyalty-tile").first().waitFor();
       await page.waitForFunction(() => !document.body.innerText.includes("Waiting to sync"), null, { timeout: 60000 });
+      // The queue sends in the background: give it a moment to finish rather than racing the banner
+      for (let i = 0; i < 60 && !(fake.table("trips").some((t) => t.name === "Offline Trip") && fake.table("personal_projects").some((t) => t.name === "Offline Kitchen") && fake.table("grocery_receipts").some((t) => t.store === "Offline Mart")); i++) await new Promise((r) => setTimeout(r, 1000));
       assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
       assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Edited Cafe", "the expense changed offline is saved once back online");
       assert(fake.table("trips").some((t) => t.name === "Offline Trip" && t.user_id === PAT), "the trip created offline is saved once back online");
