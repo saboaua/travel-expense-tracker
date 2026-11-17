@@ -3113,13 +3113,18 @@ try {
       assert((await (await page.request.get(`${BASE}/api/ocr/usage`)).json()).limited === false, "no limits until the admin sets a start day");
       // the admin sets the limits
       await ap.goto(`${BASE}/admin/pro-limits`);
-      await ap.getByTestId("lim-start").fill(addDays(today, -1));
-      await ap.locator("#lim-scans").fill("2");
-      await ap.locator("#lim-free-docs").fill("1");
+      for (const k of ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers"]) {
+        await ap.getByTestId(`lim-row-${k}`).click();
+        await ap.getByTestId(`lim-mode-${k}-now`).click();
+        if (k === "ai_scans") await ap.locator("#lim-scans").fill("2");
+        if (k === "documents") await ap.locator("#lim-free-docs").fill("1");
+        if (k === "trip_papers") await ap.locator("#lim-free-papers").fill("1");
+        await ap.getByTestId(`lim-row-${k}`).click();
+      }
       await ap.getByTestId("lim-save").click();
       for (let i = 0; i < 40 && !fake.table("pro_limits").length; i++) await new Promise((ok) => setTimeout(ok, 250));
       const row = fake.table("pro_limits")[0];
-      assert(row && row.starts_on === addDays(today, -1) && Number(row.free_ai_scans) === 2 && Number(row.free_documents) === 1, "the limits are saved: " + JSON.stringify(row));
+      assert(row && row.starts_ai_scans === today && row.starts_documents === today && row.starts_trip_papers === today && row.starts_card_sharing === today && Number(row.free_ai_scans) === 2 && Number(row.free_documents) === 1 && Number(row.free_trip_papers) === 1, "the limits are saved: " + JSON.stringify(row));
       // AI scans: 1 of 2, then used up
       fake.table("ai_scan_usage").push({ user_id: PAT, month, count: 1 });
       const u1 = await (await page.request.get(`${BASE}/api/ocr/usage`)).json();
@@ -3145,6 +3150,14 @@ try {
       assert(await page.getByTestId("doc-add").isDisabled(), "Add is off when the vault is full");
       await page.getByTestId("doc-get-pro").waitFor();
       await page.getByTestId("doc-reminders-locked").waitFor();
+      // trip papers: Free holds 1 per trip
+      fake.table("trip_papers").push({ id: "d0c00000-0000-4000-8000-0000000004bb", user_id: PAT, trip_id: TRIP_ID, title: "Limit Transfer", note: null, file_path: null, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/trips/${TRIP_ID}/papers`);
+      await page.getByTestId("paper-meter").waitFor();
+      assert(/1 of 1/.test(await page.getByTestId("paper-meter").textContent()), "the trip says 1 of 1 papers");
+      await page.getByTestId("paper-get-pro").waitFor();
+      assert((await page.getByTestId("paper-add").count()) === 0, "no Add paper when the trip is full");
+      fake.table("trip_papers").length = 0;
       // bill import by email is Pro
       await page.goto(`${BASE}/personal/utilities/emails`);
       await page.getByTestId("bills-email-locked").waitFor();

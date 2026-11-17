@@ -7,7 +7,7 @@ import { todayISO } from "@/lib/utils";
 export async function loadLimits(db: SupabaseClient): Promise<Limits> {
   const { data, error } = await db.from("pro_limits").select(LIMITS_COLS).eq("id", 1).maybeSingle();
   if (error || !data) return DEFAULT_LIMITS;
-  return readLimits(data as Partial<Record<keyof Limits, unknown>>);
+  return readLimits(data as unknown as Record<string, unknown>);
 }
 
 export async function whoIs(db: SupabaseClient, userId: string): Promise<Who> {
@@ -21,7 +21,6 @@ export async function whoIs(db: SupabaseClient, userId: string): Promise<Who> {
 /** True when this person is held back from the feature today. */
 export async function isLocked(db: SupabaseClient, userId: string, feature: ProFeature, today = todayISO()): Promise<boolean> {
   const limits = await loadLimits(db);
-  if (!limits.starts_on) return false;
   return featureLocked(limits, await whoIs(db, userId), feature, today);
 }
 

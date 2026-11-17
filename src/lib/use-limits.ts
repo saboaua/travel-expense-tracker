@@ -26,7 +26,7 @@ export function useLimits(): LimitsInfo | null {
         ]);
         const admin = prof.data?.role === "admin";
         const pro = admin || (!plan.error && isProActive(plan.data as { plan: "pro"; ends_on: string | null } | null, todayISO()));
-        if (live) setInfo({ limits: lim.error ? DEFAULT_LIMITS : readLimits(lim.data as Partial<Record<keyof Limits, unknown>> | null), who: { pro, admin }, uid });
+        if (live) setInfo({ limits: lim.error ? DEFAULT_LIMITS : readLimits(lim.data as unknown as Record<string, unknown> | null), who: { pro, admin }, uid });
       } catch { /* offline: nothing is limited */ }
     })();
     return () => { live = false; };

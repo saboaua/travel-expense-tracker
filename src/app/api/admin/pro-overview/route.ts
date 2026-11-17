@@ -27,7 +27,7 @@ export async function GET() {
     today,
     ...proOverview(rows, today),
     waiting,
-    limits: lim.data ? readLimits(lim.data) : DEFAULT_LIMITS,
+    limits: lim.data ? readLimits(lim.data as unknown as Record<string, unknown>) : DEFAULT_LIMITS,
     trial: trial.data ? readTrial(trial.data) : DEFAULT_TRIAL,
   });
 }

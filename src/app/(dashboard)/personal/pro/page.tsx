@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Bitcoin, Check, Clock, Copy, Crown, Landmark } from "lucide-react";
 import { BitcoinPay } from "@/components/pro/BitcoinPay";
 import { withColumnFallback } from "@/lib/columns";
-import { proComparison } from "@/lib/limits";
+import { limitsSet, proComparison } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
@@ -112,7 +112,7 @@ export default function GetProPage() {
 
           {ready && !pending && (
             <>
-              {lim?.limits.starts_on && !proNow && (
+              {lim && limitsSet(lim.limits) && !proNow && (
                 <Card><CardContent className="py-4" data-testid="pro-compare">
                   <div className="flex items-center pb-1.5 text-xs font-extrabold text-muted-foreground"><span className="flex-[1.6]" /><span className="flex-1 text-center">Free</span><span className="flex-1 text-center text-primary">Pro</span></div>
                   {proComparison(lim.limits).map((r) => (

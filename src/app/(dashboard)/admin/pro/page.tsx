@@ -8,7 +8,7 @@ import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import { trialSummary, type TrialSettings } from "@/lib/pro-trial";
-import { limitsActive, type Limits } from "@/lib/limits";
+import { LIMIT_KEYS, limitOn, limitsSet, type Limits } from "@/lib/limits";
 import { cn } from "@/lib/utils";
 
 type Overview = { today: string; proNow: number; ending: number; onTrial: number; waiting: number; limits: Limits; trial: TrialSettings };
@@ -28,7 +28,7 @@ export default function AdminProPage() {
   const rows = o ? [
     { href: "/admin/pro/people", icon: Users, tone: "people" as const, title: "People and access", sub: "Give or end Pro for one person", status: `${o.proNow} Pro`, status2: o.ending ? `${o.ending} ending` : "", id: "people" },
     { href: "/admin/pro/payments", icon: Banknote, tone: "money" as const, title: "Prices and payments", sub: "Prices, bank accounts, Bitcoin", status: o.waiting ? `${o.waiting} waiting` : "Nothing waiting", status2: "", id: "payments", alert: o.waiting > 0 },
-    { href: "/admin/pro/limits", icon: Scale, tone: "fixed" as const, title: "Free plan limits", sub: "AI scans, documents, Pro-only features", status: `${o.limits.free_ai_scans} scans`, status2: limitsActive(o.limits, o.today) ? "On" : o.limits.starts_on ? `from ${o.limits.starts_on}` : "Not started", id: "limits" },
+    { href: "/admin/pro/limits", icon: Scale, tone: "fixed" as const, title: "Free plan limits", sub: "Choose which limits start, and when", status: `${LIMIT_KEYS.filter((k) => limitOn(o.limits, k, o.today)).length} of ${LIMIT_KEYS.length} on`, status2: LIMIT_KEYS.some((k) => limitOn(o.limits, k, o.today)) ? "" : limitsSet(o.limits) ? "Scheduled" : "Not started", id: "limits" },
     { href: "/admin/pro/trial", icon: Gift, tone: "badges" as const, title: "Free Pro month", sub: "New accounts try Pro first", status: o.trial.mode === "off" ? "Off" : o.trial.mode === "always" ? "On" : "Dates", status2: o.trial.mode === "off" ? "" : `${o.trial.days} days`, id: "trial", good: o.trial.mode === "always" },
   ] : [];
 

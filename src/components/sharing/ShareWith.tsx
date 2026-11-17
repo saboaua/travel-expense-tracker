@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Users } from "lucide-react";
+import { Crown, Lock, Users } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm";
 import { activePartners, kindLabel, sharedWith, type ShareKind } from "@/lib/sharing";
 import { sharingAction, useSharing } from "@/lib/use-sharing";
+import { sharingStatus } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
+import { todayISO } from "@/lib/utils";
 
 /**
  * "Share with" row on a card or a trip (owner only). Nothing is shared unless a switch here is turned on for that one partner.
@@ -13,6 +16,7 @@ import { sharingAction, useSharing } from "@/lib/use-sharing";
 export function ShareWith({ kind, itemId, className = "" }: { kind: ShareKind; itemId: string; className?: string }) {
   const { overview, refresh } = useSharing();
   const confirm = useConfirm();
+  const lim = useLimits();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,6 +31,21 @@ export function ShareWith({ kind, itemId, className = "" }: { kind: ShareKind; i
         <Users className="mr-1 inline h-3.5 w-3.5" aria-hidden="true" />
         Want to share this {what}? Add a partner in <Link href="/profile#sharing" className="font-semibold text-primary hover:underline">Profile</Link>.
       </p>
+    );
+  }
+
+  // Free plan: the card limit is full and this card is not one of the shared ones
+  const sharedCards = new Set(overview.shares.filter((x) => x.kind === "loyalty_card").map((x) => x.item_id));
+  const st = kind === "loyalty_card" && lim ? sharingStatus(lim.limits, lim.who, sharedCards.size, todayISO()) : null;
+  if (st?.full && Object.keys(shared).length === 0) {
+    return (
+      <div className={`rounded-xl border bg-card p-3 ${className}`} data-testid="share-limit">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700" aria-hidden="true"><Lock className="h-5 w-5" /></span>
+          <div><p className="text-sm font-extrabold">Share more cards with Pro</p><p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">You share {st.limit} card{st.limit === 1 ? "" : "s"}, the most Free allows. Stop sharing one to share another.</p></div>
+        </div>
+        <Link href="/personal/pro" className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground hover:bg-primary/90"><Crown className="h-4 w-4" aria-hidden="true" />Get Pro</Link>
+      </div>
     );
   }
 

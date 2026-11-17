@@ -12,7 +12,9 @@ import { createClient } from "@/lib/supabase/client";
 import { compressReceiptImage } from "@/lib/compress-image";
 import { ALLOWED, DOC_ACCEPT, MAX_DOC_BYTES, formatBytes, safeName } from "@/lib/document-upload";
 import { PAPER_BUCKET, paperRemovalDay, parsePaper } from "@/lib/trip-papers";
-import { formatDate } from "@/lib/utils";
+import { formatDate, todayISO } from "@/lib/utils";
+import { papersStatus } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
 
 export default function NewTripPaperPage() {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +25,7 @@ export default function NewTripPaperPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endDate, setEndDate] = useState<string | null>(null);
+  const lim = useLimits();
   const camera = useRef<HTMLInputElement>(null);
   const picker = useRef<HTMLInputElement>(null);
 
@@ -45,6 +48,11 @@ export default function NewTripPaperPage() {
       const { data: { session } } = await supabase.auth.getSession();
       const uid = session?.user.id;
       if (!uid) throw new Error("Sign in again to save.");
+      if (lim) {
+        const { count } = await supabase.from("trip_papers").select("id", { count: "exact", head: true }).eq("trip_id", id);
+        const cap = papersStatus(lim.limits, lim.who, count ?? 0, todayISO());
+        if (cap.full) throw new Error(`Your ${lim.who.pro ? "Pro" : "Free"} plan holds ${cap.limit} papers per trip.${lim.who.pro ? "" : " Get Pro to add more."}`);
+      }
       let path: string | null = null;
       if (file) {
         let f = file;

@@ -28,6 +28,7 @@ need_cols(tbl, col, fix) as (values
   ('plan_payments','btc_address','migration_pro_bitcoin.sql'),
   ('plan_payments','claimed_at','migration_pro_bitcoin.sql'),
   ('pro_limits','free_ai_scans','migration_pro_limits.sql'),
+  ('pro_limits','starts_trip_papers','migration_limit_starts.sql'),
   ('pro_trial_settings','days','migration_pro_trial.sql'),
   ('trip_papers','note','migration_trip_papers.sql'),
   ('btc_addresses','derive_index','migration_pro_bitcoin_xpub.sql'),

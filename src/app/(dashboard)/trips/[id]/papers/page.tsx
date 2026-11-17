@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Clock, FileText, Plus, Ticket, Trash2 } from "lucide-react";
+import { Clock, Crown, FileText, Plus, Ticket, Trash2 } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { createClient } from "@/lib/supabase/client";
 import { PAPER_BUCKET, PAPER_COLS, paperRemovalDay, paperSub, type TripPaper } from "@/lib/trip-papers";
-import { formatDate } from "@/lib/utils";
+import { formatDate, todayISO } from "@/lib/utils";
+import { papersStatus } from "@/lib/limits";
+import { useLimits } from "@/lib/use-limits";
 
 function Papers() {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +24,8 @@ function Papers() {
   const [error, setError] = useState<string | null>(null);
   const [viewing, setViewing] = useState<{ title: string; url: string; path: string } | null>(null);
   const [asked, setAsked] = useState<string | null>(null);
+  const lim = useLimits();
+  const cap = lim ? papersStatus(lim.limits, lim.who, papers.length, todayISO()) : null;
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -69,6 +73,13 @@ function Papers() {
             <Clock className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" aria-hidden="true" />
             <span>Only you see these. {removalDay ? <>They are removed on <b>{formatDate(removalDay)}</b>, 7 days after the trip ends.</> : "They are removed 7 days after the trip ends. Set an end date for the trip to see the day."}</span>
           </div>
+          {cap && cap.limit != null && (
+            <div className="rounded-xl border bg-card p-3" data-testid="paper-meter">
+              <div className="flex items-baseline justify-between"><span className="text-sm font-extrabold">Papers on this trip</span><span className="text-[13px] font-bold text-muted-foreground">{cap.count} of {cap.limit}</span></div>
+              <div className="my-2 h-2 rounded bg-muted"><div className={`h-2 rounded ${cap.full ? "bg-amber-600" : "bg-primary"}`} style={{ width: `${Math.min(100, Math.round((100 * cap.count) / Math.max(1, cap.limit)))}%` }} /></div>
+              <p className="text-xs text-muted-foreground">{cap.full ? (lim?.who.pro ? `This trip holds up to ${cap.limit} papers.` : `This trip is full on Free. Pro holds up to ${lim?.limits.pro_trip_papers} papers per trip.`) : `The ${lim?.who.pro ? "Pro" : "Free"} plan holds ${cap.limit} papers per trip.`}</p>
+            </div>
+          )}
           {papers.length === 0 ? (
             <Card><CardContent className="py-8 text-center text-sm text-muted-foreground" data-testid="papers-empty">Nothing here yet. Add the transfer, tickets or booking details.</CardContent></Card>
           ) : (
@@ -88,7 +99,11 @@ function Papers() {
               ))}
             </CardContent></Card>
           )}
-          <Link href={`/trips/${id}/papers/new`} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground hover:bg-primary/90" data-testid="paper-add"><Plus className="h-5 w-5" aria-hidden="true" />Add paper</Link>
+          {cap?.full ? (
+            lim?.who.pro ? null : <Link href="/personal/pro" className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border bg-card px-4 text-[15px] font-bold hover:bg-accent" data-testid="paper-get-pro"><Crown className="h-5 w-5 text-primary" aria-hidden="true" />Get Pro to add more</Link>
+          ) : (
+            <Link href={`/trips/${id}/papers/new`} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-[15px] font-bold text-primary-foreground hover:bg-primary/90" data-testid="paper-add"><Plus className="h-5 w-5" aria-hidden="true" />Add paper</Link>
+          )}
         </>
       )}
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}
