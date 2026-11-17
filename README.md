@@ -133,6 +133,13 @@ supabase/
 - [ ] Offline support / PWA
 - [ ] Multi-currency conversion
 - [ ] Team / shared trips
+- [ ] Travel calendar (designed, approved on the Design canvas: boards CAL1 to CAL6)
+  - One calendar above Business and Personal, opened from a week strip on Home and from Menu (no new tab)
+  - Built from trips, flights and hotel stays already in the app, plus events added by hand or imported
+  - Import from a calendar file (.ics) or a share link: the person picks the events; only title, day, time and place are kept (no guests, notes or meeting links), and no Google or Outlook sign-in
+  - Each event is Business, Personal or Imported; filters All / Business / Personal / partner
+  - Sharing reuses partner approval (whole calendar, or per event); partners see events read-only
+  - Later: an optional live link that refreshes the chosen events; forwarding an invite by email
 
 ## License
 
