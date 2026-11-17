@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_LIMITS, LIMITS_COLS, readLimits, type Limits, type Who } from "@/lib/limits";
+import { DEFAULT_LIMITS, readLimits, selectLimits, type Limits, type Who } from "@/lib/limits";
 import { PLAN_COLS, isProActive } from "@/lib/plans";
 import { todayISO } from "@/lib/utils";
 
@@ -21,7 +21,7 @@ export function useLimits(): LimitsInfo | null {
         if (!uid) return;
         const [prof, lim, plan] = await Promise.all([
           supabase.from("profiles").select("role").eq("id", uid).single(),
-          supabase.from("pro_limits").select(LIMITS_COLS).eq("id", 1).maybeSingle(),
+          selectLimits((c) => supabase.from("pro_limits").select(c).eq("id", 1).maybeSingle()),
           supabase.from("user_plans").select(PLAN_COLS).eq("user_id", uid).maybeSingle(),
         ]);
         const admin = prof.data?.role === "admin";

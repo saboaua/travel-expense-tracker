@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Check, Crown, Lock } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { defaultEndsOn, planSummary, type ManualPeriod, type PlanRow } from "@/lib/plans";
+import { extendedEndsOn, planSummary, type ManualPeriod, type PlanRow } from "@/lib/plans";
 import { METHOD_LABEL, priceFor, userReference, type PayMethod, type PaymentSettings } from "@/lib/payments";
 
 type Person = { id: string; email: string | null; name: string; role: string; plan: PlanRow | null };
@@ -51,14 +51,15 @@ export default function AdminPlansPage() {
   const chosen = people.find((p) => p.id === pick) ?? null;
 
   const fillPayment = (c: Choice, id: string) => { setAmount(cfg && (c === "monthly" || c === "yearly") ? String(priceFor(cfg, c)) : ""); setPaidOn(today); setRef(userReference(id)); setNote(""); };
-  const choose = (id: string) => { setPick(id); setNotice(null); setPeriod("monthly"); setEndsOn(defaultEndsOn("monthly", today) ?? ""); setGot(false); setMethod("aruba_bank"); fillPayment("monthly", id); };
-  const changePeriod = (c: Choice) => { setPeriod(c); setEndsOn(c === "free" ? "" : defaultEndsOn(c, today) ?? ""); if (c === "gift" || c === "free") setGot(false); if (pick) fillPayment(c, pick); };
-  const save = async () => {
+  const choose = (id: string) => { setPick(id); setNotice(null); setPeriod("monthly"); setEndsOn(extendedEndsOn("monthly", today, people.find((x) => x.id === id)?.plan) ?? ""); setGot(false); setMethod("aruba_bank"); fillPayment("monthly", id); };
+  const changePeriod = (c: Choice) => { setPeriod(c); setEndsOn(c === "free" ? "" : extendedEndsOn(c, today, chosen?.plan) ?? ""); if (c === "gift" || c === "free") setGot(false); if (pick) fillPayment(c, pick); };
+  const save = async (replace = false) => {
     if (!chosen) return;
     setSaving(true); setError(null); setNotice(null);
-    const res = await fetch("/api/admin/plans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: chosen.id, period, endsOn: period === "free" ? undefined : endsOn || null, payment: got && (period === "monthly" || period === "yearly") ? { amount, paid_on: paidOn, method, reference: ref, note } : undefined }) });
+    const res = await fetch("/api/admin/plans", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ userId: chosen.id, period, endsOn: period === "free" ? undefined : endsOn || null, replace: replace || undefined, payment: got && (period === "monthly" || period === "yearly") ? { amount, paid_on: paidOn, method, reference: ref, note } : undefined }) });
     const json = await res.json().catch(() => ({}));
     setSaving(false);
+    if (res.status === 409 && json.conflict) { if (window.confirm(`${json.error}\n\nReplace it anyway?`)) return save(true); return; }
     if (!res.ok) return setError(json.error || "Could not save.");
     setNotice(period === "free" ? `${chosen.name} is on the free plan.` : `Pro is on for ${chosen.name}.`);
     setPick(null);
@@ -107,7 +108,7 @@ export default function AdminPlansPage() {
             <div className="max-w-xs space-y-1.5">
               <label htmlFor="plan-ends" className="text-sm font-medium">Pro ends on</label>
               <Input id="plan-ends" type="date" value={endsOn} min={today} onChange={(e) => setEndsOn(e.target.value)} />
-              <p className="text-xs text-muted-foreground">{period === "gift" ? "Leave it empty for no end date." : "Set when the paid time runs out. Pro switches off after this day."}</p>
+              <p className="text-xs text-muted-foreground">{period === "gift" ? "Leave it empty for no end date." : chosen.plan && planSummary(chosen.plan, today).pro ? `They have Pro ${chosen.plan.ends_on ? "until " + chosen.plan.ends_on : "with no end date"}. The new time is added on top of it.` : "Set when the paid time runs out. Pro switches off after this day."}</p>
             </div>
           )}
           {(period === "monthly" || period === "yearly") && (
@@ -128,7 +129,7 @@ export default function AdminPlansPage() {
               )}
             </div>
           )}
-          <div className="flex gap-2"><Button onClick={save} disabled={saving} data-testid="plan-save"><Check className="h-4 w-4" aria-hidden="true" />{period === "free" ? "Remove Pro" : "Turn on Pro"}</Button><Button variant="outline" onClick={() => setPick(null)}>Cancel</Button></div>
+          <div className="flex gap-2"><Button onClick={() => save()} disabled={saving} data-testid="plan-save"><Check className="h-4 w-4" aria-hidden="true" />{period === "free" ? "Remove Pro" : "Turn on Pro"}</Button><Button variant="outline" onClick={() => setPick(null)}>Cancel</Button></div>
         </CardContent></Card>
       )}
     </div>

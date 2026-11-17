@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireAdminService, isMissingTable } from "@/lib/admin-roles-api";
 import { onProOn } from "@/lib/pro-on";
 import { logAudit } from "@/lib/audit";
-import { PLAN_COLS, defaultEndsOn, isIsoDate, isPeriod } from "@/lib/plans";
+import { PLAN_COLS, extendedEndsOn, isIsoDate, isPeriod, shortensPlan, PERIOD_LABEL, type PlanRow } from "@/lib/plans";
 import { parseReceived } from "@/lib/payments";
 import { todayISO } from "@/lib/utils";
 
@@ -30,7 +30,7 @@ export async function GET() {
   });
 }
 
-/** Body: { userId, period: "monthly" | "yearly" | "gift" | "free", endsOn?: "YYYY-MM-DD", payment?: { amount, paid_on, method, reference, note } }. Free removes the plan. A payment is kept in the ledger as confirmed. */
+/** Body: { userId, period: "monthly" | "yearly" | "gift" | "free", endsOn?: "YYYY-MM-DD", replace?: true, payment?: { amount, paid_on, method, reference, note } }. Adding a plan to someone who still has Pro adds the time to what they have left; an end date earlier than their current one is refused (409) unless replace is true. Free removes the plan. A payment is kept in the ledger as confirmed. */
 export async function PUT(request: Request) {
   const ctx = await requireAdminService();
   if ("error" in ctx) return NextResponse.json({ error: ctx.error }, { status: ctx.status });
@@ -46,9 +46,17 @@ export async function PUT(request: Request) {
   }
   if (!isPeriod(body.period)) return NextResponse.json({ error: "Choose Monthly, Yearly or Free gift." }, { status: 400 });
   const today = todayISO();
-  const endsOn = body.endsOn === undefined || body.endsOn === "" ? defaultEndsOn(body.period, today) : body.endsOn === null ? null : body.endsOn;
+  const { data: currentPlan } = await ctx.admin.from("user_plans").select(PLAN_COLS).eq("user_id", userId).maybeSingle();
+  const current = (currentPlan ?? null) as PlanRow | null;
+  const endsOn = body.endsOn === undefined || body.endsOn === "" ? extendedEndsOn(body.period, today, current) : body.endsOn === null ? null : body.endsOn;
   if (endsOn !== null && !isIsoDate(endsOn)) return NextResponse.json({ error: "The end date is not a valid date." }, { status: 400 });
   if (endsOn !== null && endsOn < today) return NextResponse.json({ error: "The end date is already past." }, { status: 400 });
+
+  // A plan that is still running is never cut short by accident
+  if (body.replace !== true && shortensPlan(current, endsOn, today)) {
+    const until = current?.ends_on ? `until ${current.ends_on}` : "with no end date";
+    return NextResponse.json({ error: `They already have ${PERIOD_LABEL[current!.period] ?? "Pro"} ${until}. This would end it ${endsOn ? "on " + endsOn : "sooner"}.`, conflict: true }, { status: 409 });
+  }
 
   let received: ReturnType<typeof parseReceived> | null = null;
   if (body.payment) {

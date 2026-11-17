@@ -1,3 +1,4 @@
+import { isMissingColumn } from "@/lib/columns";
 /** What the Free plan allows and what only Pro has. The admin sets every number and switch; nothing here removes what people already saved. */
 
 export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects" | "trip_reports";
@@ -37,7 +38,7 @@ export function readLimits(row: Record<string, unknown> | null | undefined): Lim
   const n = (v: unknown, d: number) => (Number.isFinite(Number(v)) && v !== null && v !== "" ? Math.max(0, Math.floor(Number(v))) : d);
   const D = DEFAULT_LIMITS;
   const starts = { ...NO_STARTS };
-  for (const k of LIMIT_KEYS) { const v = r[startCol(k)]; starts[k] = isIso(v) ? v : null; }
+  for (const k of LIMIT_KEYS) { const c = startCol(k); starts[k] = !(c in r) ? D.starts[k] : isIso(r[c]) ? (r[c] as string) : null; }
   return { starts, free_ai_scans: n(r.free_ai_scans, D.free_ai_scans), free_documents: n(r.free_documents, D.free_documents), pro_documents: n(r.pro_documents, D.pro_documents), free_shared_cards: n(r.free_shared_cards, D.free_shared_cards), free_trip_papers: n(r.free_trip_papers, D.free_trip_papers), pro_trip_papers: n(r.pro_trip_papers, D.pro_trip_papers), free_projects: n(r.free_projects, D.free_projects), pro_projects: n(r.pro_projects, D.pro_projects) };
 }
 
@@ -46,6 +47,32 @@ export function limitsRow(l: Limits): Record<string, unknown> {
   const out: Record<string, unknown> = { free_ai_scans: l.free_ai_scans, free_documents: l.free_documents, pro_documents: l.pro_documents, free_shared_cards: l.free_shared_cards, free_trip_papers: l.free_trip_papers, pro_trip_papers: l.pro_trip_papers, free_projects: l.free_projects, pro_projects: l.pro_projects };
   for (const k of LIMIT_KEYS) out[startCol(k)] = l.starts[k];
   return out;
+}
+
+/**
+ * Reads the limits row. When a newer column does not exist yet (the code is live before its migration is run) that one column is left out and
+ * read as its default; every other saved setting is still read, so an update never turns the saved settings into defaults.
+ */
+export async function selectLimits(run: (columns: string) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>): Promise<{ data: Record<string, unknown> | null; error: { code?: string; message?: string } | null }> {
+  const cols = LIMITS_COLS.split(", ");
+  for (let i = 0; i <= cols.length; i++) {
+    const res = await run(cols.join(", "));
+    if (!isMissingColumn(res.error)) return { data: (res.data ?? null) as Record<string, unknown> | null, error: res.error };
+    const m = /column\s+(?:\w+\.)?"?(\w+)"?\s+does not exist/i.exec(res.error?.message ?? "") ?? /find the '(\w+)' column/i.exec(res.error?.message ?? "");
+    const at = m ? cols.indexOf(m[1]) : -1;
+    if (at < 0) return { data: null, error: res.error };
+    cols.splice(at, 1);
+  }
+  return { data: null, error: { message: "could not read the limits" } };
+}
+
+/** Fill what an admin form left out with what is saved, so an old page or a new setting never writes defaults over saved settings. */
+export function mergeLimitsBody(current: Limits, body: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...limitsRow(current), ...Object.fromEntries(Object.entries(body).filter(([k, v]) => k !== "starts" && v !== undefined)) };
+  const given = body.starts && typeof body.starts === "object" ? (body.starts as Record<string, unknown>) : {};
+  const starts: Record<string, unknown> = {};
+  for (const k of LIMIT_KEYS) starts[k] = k in given ? given[k] : current.starts[k];
+  return { ...out, starts };
 }
 
 /** Admin input. Returns the limits to save, or the sentence that says what to fix. */

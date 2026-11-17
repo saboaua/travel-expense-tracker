@@ -1,13 +1,13 @@
 /** Server side of the Pro limits: read them, find out who is Pro, count AI scans. Missing tables (migration not run) mean no limits. */
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_LIMITS, LIMITS_COLS, featureLocked, monthKey, readLimits, scanStatus, type Limits, type ProFeature, type ScanStatus, type Who } from "@/lib/limits";
+import { DEFAULT_LIMITS, featureLocked, monthKey, readLimits, scanStatus, selectLimits, type Limits, type ProFeature, type ScanStatus, type Who } from "@/lib/limits";
 import { PLAN_COLS, isProActive } from "@/lib/plans";
 import { todayISO } from "@/lib/utils";
 
 export async function loadLimits(db: SupabaseClient): Promise<Limits> {
-  const { data, error } = await db.from("pro_limits").select(LIMITS_COLS).eq("id", 1).maybeSingle();
+  const { data, error } = await selectLimits((c) => db.from("pro_limits").select(c).eq("id", 1).maybeSingle());
   if (error || !data) return DEFAULT_LIMITS;
-  return readLimits(data as unknown as Record<string, unknown>);
+  return readLimits(data);
 }
 
 export async function whoIs(db: SupabaseClient, userId: string): Promise<Who> {

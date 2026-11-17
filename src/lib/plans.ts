@@ -26,6 +26,20 @@ export function defaultEndsOn(period: PlanPeriod, today: string): string | null 
   return `${ny}-${String(nm + 1).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
 }
 
+/** The end date to suggest when an admin adds time to a person: on top of what they have left, never from today. A gift has no end. */
+export function extendedEndsOn(period: PlanPeriod, today: string, current: Pick<PlanRow, "ends_on"> | null | undefined): string | null {
+  if (period === "gift") return null;
+  const base = current?.ends_on && current.ends_on > today ? current.ends_on : today;
+  return defaultEndsOn(period, base);
+}
+
+/** Would saving this end date take time away from a plan that is still running? (No end date counts as the longest.) */
+export function shortensPlan(current: Pick<PlanRow, "plan" | "ends_on"> | null | undefined, newEndsOn: string | null, today: string): boolean {
+  if (!current || !isProActive(current, today)) return false;
+  if (current.ends_on == null) return newEndsOn !== null;
+  return newEndsOn !== null && newEndsOn < current.ends_on;
+}
+
 export const isPeriod = (v: unknown): v is ManualPeriod => v === "monthly" || v === "yearly" || v === "gift";
 export const isIsoDate = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v));
 

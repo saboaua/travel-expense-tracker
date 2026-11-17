@@ -3774,6 +3774,32 @@ try {
     assert(asst && !asst.effective.includes("personal.dashboard"), "assistant role should not have personal.dashboard once reviewed");
   });
 
+  await test("saved settings survive updates: adding Pro to someone who has it extends their time, an earlier end is refused, and an old limits page keeps the newer settings", async () => {
+    const put = (path, data) => admin.page.request.put(`${BASE}${path}`, { data });
+    fake.table("user_plans").splice(0);
+    fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "yearly", ends_on: "2099-01-31" });
+    // adding a month goes on top of what is left
+    let r = await put("/api/admin/plans", { userId: PAT, period: "monthly" });
+    assert(r.status() === 200, "adding a month works: " + r.status());
+    assert(fake.table("user_plans").find((x) => x.user_id === PAT).ends_on === "2099-02-28", "the month is added to the end date: " + JSON.stringify(fake.table("user_plans")));
+    // an earlier end date is refused, not applied
+    r = await put("/api/admin/plans", { userId: PAT, period: "monthly", endsOn: "2098-01-01" });
+    assert(r.status() === 409, "an earlier end date is refused: " + r.status());
+    assert(fake.table("user_plans").find((x) => x.user_id === PAT).ends_on === "2099-02-28", "the saved end date is unchanged");
+    r = await put("/api/admin/plans", { userId: PAT, period: "monthly", endsOn: "2098-01-01", replace: true });
+    assert(r.status() === 200 && fake.table("user_plans").find((x) => x.user_id === PAT).ends_on === "2098-01-01", "replace on purpose works");
+    fake.table("user_plans").splice(0);
+    // an old limits page (it does not know the newer settings) saves without resetting them
+    fake.table("pro_limits").length = 0;
+    fake.table("pro_limits").push({ id: 1, starts_projects: "2026-03-01", free_projects: 4, pro_projects: 25, starts_trip_reports: "2027-01-01", starts_ai_scans: "2026-12-01", free_ai_scans: 7, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50 });
+    r = await put("/api/admin/pro-limits", { free_ai_scans: 9, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, starts: { ai_scans: "2026-12-05" } });
+    assert(r.status() === 200, "the old page saves: " + r.status() + " " + (await r.text()));
+    const row = fake.table("pro_limits").find((x) => x.id === 1);
+    assert(row.free_ai_scans === 9 && row.starts_ai_scans === "2026-12-05", "what the page sent is saved");
+    assert(row.free_projects === 4 && row.pro_projects === 25 && row.starts_projects === "2026-03-01" && row.starts_trip_reports === "2027-01-01", "the newer settings are kept: " + JSON.stringify(row));
+    fake.table("pro_limits").length = 0;
+  });
+
   await test("admin: Security page shows events and the audit trail", async () => {
     await admin.page.goto(`${BASE}/admin/security`);
     await admin.page.getByRole("heading", { name: /Security/ }).first().waitFor();
