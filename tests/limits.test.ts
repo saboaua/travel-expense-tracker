@@ -87,6 +87,15 @@ eq("projects: parse numbers", (parseLimits({ ...base, free_projects: 3, pro_proj
 eq("projects: pro below free refused", parseLimits({ ...base, free_projects: 5, pro_projects: 3 }).ok, false);
 eq("projects: table row", proComparison(DEFAULT_LIMITS).find((r) => r.label === "Active business projects"), { label: "Active business projects", free: "2", pro: "50" });
 
+// Business trip reports: Pro only, from its own start day
+const tr = { ...DEFAULT_LIMITS, starts: { ...DEFAULT_LIMITS.starts, trip_reports: "2026-12-01" } };
+eq("trip reports: free is held back from the day", featureLocked(tr, FREE, "trip_reports", "2026-12-01"), true);
+eq("trip reports: before the day nothing changes", featureLocked(tr, FREE, "trip_reports", "2026-11-30"), false);
+eq("trip reports: off by default", featureLocked(DEFAULT_LIMITS, FREE, "trip_reports", "2027-01-01"), false);
+eq("trip reports: pro and admin keep everything", [featureLocked(tr, PRO, "trip_reports", "2026-12-05"), featureLocked(tr, ADMIN, "trip_reports", "2026-12-05")], [false, false]);
+eq("trip reports: parse the start day", (parseLimits({ ...base, starts: { trip_reports: "2026-12-01" } }) as { value: Limits }).value.starts.trip_reports, "2026-12-01");
+eq("trip reports: table row", proComparison(tr).find((r) => r.label.startsWith("Trip and project reports")), { label: "Trip and project reports (Excel, PDF)", free: "Receipt photos only", pro: "Yes" });
+
 // Rows from the database
 eq("strings from the database", readLimits({ starts_ai_scans: "2026-12-01", free_ai_scans: "7", free_documents: "3", pro_documents: "50", free_trip_papers: "4" }), { ...DEFAULT_LIMITS, starts: { ...DEFAULT_LIMITS.starts, ai_scans: "2026-12-01", projects: null }, free_ai_scans: 7, free_documents: 3, pro_documents: 50, free_trip_papers: 4 });
 eq("a missing row gives the defaults", readLimits(null), DEFAULT_LIMITS);
@@ -95,7 +104,7 @@ eq("row round trip", readLimits(limitsRow(on)), on);
 
 // The table on the Get Pro page follows the limits that have a start day
 eq("table follows the starts", proComparison({ ...on, starts: starts("2026-12-01", ["ai_scans", "documents"]) }).map((r) => r.label), ["AI receipt scans", "Documents", "Excel and PDF reports"]);
-eq("full table", proComparison(on).length, 10);
+eq("full table", proComparison(on).length, 11);
 eq("table numbers", proComparison(on)[0], { label: "AI receipt scans", free: "10 a month", pro: "No limit" });
 eq("new rows", proComparison({ ...on, starts: starts("2026-12-01", ["card_sharing", "trip_papers"]) }).slice(0, 2), [{ label: "Shared loyalty cards", free: "1", pro: "No limit" }, { label: "Papers per trip", free: "3", pro: "50" }]);
 

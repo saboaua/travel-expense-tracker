@@ -1,7 +1,7 @@
 /** What the Free plan allows and what only Pro has. The admin sets every number and switch; nothing here removes what people already saved. */
 
-export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects";
-export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers", "projects"];
+export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects" | "trip_reports";
+export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers", "projects", "trip_reports"];
 export type Limits = {
   /** The day each limit begins. Empty: that limit is off and everything works as before. */
   starts: Record<LimitKey, string | null>;
@@ -15,15 +15,15 @@ export type Limits = {
   free_projects: number;
   pro_projects: number;
 };
-export type ProFeature = "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders";
+export type ProFeature = "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "trip_reports";
 
 const NO_STARTS = Object.fromEntries(LIMIT_KEYS.map((k) => [k, null])) as Record<LimitKey, string | null>;
 /** Business projects are limited from the start (2 active on Free); the admin can switch it off or move the day. */
 export const DEFAULT_LIMITS: Limits = { starts: { ...NO_STARTS, projects: "2026-01-01" }, free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, free_projects: 2, pro_projects: 50 };
 export const startCol = (k: LimitKey) => `starts_${k}`;
 export const LIMITS_COLS = [...LIMIT_KEYS.map(startCol), "free_ai_scans", "free_documents", "pro_documents", "free_shared_cards", "free_trip_papers", "pro_trip_papers", "free_projects", "pro_projects"].join(", ");
-export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers", projects: "Business projects" };
-export const FEATURE_LABEL: Record<ProFeature, string> = { bills_email: LIMIT_LABEL.bills_email, telegram_save: LIMIT_LABEL.telegram_save, telegram_summary: LIMIT_LABEL.telegram_summary, doc_reminders: LIMIT_LABEL.doc_reminders };
+export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers", projects: "Business projects", trip_reports: "Business trip reports" };
+export const FEATURE_LABEL: Record<ProFeature, string> = { bills_email: LIMIT_LABEL.bills_email, telegram_save: LIMIT_LABEL.telegram_save, telegram_summary: LIMIT_LABEL.telegram_summary, doc_reminders: LIMIT_LABEL.doc_reminders, trip_reports: LIMIT_LABEL.trip_reports };
 
 /** Who is asking: Pro and admins have everything the Free limits would hold back. */
 export type Who = { pro: boolean; admin: boolean };
@@ -146,6 +146,7 @@ export function proComparison(l: Limits): { label: string; free: string; pro: st
   if (has("card_sharing")) rows.push({ label: "Shared loyalty cards", free: String(l.free_shared_cards), pro: "No limit" });
   if (has("trip_papers")) rows.push({ label: "Papers per trip", free: String(l.free_trip_papers), pro: String(l.pro_trip_papers) });
   if (has("projects")) rows.push({ label: "Active business projects", free: String(l.free_projects), pro: String(l.pro_projects) });
+  if (has("trip_reports")) rows.push({ label: "Trip and project reports (Excel, PDF)", free: "Receipt photos only", pro: "Yes" });
   rows.push({ label: "Excel and PDF reports", free: "No", pro: "Yes" });
   return rows;
 }

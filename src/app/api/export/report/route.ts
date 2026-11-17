@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { hasPro } from "@/lib/plans-server";
+import { isLocked } from "@/lib/limits-server";
 import { buildReportPdf, buildReportWorkbook } from "@/lib/report-export";
 import { buildReport, fileNameFor } from "@/lib/report-server";
 
@@ -14,7 +15,9 @@ export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!(await hasPro(supabase, user.id))) return NextResponse.json({ error: "Reports are a Pro feature. Ask your admin to turn Pro on for your account." }, { status: 402 });
+  // Project reports follow the trip reports switch; the personal reports stay Pro
+  const blocked = u.searchParams.get("scope") === "bproject" ? await isLocked(supabase, user.id, "trip_reports") : !(await hasPro(supabase, user.id));
+  if (blocked) return NextResponse.json({ error: "Reports are a Pro feature. Ask your admin to turn Pro on for your account." }, { status: 402 });
 
   const result = await buildReport(supabase, user.id, { scope: u.searchParams.get("scope") ?? "", month: u.searchParams.get("month"), id: u.searchParams.get("id"), logo: u.searchParams.get("logo") !== "0" });
   if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });

@@ -14,8 +14,9 @@ import { MONTH_LONG, summarize, type ExpenseRow } from "@/lib/reports";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { ProjectReportList, type ProjectReportRow } from "@/components/reports/ProjectReportList";
 import { PROJECT_COLS, projectTotals, type BizProject } from "@/lib/business-projects";
-import { whoIs } from "@/lib/limits-server";
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, CalendarRange, Download, FileSpreadsheet, Plane, Receipt, TrendingUp, Wallet } from "lucide-react";
+import { loadLimits, whoIs } from "@/lib/limits-server";
+import { featureLocked } from "@/lib/limits";
+import { AlertTriangle, ArrowDownRight, Crown, ArrowUpRight, CalendarRange, Download, FileSpreadsheet, Plane, Receipt, TrendingUp, Wallet } from "lucide-react";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string };
 
@@ -96,7 +97,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const t = projectTotals(mine, p.budget != null ? Number(p.budget) : null);
     return { id: p.id, name: p.name, client: p.client_name, status: p.status, total: t.total, count: t.count, budget: p.budget != null ? Number(p.budget) : null };
   });
-  const proAccess = projects.length ? (await whoIs(supabase, user.id)).pro : false;
+  const reportsLocked = featureLocked(await loadLimits(supabase), await whoIs(supabase, user.id), "trip_reports", today);
   const s = summarize(expenses, year, today.slice(0, 7));
 
   // Trips that overlap the year or have expenses in it
@@ -131,9 +132,13 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
               </Link>
             ))}
           </nav>
-          <a href={`/api/export/year/${year}/excel`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
-            <Download className="h-4 w-4" /> Export {year}
-          </a>
+          {reportsLocked ? (
+            <Link href="/personal/pro" className="inline-flex h-10 items-center gap-2 rounded-lg border bg-card px-4 text-sm font-medium hover:bg-accent" data-testid="year-excel-pro"><Crown className="h-4 w-4 text-amber-600" /> Export {year}</Link>
+          ) : (
+            <a href={`/api/export/year/${year}/excel`} className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm hover:bg-primary/90">
+              <Download className="h-4 w-4" /> Export {year}
+            </a>
+          )}
         </>}
       />
 
@@ -188,17 +193,17 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       <Section title="Export a month" subtitle="One Excel with every expense in that month: same columns as a trip report, plus trip name and destination">
         <div className="flex items-start gap-4">
           <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary sm:flex"><FileSpreadsheet className="h-5 w-5" /></span>
-          <MonthlyDownload defaultMonth={today.slice(0, 7)} />
+          <MonthlyDownload defaultMonth={today.slice(0, 7)} locked={reportsLocked} />
         </div>
       </Section>
 
       <Section title="Trip reports" subtitle={`Trips in ${year}. Download Excel, or a ZIP with the Excel and receipt images`}>
-        <TripReportList trips={tripRows} year={year} />
+        <TripReportList trips={tripRows} year={year} locked={reportsLocked} />
       </Section>
 
       {projRows.length > 0 && (
         <Section title="Project reports" subtitle="Each project with its client, receipts and budget. Excel and PDF are part of Pro">
-          <ProjectReportList projects={projRows} pro={proAccess} />
+          <ProjectReportList projects={projRows} locked={reportsLocked} />
         </Section>
       )}
     </div>

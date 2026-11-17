@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Bell, Briefcase, Check, ChevronDown, ChevronUp, Mail, Plane, Send, Share2, Sparkles, FileText, type LucideIcon } from "lucide-react";
+import { Bell, Briefcase, Check, FileSpreadsheet, ChevronDown, ChevronUp, Mail, Plane, Send, Share2, Sparkles, FileText, type LucideIcon } from "lucide-react";
 import { ProSubHeader } from "@/components/admin/ProSubHeader";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ const PRO_ONLY: { key: LimitKey; icon: LucideIcon; hint: string }[] = [
   { key: "telegram_save", icon: Send, hint: "Pro only" },
   { key: "telegram_summary", icon: Send, hint: "Pro only" },
   { key: "doc_reminders", icon: Bell, hint: "By push and Telegram" },
+  { key: "trip_reports", icon: FileSpreadsheet, hint: "Free keeps receipt photos" },
 ];
 
 export default function ProLimitsPage() {

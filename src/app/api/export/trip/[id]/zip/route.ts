@@ -1,3 +1,4 @@
+import { isLocked } from "@/lib/limits-server";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
@@ -7,7 +8,7 @@ import { isOwnReceiptPath } from "@/lib/receipt-path";
 import { EXPENSE_COLS, TRIP_EXPORT_COLS } from "@/lib/columns";
 
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
@@ -48,7 +49,10 @@ export async function GET(
     profile?.full_name ||
     undefined;
 
-  const excelBuffer = await buildTripWorkbook({
+  // Free (and "?images=1") get the receipt photos only; the Excel report is part of Pro
+  const imagesOnly = new URL(request.url).searchParams.get("images") === "1" || (await isLocked(supabase, user.id, "trip_reports"));
+
+  const excelBuffer = imagesOnly ? null : await buildTripWorkbook({
     id: trip.id,
     name: trip.name,
     start_date: trip.start_date,
@@ -63,7 +67,7 @@ export async function GET(
 
   const zip = new JSZip();
   const safeName = trip.name.replace(/[^a-z0-9-_]/gi, "_");
-  zip.file(`${safeName}_expenses.xlsx`, Buffer.from(excelBuffer));
+  if (excelBuffer) zip.file(`${safeName}_expenses.xlsx`, Buffer.from(excelBuffer));
 
   const receiptsFolder = zip.folder("receipts");
 
@@ -104,7 +108,7 @@ export async function GET(
   }
 
   const zipBytes = await zip.generateAsync({ type: "uint8array" });
-  const zipName = `${safeName}_export.zip`;
+  const zipName = imagesOnly ? `${safeName}_receipts.zip` : `${safeName}_export.zip`;
 
   // new Uint8Array(...) produces Uint8Array<ArrayBuffer>, which is a valid BlobPart
   // (plain Uint8Array from JSZip is typed as Uint8Array<ArrayBufferLike> under TS 5.9+)

@@ -1002,6 +1002,7 @@ try {
     await page.getByTestId("project-reports").waitFor();
     assert(/Harbour rebrand/.test(await page.getByTestId("project-reports").innerText()), "the project is on the Reports page");
     // the report: Free is sent to Pro, an admin or Pro gets the file with the client on it
+    fake.table("pro_limits").push({ id: 1, starts_projects: "2026-01-01", starts_trip_reports: "2026-01-01" });
     const res = await page.request.get(`${BASE}/api/export/report?scope=bproject&id=${proj.id}&format=excel`);
     assert(res.status() === 402, "the Excel report is a Pro feature: " + res.status());
     // Free holds 2 active projects
@@ -1018,6 +1019,37 @@ try {
     await page.getByTestId("new-project").waitFor();
     fake.table("business_project_receipts").length = 0;
     fake.table("business_projects").length = 0;
+    fake.table("pro_limits").length = 0;
+    await ctx.close();
+  });
+
+  await test("business trip reports: Free keeps the receipt photos, Excel and the report ZIP are Pro, and nothing changes before the start day", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    // before the start day: everything works as it did
+    let r = await page.request.get(`${BASE}/api/export/trip/${TRIP_ID}/excel`);
+    assert(r.status() === 200, "Excel works before the start day: " + r.status());
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByRole("button", { name: /Export/ }).click();
+    await page.getByTestId("export-excel").waitFor();
+    // from the start day
+    fake.table("pro_limits").push({ id: 1, starts_trip_reports: "2026-01-01" });
+    for (const path of ["excel"]) { r = await page.request.get(`${BASE}/api/export/trip/${TRIP_ID}/${path}`); assert(r.status() === 402, `trip ${path} is Pro: ` + r.status()); }
+    r = await page.request.get(`${BASE}/api/export/month/2026-11/excel`); assert(r.status() === 402, "the month Excel is Pro: " + r.status());
+    r = await page.request.get(`${BASE}/api/export/year/2026/excel`); assert(r.status() === 402, "the year Excel is Pro: " + r.status());
+    // the ZIP link still works for Free, with the photos only (no Excel inside)
+    r = await page.request.get(`${BASE}/api/export/trip/${TRIP_ID}/zip`);
+    assert(r.status() === 200 && /_receipts\.zip/.test(r.headers()["content-disposition"] || ""), "Free gets the photos ZIP: " + r.status() + " " + r.headers()["content-disposition"]);
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByRole("button", { name: /Export/ }).click();
+    await page.getByTestId("export-images").waitFor();
+    await page.getByTestId("export-excel-pro").waitFor();
+    assert((await page.getByTestId("export-excel").count()) === 0, "no plain Excel link for Free");
+    await page.goto(`${BASE}/reports`);
+    await page.getByTestId("year-excel-pro").waitFor();
+    await page.getByTestId("month-excel-pro").waitFor();
+    fake.table("pro_limits").length = 0;
     await ctx.close();
   });
 

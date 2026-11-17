@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Money } from "@/components/ui/money";
 import { createClient } from "@/lib/supabase/client";
 import { PROJECT_COLS, RECEIPT_COLS, clientLines, projectTotals, receiptUsd, type BizProject, type BizReceipt } from "@/lib/business-projects";
-import { projectsStatus } from "@/lib/limits";
+import { featureLocked, projectsStatus } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
 import { formatDate, todayISO } from "@/lib/utils";
 
@@ -80,8 +80,8 @@ export default function ProjectPage() {
     if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener");
   };
 
-  const pro = lim?.who.pro ?? false;
-  const exportLink = (format: "pdf" | "excel", label: string, Icon: typeof Download) => pro
+  const locked = !!lim && featureLocked(lim.limits, lim.who, "trip_reports", todayISO());
+  const exportLink = (format: "pdf" | "excel", label: string, Icon: typeof Download) => !locked
     ? <a key={format} href={`/api/export/report?scope=bproject&id=${id}&format=${format}`} download className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:bg-accent" data-testid={`project-${format}`}><Icon className="h-4 w-4" aria-hidden="true" />{label}</a>
     : <Link key={format} href="/personal/pro" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:bg-accent" data-testid={`project-${format}`}><Crown className="h-4 w-4 text-amber-600" aria-hidden="true" />{label}</Link>;
 
@@ -131,7 +131,7 @@ export default function ProjectPage() {
 
       <p className="px-0.5 pt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Report</p>
       <div className="flex gap-3">{exportLink("pdf", "PDF", Download)}{exportLink("excel", "Excel", FileSpreadsheet)}</div>
-      <p className="text-xs text-muted-foreground">Client details, totals by category and every receipt. {pro ? "" : "Excel and PDF reports are part of Pro."}</p>
+      <p className="text-xs text-muted-foreground">Client details, totals by category and every receipt. {locked ? "Excel and PDF reports are part of Pro." : ""}</p>
 
       <div className="flex flex-col gap-2 pt-2">
         {p.status === "active"

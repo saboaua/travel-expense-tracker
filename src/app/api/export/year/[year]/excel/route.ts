@@ -1,3 +1,4 @@
+import { isLocked } from "@/lib/limits-server";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildYearlyWorkbook } from "@/lib/export";
@@ -21,6 +22,8 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  if (await isLocked(supabase, user.id, "trip_reports")) return NextResponse.json({ error: "Excel reports are part of Pro. Receipt photos stay free.", reason: "pro" }, { status: 402 });
 
   const { data: trips } = await supabase
     .from("trips")

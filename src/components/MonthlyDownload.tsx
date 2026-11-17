@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Download } from "lucide-react";
+import Link from "next/link";
+import { Crown, Download } from "lucide-react";
 
-export function MonthlyDownload({ defaultMonth }: { defaultMonth: string }) {
+export function MonthlyDownload({ defaultMonth, locked = false }: { defaultMonth: string; locked?: boolean }) {
   const [month, setMonth] = useState(defaultMonth);
 
   return (
@@ -20,6 +21,9 @@ export function MonthlyDownload({ defaultMonth }: { defaultMonth: string }) {
           className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm sm:w-auto"
         />
       </div>
+      {locked ? (
+        <Link href="/personal/pro" className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border bg-card px-4 text-sm font-medium hover:bg-accent" data-testid="month-excel-pro"><Crown className="h-4 w-4 text-amber-600" />Excel is part of Pro</Link>
+      ) : (
       <a
         href={month ? `/api/export/month/${month}/excel` : undefined}
         aria-disabled={!month}
@@ -28,6 +32,7 @@ export function MonthlyDownload({ defaultMonth }: { defaultMonth: string }) {
         <Download className="h-4 w-4" />
         Download Excel
       </a>
+      )}
     </div>
   );
 }
