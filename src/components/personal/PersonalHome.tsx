@@ -14,6 +14,7 @@ import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTile
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
 import { BudgetCard } from "@/components/personal/BudgetCard";
+import { PricesGlance } from "@/components/personal/PricesGlance";
 import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
 import { IconTile } from "@/components/ui/icon-tile";
 import { TrialBanner } from "@/components/personal/TrialBanner";
@@ -132,7 +133,7 @@ function MyIptv() {
 }
 
 /**
- * The Personal dashboard: what is worth a daily look, in this order: Keep handy, the month budget, Active trips and their
+ * The Personal dashboard: what is worth a daily look, in this order: Keep handy, the month budget, the price cards, Active trips and their
  * travel advice, Projects, Documents, Subscriptions, and the IPTV service when an admin assigned one. A section with nothing
  * in it hides itself. Everything is set up in Personal > Organizer; the numbers and exports are in Personal > Reports.
  */
@@ -164,6 +165,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
       <div className="space-y-4 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
         <div className="min-w-0 space-y-4">
           <BudgetCard />
+          <PricesGlance />
           <ActiveTrips rows={rows} projects={projects} today={today} />
           <HomeProjects rows={rows} projects={projects} />
         </div>

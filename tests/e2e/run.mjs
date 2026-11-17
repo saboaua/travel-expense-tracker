@@ -1153,6 +1153,45 @@ try {
     }
   });
 
+  await test("home: the price cards show what changed and the cheapest store for your list, and open their pages", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const buys = [["Ling & Sons", -20, 3.49, 6.0], ["Ling & Sons", -4, 3.79, 6.0], ["New Ten Sing", -8, 3.6, 5.5]];
+    buys.forEach(([st, d, milk, rice], i) => {
+      const rid = `9c000000-0000-4000-8000-0000000d0${i}0`;
+      fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: st, purchase_date: addDays(today, d), total: milk + rice, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      [["Milk", milk], ["Rice", rice]].forEach(([n, price], ni) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000d${i}${ni}00`, receipt_id: rid, user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() }));
+    });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // Price tracker card: needs only receipts
+      const tracker = page.getByTestId("glance-tracker");
+      await tracker.waitFor({ timeout: 60_000 });
+      const t = await tracker.innerText();
+      assert(/Milk/.test(t) && /went up 9%/.test(t), `the tracker card names the item that went up (got: ${t})`);
+      assert(/1 cost more/.test(t), "and counts it");
+      assert((await page.getByTestId("glance-best").count()) === 0, "no shopping list yet: no Best prices card");
+      // Make a list on the Best prices page, then the second card appears
+      await page.goto(`${BASE}/personal/groceries/basket`);
+      const usual = page.getByTestId("usual-item");
+      await usual.first().waitFor({ timeout: 60_000 });
+      await usual.first().click();
+      await page.getByTestId("list-row").first().waitFor();
+      await page.goto(`${BASE}/`);
+      const best = page.getByTestId("glance-best");
+      await best.waitFor({ timeout: 60_000 });
+      assert(/cheapest for your list/.test(await best.innerText()), "the Best prices card names the cheapest store");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "the swipe row does not make the page scroll sideways");
+      await tracker.click();
+      await page.waitForURL((u) => u.pathname === "/personal/groceries/prices");
+    } finally {
+      await ctx.close();
+      for (const tb of ["grocery_receipts", "grocery_items", "shopping_list_items"]) { const a = fake.table(tb); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000d") || (a[i].user_id === PAT && tb === "shopping_list_items")) a.splice(i, 1); }
+    }
+  });
+
   await test("home gps: saved from the Home place card, and Best store measures from it when location is off", async () => {
     const gctx = await browser.newContext({ viewport: { width: 390, height: 844 }, geolocation: { latitude: 12.52049, longitude: -70.03051 }, permissions: ["geolocation"] });
     gctx.setDefaultTimeout(60_000);
