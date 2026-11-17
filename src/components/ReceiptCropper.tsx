@@ -25,6 +25,9 @@ export function ReceiptCropper({
   const [url, setUrl] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop>(initialCrop);
   const [busy, setBusy] = useState(false);
+  // The photo must be on screen before it can be cropped: a tap too early would cut a blank picture
+  const [loaded, setLoaded] = useState(false);
+  const gaveUp = useRef(false);
   const drag = useRef<{ mode: "move" | "nw" | "ne" | "sw" | "se"; startX: number; startY: number; start: Crop } | null>(null);
 
   useEffect(() => {
@@ -32,6 +35,13 @@ export function ReceiptCropper({
     setUrl(u);
     return () => URL.revokeObjectURL(u);
   }, [file]);
+
+  // A photo this phone cannot show (an odd format, too big): skip the crop and read the photo as it is, instead of getting stuck
+  const skipCrop = () => {
+    if (gaveUp.current) return;
+    gaveUp.current = true;
+    onDone(file);
+  };
 
   const onPointerDown = (e: React.PointerEvent, mode: "move" | "nw" | "ne" | "sw" | "se") => {
     e.preventDefault();
@@ -73,6 +83,7 @@ export function ReceiptCropper({
 
   const applyCrop = async (full: boolean) => {
     if (!imgRef.current) return;
+    if (!imgRef.current.naturalWidth) return skipCrop();
     setBusy(true);
     try {
       const img = imgRef.current;
@@ -90,6 +101,8 @@ export function ReceiptCropper({
       if (!blob) throw new Error("Crop failed");
       const cropped = new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
       onDone(cropped);
+    } catch {
+      skipCrop();
     } finally {
       setBusy(false);
     }
@@ -110,7 +123,7 @@ export function ReceiptCropper({
       <div className="relative flex flex-1 items-center justify-center overflow-hidden px-3">
         <div className="relative inline-block max-h-full max-w-full">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img ref={imgRef} src={url} alt="Crop source" className="block max-h-[60dvh] max-w-full object-contain" />
+          <img ref={imgRef} src={url} alt="Crop source" onLoad={() => setLoaded(true)} onError={skipCrop} className="block max-h-[60dvh] max-w-full object-contain" />
           <div
             className="absolute border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move touch-none"
             style={{ left: `${crop.x}%`, top: `${crop.y}%`, width: `${crop.w}%`, height: `${crop.h}%` }}
@@ -135,17 +148,17 @@ export function ReceiptCropper({
       <div className="flex gap-3 p-4 pb-6">
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !loaded}
           onClick={() => applyCrop(true)}
-          className="flex-1 h-11 rounded-lg border border-white/30 text-white text-sm font-medium"
+          className="flex-1 h-11 rounded-lg border border-white/30 text-white text-sm font-medium disabled:opacity-50"
         >
           Use full image
         </button>
         <button
           type="button"
-          disabled={busy}
+          disabled={busy || !loaded}
           onClick={() => applyCrop(false)}
-          className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2"
+          className="flex-1 h-11 rounded-lg bg-primary text-primary-foreground text-sm font-semibold inline-flex items-center justify-center gap-2 disabled:opacity-50"
         >
           <Check className="h-4 w-4" /> Crop
         </button>

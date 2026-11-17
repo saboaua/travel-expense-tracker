@@ -51,6 +51,8 @@ export function ReceiptCapture({
     }
     const reader = new FileReader();
     reader.onload = () => onFile(processed, reader.result as string);
+    // If the preview cannot be made, the photo is still read and kept
+    reader.onerror = () => onFile(processed, URL.createObjectURL(processed));
     reader.readAsDataURL(processed);
   };
 

@@ -953,6 +953,21 @@ try {
     await ctx.close();
   });
 
+  await test("groceries: a photo the phone cannot show in the crop step is still read and kept, never left blank or stuck", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Super Food", date: null, total: 5.59, currency: "USD", source: "ai", items: [item("Milk", 2.49), item("Bread", 3.1)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/groceries/new`);
+    // bytes that are not a picture: the crop screen cannot show them
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "camera.jpg", mimeType: "image/jpeg", buffer: Buffer.from("this is not a picture at all") });
+    await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+    assert((await page.locator("#gr-total").inputValue()) === "5.59", "the photo was still read");
+    assert((await page.getByRole("button", { name: "Use full image" }).count()) === 0, "the crop screen is gone, not stuck");
+    await ctx.close();
+  });
+
   await test("scan: when nothing can be read a blank row is ready to type into", async () => {
     const { ctx, page } = await newPage();
     await page.route("**/api/ocr", (route) => route.fulfill({ status: 502, json: { error: "AI OCR failed", reason: "ai_failed" } }));
