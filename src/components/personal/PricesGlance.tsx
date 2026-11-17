@@ -16,7 +16,7 @@ const chip = "inline-flex min-h-6 items-center whitespace-nowrap rounded-full bo
 const RED = "border-red-200 bg-red-50 text-red-800 dark:border-red-900 dark:bg-red-950/40 dark:text-red-200";
 const GREEN = "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200";
 const BLUE = "border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-200";
-const card = "group flex min-h-[196px] flex-col gap-2.5 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
+const card = "group flex min-h-[196px] w-full min-w-0 flex-col gap-2.5 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 function TrackerCard({ t }: { t: TrackerGlance }) {
   const fmt = (n: number) => formatCurrency(n, t.currency);
@@ -84,7 +84,7 @@ export function PricesGlance() {
         onScroll={(e) => { const el = e.currentTarget; setPage(el.scrollLeft + el.clientWidth / 2 > el.scrollWidth / 2 ? 1 : 0); }}
         className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
       >
-        {cards.map((c, i) => <div key={i} className="w-[86%] max-w-[330px] shrink-0 snap-start sm:w-[calc(50%-5px)] sm:max-w-none">{c}</div>)}
+        {cards.map((c, i) => <div key={i} className="flex w-[86%] max-w-[330px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:min-w-0 sm:flex-1 sm:basis-0">{c}</div>)}
       </div>
       {cards.length > 1 && (
         <div className="flex justify-center gap-1.5 sm:hidden" aria-hidden="true">

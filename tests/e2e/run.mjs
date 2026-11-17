@@ -1184,6 +1184,14 @@ try {
       await best.waitFor({ timeout: 60_000 });
       assert(/cheapest for your list/.test(await best.innerText()), "the Best prices card names the cheapest store");
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "the swipe row does not make the page scroll sideways");
+      const sizeOf = async () => { const a = await tracker.boundingBox(); const b = await best.boundingBox(); return [Math.round(a.width), Math.round(a.height), Math.round(b.width), Math.round(b.height)]; };
+      let [aw, ah, bw, bh] = await sizeOf();
+      assert(aw === bw && ah === bh, `both cards are the same size on a phone (${aw}x${ah} and ${bw}x${bh})`);
+      await page.setViewportSize({ width: 1100, height: 800 });
+      await page.waitForTimeout(300);
+      [aw, ah, bw, bh] = await sizeOf();
+      assert(aw === bw && ah === bh, `and side by side on a wide screen (${aw}x${ah} and ${bw}x${bh})`);
+      await page.setViewportSize({ width: 390, height: 844 });
       await tracker.click();
       await page.waitForURL((u) => u.pathname === "/personal/groceries/prices");
     } finally {
