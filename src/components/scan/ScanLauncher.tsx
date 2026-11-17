@@ -103,7 +103,7 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
   const btn = "inline-flex h-12 items-center justify-center gap-2 rounded-xl text-[15px] font-semibold transition-colors disabled:opacity-70";
   return (
     <>
-      <div className={`mt-4 grid gap-3 md:max-w-xl ${showNewTrip ? "grid-cols-3" : "grid-cols-2"}`}>
+      <div className={`mt-4 grid gap-3 md:max-w-xl ${showNewTrip ? "grid-cols-[1.25fr_1fr] md:grid-cols-3" : "grid-cols-2"}`}>
         {canScan && (
           <div className="flex h-12 overflow-hidden rounded-xl bg-primary text-primary-foreground shadow-sm">
             <button type="button" disabled={!!busy} onClick={() => camera.current?.click()} className="inline-flex flex-1 items-center justify-center gap-2 text-[15px] font-semibold transition-colors hover:bg-primary/90 disabled:opacity-70">
@@ -122,7 +122,7 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
           </button>
         )}
         {showNewTrip && (
-          <Link href="/trips/new" className={`${btn} bg-primary/10 text-primary hover:bg-primary/15`}>
+          <Link href="/trips/new" className={`${btn} col-span-2 bg-primary/10 text-primary hover:bg-primary/15 md:col-span-1`}>
             <Plus className="h-5 w-5" aria-hidden="true" />
             New Trip
           </Link>
