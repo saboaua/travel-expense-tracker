@@ -10,7 +10,7 @@ const CACHE = "expense-tracker-v6";
 const PAGES = "expense-pages-v1"; // keep in step with PAGES_CACHE in src/lib/offline-store.ts
 const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"]; // keep in step with src/lib/offline-warm.ts
 // Trip pages are kept as they are visited (and the recent ones ahead of time); keep in step with KEPT_PAGE in src/lib/offline-warm.ts
-const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|papers|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
+const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|papers|checklist|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
 const MAX_TRIP_PAGES = 150;
 const SLOW_NETWORK_MS = 6000;
 const isKept = (pathname) => OFFLINE_PAGES.includes(pathname) || KEPT_PAGE.test(pathname);

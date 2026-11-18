@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, EXPENSE_COLS, TRIP_COLS, TRIP_COLS_BASE, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 import { DOC_BUCKET } from "@/lib/document-upload";
 import { PAPER_BUCKET, PAPER_COLS, type TripPaper } from "@/lib/trip-papers";
+import { CHECKLIST_COLS, type ChecklistItem } from "@/lib/trip-checklist";
 import type { TravelDocument } from "@/lib/documents";
 import type { LoyaltyCard } from "@/lib/loyalty";
 import { LOYALTY_BUCKET } from "@/lib/loyalty-image";
@@ -25,6 +26,15 @@ export const paperTripKey = (userId: string, tripId: string) => `${userId}:paper
 /** The papers of one trip (tickets, boarding passes, bookings). */
 export function fetchTripPapers(supabase: SupabaseClient, tripId: string) {
   return supabase.from("trip_papers").select(PAPER_COLS).eq("trip_id", tripId).order("created_at", { ascending: false }) as unknown as PromiseLike<{ data: TripPaper[] | null; error: { message: string } | null }>;
+}
+
+export const checklistKey = (userId: string, tripId: string) => `${userId}:checklist:${tripId}`;
+export const checklistTripKey = (userId: string, tripId: string) => `${userId}:checklist-trip:${tripId}`;
+export type ChecklistTrip = { id: string; name: string; destination: string | null; start_date: string | null; end_date: string | null };
+
+/** The things on one trip's checklist, in the order they were added. */
+export function fetchChecklist(supabase: SupabaseClient, tripId: string) {
+  return supabase.from("trip_checklist_items").select(CHECKLIST_COLS).eq("trip_id", tripId).order("sort", { ascending: true }).order("created_at", { ascending: true }) as unknown as PromiseLike<{ data: ChecklistItem[] | null; error: { message: string } | null }>;
 }
 
 export function fetchLoyaltyCards(supabase: SupabaseClient, userId: string) {
@@ -99,7 +109,7 @@ export async function warmTrips(supabase: SupabaseClient, userId: string): Promi
   const pages = ["/trips", "/trips/new"];
   for (const t of trips as unknown as { id: string }[]) {
     await browserKv.set(tripKey(userId, t.id), t).catch(() => {});
-    pages.push(`/trips/${t.id}`, `/trips/${t.id}/edit`, `/trips/${t.id}/add-expense`, `/trips/${t.id}/papers`);
+    pages.push(`/trips/${t.id}`, `/trips/${t.id}/edit`, `/trips/${t.id}/add-expense`, `/trips/${t.id}/papers`, `/trips/${t.id}/checklist`);
     await warmTripPapers(supabase, userId, t as unknown as { id: string; name: string; start_date: string; end_date: string | null });
     const { data: expenses } = await supabase.from("expenses").select(EXPENSE_COLS).eq("trip_id", t.id).order("expense_date", { ascending: false }).limit(30);
     for (const e of (expenses ?? []) as unknown as { id: string }[]) {
@@ -113,6 +123,9 @@ export async function warmTrips(supabase: SupabaseClient, userId: string): Promi
 /** Trip papers and the documents attached to a trip: the lists for every kept trip, and the files for the trips that are on now or coming up (what you need at the airport). */
 async function warmTripPapers(supabase: SupabaseClient, userId: string, t: { id: string; name: string; start_date: string; end_date: string | null }): Promise<void> {
   await browserKv.set(paperTripKey(userId, t.id), { name: t.name, end_date: t.end_date }).catch(() => {});
+  const trip = t as unknown as ChecklistTrip;
+  await browserKv.set(checklistTripKey(userId, t.id), { id: t.id, name: t.name, destination: trip.destination ?? null, start_date: t.start_date, end_date: t.end_date } satisfies ChecklistTrip).catch(() => {});
+  await loadWithCache(browserKv, checklistKey(userId, t.id), () => fetchChecklist(supabase, t.id));
   const [papers, docs] = await Promise.all([
     loadWithCache(browserKv, papersKey(userId, t.id), () => fetchTripPapers(supabase, t.id)),
     loadWithCache(browserKv, documentsKey(userId, t.id), () => fetchDocuments(supabase, t.id)),

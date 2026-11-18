@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
-import { Camera, CalendarDays, ChevronRight, Clock, MapPin, Pencil, Plus, Tag, Ticket } from "lucide-react";
+import { Camera, CalendarDays, ChevronRight, Clock, ListChecks, MapPin, Pencil, Plus, Tag, Ticket } from "lucide-react";
 import { daysBetween, formatCurrency, formatDate, formatDateRange, todayISO } from "@/lib/utils";
 import { getDestinationInfo } from "@/lib/destination";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
@@ -59,6 +59,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   const flights = (flightRows ?? []) as unknown as TripFlight[];
   const { count: paperRows } = await supabase.from("trip_papers").select("id", { count: "exact", head: true }).eq("trip_id", id);
   const paperCount = paperRows ?? 0;
+  const checklistRows = await supabase.from("trip_checklist_items").select("done").eq("trip_id", id);
+  const checklist = checklistRows.error ? null : { total: (checklistRows.data ?? []).length, done: (checklistRows.data ?? []).filter((r) => r.done).length };
 
   const today = todayISO();
   const endDate: string = trip.end_date || trip.start_date;
@@ -200,6 +202,14 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Trip papers{paperCount > 0 && <span className="ml-1.5 text-muted-foreground">{paperCount}</span>}</span><span className="block text-xs text-muted-foreground">Transfers, tickets and booking details. Removed a week after the trip ends.</span></span>
         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>
+
+      {checklist && (
+        <Link href={`/trips/${id}/checklist`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-checklist-link">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true"><ListChecks className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Checklist{checklist.total > 0 && <span className="ml-1.5 text-muted-foreground">{checklist.done} of {checklist.total}</span>}</span><span className="block text-xs text-muted-foreground">Things to pack and do before you go. Only you see it.</span></span>
+          <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      )}
 
       <section className="rounded-xl border bg-card p-5 shadow-sm">
         <div className="mb-3">

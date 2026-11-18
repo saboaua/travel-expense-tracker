@@ -1,12 +1,13 @@
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
-import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, Plus, RefreshCw, Ticket } from "lucide-react";
+import { BedDouble, Camera, ChevronRight, Clock, MapPin, Navigation, Plane, Plus, RefreshCw, Ticket, ListChecks, Copy, Check } from "lucide-react";
 import { DestinationPhoto } from "@/components/DestinationPhoto";
 import { StatusChip } from "@/components/flights/FlightPanel";
 import { formatDate } from "@/lib/utils";
 import { BADGE_CLASS, type TripBadge } from "@/lib/trip-card";
 import { directionsUrl, type Hotel } from "@/lib/hotel";
 import { paperSub, type TripPaper } from "@/lib/trip-papers";
+import type { CardChecklist } from "@/lib/trip-checklist";
 import { clock, durationMinutes, durationText, shownArrival, shownDeparture, type TripFlight } from "@/lib/flights";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null };
@@ -142,7 +143,45 @@ function PapersStrip({ tripId, count, latest }: { tripId: string; count: number;
 }
 
 /** The trip the dashboard features: photo, dates, the next flight and what has been spent. */
-export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, hotel = null, papers = null, total, count }: {
+/** The private to-do and packing list of the trip, under Trip papers: progress and what is next, or a way to start one (or copy one from the same place). */
+function ChecklistStrip({ tripId, data }: { tripId: string; data: CardChecklist }) {
+  const base = `/trips/${tripId}/checklist`;
+  const dashed = "flex min-h-12 items-center justify-center gap-2 rounded-xl border border-dashed border-slate-400 px-3 text-sm font-bold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  if (data.total === 0 && data.suggestion) return (
+    <div className="border-t pt-3" data-testid="trip-checklist">
+      <div className="flex items-baseline justify-between"><h4 className="text-[15px] font-extrabold">Checklist</h4><span className="text-[13px] font-bold text-muted-foreground">Only you</span></div>
+      <div className="mt-2 flex items-center gap-2.5 rounded-xl border border-green-200 bg-green-50 p-3 text-sm leading-snug text-green-950 dark:border-green-900 dark:bg-green-950 dark:text-green-100" data-testid="trip-checklist-suggest"><Copy className="h-5 w-5 shrink-0 text-green-700" aria-hidden="true" /><span><b>You have a {data.suggestion.place} list.</b> Copy its {data.suggestion.count} thing{data.suggestion.count === 1 ? "" : "s"}?</span></div>
+      <div className="mt-2 grid grid-cols-2 gap-2.5">
+        <Link href={`${base}?copy=1`} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-3 text-sm font-bold text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-checklist-copy"><Copy className="h-4 w-4" aria-hidden="true" />Copy it</Link>
+        <Link href={base} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border bg-card px-3 text-sm font-bold hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-checklist-empty"><Plus className="h-4 w-4" aria-hidden="true" />Start empty</Link>
+      </div>
+    </div>
+  );
+  if (data.total === 0) return (
+    <div className="border-t pt-3" data-testid="trip-checklist">
+      <Link href={base} className={`${dashed} min-h-[52px] justify-start`} data-testid="trip-checklist-start"><ListChecks className="h-5 w-5" aria-hidden="true" /><span className="flex-1">Make a checklist for this trip</span><Plus className="h-4 w-4" aria-hidden="true" /></Link>
+    </div>
+  );
+  const all = data.done === data.total;
+  return (
+    <div className="border-t pt-3" data-testid="trip-checklist">
+      <div className="flex items-baseline justify-between"><h4 className="text-[15px] font-extrabold">Checklist <span className="font-bold text-muted-foreground" data-testid="trip-checklist-count">{data.done} of {data.total}</span></h4><span className="text-[13px] font-bold text-muted-foreground">Only you</span></div>
+      <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={data.total} aria-valuenow={data.done} aria-label="Checklist progress"><div className={`h-2 ${all ? "bg-emerald-500" : "bg-primary"}`} style={{ width: `${Math.round((100 * data.done) / data.total)}%` }} /></div>
+      {all ? (
+        <p className="mt-2 flex items-center gap-2 text-sm font-bold text-emerald-700 dark:text-emerald-300" data-testid="trip-checklist-ready"><Check className="h-4 w-4" aria-hidden="true" />Everything is ready for the trip</p>
+      ) : (
+        <ul className="mt-1 divide-y">
+          {data.next.map((i) => (
+            <li key={i.id}><Link href={base} data-testid="trip-checklist-item" className="flex min-h-12 items-center gap-3 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><span className="h-[26px] w-[26px] shrink-0 rounded-lg border-2 border-slate-400" aria-hidden="true" /><span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{i.title}</span></Link></li>
+          ))}
+        </ul>
+      )}
+      <Link href={base} className={`${dashed} mt-1.5 border-solid border-slate-300 bg-card`} data-testid="trip-checklist-open">Open checklist<ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
+    </div>
+  );
+}
+
+export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, hotel = null, papers = null, checklist = null, total, count }: {
   trip: Trip;
   imageUrl: string | null;
   badge: TripBadge;
@@ -150,6 +189,7 @@ export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, h
   moreFlights: number;
   hotel?: Hotel | null;
   papers?: { count: number; latest: TripPaper[] } | null;
+  checklist?: CardChecklist | null;
   total: number;
   count: number;
 }) {
@@ -216,6 +256,7 @@ export function FeaturedTripCard({ trip, imageUrl, badge, flight, moreFlights, h
         </div>
 
         {papers && <PapersStrip tripId={trip.id} count={papers.count} latest={papers.latest} />}
+        {checklist && <ChecklistStrip tripId={trip.id} data={checklist} />}
       </div>
     </div>
   );

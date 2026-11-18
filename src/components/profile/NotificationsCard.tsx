@@ -102,6 +102,7 @@ export function NotificationsCard() {
       { key: "trips", title: "Trip coming up", hint: "3 days and 1 day before a trip starts.", example: "\u201cWinlott Meeting starts tomorrow (Nov 17). Flight CM 312 leaves AUA at 9:45 AM.\u201d" },
       { key: "flights", title: "Flight changes", hint: "Tells you a flight on your trip changed. Wording unchanged for now.", example: "\u201cA flight on your trip changed. Open the app to check it.\u201d" },
       { key: "flightTomorrow", title: "Flight tomorrow", hint: "One reminder the day before you fly.", example: "\u201cFlight tomorrow: CM 312 AUA to PTY, 9:45 AM.\u201d", isNew: true },
+      { key: "checklist", title: "Trip checklist", hint: "If things are still not ticked: 2 days and 1 day before you leave. It only says how many are left.", example: "\u201cWinlott Meeting: 6 things not ticked yet. You leave tomorrow. Open your checklist to finish.\u201d", isNew: true },
       { key: "afterTrip", title: "After the trip", hint: "One reminder to add the last receipts and mark the trip completed.", example: "\u201cWinlott Meeting ended. Add your last receipts.\u201d", isNew: true },
     ] },
     { title: "Money and papers", rows: [

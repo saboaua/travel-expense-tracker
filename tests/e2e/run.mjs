@@ -621,6 +621,10 @@ try {
       { id: "7a000000-0000-4000-8000-0000000000a2", trip_id: TRIP_ID, user_id: PAT, title: "Hotel booking", note: "Confirmation 8841", file_path: null, created_at: new Date().toISOString() },
     );
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000000bb", user_id: PAT, kind: "other", title: "Trip Voucher", issuing_country: null, document_number: null, expiry_date: addDays(today, 30), trip_id: TRIP_ID, file_path: `${PAT}/ticket.png`, created_at: new Date().toISOString() });
+    fake.table("trip_checklist_items").push(
+      { id: "c1000000-0000-4000-8000-0000000000a1", user_id: PAT, trip_id: TRIP_ID, title: "Offline Passport check", category: "documents", done: false, sort: 1, created_at: new Date().toISOString() },
+      { id: "c1000000-0000-4000-8000-0000000000a2", user_id: PAT, trip_id: TRIP_ID, title: "Offline Charger", category: "tech", done: false, sort: 2, created_at: new Date().toISOString() },
+    );
     const EXP_ID = "e0000000-0000-4000-8000-0000000000e1";
     fake.table("expenses").push({ id: EXP_ID, trip_id: TRIP_ID, user_id: PAT, merchant: "Trip Cafe", amount: 12, currency: "USD", exchange_rate: 1, amount_usd: 12, category: "Meals", expense_date: today, notes: null, receipt_path: null, created_at: new Date().toISOString() });
     const ctx2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -685,6 +689,14 @@ try {
       await page.goto(`${BASE}/trips/${TRIP_ID}`);
       await page.getByText("Trip Voucher").first().waitFor({ timeout: 30000 });
 
+      // The trip checklist opens on the plane, and ticking works with no connection
+      await page.goto(`${BASE}/trips/${TRIP_ID}/checklist`);
+      await page.getByText("Offline Charger").first().waitFor({ timeout: 30000 });
+      assert((await page.getByTestId("checklist-tick").count()) === 2, "the checklist shows with no connection");
+      await page.getByRole("checkbox", { name: /Offline Charger/ }).click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="checklist-progress"]')?.textContent?.includes("1 of 2"));
+      assert(!fake.table("trip_checklist_items").some((r) => r.done === true), "nothing was sent while offline");
+
       // A trip, and an expense on it, can be changed with no connection
       await page.goto(`${BASE}/trips/${TRIP_ID}`);
       await page.getByText("Trip Cafe").first().waitFor({ timeout: 30000 });
@@ -730,6 +742,8 @@ try {
       for (let i = 0; i < 60 && !(fake.table("trips").some((t) => t.name === "Offline Trip") && fake.table("personal_projects").some((t) => t.name === "Offline Kitchen") && fake.table("grocery_receipts").some((t) => t.store === "Offline Mart")); i++) await new Promise((r) => setTimeout(r, 1000));
       assert(fake.table("loyalty_cards").some((c) => c.store_name === "Offline Deli" && c.user_id === PAT), "the card added offline is saved once back online");
       assert(fake.table("expenses").find((e) => e.id === EXP_ID).merchant === "Edited Cafe", "the expense changed offline is saved once back online");
+      for (let i = 0; i < 60 && !fake.table("trip_checklist_items").some((r) => r.title === "Offline Charger" && r.done === true); i++) await new Promise((r) => setTimeout(r, 1000));
+      assert(fake.table("trip_checklist_items").some((r) => r.title === "Offline Charger" && r.done === true), "the thing ticked offline is saved once back online");
       assert(fake.table("trips").some((t) => t.name === "Offline Trip" && t.user_id === PAT), "the trip created offline is saved once back online");
       assert(fake.table("personal_projects").some((t) => t.name === "Offline Kitchen" && t.user_id === PAT && t.kind === "home_project"), "the project created offline is saved once back online");
       assert(fake.table("grocery_receipts").some((t) => t.store === "Offline Mart" && Number(t.total) === 21.5), "the grocery receipt created offline is saved once back online");
@@ -1200,6 +1214,61 @@ try {
     await old.page.waitForTimeout(1500);
     assert((await old.page.getByTestId("welcome-tour").count()) === 0 && (await old.page.getByTestId("getting-started").count()) === 0, "nothing new for people who were here before");
     await old.ctx.close();
+  });
+
+  await test("trip checklist: copy a list from the same place, tick, add, private to you", async () => {
+    const OLD_TRIP = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c90";
+    fake.table("trips").push({ id: OLD_TRIP, user_id: PAT, name: "Miami Meeting 2025", destination: "miami, USA", category: "Business", start_date: addDays(today, -400), end_date: addDays(today, -397), currency: "USD", status: "completed", notes: null, created_at: new Date().toISOString() });
+    const item = (n, title, category, done) => ({ id: `c1000000-0000-4000-8000-00000000000${n}`, user_id: PAT, trip_id: OLD_TRIP, title, category, done, sort: n, created_at: new Date(Date.now() - 1000 * (10 - n)).toISOString() });
+    fake.table("trip_checklist_items").push(item(1, "Passport", "documents", true), item(2, "Charger and adapter", "tech", true), item(3, "Rain jacket", "clothes", false));
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // The trip card offers the list from the same place (when this trip is the one on the card)
+      await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
+      const onCard = await page.getByTestId("trip-checklist-suggest").waitFor({ timeout: 15_000 }).then(() => true, () => false);
+      if (onCard) {
+        assert((await page.getByTestId("trip-checklist-suggest").innerText()).includes("3 things"), "the card says how many things it can copy");
+        await page.getByTestId("trip-checklist-copy").click();
+      } else await page.goto(`${BASE}/trips/${TRIP_ID}/checklist?copy=1`);
+      await page.getByTestId("checklist-tick").first().waitFor({ timeout: 20_000 });
+      assert((await page.getByTestId("checklist-tick").count()) === 3, "all three things came in");
+      const mineNow = () => fake.table("trip_checklist_items").filter((r) => r.trip_id === TRIP_ID);
+      assert(mineNow().length === 3 && mineNow().every((r) => r.done === false && r.user_id === PAT), "they are saved on this trip, unticked, for me");
+      assert(fake.table("trip_checklist_items").filter((r) => r.trip_id === OLD_TRIP).length === 3, "the earlier list is untouched");
+      assert((await page.getByTestId("checklist-progress").innerText()).includes("0 of 3"), "nothing is ticked yet");
+      // Tick one
+      await page.getByTestId("checklist-tick").first().click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="checklist-progress"]')?.textContent?.includes("1 of 3"));
+      assert(mineNow().filter((r) => r.done).length === 1, "the tick is saved");
+      // Add one in its own group
+      await page.getByRole("button", { name: "Health" }).click();
+      await page.getByTestId("checklist-input").fill("Sunscreen");
+      await page.getByTestId("checklist-add-button").click();
+      await page.getByTestId("checklist-group-health").waitFor();
+      assert(mineNow().some((r) => r.title === "Sunscreen" && r.category === "health" && r.done === false), "the new thing is saved in Health");
+      await page.getByTestId("checklist-reminder").waitFor();
+      assert((await page.getByTestId("checklist-reminder").innerText()).includes("Reminder on"), "the reminder is on by default");
+      // The trip card shows the progress, and the trip page links to the list
+      await page.goto(`${BASE}/`);
+      await page.getByRole("tab", { name: "Business" }).click();
+      if (onCard) {
+        await page.getByTestId("trip-checklist-count").waitFor();
+        assert((await page.getByTestId("trip-checklist-count").innerText()).includes("1 of 4"), "the card says 1 of 4");
+      }
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      assert((await page.getByTestId("trip-checklist-link").innerText()).includes("1 of 4"), "the trip page links to the checklist");
+      // Remove one
+      await page.goto(`${BASE}/trips/${TRIP_ID}/checklist`);
+      await page.getByTestId("checklist-remove").first().click();
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="checklist-row"]').length === 3);
+      assert(mineNow().length === 3, "a removed thing is deleted");
+    } finally {
+      fake.table("trip_checklist_items").length = 0;
+      const t = fake.table("trips"); const i = t.findIndex((x) => x.id === OLD_TRIP); if (i >= 0) t.splice(i, 1);
+      await ctx.close();
+    }
   });
 
   await test("hotel: a trip can carry a hotel with a Directions button, and it shows on the trip card", async () => {
@@ -4077,7 +4146,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 16, "device switch, fifteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
+    assert((await card.getByRole("switch").count()) === 17, "device switch, sixteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);

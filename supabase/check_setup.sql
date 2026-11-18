@@ -39,6 +39,7 @@ need_cols(tbl, col, fix) as (values
   ('business_project_receipts','receipt_path','migration_projects.sql'),
   ('pro_trial_settings','days','migration_pro_trial.sql'),
   ('trip_papers','note','migration_trip_papers.sql'),
+  ('trip_checklist_items','done','migration_trip_checklist.sql'),
   ('btc_addresses','derive_index','migration_pro_bitcoin_xpub.sql'),
   ('profiles','business_logo_path','migration_report_logo.sql'),
   ('personal_projects','project_type','migration_project_types_plans.sql'),
@@ -119,6 +120,7 @@ need_tables(tbl, fix) as (values
   ('pro_limits','migration_pro_limits.sql'),
   ('pro_trial_settings','migration_pro_trial.sql'),
   ('trip_papers','migration_trip_papers.sql'),
+  ('trip_checklist_items','migration_trip_checklist.sql'),
   ('business_projects','migration_projects.sql'),
   ('business_project_receipts','migration_projects.sql'),
   ('ai_scan_usage','migration_pro_limits.sql'),
@@ -212,6 +214,13 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_bill_emails.sql'
   from (values ('bills-from-email'), ('bills-from-email-problems')) as s(slug)
+  union all
+  select 'help topic', s.slug,
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', s.slug), false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_trip_checklist.sql'
+  from (values ('trip-checklist')) as s(slug)
   union all
   select 'function', f.fn,
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = f.fn) then 'OK' else 'MISSING' end,

@@ -16,6 +16,7 @@ export const PUSH_TEXT = {
   trip: { title: "Lifolio", body: "A trip is coming up. Open the app to check your plans." },
   flight: { title: "Lifolio", body: "A flight on your trip changed. Open the app to check it." },
   flightTomorrow: { title: "Lifolio", body: "You have a flight tomorrow. Open the app to check it." },
+  checklist: { title: "Lifolio", body: "Your trip checklist still has things to tick. Open the app to finish it." },
   afterTrip: { title: "Lifolio", body: "A trip has ended. Open the app to add your last receipts." },
   document: { title: "Lifolio", body: "A document is about to expire. Open the app to check it." },
   utility: { title: "Lifolio", body: "Time to add your utility bills for this month." },
@@ -100,6 +101,13 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
     case "flightTomorrow": {
       const f = d.flight;
       return f ? `Flight tomorrow: ${f.number}${route(f) ? ` ${route(f)}` : ""}${f.time ? `, ${f.time}` : ""}.` : null;
+    }
+    case "checklist": {
+      const name = clean(d.trip, 60);
+      const n = d.count ?? 0;
+      if (!name || n < 1) return null;
+      const when = d.days === 1 ? " You leave tomorrow." : d.days != null && d.days > 1 ? ` You leave in ${d.days} days.` : "";
+      return `${name}: ${n} thing${n === 1 ? "" : "s"} not ticked yet.${when} Open your checklist to finish.`;
     }
     case "afterTrip": return clean(d.trip, 60) ? `${clean(d.trip, 60)} ended. Add your last receipts.` : null;
     case "document": {

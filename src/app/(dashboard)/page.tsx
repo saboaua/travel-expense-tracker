@@ -34,6 +34,7 @@ import { cleanTracks, shouldShowWelcome } from "@/lib/welcome";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
 import { hotelOf } from "@/lib/hotel";
 import { PAPER_COLS, latestPapers, type TripPaper } from "@/lib/trip-papers";
+import { cardChecklist } from "@/lib/trip-checklist";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PROFILE_HOME_WELCOME_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
@@ -54,7 +55,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const uid = user?.id;
 
   // Wave 1: everything that only needs to know who is signed in, asked together
-  const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes, papersRes] = await Promise.all([
+  const [profileRes, tripsRes, docRes, flagRes, rolesRes, flightsRes, papersRes, checklistRes] = await Promise.all([
     withColumnFallback3(
       (cols) => supabase.from("profiles").select(cols).eq("id", uid).single(),
       PROFILE_HOME_WELCOME_COLS,
@@ -79,6 +80,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     supabase.from("trip_flights").select(FLIGHT_COLS).eq("user_id", uid),
     // Trip papers (a database without the table just gives none)
     supabase.from("trip_papers").select(PAPER_COLS).eq("user_id", uid),
+    // The private trip checklist (a database without the table just gives none, and the card is not shown)
+    supabase.from("trip_checklist_items").select("id, trip_id, title, done, sort, created_at").eq("user_id", uid).limit(5000),
   ]);
   const flightsByTrip = new Map<string, TripFlight[]>();
   for (const f of (flightsRes.data ?? []) as unknown as TripFlight[]) flightsByTrip.set(f.trip_id, [...(flightsByTrip.get(f.trip_id) ?? []), f]);
@@ -277,6 +280,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     flight={fNext}
                     hotel={hotelOf(featured as { hotel_name?: string | null; hotel_address?: string | null })}
                     moreFlights={fNext ? fFlights.length - 1 : 0}
+                    checklist={checklistRes.error ? null : cardChecklist(featured, trips ?? [], (checklistRes.data ?? []) as unknown as Parameters<typeof cardChecklist>[2])}
                     papers={papersRes.error ? null : { count: (papersByTrip.get(featured.id) ?? []).length, latest: latestPapers(papersByTrip.get(featured.id) ?? []) }}
                     total={fTotal}
                     count={featured.expenses?.length || 0}

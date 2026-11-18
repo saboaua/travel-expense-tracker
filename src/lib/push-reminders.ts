@@ -6,6 +6,7 @@ import { documentTier, type ReminderDoc } from "@/lib/telegram-reminders";
 import { kindLabel } from "@/lib/documents";
 import { isLocked } from "@/lib/limits-server";
 import { addDaysISO } from "@/lib/utils";
+import { REMINDER_DAYS, reminderDue } from "@/lib/trip-checklist";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
 import { gamblingState, KIND_LABEL, costName, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
@@ -48,6 +49,28 @@ export async function flightsTomorrow(db: SupabaseClient, today: string): Promis
   for (const f of (r.data ?? []) as FlightRow[]) {
     if (!(await claimOnce(f.user_id, `flight-tomorrow:${f.id}`))) continue;
     n += await sendPush(f.user_id, "flightTomorrow", "flightTomorrow", { flight: flightFacts(f) }, { today });
+  }
+  return n;
+}
+
+/** 2 days and 1 day before a trip starts, while things on its checklist are not ticked. Only says how many are left, never what they are. One alert per person a day. */
+export async function checklistReminders(db: SupabaseClient, today: string): Promise<number> {
+  const trips = await db.from("trips").select("id, user_id, name, start_date").eq("status", "active").in("start_date", REMINDER_DAYS.map((d) => addDaysISO(today, d))).order("start_date").limit(5000);
+  if (trips.error) throw new Error(trips.error.message);
+  const rows = (trips.data ?? []) as { id: string; user_id: string; name: string; start_date: string }[];
+  if (!rows.length) return 0;
+  const items = await db.from("trip_checklist_items").select("trip_id, user_id, done").in("trip_id", rows.map((t) => t.id)).eq("done", false).limit(20000);
+  if (items.error) { if (missing(items.error.message)) return 0; throw new Error(items.error.message); }
+  const left = new Map<string, number>();
+  for (const i of (items.data ?? []) as { trip_id: string; user_id: string }[]) left.set(i.trip_id, (left.get(i.trip_id) ?? 0) + 1);
+  const done = new Set<string>();
+  let n = 0;
+  for (const t of rows) {
+    const days = reminderDue(t.start_date, today, left.get(t.id) ?? 0);
+    if (days == null || done.has(t.user_id)) continue;
+    if (!(await claimOnce(t.user_id, `checklist:${t.id}:${days}`))) continue;
+    done.add(t.user_id);
+    n += await sendPush(t.user_id, "checklist", "checklist", { trip: t.name, count: left.get(t.id), days, date: t.start_date }, { today });
   }
   return n;
 }
