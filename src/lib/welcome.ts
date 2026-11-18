@@ -38,12 +38,17 @@ export function installPlatform(ua: string, maxTouchPoints = 0): Platform {
 export const TOUR_STEPS = ["welcome", "highlights", "track", "home", "install"] as const;
 export type TourStep = (typeof TOUR_STEPS)[number];
 
-/** The three highlight slides. Each links to its Help guide. */
+/** The highlight slides. Each links to its Help guide. */
 export const HIGHLIGHTS = [
   { id: "scan", help: "add-a-trip-receipt" },
   { id: "budget", help: "monthly-budget" },
+  { id: "trips", help: "add-a-flight" },
+  { id: "work", help: "reports" },
+  { id: "papers", help: "add-your-documents" },
+  { id: "community", help: "community-prices" },
   { id: "more", help: "bills-from-email" },
 ] as const;
+export type HighlightId = (typeof HIGHLIGHTS)[number]["id"];
 
 export type ChecklistFacts = { homeSet: boolean; tracksSet: boolean; installed: boolean; hasReceipt: boolean; hasBudget: boolean; reminders: boolean };
 export type ChecklistItem = { id: string; title: string; sub: string; done: boolean; cta?: string; href?: string };

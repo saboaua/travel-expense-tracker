@@ -1,4 +1,4 @@
-import { checklist, cleanTracks, installPlatform, shouldShowWelcome, TRACKS } from "../src/lib/welcome";
+import { HIGHLIGHTS, checklist, cleanTracks, installPlatform, shouldShowWelcome, TRACKS } from "../src/lib/welcome";
 
 let failed = 0;
 const eq = (got: unknown, want: unknown, msg: string) => {
@@ -25,5 +25,9 @@ const some = checklist({ homeSet: true, tracksSet: true, installed: false, hasRe
 eq([some.done, some.items.filter((i) => i.done).map((i) => i.id)], [3, ["home", "tracks", "receipt"]], "done items are counted");
 eq(checklist({ homeSet: true, tracksSet: true, installed: true, hasReceipt: true, hasBudget: true, reminders: true }).all, true, "all done");
 eq(none.items.every((i) => !!i.href && !!i.cta), true, "every open item says what to tap and where it goes");
+
+eq(HIGHLIGHTS.map((h) => h.id), ["scan", "budget", "trips", "work", "papers", "community", "more"], "the tour has seven highlights, in order");
+eq(HIGHLIGHTS.find((h) => h.id === "community")?.help, "community-prices", "the community slide links to its guide");
+eq(new Set(HIGHLIGHTS.map((h) => h.help)).size, HIGHLIGHTS.length, "each highlight has its own guide");
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Camera, Check, ChevronRight, Coins, Home, MapPin, Plane, Plus, Send, Share, ShoppingCart, Users, Wallet, Wifi, X, Zap, Mail, Download, ShoppingBag, Award } from "lucide-react";
+import { BookOpen, Camera, Check, ChevronRight, Coins, Home, MapPin, Plane, Plus, Send, Share, ShoppingCart, Users, Wallet, Wifi, X, Zap, Mail, Download, ShoppingBag, Award, BedDouble, Briefcase, CreditCard, FileText, PiggyBank } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
@@ -10,7 +10,7 @@ import { isMissingColumn } from "@/lib/columns";
 import { currentPlace } from "@/lib/scan-place";
 import { countryName } from "@/lib/scan-destination";
 import { homeCurrency } from "@/lib/personal/currency-guess";
-import { HIGHLIGHTS, TOUR_STEPS, TRACKS, installPlatform, type Platform, type TrackId } from "@/lib/welcome";
+import { HIGHLIGHTS, TOUR_STEPS, TRACKS, installPlatform, type HighlightId, type Platform, type TrackId } from "@/lib/welcome";
 import { cn } from "@/lib/utils";
 
 type InstallEvent = Event & { prompt: () => Promise<void>; userChoice: Promise<{ outcome: string }> };
@@ -47,11 +47,21 @@ function AreaRow({ color, icon, label, amount, limit }: { color: string; icon: R
   );
 }
 
-function Slide({ id }: { id: "scan" | "budget" | "more" }) {
+const Count = ({ n }: { n: number }) => <Pill>Highlight {n} of {HIGHLIGHTS.length}</Pill>;
+const Row = ({ icon, tone, title, text }: { icon: ReactNode; tone: string; title: string; text: string }) => (
+  <div className="flex items-start gap-3.5">
+    <span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[14px]", tone)} aria-hidden="true">{icon}</span>
+    <div><div className="text-base font-bold">{title}</div><div className="mt-0.5 text-sm leading-snug text-muted-foreground">{text}</div></div>
+  </div>
+);
+const SOFT = { blue: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300", violet: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", teal: "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300", amber: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300", green: "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300", indigo: "bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300" };
+const Chip = ({ children, tone = "bg-muted text-muted-foreground" }: { children: ReactNode; tone?: string }) => <span className={cn("whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold", tone)}>{children}</span>;
+
+function Slide({ id }: { id: HighlightId }) {
   if (id === "scan") {
     return (
       <>
-        <div><Pill>Highlight 1 of 3</Pill><div className="mt-2.5"><Title sub="Tap the camera on the dashboard, or Upload a photo. Check the details, then save.">Scan, don&apos;t type</Title></div></div>
+        <div><Count n={1} /><div className="mt-2.5"><Title sub="Tap the camera on the dashboard, or Upload a photo. Check the details, then save.">Scan, don&apos;t type</Title></div></div>
         <div className="flex items-stretch gap-3" aria-hidden="true">
           <div className="flex-1 rounded-2xl border bg-muted/50 p-3 font-mono text-xs leading-7"><b className="block text-center">SUPER FOOD</b>MILK 1L · 3.25<br />CHICKEN · 14.88<br />BREAD · 8.20<br /><b>TOTAL · 26.33</b></div>
           <div className="flex items-center text-xl text-primary">→</div>
@@ -67,7 +77,7 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
   if (id === "budget") {
     return (
       <>
-        <div><Pill>Highlight 2 of 3</Pill><div className="mt-2.5"><Title sub="One bar for the month. Groceries, shopping, bills, house and savings fill it in by themselves.">Know where your money goes</Title></div></div>
+        <div><Count n={2} /><div className="mt-2.5"><Title sub="One bar for the month. Groceries, shopping, bills, house and savings fill it in by themselves.">Know where your money goes</Title></div></div>
         <div className="rounded-[20px] border bg-card p-3.5 shadow-sm" data-testid="tour-budget" role="img" aria-label="Example budget: AWG 1,240 of 2,000 used, on track">
           <div className="flex items-center justify-between"><div className="text-xs font-bold uppercase tracking-wider text-muted-foreground">November budget · example</div><span className="rounded-[10px] bg-green-100 px-2.5 py-1 text-xs font-bold text-green-900 dark:bg-green-950 dark:text-green-200">On track</span></div>
           <div className="mt-1.5 text-[28px] font-extrabold tabular-nums"><span className="text-[0.62em] font-bold tracking-wider opacity-65">AWG </span>1,240 <span className="text-[15px] font-semibold text-muted-foreground">of 2,000</span></div>
@@ -85,20 +95,80 @@ function Slide({ id }: { id: "scan" | "budget" | "more" }) {
       </>
     );
   }
+  if (id === "trips") {
+    return (
+      <>
+        <div><Count n={3} /><div className="mt-2.5"><Title sub="Add a trip once. Flights, hotel and papers stay in one card.">Trips that look after you</Title></div></div>
+        <div className="rounded-2xl border bg-muted/40 p-3" aria-hidden="true">
+          <div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-900 text-[11px] font-bold text-white">CM</span><b className="flex-1 text-sm">CM 767 · Copa Airlines</b><Chip>Landed</Chip></div>
+          <div className="mt-2 text-[15px] font-bold">AUA 03:55 PM — ✈ — PTY 04:44 PM</div>
+          <div className="mt-1 text-xs text-muted-foreground">Next up: the return flight</div>
+        </div>
+        <div className="flex items-center gap-2.5 rounded-2xl border p-2.5" aria-hidden="true"><span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"><BedDouble className="h-5 w-5" /></span><div className="flex-1 text-sm font-bold">Hotel<div className="text-xs font-normal text-muted-foreground">Address and a Directions button</div></div><Chip tone="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Directions</Chip></div>
+        <Row icon={<Plane className="h-5 w-5" />} tone={SOFT.blue} title="Flights update themselves" text="Add a flight number: status, gate and delays show, then the return takes over." />
+        <Row icon={<FileText className="h-5 w-5" />} tone={SOFT.violet} title="Trip papers" text="Boarding passes, bookings and forms, kept with the trip." />
+        <Row icon={<Wifi className="h-5 w-5" />} tone={SOFT.teal} title="Works on the plane" text="Current and upcoming trips, with their papers, are saved on your phone." />
+        <Learn slug="add-a-flight" label="Add a flight to a trip" />
+      </>
+    );
+  }
+  if (id === "work") {
+    return (
+      <>
+        <div><Count n={4} /><div className="mt-2.5"><Title sub="Group receipts by trip or by client project, then export.">Work expenses, ready to send</Title></div></div>
+        <div className="rounded-2xl border bg-card p-3" aria-hidden="true">
+          <div className="flex rounded-xl bg-muted p-1 text-[13px] font-bold"><span className="flex-1 py-1.5 text-center text-muted-foreground">Trips</span><span className="flex-1 rounded-[9px] bg-background py-1.5 text-center shadow-sm">Projects</span><span className="flex-1 py-1.5 text-center text-muted-foreground">Reports</span></div>
+          <div className="mt-2.5 flex items-center gap-2.5"><span className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300"><Briefcase className="h-5 w-5" /></span><div className="flex-1"><b className="text-[15px]">Harbour rebrand</b><div className="text-xs text-muted-foreground">Blue Wave Co. · 14 receipts</div></div><b>$2,480.50</b></div>
+          <div className="mt-2 h-1.5 rounded-full bg-muted"><div className="h-1.5 w-3/5 rounded-full bg-emerald-500" /></div>
+        </div>
+        <Row icon={<Briefcase className="h-5 w-5" />} tone={SOFT.indigo} title="Projects for clients" text="Client details, a budget and every receipt in one place." />
+        <Row icon={<FileText className="h-5 w-5" />} tone={SOFT.amber} title="PDF and Excel reports" text="Totals by category with receipt photos. Pro unlocks the report; Free can download the photos." />
+        <Learn slug="reports" label="Reports: business travel spending" />
+      </>
+    );
+  }
+  if (id === "papers") {
+    return (
+      <>
+        <div><Count n={5} /><div className="mt-2.5"><Title sub="Keep what you need to show, even with no signal.">Your papers, always with you</Title></div></div>
+        <div className="rounded-2xl border bg-card px-3 py-1.5" aria-hidden="true">
+          <div className="flex items-center gap-2.5 py-2"><span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"><FileText className="h-5 w-5" /></span><div className="flex-1"><b className="text-[15px]">Passport</b><div className="text-xs text-muted-foreground">Expires 14 Mar 2027</div></div><Chip tone="bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">Reminder on</Chip></div>
+          <div className="flex items-center gap-2.5 border-t py-2"><span className="flex h-9 w-9 items-center justify-center rounded-[11px] bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300"><CreditCard className="h-5 w-5" /></span><div className="flex-1"><b className="text-[15px]">Super Food card</b><div className="text-xs text-muted-foreground">Barcode ready at the till</div></div><Chip tone="bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300">Saved here</Chip></div>
+        </div>
+        <Row icon={<FileText className="h-5 w-5" />} tone={SOFT.red} title="Documents with reminders" text="Passport, insurance, tickets. We remind you before they expire." />
+        <Row icon={<CreditCard className="h-5 w-5" />} tone={SOFT.amber} title="Loyalty cards" text="Scan once, show the barcode at the till." />
+        <Row icon={<Wifi className="h-5 w-5" />} tone={SOFT.teal} title="Opens offline" text="Saved on your phone, refreshed when you are online." />
+        <Learn slug="add-your-documents" label="Add your documents" />
+      </>
+    );
+  }
+  if (id === "community") {
+    return (
+      <>
+        <div><Count n={6} /><div className="mt-2.5"><Title sub="Share your prices and see where an item costs less.">Cheaper groceries, together</Title></div></div>
+        <div className="rounded-2xl border bg-card p-3" data-testid="tour-community" aria-hidden="true">
+          <div className="text-xs font-bold text-muted-foreground">Profile › Community prices</div>
+          <div className="mt-2 flex items-center gap-3"><div className="flex-1"><b className="text-[15px]">Share my prices</b><div className="text-[13px] text-muted-foreground">On. Thank you for helping.</div></div><span className="relative h-[30px] w-[52px] shrink-0 rounded-full bg-emerald-600"><span className="absolute left-[25px] top-[3px] h-6 w-6 rounded-full bg-white shadow" /></span></div>
+        </div>
+        <Row icon={<Users className="h-5 w-5" />} tone={SOFT.violet} title="Turn it on yourself" text="Profile, Community prices, then switch on Share my prices. It is off until you do." />
+        <Row icon={<Check className="h-5 w-5" />} tone={SOFT.green} title="Only store, item, size and price" text="Never your name, email, receipts, dates or totals. Last 60 days only." />
+        <Row icon={<Award className="h-5 w-5" />} tone={SOFT.amber} title="Earn badges" text="Share prices to become a Helper and level up. Turn it off and delete what you shared any time." />
+        <Learn slug="community-prices" label="Share prices with the community" />
+      </>
+    );
+  }
   const tile = (icon: ReactNode, tone: string, title: string, text: string) => (
     <div className="flex items-center gap-3 rounded-2xl border p-2.5"><span className={cn("flex h-11 w-11 shrink-0 items-center justify-center rounded-[13px]", tone)} aria-hidden="true">{icon}</span><div className="flex-1"><div className="text-[15px] font-bold">{title}</div><div className="mt-px text-[13px] leading-snug text-muted-foreground">{text}</div></div></div>
   );
   return (
     <>
-      <div><Pill>Highlight 3 of 3</Pill><div className="mt-2.5"><Title sub="Bills, prices and trips, handled for you.">And it does the boring parts</Title></div></div>
+      <div><Count n={7} /><div className="mt-2.5"><Title sub="Each one has a guide in Help.">And it does the boring parts</Title></div></div>
       <div className="flex flex-col gap-2.5">
-        {tile(<Mail className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Bills from your Gmail", "Bills appear in Utilities with an alert.")}
-        {tile(<ShoppingCart className="h-5 w-5" />, "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Price tracker", "See which store sells it for less.")}
-        {tile(<Award className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Community badges", "Share prices, earn badges.")}
-        {tile(<Wifi className="h-5 w-5" />, "bg-teal-100 text-teal-700 dark:bg-teal-950 dark:text-teal-300", "Works offline", "Add receipts with no signal.")}
-        {tile(<Send className="h-5 w-5" />, "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300", "Telegram", "Send a receipt photo to a chat.")}
-        {tile(<Users className="h-5 w-5" />, "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", "Share with a partner", "Look at the same budget together.")}
-        {tile(<Plane className="h-5 w-5" />, "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Business trips", "Flights, hotels and a PDF report.")}
+        {tile(<Mail className="h-5 w-5" />, "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300", "Bills from your Gmail", "Utility bills land in Utilities with a phone alert.")}
+        {tile(<ShoppingCart className="h-5 w-5" />, "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300", "Price tracker and badges", "See which store is cheaper. Earn badges for sharing prices.")}
+        {tile(<Send className="h-5 w-5" />, "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300", "Telegram", "Send a receipt photo to a chat and it is added.")}
+        {tile(<Users className="h-5 w-5" />, "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300", "Share with a partner", "Look at the same budget, trip or card together.")}
+        {tile(<PiggyBank className="h-5 w-5" />, "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300", "Fuel, subscriptions, savings", "Fill-ups, what renews each month, and goals.")}
       </div>
       <Learn slug="bills-from-email" label="Get your bills from your email" />
     </>
