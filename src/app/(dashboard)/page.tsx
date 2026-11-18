@@ -278,8 +278,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     imageUrl={destinationInfo?.imageUrl ?? null}
                     badge={tripBadge(featured.start_date, featured.end_date, today)!}
                     flight={fNext}
+                    flights={fFlights}
+                    serverNow={Date.now()}
                     hotel={hotelOf(featured as { hotel_name?: string | null; hotel_address?: string | null })}
-                    moreFlights={fNext ? fFlights.length - 1 : 0}
                     checklist={checklistRes.error ? null : cardChecklist(featured, trips ?? [], (checklistRes.data ?? []) as unknown as Parameters<typeof cardChecklist>[2])}
                     papers={papersRes.error ? null : { count: (papersByTrip.get(featured.id) ?? []).length, latest: latestPapers(papersByTrip.get(featured.id) ?? []) }}
                     total={fTotal}
