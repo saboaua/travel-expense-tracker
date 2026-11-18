@@ -1217,6 +1217,7 @@ try {
   });
 
   await test("trip checklist: copy a list from the same place, tick, add, private to you", async () => {
+    fake.table("trip_checklist_items").length = 0; // anything an earlier test left behind
     const OLD_TRIP = "7d1c6a1e-3b7f-4d6a-9d52-0f4a3a1b2c90";
     fake.table("trips").push({ id: OLD_TRIP, user_id: PAT, name: "Miami Meeting 2025", destination: "miami, USA", category: "Business", start_date: addDays(today, -400), end_date: addDays(today, -397), currency: "USD", status: "completed", notes: null, created_at: new Date().toISOString() });
     const item = (n, title, category, done) => ({ id: `c1000000-0000-4000-8000-00000000000${n}`, user_id: PAT, trip_id: OLD_TRIP, title, category, done, sort: n, created_at: new Date(Date.now() - 1000 * (10 - n)).toISOString() });
