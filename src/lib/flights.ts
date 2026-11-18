@@ -420,9 +420,11 @@ export const changeKey = (f: Pick<TripFlight, "status" | "dep_est_local" | "dep_
   [f.status, f.dep_est_local ?? "", f.dep_gate ?? "", f.dep_terminal ?? ""].join("|");
 
 /** True once the shown arrival time (the estimate when there is one) is in the past. Needs the arrival's own time zone; without it nothing is assumed. */
-export function hasArrived(f: Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset">>, now: number): boolean {
+export function hasArrived(f: Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset" | "dep_local" | "dep_offset" | "flight_date">>, now: number): boolean {
   const local = f.arr_est_local ?? f.arr_local;
   if (!local || f.arr_offset == null) return false;
+  // A flight cannot land before it has left: an arrival from another day's lookup does not count
+  if ((f.dep_local || f.flight_date) && departureMs(f as Pick<TripFlight, "dep_local" | "dep_offset" | "flight_date">) > now) return false;
   return Date.parse(`${local}:00Z`) - f.arr_offset * 60000 <= now;
 }
 

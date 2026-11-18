@@ -106,7 +106,7 @@ eq("alert key changes with the gate", changeKey(fl()) === changeKey(fl({ dep_gat
 eq("alert key steady", changeKey(fl()) === changeKey(fl()), true);
 
 // order and the next flight
-const back = fl({ id: "2", leg: "return", flight_date: "2026-11-20", dep_local: "2026-11-20T14:00", dep_offset: -300 });
+const back = fl({ id: "2", leg: "return", flight_date: "2026-11-20", dep_local: "2026-11-20T14:00", dep_offset: -300, arr_local: "2026-11-20T15:00" });
 eq("sorted outbound first", sortFlights([back, fl()]).map((x) => x.id), ["1", "2"]);
 eq("next: soonest not landed", nextFlight([back, fl()], NOW)?.id, "1");
 eq("next: skips a landed one", nextFlight([fl({ status: "landed" }), back], NOW + 13 * 3600_000)?.id, "2");
@@ -149,6 +149,11 @@ eq("arrived: before landing the outbound stays", nextFlight([out, homeLeg], Date
 // a return flight wrongly marked landed by an old lookup is still ahead, and the card moves to it
 const staleBack = fl({ id: "s", leg: "return", status: "landed", dep_local: "2026-11-20T10:00", flight_date: "2026-11-20", arr_local: "2026-11-20T11:00" });
 eq("arrived: a not-yet-departed flight marked landed is still next", nextFlight([out, staleBack], Date.parse("2026-11-18T15:50:00Z"))?.id, "s");
+
+// a return flight carrying another day's arrival time is not landed before it has left
+const staleArr = fl({ id: "t", leg: "return", dep_local: "2026-11-20T10:00", dep_offset: -300, flight_date: "2026-11-20", arr_local: "2026-11-17T16:44", arr_offset: -300 });
+eq("arrived: not before it departs", statusView(staleArr, Date.parse("2026-11-18T15:50:00Z")).label !== "Landed", true);
+eq("arrived: card moves to a return with stale arrival", nextFlight([out, staleArr], Date.parse("2026-11-18T15:50:00Z"))?.id, "t");
 
 console.log(fail ? `${fail} FAILED` : "flights: all checks passed");
 process.exit(fail ? 1 : 0);
