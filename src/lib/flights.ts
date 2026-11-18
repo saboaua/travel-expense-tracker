@@ -428,7 +428,8 @@ export function hasArrived(f: Partial<Pick<TripFlight, "arr_local" | "arr_est_lo
 
 /** Soonest flight that has not landed, for the line on a trip card. */
 export function nextFlight<T extends Pick<TripFlight, "status" | "dep_local" | "dep_offset" | "flight_date"> & Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset">>>(flights: T[], now: number): T | null {
-  const open = flights.filter((f) => f.status !== "landed" && f.status !== "cancelled" && departureMs(f) > now - 6 * HOUR && !hasArrived(f, now));
+  // A flight that has not left yet is still ahead, whatever an old lookup said about its status (the service can answer with an earlier day's flight of the same number)
+  const open = flights.filter((f) => f.status !== "cancelled" && departureMs(f) > now - 6 * HOUR && !hasArrived(f, now) && (f.status !== "landed" || departureMs(f) > now));
   const pool = open.length ? open : flights;
   return [...pool].sort((a, b) => departureMs(a) - departureMs(b))[0] ?? null;
 }

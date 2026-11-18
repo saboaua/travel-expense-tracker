@@ -109,7 +109,7 @@ eq("alert key steady", changeKey(fl()) === changeKey(fl()), true);
 const back = fl({ id: "2", leg: "return", flight_date: "2026-11-20", dep_local: "2026-11-20T14:00", dep_offset: -300 });
 eq("sorted outbound first", sortFlights([back, fl()]).map((x) => x.id), ["1", "2"]);
 eq("next: soonest not landed", nextFlight([back, fl()], NOW)?.id, "1");
-eq("next: skips a landed one", nextFlight([fl({ status: "landed" }), back], NOW)?.id, "2");
+eq("next: skips a landed one", nextFlight([fl({ status: "landed" }), back], NOW + 13 * 3600_000)?.id, "2");
 eq("next: none", nextFlight([], NOW), null);
 
 // look-ahead: a flight further ahead than the service sees is entered by hand
@@ -145,6 +145,10 @@ const out = fl({ id: "o", status: "departed", dep_local: "2026-11-17T15:55", dep
 const homeLeg = fl({ id: "r", leg: "return", dep_local: "2026-11-20T10:00", flight_date: "2026-11-20", arr_local: "2026-11-20T11:00" });
 eq("arrived: next flight moves to the return", nextFlight([out, homeLeg], Date.parse("2026-11-17T21:50:00Z"))?.id, "r");
 eq("arrived: before landing the outbound stays", nextFlight([out, homeLeg], Date.parse("2026-11-17T20:30:00Z"))?.id, "o");
+
+// a return flight wrongly marked landed by an old lookup is still ahead, and the card moves to it
+const staleBack = fl({ id: "s", leg: "return", status: "landed", dep_local: "2026-11-20T10:00", flight_date: "2026-11-20", arr_local: "2026-11-20T11:00" });
+eq("arrived: a not-yet-departed flight marked landed is still next", nextFlight([out, staleBack], Date.parse("2026-11-18T15:50:00Z"))?.id, "s");
 
 console.log(fail ? `${fail} FAILED` : "flights: all checks passed");
 process.exit(fail ? 1 : 0);
