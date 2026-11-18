@@ -1,6 +1,6 @@
 import {
   parseFlightNumber, parseStamp, fromAviationstack, zoneOffsetMinutes, statusFromService, statusView, clock, delayMinutes, durationMinutes, durationText,
-  arrivalDayOffset, zoneNote, manualFlight, sanitizeFlightScan, maskPnr, needsRefresh, lookupPatch, tooEarlyToLook, flightLine, changeKey, nextFlight, sortFlights, flightSummary, type TripFlight,
+  arrivalDayOffset, departureMs, zoneNote, manualFlight, sanitizeFlightScan, maskPnr, needsRefresh, lookupPatch, tooEarlyToLook, flightLine, changeKey, nextFlight, sortFlights, flightSummary, type TripFlight,
 } from "../src/lib/flights";
 
 let fail = 0;
@@ -154,6 +154,15 @@ eq("arrived: a not-yet-departed flight marked landed is still next", nextFlight(
 const staleArr = fl({ id: "t", leg: "return", dep_local: "2026-11-20T10:00", dep_offset: -300, flight_date: "2026-11-20", arr_local: "2026-11-17T16:44", arr_offset: -300 });
 eq("arrived: not before it departs", statusView(staleArr, Date.parse("2026-11-18T15:50:00Z")).label !== "Landed", true);
 eq("arrived: card moves to a return with stale arrival", nextFlight([out, staleArr], Date.parse("2026-11-18T15:50:00Z"))?.id, "t");
+
+// the database gives time stamps with seconds ("2026-11-20T09:09:00"): the same answers as without
+const dbOut = fl({ id: "o", status: "departed", dep_local: "2026-11-17T15:55:00", dep_offset: -240, flight_date: "2026-11-17", arr_local: "2026-11-17T16:44:00", arr_offset: -300 });
+const dbBack = fl({ id: "r", leg: "return", status: "scheduled", source: "manual", dep_local: "2026-11-20T09:09:00", dep_offset: null, flight_date: "2026-11-20", arr_local: "2026-11-20T12:09:00", arr_offset: null });
+eq("db stamps: card moves to the return once the outbound landed", nextFlight([dbOut, dbBack], Date.parse("2026-11-18T16:40:00Z"))?.id, "r");
+eq("db stamps: outbound stays until it lands", nextFlight([dbOut, dbBack], Date.parse("2026-11-17T20:30:00Z"))?.id, "o");
+eq("db stamps: outbound shows landed after arrival", statusView(dbOut, Date.parse("2026-11-17T21:45:00Z")).label, "Landed");
+eq("db stamps: departure time reads right", departureMs(dbBack), Date.parse("2026-11-20T09:09:00Z"));
+eq("db stamps: duration", durationMinutes(dbOut), 109);
 
 console.log(fail ? `${fail} FAILED` : "flights: all checks passed");
 process.exit(fail ? 1 : 0);

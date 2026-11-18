@@ -117,9 +117,12 @@ export function statusFromService(raw: unknown, delay: number): FlightStatus {
   return delay >= 15 ? "delayed" : "unknown";
 }
 
+/** A local time stamp as milliseconds, read as if it were UTC. The database gives "2026-11-20T09:09:00" (with seconds), the forms "2026-11-20T09:09": both work. */
+export const localMs = (local: string): number => Date.parse(`${local.slice(0, 16)}:00Z`);
+
 const minutesBetween = (a: string | null, b: string | null): number => {
   if (!a || !b) return 0;
-  return Math.round((Date.parse(`${b}:00Z`) - Date.parse(`${a}:00Z`)) / 60000);
+  return Math.round((localMs(b) - localMs(a)) / 60000);
 };
 
 /** The airport's UTC offset (minutes) at a local wall-clock time, from its IANA zone name. */
@@ -132,7 +135,7 @@ export function zoneOffsetMinutes(timeZone: unknown, local: string): number | nu
       const m = part.match(/GMT([+-])(\d{2}):?(\d{2})?/);
       return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3] ?? 0)) : part === "GMT" ? 0 : null;
     };
-    const guess = Date.parse(`${local}:00Z`);
+    const guess = localMs(local);
     const first = at(guess);
     if (first == null) return null;
     return at(guess - first * 60000) ?? first;
@@ -167,7 +170,7 @@ export function fromAviationstack(json: unknown, date: string | null, wanted?: s
     const actual = parseStamp(side.actual);
     if (actual) return actual;
     const late = typeof side.delay === "number" && Number.isFinite(side.delay) ? side.delay : 0;
-    if (sched && late > 0) return { local: new Date(Date.parse(`${sched.local}:00Z`) + late * 60000).toISOString().slice(0, 16) };
+    if (sched && late > 0) return { local: new Date(localMs(sched.local) + late * 60000).toISOString().slice(0, 16) };
     return parseStamp(side.estimated);
   };
   const depEst = revised(dep, depSched);
@@ -369,7 +372,7 @@ const HOUR = 3600_000;
 /** The flight's departure as a point in time (needs the offset; otherwise the wall-clock time read as UTC, which is good enough for "is it soon"). */
 export function departureMs(f: Pick<TripFlight, "dep_local" | "dep_offset" | "flight_date">): number {
   const local = f.dep_local ?? `${f.flight_date}T12:00`;
-  return Date.parse(`${local}:00Z`) - (f.dep_offset ?? 0) * 60000;
+  return localMs(local) - (f.dep_offset ?? 0) * 60000;
 }
 
 /**
@@ -425,7 +428,7 @@ export function hasArrived(f: Partial<Pick<TripFlight, "arr_local" | "arr_est_lo
   if (!local || f.arr_offset == null) return false;
   // A flight cannot land before it has left: an arrival from another day's lookup does not count
   if ((f.dep_local || f.flight_date) && departureMs(f as Pick<TripFlight, "dep_local" | "dep_offset" | "flight_date">) > now) return false;
-  return Date.parse(`${local}:00Z`) - f.arr_offset * 60000 <= now;
+  return localMs(local) - f.arr_offset * 60000 <= now;
 }
 
 /** Soonest flight that has not landed, for the line on a trip card. */

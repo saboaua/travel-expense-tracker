@@ -1,4 +1,4 @@
-import { clock, shownArrival, shownDeparture, type FlightFields } from "@/lib/flights";
+import { clock, localMs, shownArrival, shownDeparture, type FlightFields } from "@/lib/flights";
 import { escapeIcsText, foldIcsLine } from "@/lib/trip-calendar";
 
 /**
@@ -22,7 +22,7 @@ export type CalendarFlight = Pick<FlightFields,
 const pad = (n: number) => String(n).padStart(2, "0");
 const compactLocal = (local: string) => `${local.slice(0, 10).replace(/-/g, "")}T${local.slice(11, 13)}${local.slice(14, 16)}00`;
 const addMinutes = (local: string, min: number) => {
-  const d = new Date(Date.parse(`${local}:00Z`) + min * 60000);
+  const d = new Date(localMs(local) + min * 60000);
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
 };
 const toUtc = (local: string, offset: number) => addMinutes(local, -offset);
@@ -36,10 +36,10 @@ export function flightTimes(f: CalendarFlight): { start: string; end: string; fi
   if (fixed) {
     const s = toUtc(dep, f.dep_offset as number);
     const e = arr ? toUtc(arr, f.arr_offset as number) : addMinutes(s, 60);
-    const end = Date.parse(`${e}:00Z`) > Date.parse(`${s}:00Z`) ? e : addMinutes(s, 60);
+    const end = localMs(e) > localMs(s) ? e : addMinutes(s, 60);
     return { start: `${compactLocal(s)}Z`, end: `${compactLocal(end)}Z`, fixed: true };
   }
-  const end = arr && Date.parse(`${arr}:00Z`) > Date.parse(`${dep}:00Z`) ? arr : addMinutes(dep, 60);
+  const end = arr && localMs(arr) > localMs(dep) ? arr : addMinutes(dep, 60);
   return { start: compactLocal(dep), end: compactLocal(end), fixed: false };
 }
 
