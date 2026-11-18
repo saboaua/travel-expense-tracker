@@ -67,9 +67,9 @@ eq("day offset: same day", arrivalDayOffset(fl()), 0);
 eq("day offset: overnight", arrivalDayOffset(fl({ arr_local: "2026-11-18T06:00" })), 1);
 eq("zone note: behind", zoneNote(fl()), "Local times at each airport. PTY is 1 hour behind AUA.");
 eq("zone note: unknown", zoneNote(fl({ dep_offset: null })), "Local times at each airport.");
-eq("status: on time", statusView(fl()), { label: "On time", tone: "ok" });
-eq("status: manual is just scheduled", statusView(fl({ source: "manual" })), { label: "Scheduled", tone: "muted" });
-eq("status: delayed", statusView(fl({ status: "delayed", dep_est_local: "2026-11-17T10:10" })), { label: "Delayed 25 min", tone: "warn" });
+eq("status: on time", statusView(fl(), Date.parse("2026-11-17T08:00:00Z")), { label: "On time", tone: "ok" });
+eq("status: manual is just scheduled", statusView(fl({ source: "manual" }), Date.parse("2026-11-17T08:00:00Z")), { label: "Scheduled", tone: "muted" });
+eq("status: delayed", statusView(fl({ status: "delayed", dep_est_local: "2026-11-17T10:10" }), Date.parse("2026-11-17T08:00:00Z")), { label: "Delayed 25 min", tone: "warn" });
 eq("status: cancelled", statusView(fl({ status: "cancelled" })).tone, "bad");
 eq("pnr is masked", maskPnr("WK89L2"), "••••L2");
 eq("pnr empty", maskPnr(null), "");
@@ -134,6 +134,17 @@ eq("patch: seat, cabin and code are never in the patch", ["pnr", "seat", "cabin"
 const line = flightLine([fl(), fl({ id: "2", leg: "return", flight_number: "CM 313", dep_local: "2026-11-24T14:00", flight_date: "2026-11-24" })], Date.parse("2026-11-10T12:00:00Z"));
 eq("line: next flight, route, time and how many more", [line?.number, line?.from, line?.to, line?.time, line?.more], ["CM 312", "AUA", "PTY", "09:45 AM", 1]);
 eq("line: no flights, no line", flightLine([], NOW), null);
+
+// a flight whose arrival time has passed is landed, even when the service never said so
+const inAir = { status: "departed" as const, source: "auto" as const, dep_local: "2026-11-17T15:55", dep_est_local: null, arr_local: "2026-11-17T16:44", arr_est_local: null, arr_offset: -300 };
+eq("arrived: before arrival still in the air", statusView(inAir, Date.parse("2026-11-17T21:00:00Z")).label, "In the air");
+eq("arrived: after arrival is landed", statusView(inAir, Date.parse("2026-11-17T21:45:00Z")).label, "Landed");
+eq("arrived: cancelled stays cancelled", statusView({ ...inAir, status: "cancelled" }, Date.parse("2026-11-17T23:00:00Z")).label, "Cancelled");
+eq("arrived: no zone, nothing assumed", statusView({ ...inAir, arr_offset: null }, Date.parse("2026-11-17T23:00:00Z")).label, "In the air");
+const out = fl({ id: "o", status: "departed", dep_local: "2026-11-17T15:55", dep_offset: -240, flight_date: "2026-11-17", arr_local: "2026-11-17T16:44", arr_offset: -300 });
+const homeLeg = fl({ id: "r", leg: "return", dep_local: "2026-11-20T10:00", flight_date: "2026-11-20", arr_local: "2026-11-20T11:00" });
+eq("arrived: next flight moves to the return", nextFlight([out, homeLeg], Date.parse("2026-11-17T21:50:00Z"))?.id, "r");
+eq("arrived: before landing the outbound stays", nextFlight([out, homeLeg], Date.parse("2026-11-17T20:30:00Z"))?.id, "o");
 
 console.log(fail ? `${fail} FAILED` : "flights: all checks passed");
 process.exit(fail ? 1 : 0);

@@ -340,8 +340,13 @@ export function zoneNote(f: Pick<TripFlight, "dep_offset" | "arr_offset" | "dep_
 }
 
 export type StatusTone = "ok" | "warn" | "bad" | "info" | "muted";
-export function statusView(f: Pick<TripFlight, "status" | "source" | "dep_local" | "dep_est_local">): { label: string; tone: StatusTone } {
+export function statusView(
+  f: Pick<TripFlight, "status" | "source" | "dep_local" | "dep_est_local"> & Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset">>,
+  now: number = Date.now(),
+): { label: string; tone: StatusTone } {
   const late = delayMinutes(f);
+  // The flight service can be slow to say "landed" (and the free plan only tracks flights of today): once the arrival time has passed, it has landed
+  if (f.status !== "cancelled" && f.status !== "diverted" && hasArrived(f, now)) return { label: "Landed", tone: "muted" };
   switch (f.status) {
     case "cancelled": return { label: "Cancelled", tone: "bad" };
     case "diverted": return { label: "Diverted", tone: "bad" };
@@ -414,9 +419,16 @@ export function lookupPatch(f: Pick<TripFlight, "source" | "flight_number" | "de
 export const changeKey = (f: Pick<TripFlight, "status" | "dep_est_local" | "dep_gate" | "dep_terminal">) =>
   [f.status, f.dep_est_local ?? "", f.dep_gate ?? "", f.dep_terminal ?? ""].join("|");
 
+/** True once the shown arrival time (the estimate when there is one) is in the past. Needs the arrival's own time zone; without it nothing is assumed. */
+export function hasArrived(f: Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset">>, now: number): boolean {
+  const local = f.arr_est_local ?? f.arr_local;
+  if (!local || f.arr_offset == null) return false;
+  return Date.parse(`${local}:00Z`) - f.arr_offset * 60000 <= now;
+}
+
 /** Soonest flight that has not landed, for the line on a trip card. */
-export function nextFlight<T extends Pick<TripFlight, "status" | "dep_local" | "dep_offset" | "flight_date">>(flights: T[], now: number): T | null {
-  const open = flights.filter((f) => f.status !== "landed" && f.status !== "cancelled" && departureMs(f) > now - 6 * HOUR);
+export function nextFlight<T extends Pick<TripFlight, "status" | "dep_local" | "dep_offset" | "flight_date"> & Partial<Pick<TripFlight, "arr_local" | "arr_est_local" | "arr_offset">>>(flights: T[], now: number): T | null {
+  const open = flights.filter((f) => f.status !== "landed" && f.status !== "cancelled" && departureMs(f) > now - 6 * HOUR && !hasArrived(f, now));
   const pool = open.length ? open : flights;
   return [...pool].sort((a, b) => departureMs(a) - departureMs(b))[0] ?? null;
 }
