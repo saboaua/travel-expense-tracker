@@ -2383,7 +2383,7 @@ try {
     try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
-      await ap.goto(`${BASE}/admin/supermarkets`);
+      await ap.goto(`${BASE}/admin/supermarkets/places`);
       await ap.getByRole("heading", { name: "Supermarket places" }).waitFor();
       await ap.getByTestId("places-template").waitFor();
       const r = await ap.evaluate(async () => { const x = await fetch("/api/admin/supermarket-import?template=1"); const b = new Uint8Array(await x.arrayBuffer()); return { ok: x.ok, head: String.fromCharCode(b[0], b[1]) }; });
@@ -2408,8 +2408,9 @@ try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
       await ap.goto(`${BASE}/admin/settings`);
-      await ap.getByRole("link", { name: /Community Prices Import/ }).waitFor();
-      await ap.goto(`${BASE}/admin/community-prices`);
+      await ap.getByRole("link", { name: /Supermarkets/ }).click();
+      await ap.getByTestId("supermarkets-row-community").click();
+      await ap.waitForURL((u) => u.pathname === "/admin/supermarkets/community");
       await ap.getByRole("heading", { name: "Community prices import" }).waitFor();
       const r = await ap.evaluate(async () => { const x = await fetch("/api/admin/community-import?template=1"); const b = new Uint8Array(await x.arrayBuffer()); return { ok: x.ok, head: String.fromCharCode(b[0], b[1]) }; });
       assert(r.ok && r.head === "PK", "the template is a real .xlsx");
@@ -2443,6 +2444,41 @@ try {
     } finally { SP.splice(0, SP.length); IM.splice(0, IM.length); await ctx.close(); await actx.close(); }
   });
 
+  await test("admin: Supermarkets is one card with its three tools; the old addresses still work; a regular user cannot open it", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    actx.setDefaultTimeout(60_000); ctx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage(); const page = await ctx.newPage();
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/settings`);
+      await ap.getByRole("link", { name: /Supermarkets/ }).waitFor();
+      for (const gone of [/Do it Aruba Prices/, /Supermarket Places/, /Community Prices Import/]) {
+        assert((await ap.getByRole("link", { name: gone }).count()) === 0, `${gone} is no longer a card of its own`);
+      }
+      assert((await ap.getByTestId("tools-count-supermarkets").innerText()).trim() === "3 tools", "Supermarkets says it holds 3 tools");
+      assert((await ap.getByTestId("tools-count-pro").innerText()).trim() === "4 tools", "Pro plan says it holds 4 tools");
+      await ap.getByRole("link", { name: /Supermarkets/ }).click();
+      await ap.waitForURL((u) => u.pathname === "/admin/supermarkets");
+      await ap.getByTestId("supermarkets-row-doit").waitFor();
+      assert((await ap.locator('[data-testid^="supermarkets-row-"]').count()) === 3, "three tools are listed");
+      await ap.getByTestId("supermarkets-row-doit").click();
+      await ap.waitForURL((u) => u.pathname === "/admin/supermarkets/doit");
+      await ap.getByRole("link", { name: "Supermarkets" }).first().waitFor();
+      for (const [old, now] of [["/admin/doit", "/admin/supermarkets/doit"], ["/admin/community-prices", "/admin/supermarkets/community"]]) {
+        await ap.goto(`${BASE}${old}`);
+        await ap.waitForURL((u) => u.pathname === now);
+      }
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      for (const p of ["/admin/supermarkets", "/admin/supermarkets/doit", "/admin/supermarkets/community"]) {
+        await page.goto(`${BASE}${p}`);
+        await page.waitForURL((u) => !u.pathname.startsWith("/admin"));
+      }
+    } finally { await ctx.close(); await actx.close(); }
+  });
+
   await test("supermarket places: an admin finds a wrong point, fixes it, removes a duplicate, and a later import keeps the fix and does not bring the removed one back", async () => {
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -2454,7 +2490,7 @@ try {
     try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
-      await ap.goto(`${BASE}/admin/supermarkets`);
+      await ap.goto(`${BASE}/admin/supermarkets/places`);
       await ap.getByTestId("places-list").waitFor();
       assert((await ap.getByTestId("place-row").count()) === 4, "all four places are listed");
       await ap.getByTestId("place-flag-outside").waitFor();

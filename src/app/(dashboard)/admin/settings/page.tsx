@@ -7,9 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useAccess } from "@/lib/use-access";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, FileSpreadsheet, MapPin, UserPlus, Crown } from "lucide-react";
+import { PRO_TOOL_COUNT, SUPERMARKET_TOOLS } from "@/lib/admin-tools";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, ShoppingCart, UserPlus, Crown } from "lucide-react";
 
-const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone }[] = [
+const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone; tools?: number }[] = [
   {
     href: "/admin/branding",
     feature: "branding.manage",
@@ -73,30 +74,16 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "People and access, prices and payments, Free limits and the free month for new accounts.",
     icon: Crown,
     tone: "badges",
-  },
-  {
-    href: "/admin/doit",
-    feature: "admin.only",
-    title: "Do it Aruba Prices",
-    description: "Import the Do it price list from an exported Excel file for the Price tracker.",
-    icon: FileSpreadsheet,
-    tone: "shop",
+    tools: PRO_TOOL_COUNT,
   },
   {
     href: "/admin/supermarkets",
     feature: "admin.only",
-    title: "Supermarket Places",
-    description: "Import supermarket GPS points from Excel so they show on the Best store map.",
-    icon: MapPin,
-    tone: "place",
-  },
-  {
-    href: "/admin/community-prices",
-    feature: "admin.only",
-    title: "Community Prices Import",
-    description: "Add supermarket prices from an Excel file so people can see the best price. Each upload counts as one more shopper.",
-    icon: FileSpreadsheet,
+    title: "Supermarkets",
+    description: "Do it Aruba prices, supermarket places and community price imports.",
+    icon: ShoppingCart,
     tone: "shop",
+    tools: SUPERMARKET_TOOLS.length,
   },
   {
     href: "/admin/account-requests",
@@ -141,6 +128,7 @@ export default function AdminSettingsPage() {
                 <CardHeader className="flex flex-row items-center gap-3 space-y-0 pb-2">
                   <IconTile tone={s.tone} className="h-11 w-11"><Icon className="h-6 w-6" /></IconTile>
                   <CardTitle className="min-w-0 flex-1 text-lg">{s.title}</CardTitle>
+                  {s.tools != null && <span className="rounded-full border bg-muted/60 px-2.5 py-0.5 text-xs font-semibold text-muted-foreground" data-testid={`tools-count-${s.href.split("/").pop()}`}>{s.tools} tools</span>}
                   {s.href === "/admin/pro" && waiting > 0 && <span className="rounded-full bg-red-600 px-2.5 py-0.5 text-xs font-bold text-white" data-testid="pro-tile-waiting">{waiting} waiting</span>}
                 </CardHeader>
                 <CardContent>
