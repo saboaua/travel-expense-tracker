@@ -14,10 +14,10 @@ import type { OutboxItem } from "@/lib/outbox";
 
 type Result<T> = Promise<{ data: T | null; error: unknown }>;
 
-export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null };
+export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null; area?: string | null };
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
-export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null };
+export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null; area?: string | null };
 export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[] };
 
 export const overviewKey = (userId: string) => `${userId}:groceries:overview`;
@@ -38,7 +38,10 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
     const receipts = (cols: string) => fetchAll<OverviewReceipt>((a, b) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b) as never);
     const [r, i] = await Promise.all([
       // Before the price-notes migration there is no prices_only column: everything is spending
-      receipts("id, store, purchase_date, total, currency, prices_only, paid_with, trip_ref").catch((e) => {
+      receipts("id, store, purchase_date, total, currency, prices_only, paid_with, trip_ref, area").catch((e) => {
+        if (!isMissingColumn({ message: e instanceof Error ? e.message : "" })) throw e;
+        return receipts("id, store, purchase_date, total, currency, prices_only, paid_with, trip_ref");
+      }).catch((e) => {
         if (!isMissingColumn({ message: e instanceof Error ? e.message : "" })) throw e;
         return receipts("id, store, purchase_date, total, currency, prices_only").catch((e2) => { if (isMissingColumn({ message: e2 instanceof Error ? e2.message : "" })) return receipts("id, store, purchase_date, total, currency"); throw e2; });
       }),
@@ -48,7 +51,7 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
     ]);
     return {
       data: {
-        receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true, paid_with: normPaid(x.paid_with), trip_ref: normTripRef(x.trip_ref) })),
+        receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true, paid_with: normPaid(x.paid_with), trip_ref: normTripRef(x.trip_ref), area: x.area === "shopping" ? "shopping" : "groceries" })),
         items: i.map((x) => ({ receipt_id: x.receipt_id, category: x.category, name: x.name, normalized_name: x.normalized_name, line_total: Number(x.line_total) })),
       },
       error: null,

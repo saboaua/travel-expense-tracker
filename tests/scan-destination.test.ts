@@ -69,9 +69,9 @@ eq(u5.pick?.key, "trip:t1", "upload, business only: falls back to the trip");
 // Shopping next to Groceries
 const withShop = buildScanOptions({ trips, projects, canTrips: true, canPersonal: true, canDocuments: true, shopping: true });
 eq(withShop.map((o) => o.key), ["trip:t1", "trip:t2", "grocery", "shopping", "project:p1", "ptrip:p2", "document"], "Shopping sits right after Groceries");
-eq(withShop.find((o) => o.key === "shopping")?.href, "/personal/groceries/new?area=shopping", "Shopping opens the grocery form as Shopping");
+eq(withShop.find((o) => o.key === "shopping")?.href, "/personal/shopping/new", "Shopping opens its own form");
 eq(buildScanOptions({ trips, projects, canTrips: true, canPersonal: false, canDocuments: false, shopping: true }).some((o) => o.key === "shopping"), false, "no Shopping without personal access");
-eq(withQuery("/personal/groceries/new?area=shopping", "quick=1"), "/personal/groceries/new?area=shopping&quick=1", "quick joins an existing query");
+eq(withQuery("/personal/shopping/new?x=1", "quick=1"), "/personal/shopping/new?x=1&quick=1", "quick joins an existing query");
 eq(withQuery("/trips/x/add-expense", "quick=1"), "/trips/x/add-expense?quick=1", "quick starts a query");
 const shopHome = suggestDestination({ mode: "scan", options: withShop, place: { city: "Oranjestad", countryCode: "AW" }, home: { city: "Oranjestad", country: "Aruba" }, today, last: "shopping" });
 eq([shopHome.pick?.key, shopHome.confident], ["shopping", false], "at home the last choice (Shopping) is suggested, with the sheet");

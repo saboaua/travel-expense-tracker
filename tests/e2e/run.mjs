@@ -974,7 +974,7 @@ try {
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
     await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "shopping", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
-    await page.goto(`${BASE}/personal/groceries/new?area=shopping&quick=1`);
+    await page.goto(`${BASE}/personal/shopping/new?quick=1`);
     await page.getByText("Shopping \u00b7 Personal").waitFor({ timeout: 20_000 });
     await page.getByRole("button", { name: "Use full image" }).click();
     await page.getByTestId("split-shopping").waitFor({ timeout: 20_000 });
@@ -984,7 +984,7 @@ try {
     await page.getByRole("radio", { name: /Shopping/ }).waitFor();
     await page.getByRole("radio", { name: /Groceries/ }).click();
     await page.getByRole("button", { name: /Save to Groceries/ }).click();
-    await page.waitForURL((u) => u.pathname === "/personal/groceries/new" && !u.search.includes("area=shopping"), { timeout: 20_000 });
+    await page.waitForURL((u) => u.pathname === "/personal/groceries/new", { timeout: 20_000 });
     await page.getByText("Groceries \u00b7 Personal").waitFor({ timeout: 20_000 });
     await ctx.close();
   });
@@ -997,7 +997,7 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     const spendBefore = fake.table("expenses").length;
     await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "shopping", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
-    await page.goto(`${BASE}/personal/groceries/new?area=shopping&quick=1`);
+    await page.goto(`${BASE}/personal/shopping/new?quick=1`);
     await page.getByRole("button", { name: "Use full image" }).click();
     await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
     // The trip that is on today is already picked; the card is one tap
@@ -1009,9 +1009,16 @@ try {
     for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
     const saved = fake.table("grocery_receipts").find((r) => r.store === "Zara Panama");
     assert(saved && saved.paid_with === "credit" && saved.trip_ref === `trip:${TRIP_ID}`, "paid_with and trip are saved: " + JSON.stringify(saved));
-    // By card and trip on the Groceries page
+    assert(saved.area === "shopping", "a Shopping receipt is saved in the Shopping area: " + JSON.stringify(saved));
+    // It is on the Shopping page, not in Groceries
     await page.goto(`${BASE}/personal/groceries`);
+    await page.getByTestId("to-shopping").waitFor({ timeout: 20_000 });
+    assert((await page.getByText("Zara Panama").count()) === 0, "Groceries does not list the shopping receipt");
+    // By card and trip on the Shopping page
+    await page.goto(`${BASE}/personal/shopping`);
     await page.getByTestId("paid-filter").waitFor({ timeout: 20_000 });
+    await page.getByRole("heading", { name: "Shopping" }).waitFor();
+    await page.getByText("Zara Panama").first().waitFor();
     await page.getByTestId("pf-paid-credit").click();
     assert(/84\.50/.test(await page.getByTestId("pf-total").innerText()), "the total for credit card is shown: " + (await page.getByTestId("pf-total").innerText()));
     await page.getByTestId("pf-paid-cash").click();

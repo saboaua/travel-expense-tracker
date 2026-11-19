@@ -13,7 +13,7 @@ type R = { id: string; store: string; purchase_date: string; total: number; curr
 const chip = (on: boolean) => `inline-flex min-h-10 shrink-0 items-center gap-1.5 rounded-full border-[1.5px] px-3.5 text-sm font-bold transition-colors ${on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-foreground/80 hover:bg-muted"}`;
 
 /** Receipts by card and by trip: "what did I put on my credit card in Panama?". Shown once any receipt has a card or a trip. */
-export function PaidFilter({ receipts }: { receipts: R[] }) {
+export function PaidFilter({ receipts, base = "/personal/groceries" }: { receipts: R[]; base?: string }) {
   const trips = useTripChoices();
   const [f, setF] = useState<Filter>({ paid: null, trip: null });
   const spend = useMemo(() => receipts.filter((r) => !r.prices_only), [receipts]);
@@ -44,7 +44,7 @@ export function PaidFilter({ receipts }: { receipts: R[] }) {
         </div>
         <div className="space-y-1.5">
           {shown.slice(0, 20).map((r) => (
-            <Link key={r.id} href={`/personal/groceries/${r.id}`} className="flex min-h-12 items-center gap-3 rounded-lg px-1 hover:bg-muted">
+            <Link key={r.id} href={`${base}/${r.id}`} className="flex min-h-12 items-center gap-3 rounded-lg px-1 hover:bg-muted">
               <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{r.store}</span><span className="block truncate text-xs text-muted-foreground">{formatDate(r.purchase_date)} · {paidLabel(r.paid_with)}{r.trip_ref ? ` · ${label(r.trip_ref)}` : ""}</span></span>
               <span className="shrink-0 text-sm font-semibold">{formatCurrency(r.total, r.currency)}</span>
             </Link>

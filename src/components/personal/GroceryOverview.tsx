@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, Map as MapIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBag, Map as MapIcon } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
@@ -40,13 +40,15 @@ function ActionTile({ href, label, tint, testid, children }: { href: string; lab
   );
 }
 
-function ReceiptRow({ id, unsent, children }: { id: string; unsent: boolean; children: React.ReactNode }) {
+function ReceiptRow({ id, unsent, base, children }: { id: string; unsent: boolean; base: string; children: React.ReactNode }) {
   return unsent
     ? <div className="flex items-center justify-between rounded-xl border p-3">{children}</div>
-    : <Link href={`/personal/groceries/${id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
+    : <Link href={`${base}/${id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
 }
 
-export function GroceryOverview() {
+export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "shopping" }) {
+  const shopping = area === "shopping";
+  const base = shopping ? "/personal/shopping" : "/personal/groceries";
   const today = todayISO();
   const { data, loading, error, savedAt, userId } = useCachedQuery<Overview>((uid) => overviewKey(uid), (sb) => fetchOverview(sb, today), []);
   const { items: pending } = useOutbox(userId);
@@ -55,12 +57,14 @@ export function GroceryOverview() {
   const [monthSet, setMonthSet] = useState(false);
 
   const allReceipts = useMemo(
-    () => applyRows(data?.receipts ?? [], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) })) as Receipt[],
-    [data, pending]
+    () => (applyRows(data?.receipts ?? [], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) })) as (Receipt & { area?: string | null })[])
+      .filter((r) => (r.area === "shopping") === shopping),
+    [data, pending, shopping]
   );
+  const inArea = useMemo(() => new Set(allReceipts.map((r) => r.id)), [allReceipts]);
   // Receipts kept only for their prices are listed, but never counted in the totals, categories or top items
   const receipts = useMemo(() => allReceipts.filter(isSpending), [allReceipts]);
-  const items = useMemo(() => overviewItemsWithWaiting(data?.items ?? [], pending), [data, pending]);
+  const items = useMemo(() => overviewItemsWithWaiting(data?.items ?? [], pending).filter((x) => inArea.has(x.receipt_id)), [data, pending, inArea]);
   const withItems = useMemo(() => new Set(items.map((x) => x.receipt_id)), [items]);
   const waitingReceipts = useMemo(() => waitingRowIds(pending, "grocery_receipts"), [pending]);
   // A receipt that has not reached the server has no page of its own yet
@@ -102,26 +106,35 @@ export function GroceryOverview() {
       <div className="space-y-4 border-b pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold md:text-3xl">Groceries</h1>
-            <p className="mt-1 text-sm text-muted-foreground">Monthly spending, categories and item price changes</p>
+            <h1 className="text-2xl font-bold md:text-3xl">{shopping ? "Shopping" : "Groceries"}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{shopping ? "Clothes, electronics, home and other stores" : "Monthly spending, categories and item price changes"}</p>
           </div>
-          <Link href="/personal/groceries/new" className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> Scan receipt</Button></Link>
+          <Link href={`${base}/new`} className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> {shopping ? "Scan shopping receipt" : "Scan receipt"}</Button></Link>
         </div>
-        <div className="grid grid-cols-3 gap-3 md:gap-4">
+        {!shopping && (
+          <div className="grid grid-cols-3 gap-3 md:gap-4">
           <ActionTile href="/personal/groceries/prices" label="Price tracker" tint="bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"><TrendingUp className="h-5 w-5" aria-hidden="true" /></ActionTile>
           <ActionTile href="/personal/groceries/basket" label="Best Prices" testid="best-store-link" tint="bg-emerald-50 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300"><MapIcon className="h-5 w-5" aria-hidden="true" /></ActionTile>
           <ActionTile href="/personal/groceries/price-check" label="Add a price" testid="price-check-link" tint="bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"><Tag className="h-5 w-5" aria-hidden="true" /></ActionTile>
         </div>
+        )}
       </div>
 
+      {!shopping && (
+        <Link href="/personal/shopping" data-testid="to-shopping" className="flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm shadow-sm transition-colors hover:bg-muted/50">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"><ShoppingBag className="h-5 w-5" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1">Looking for clothes, electronics or home items? They are in <strong>Shopping</strong>.</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      )}
       <OfflineNotice savedAt={savedAt} writable />
       {error && <Alert>{error}</Alert>}
 
       {!loading && !error && allReceipts.length === 0 && (
         <Card><CardContent className="py-16 text-center">
           <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <p className="mb-4 text-muted-foreground">No grocery receipts yet</p>
-          <Link href="/personal/groceries/new"><Button><Plus className="mr-2 h-4 w-4" /> Scan your first receipt</Button></Link>
+          <p className="mb-4 text-muted-foreground">{shopping ? "No shopping receipts yet" : "No grocery receipts yet"}</p>
+          <Link href={`${base}/new`}><Button><Plus className="mr-2 h-4 w-4" /> {shopping ? "Scan your first shopping receipt" : "Scan your first receipt"}</Button></Link>
         </CardContent></Card>
       )}
 
@@ -146,11 +159,11 @@ export function GroceryOverview() {
               {change == null ? <p className="text-3xl font-bold">—</p> : <p className={`text-3xl font-bold ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
               <p className="text-xs text-muted-foreground">{prevMonth ? `Last month ${fmt(prevMonth.total)}` : "No data last month"}</p>
             </CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardDescription>Average per shop</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? <Money amount={thisMonth.total / thisMonth.count} currency={cur} /> : "—"}</p></CardContent></Card>
+            <Card><CardHeader className="pb-2"><CardDescription>{shopping ? "Average per receipt" : "Average per shop"}</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? <Money amount={thisMonth.total / thisMonth.count} currency={cur} /> : "—"}</p></CardContent></Card>
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card><CardHeader><CardTitle className="text-base">Spending by category</CardTitle></CardHeader><CardContent><Bars rows={catRows} currency={cur} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent><Bars rows={catRows} currency={cur} /></CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Last months</CardTitle></CardHeader><CardContent><Bars rows={trend} currency={cur} /></CardContent></Card>
           </div>
 
@@ -162,7 +175,7 @@ export function GroceryOverview() {
             <CardHeader><CardTitle className="text-base">Receipts in {monthLabel(month)}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
-                <ReceiptRow key={r.id} id={r.id} unsent={unsent.has(r.id)}>
+                <ReceiptRow key={r.id} id={r.id} base={base} unsent={unsent.has(r.id)}>
                   <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
                   <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}><Money amount={r.total} currency={cur} /></p>
                 </ReceiptRow>
@@ -170,7 +183,7 @@ export function GroceryOverview() {
             </CardContent>
           </Card>
 
-          <PaidFilter receipts={allReceipts} />
+          <PaidFilter receipts={allReceipts} base={base} />
         </>
       )}
     </div>

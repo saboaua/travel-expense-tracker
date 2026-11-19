@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet } from "lucide-react";
+import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet, ShoppingBag } from "lucide-react";
 import { PersonalTabs } from "@/components/layout/PersonalTabs";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
@@ -18,14 +18,14 @@ import { houseSpends, quickSpends, summarizeSpends, type SpendRow } from "@/lib/
 import { convert, convertedCount, dominantCurrency, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { formatCurrency, todayISO } from "@/lib/utils";
-import { SUBSCRIPTION_COLS, withColumnFallback } from "@/lib/columns";
+import { SUBSCRIPTION_COLS, withColumnFallback3 } from "@/lib/columns";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { fetchSavings } from "@/lib/personal/savings-data";
 import { savingsSummary } from "@/lib/personal/savings";
 import { fuelSummary, type FuelRow } from "@/lib/personal/fuel";
 import { buildComingUp, type ComingUpItem } from "@/lib/personal/coming-up";
 
-type Stats = ReturnType<typeof summarizePersonal> & { documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; currency: BudgetCurrency; converted: number; house: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
+type Stats = ReturnType<typeof summarizePersonal> & { shopping: ReturnType<typeof summarizePersonal>["grocery"]; documents: number | null; cards: number | null; spends: ReturnType<typeof summarizeSpends>; utilities: { total: number; count: number } | null; currency: BudgetCurrency; converted: number; house: { total: number; count: number } | null; savings: ReturnType<typeof savingsSummary> };
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
@@ -72,7 +72,7 @@ export default function PersonalHubPage() {
       const monthStart = `${todayISO().slice(0, 7)}-01`;
       const nextMonthStart = shiftMonth(monthStart, 1);
       const [g, p, d, l, q, lk, u, sv] = await Promise.all([
-        withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
+        withColumnFallback3((cols) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart), "total, currency, prices_only, area", "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string; area?: string | null }>(r)),
         supabase.from("personal_projects").select("id, kind, status, personal_expenses(amount_usd)").eq("status", "active"),
         supabase.from("travel_documents").select("id", { count: "exact", head: true }),
         supabase.from("loyalty_cards").select("id", { count: "exact", head: true }),
@@ -89,7 +89,7 @@ export default function PersonalHubPage() {
       const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO(), cur);
       const houseRows = houseSpends(spendRows, todayISO().slice(0, 7));
       const house = q.error ? null : { count: houseRows.length, total: round2(houseRows.reduce((t, r) => t + (convert(Number(r.amount), r.currency, cur, r.amount_usd == null ? null : Number(r.amount_usd)) ?? 0), 0)) };
-      setStats({ ...summarizePersonal(g.data, withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(quickSpends(q.data as unknown as SpendRow[]), cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
+      setStats({ shopping: summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area === "shopping"), [], cur).grocery, ...summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area !== "shopping"), withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(quickSpends(q.data as unknown as SpendRow[]), cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
     })();
   }, []);
 
@@ -147,6 +147,8 @@ export default function PersonalHubPage() {
     { href: "/personal/fixed", title: "Fixed costs", icon: Landmark, tone: "fixed", text: "Loans, insurance, credit card and more, every month" },
     { href: "/personal/groceries", title: "Groceries", icon: ShoppingCart, tone: "groceries", strong: !!grocery,
       text: !stats ? "\u00a0" : grocery ? `${formatCurrency(grocery.total, grocery.currency)} this month \u00b7 ${plural(grocery.count, "receipt")}` : "Receipts and item prices", add: { href: "/personal/groceries/new", label: "Scan", aria: "Scan receipt" } },
+    { href: "/personal/shopping", title: "Shopping", icon: ShoppingBag, tone: "projects", strong: !!stats?.shopping, testId: "shopping-tile",
+      text: !stats ? "\u00a0" : stats.shopping ? `${formatCurrency(stats.shopping.total, stats.shopping.currency)} this month \u00b7 ${plural(stats.shopping.count, "receipt")}` : "Clothes, electronics, home and other stores", add: { href: "/personal/shopping/new", label: "Scan", aria: "Scan shopping receipt" } },
     { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
     ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/fuel" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
   ];

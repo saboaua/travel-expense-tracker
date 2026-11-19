@@ -21,7 +21,7 @@ export const AREA_STYLE: Record<SpentArea, { color: string; icon: typeof Zap }> 
   savings: { color: "#0d9488", icon: PiggyBank },
   shopping: { color: "#c026d3", icon: ShoppingBag },
 };
-const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
+const AREA_HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/shopping", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
 const BAR_AREAS: SpentArea[] = [...BUDGET_AREAS.map((a) => a.key), "shopping", "savings"];
 /** Fixed costs: loans, insurances, credit card and gambling each get a row and a colour in the bar */
 const FIXED_STYLE: Record<FixedCategory, { color: string; icon: typeof Zap; href: string }> = {

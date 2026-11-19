@@ -110,7 +110,8 @@ need_cols(tbl, col, fix) as (values
   -- Paid with
   ('grocery_receipts','paid_with','migration_paid_with.sql'),
   ('grocery_receipts','trip_ref','migration_paid_with.sql'),
-  ('personal_expenses','paid_with','migration_paid_with.sql')
+  ('personal_expenses','paid_with','migration_paid_with.sql'),
+  ('grocery_receipts','area','migration_shopping_area.sql')
 ),
 col_checks as (
   select 'column' as area, n.tbl || '.' || n.col as item,

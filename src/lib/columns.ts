@@ -34,8 +34,8 @@ export const PERSONAL_EXPENSE_COLS_PAY = `${PERSONAL_EXPENSE_COLS}, paid_with`;
 
 export const GROCERY_RECEIPT_COLS_BASE = "id, store, purchase_date, total, currency, receipt_path, notes";
 export const GROCERY_RECEIPT_COLS = `${GROCERY_RECEIPT_COLS_BASE}, prices_only`;
-/** paid_with and trip_ref come from migration_paid_with.sql, which an older database may not have yet. */
-export const GROCERY_RECEIPT_COLS_PAY = `${GROCERY_RECEIPT_COLS}, paid_with, trip_ref`;
+/** paid_with and trip_ref come from migration_paid_with.sql, area from migration_shopping_area.sql, which an older database may not have yet. */
+export const GROCERY_RECEIPT_COLS_PAY = `${GROCERY_RECEIPT_COLS}, paid_with, trip_ref, area`;
 export const BUDGET_COLS = "id, month, amount, currency, limits, alert_at_80";
 export const SAVINGS_PLAN_COLS_BASE = "id, name, amount, currency, start_date, end_date, opening_balance, goal, paused_on";
 export const SAVINGS_PLAN_COLS = `${SAVINGS_PLAN_COLS_BASE}, pauses`;

@@ -160,7 +160,7 @@ export async function warmProjects(supabase: SupabaseClient, userId: string): Pr
 
 /** Groceries: the overview, the price tracker, the latest receipts, and their pages. */
 export async function warmGroceries(supabase: SupabaseClient, userId: string): Promise<void> {
-  const pages = ["/personal/groceries", "/personal/groceries/new", "/personal/groceries/prices"];
+  const pages = ["/personal/groceries", "/personal/groceries/new", "/personal/groceries/prices", "/personal/shopping", "/personal/shopping/new"];
   const overview = await fetchOverview(supabase, todayISO());
   if (overview.data) await browserKv.set(overviewKey(userId), overview.data).catch(() => {});
   const prices = await fetchPrices(supabase);
@@ -171,7 +171,8 @@ export async function warmGroceries(supabase: SupabaseClient, userId: string): P
     const bundle = await fetchReceiptBundle(supabase, r.id);
     if (!bundle.data) continue;
     await browserKv.set(receiptKey(userId, r.id), bundle.data).catch(() => {});
-    pages.push(`/personal/groceries/${r.id}`, `/personal/groceries/${r.id}/edit`);
+    const at = r.area === "shopping" ? "/personal/shopping" : "/personal/groceries";
+    pages.push(`${at}/${r.id}`, `${at}/${r.id}/edit`);
   }
   await warmPages(pages);
 }

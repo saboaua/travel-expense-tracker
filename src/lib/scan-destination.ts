@@ -138,7 +138,7 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   return { pick, confident: false, reason: last ? "Same as last time" : null };
 }
 
-/** Adds a query part to a page address that may already have one (Shopping opens the grocery form with ?area=shopping). */
+/** Adds a query part to a page address that may already have one . */
 export const withQuery = (href: string, part: string) => `${href}${href.includes("?") ? "&" : "?"}${part}`;
 
 /** Builds the list of places a receipt can go from what the person has and may use. */
@@ -159,7 +159,7 @@ export function buildScanOptions(input: {
   }
   if (input.canPersonal) {
     out.push({ key: "grocery", kind: "grocery", label: "Groceries", sub: "Supermarket receipt", href: "/personal/groceries/new" });
-    if (input.shopping) out.push({ key: "shopping", kind: "shopping", label: "Shopping", sub: "Clothes, electronics, home and other stores", href: "/personal/groceries/new?area=shopping" });
+    if (input.shopping) out.push({ key: "shopping", kind: "shopping", label: "Shopping", sub: "Clothes, electronics, home and other stores", href: "/personal/shopping/new" });
     for (const p of input.projects) {
       if ((p.status || "active") !== "active") continue;
       if (p.kind === "home_project") out.push({ key: `project:${p.id}`, kind: "project", id: p.id, label: p.name, sub: "Project", href: `/personal/projects/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });

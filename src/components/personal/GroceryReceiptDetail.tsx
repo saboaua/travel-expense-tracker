@@ -62,10 +62,11 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
     } catch (err) {
       return setError(err instanceof Error ? err.message : "Could not delete.");
     }
-    router.push("/personal/groceries");
+    router.push(base);
     router.refresh();
   };
 
+  const base = receipt?.area === "shopping" ? "/personal/shopping" : "/personal/groceries";
   if (error || (loadError && !receipt)) return <div className="p-8 text-sm text-red-600">{error || loadError}</div>;
   if (loading || !receipt) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   const fmt = (n: number) => formatCurrency(n, receipt.currency);
@@ -73,7 +74,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 pb-28 md:p-8">
-      <Link href="/personal/groceries" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Groceries</Link>
+      <Link href={base} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {base.endsWith("shopping") ? "Shopping" : "Groceries"}</Link>
       <OfflineNotice savedAt={savedAt} writable />
       {waiting && <p className="flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
       <div className="flex items-start justify-between gap-3">
@@ -88,7 +89,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
           )}
         </div>
         <div className="flex gap-2">
-          <Link href={`/personal/groceries/${id}/edit`}><Button variant="outline" size="icon" aria-label="Edit"><Pencil className="h-4 w-4" /></Button></Link>
+          <Link href={`${base}/${id}/edit`}><Button variant="outline" size="icon" aria-label="Edit"><Pencil className="h-4 w-4" /></Button></Link>
           <Button variant="outline" size="icon" className="text-red-600" onClick={remove} aria-label="Delete"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>
@@ -107,7 +108,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
               {sp.needs > 0 && (
                 <p className="rounded-lg bg-amber-50 px-3 py-2 text-[13px] text-amber-900 dark:bg-amber-950 dark:text-amber-100">
                   {sp.needsCount === 1 ? "1 line is" : `${sp.needsCount} lines are`} still in Other. Until you sort {sp.needsCount === 1 ? "it" : "them"}, {sp.needsCount === 1 ? "it counts" : "they count"} as Groceries.{" "}
-                  <Link href={`/personal/groceries/${id}/edit`} className="font-semibold underline" data-testid="sort-lines">Sort the lines</Link>
+                  <Link href={`${base}/${id}/edit`} className="font-semibold underline" data-testid="sort-lines">Sort the lines</Link>
                 </p>
               )}
             </CardContent>

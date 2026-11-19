@@ -14,7 +14,7 @@ import { formatCurrency, todayISO } from "@/lib/utils";
 import { dominantCurrency, type BudgetCurrency } from "@/lib/personal/money";
 
 const LABEL: Record<SpentArea, string> = { groceries: "Groceries", shopping: "Shopping", utilities: "Utilities", quick: "Quick spend", fuel: "Fuel", house: "House & repairs", savings: "Savings" };
-const HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/groceries", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
+const HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/shopping", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** Where this month's money went: groceries, utilities, savings, house and quick spends, each counted once (same rules as the budget). */

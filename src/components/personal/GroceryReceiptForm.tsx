@@ -36,7 +36,6 @@ import { AWG_PER_USD } from "@/lib/personal/dashboard";
 import { isMissingColumn } from "@/lib/columns";
 import { OfflineNotice } from "@/components/OfflineNotice";
 
-const BACK = "/personal/groceries";
 
 type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean; sorted?: boolean; notWeighed?: boolean };
 const uid = () => Math.random().toString(36).slice(2);
@@ -46,15 +45,17 @@ const money = (s: string) => {
 };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
+export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; area?: "shopping" }) {
   const router = useRouter();
   const currencies = useCurrencies();
   const groceryCategories = useGroceryCategories();
   const categoryNames = useMemo(() => groceryCategories.map((c) => c.name), [groceryCategories]);
   /** Map a guessed/scanned category onto the admin-managed list (falls back to Other, then the first). */
   // Opened as Shopping (?area=shopping): lines that cannot be placed start as Shopping instead of Other
-  const [asShopping, setAsShopping] = useState(false);
-  useEffect(() => { setAsShopping(new URLSearchParams(window.location.search).get("area") === "shopping"); }, []);
+  // A receipt belongs to Shopping when opened from the Shopping pages (or the older ?area=shopping link), or when it was saved there
+  const [asShopping, setAsShopping] = useState(area === "shopping");
+  useEffect(() => { if (new URLSearchParams(window.location.search).get("area") === "shopping") setAsShopping(true); }, []);
+  const BACK = asShopping ? "/personal/shopping" : "/personal/groceries";
   const allowed = (c: string) => {
     const hit = categoryNames.find((n) => n.toLowerCase() === c.toLowerCase());
     const shop = asShopping ? categoryNames.find((n) => n.toLowerCase() === "shopping") : undefined;
@@ -102,6 +103,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const [pricesOnly, setPricesOnly] = useState(false);
   const wasPricesOnly = useRef(false);
   const wasPaid = useRef(false);
+  const wasArea = useRef(false);
   const wasTrip = useRef(false);
   // Currency per store: the one used last at that shop is filled in until you choose your own
   const knownReceipts = useRef<{ store: string; currency: string; purchase_date: string }[]>([]);
@@ -157,6 +159,8 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       setNotes(head.notes || "");
       setPricesOnly(head.prices_only === true);
       wasSaved.current = true;
+      if (head.area === "shopping") setAsShopping(true);
+      wasArea.current = head.area === "shopping";
       wasPaid.current = !!normPaid(head.paid_with);
       wasTrip.current = !!normTripRef(head.trip_ref);
       setPaidWith(normPaid(head.paid_with));
@@ -193,7 +197,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     quickHandled.current = true;
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
     // The photo goes to the crop step first, then is read, the same as a photo picked on this screen
-    takeQuickScan(new URLSearchParams(window.location.search).get("area") === "shopping" ? "shopping" : "grocery").then((f) => { if (f) setIncoming(f); });
+    takeQuickScan(area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping" ? "shopping" : "grocery").then((f) => { if (f) setIncoming(f); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [categoryNames.length]);
 
@@ -326,7 +330,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       if (!owner) throw new Error("Sign in again to save.");
 
       // Only sent when it matters, so a database without the price-notes migration still saves the receipt
-      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
+      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || wasArea.current ? { area: asShopping ? "shopping" : "groceries" } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -453,6 +457,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
               </div>
             </div>
 
+            <div className="space-y-2">
+              <label htmlFor="gr-area" className="text-sm font-medium">Shows up in</label>
+              <Select id="gr-area" value={asShopping ? "shopping" : "groceries"} onChange={(e) => setAsShopping(e.target.value === "shopping")}>
+                <option value="groceries">Groceries</option>
+                <option value="shopping">Shopping</option>
+              </Select>
+            </div>
             <PaidWithPicker value={paidWith} onChange={setPaidWith} />
             <TripPicker trips={trips} value={tripRef} suggested={suggestedTrip} onChange={(v) => { tripTouched.current = true; setTripRef(v); }} />
 
