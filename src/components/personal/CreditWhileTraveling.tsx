@@ -5,7 +5,7 @@ import { CreditCard } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { useTripChoices } from "@/components/personal/TripPicker";
-import { formatCurrency } from "@/lib/utils";
+import { Money } from "@/components/ui/money";
 
 type Line = { ref: string; currency: string; amount: number; n: number };
 
@@ -43,12 +43,12 @@ export function CreditWhileTraveling({ year }: { year: string }) {
     <Card data-testid="credit-while-traveling">
       <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-base"><CreditCard className="h-4 w-4" aria-hidden="true" />Credit card while traveling · {year}</CardTitle></CardHeader>
       <CardContent className="space-y-3">
-        <div className="rounded-xl bg-muted/50 p-3">{sums.map(([c, a]) => <p key={c} className="text-2xl font-bold">{formatCurrency(a, c)}</p>)}</div>
+        <div className="rounded-xl bg-muted/50 p-3">{sums.map(([c, a]) => <p key={c} className="text-2xl font-bold"><Money amount={a} currency={c} /></p>)}</div>
         <div className="divide-y">
           {[...lines].sort((a, b) => b.amount - a.amount).map((l) => (
             <div key={`${l.ref}|${l.currency}`} className="flex min-h-12 items-center gap-3 py-2">
               <span className="min-w-0 flex-1"><span className="block truncate text-sm font-semibold">{name(l.ref)}</span><span className="block text-xs text-muted-foreground">{l.n} {l.n === 1 ? "expense" : "expenses"}</span></span>
-              <span className="shrink-0 text-sm font-bold">{formatCurrency(l.amount, l.currency)}</span>
+              <span className="shrink-0 text-sm font-bold"><Money amount={l.amount} currency={l.currency} /></span>
             </div>
           ))}
         </div>

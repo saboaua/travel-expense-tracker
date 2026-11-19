@@ -5,7 +5,7 @@ import { Banknote, CreditCard, Landmark } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
 import { currenciesOf, normPaid, paidTotals, type Pay } from "@/lib/paid-with";
-import { formatCurrency } from "@/lib/utils";
+import { Money } from "@/components/ui/money";
 
 type Receipt = { total: number | string; currency: string; paid_with: string | null; prices_only?: boolean | null };
 
@@ -55,7 +55,7 @@ export function HowYouPaid({ tripRef, expenses = [], title = "How you paid", hin
                     <div className="flex items-center gap-3">
                       {l.Icon ? <l.Icon className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" /> : <span className="h-5 w-5 shrink-0" />}
                       <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{l.label}</p><p className="text-xs text-muted-foreground">{t.count[l.k]} {t.count[l.k] === 1 ? "expense" : "expenses"}</p></div>
-                      <div className="text-right"><p className="text-sm font-bold">{formatCurrency(t[l.k], cur)}</p><p className="text-xs text-muted-foreground">{pct}%</p></div>
+                      <div className="text-right"><p className="text-sm font-bold"><Money amount={t[l.k]} currency={cur} /></p><p className="text-xs text-muted-foreground">{pct}%</p></div>
                     </div>
                     <div className="mt-1.5 h-2 rounded-full bg-muted"><div className={`h-2 rounded-full ${l.color}`} style={{ width: `${pct}%` }} /></div>
                   </div>
