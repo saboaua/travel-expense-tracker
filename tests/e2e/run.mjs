@@ -968,6 +968,42 @@ try {
     await ctx.close();
   });
 
+  await test("paid with: a Shopping receipt on a work trip keeps Credit card and the trip, shows under By card and trip and on the trip page, and stays out of the business totals", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Zara Panama", date: null, total: 84.5, currency: "USD", source: "ai", items: [item("Linen shirt", 84.5)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const spendBefore = fake.table("expenses").length;
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "shopping", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?area=shopping&quick=1`);
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+    // The trip that is on today is already picked; the card is one tap
+    await page.getByTestId(`during-trip:${TRIP_ID}`).waitFor();
+    assert((await page.getByTestId(`during-trip:${TRIP_ID}`).getAttribute("aria-checked")) === "true", "the trip that is on today is picked for you");
+    await page.getByTestId("paid-credit").click();
+    const before = fake.table("grocery_receipts").length;
+    await page.getByRole("button", { name: "Save receipt" }).click();
+    for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const saved = fake.table("grocery_receipts").find((r) => r.store === "Zara Panama");
+    assert(saved && saved.paid_with === "credit" && saved.trip_ref === `trip:${TRIP_ID}`, "paid_with and trip are saved: " + JSON.stringify(saved));
+    // By card and trip on the Groceries page
+    await page.goto(`${BASE}/personal/groceries`);
+    await page.getByTestId("paid-filter").waitFor({ timeout: 20_000 });
+    await page.getByTestId("pf-paid-credit").click();
+    assert(/84\.50/.test(await page.getByTestId("pf-total").innerText()), "the total for credit card is shown: " + (await page.getByTestId("pf-total").innerText()));
+    await page.getByTestId("pf-paid-cash").click();
+    assert(/No receipts/.test(await page.getByTestId("pf-total").innerText()), "cash has none");
+    // The trip page shows it as personal spending, apart from the business totals
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByTestId("how-you-paid").waitFor({ timeout: 20_000 });
+    assert(/Credit card/.test(await page.getByTestId("paid-line-credit").innerText()) && /84\.50/.test(await page.getByTestId("paid-line-credit").innerText()), "credit card line on the trip");
+    assert(fake.table("expenses").length === spendBefore, "no business expense was created");
+    fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Zara Panama"));
+    await ctx.close();
+  });
+
   await test("scan: rows the second look disagrees with get a Check mark and a Use button, and the total bar turns green once the items add up", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

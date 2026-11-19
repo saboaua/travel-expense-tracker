@@ -46,4 +46,5 @@ export type PersonalExpense = {
   expense_date: string;
   notes: string | null;
   receipt_path: string | null;
+  paid_with?: string | null;
 };

@@ -1,5 +1,6 @@
 "use client";
 
+import { HowYouPaid } from "@/components/personal/HowYouPaid";
 import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
 import { ShareWith } from "@/components/sharing/ShareWith";
@@ -168,6 +169,8 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
           <Card><CardHeader className="pb-2"><CardDescription>Biggest expense</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{biggest ? formatCurrency(biggest.amount_usd, "USD") : "—"}</p><p className="truncate text-xs text-muted-foreground">{biggest ? biggest.merchant || biggest.category : "No expenses yet"}</p></CardContent></Card>
         )}
       </div>
+
+      {kind === "personal_trip" && <HowYouPaid tripRef={`ptrip:${id}`} expenses={expenses} />}
 
       {byCategory.length > 0 && (
         <Card>

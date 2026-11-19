@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "@/lib/personal/fetch-all";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, SAVINGS_PLAN_COLS, SAVINGS_EVENT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, SUBSCRIPTION_COLS, TRIP_COLS, BUDGET_COLS, FIXED_COST_COLS, FIXED_ENTRY_COLS, UTILITY_BILL_COLS, UTILITY_BILL_COLS_REF, TRIP_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, GROCERY_RECEIPT_COLS_PAY, PERSONAL_EXPENSE_COLS_PAY, PRICE_CHECK_COLS, SAVINGS_PLAN_COLS, SAVINGS_EVENT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, SUBSCRIPTION_COLS, TRIP_COLS, BUDGET_COLS, FIXED_COST_COLS, FIXED_ENTRY_COLS, UTILITY_BILL_COLS, UTILITY_BILL_COLS_REF, TRIP_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 /** Tables that belong to one person (column holding the owner), and the storage bucket their files sit in. */
 export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; cols: string; mid?: string; base?: string; /** a column that puts the rows in a fixed order, so paging never skips or repeats one */ order?: string }[] = [
@@ -8,7 +8,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "trips", owner: "user_id", cols: `${TRIP_COLS}, user_id, created_at`, base: `${TRIP_COLS_BASE}, user_id, created_at` },
   { table: "expenses", owner: "user_id", bucket: "receipts", cols: `${EXPENSE_COLS}, user_id, trip_id, created_at` },
   { table: "personal_projects", owner: "user_id", cols: PERSONAL_PROJECT_COLS_TYPED, base: PERSONAL_PROJECT_COLS },
-  { table: "personal_expenses", owner: "user_id", bucket: "receipts", cols: PERSONAL_EXPENSE_COLS },
+  { table: "personal_expenses", owner: "user_id", bucket: "receipts", cols: PERSONAL_EXPENSE_COLS_PAY, base: PERSONAL_EXPENSE_COLS },
   { table: "utility_bills", owner: "user_id", bucket: "receipts", cols: UTILITY_BILL_COLS_REF, base: UTILITY_BILL_COLS },
   { table: "personal_budgets", owner: "user_id", cols: BUDGET_COLS },
   { table: "fixed_costs", owner: "user_id", cols: FIXED_COST_COLS },
@@ -19,7 +19,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "fuel_fillups", owner: "user_id", cols: "id, fill_date, unit, quantity, price_per_unit, amount, currency, amount_usd, station, created_at" },
   { table: "utility_prefs", owner: "user_id", cols: "user_id, remind_day", order: "user_id" },
   { table: "subscriptions", owner: "user_id", cols: SUBSCRIPTION_COLS },
-  { table: "grocery_receipts", owner: "user_id", bucket: "receipts", cols: GROCERY_RECEIPT_COLS, base: GROCERY_RECEIPT_COLS_BASE },
+  { table: "grocery_receipts", owner: "user_id", bucket: "receipts", cols: GROCERY_RECEIPT_COLS_PAY, mid: GROCERY_RECEIPT_COLS, base: GROCERY_RECEIPT_COLS_BASE },
   { table: "shopping_list_items", owner: "user_id", cols: "id, product_key, name, qty, created_at" },
   { table: "store_locations", owner: "user_id", cols: "id, name, lat, lng, source, osm_id, created_at" },
   { table: "invite_links", owner: "user_id", cols: "user_id, code, show_name, created_at", order: "user_id" },

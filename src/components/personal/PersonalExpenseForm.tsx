@@ -1,10 +1,12 @@
 "use client";
 
+import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
+import { lastPaid, normPaid, type PaidWith } from "@/lib/paid-with";
 import { AiScanMeter } from "@/components/pro/AiScanMeter";
 import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -45,6 +47,9 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
   const [category, setCategory] = useState(meta.categories[0]);
   const [date, setDate] = useState(todayISO());
   const [notes, setNotes] = useState("");
+  const [paidWith, setPaidWith] = useState<PaidWith | null>(null);
+  const wasPaid = useRef(false);
+  useEffect(() => { if (!expenseId) setPaidWith((p) => p ?? lastPaid()); }, [expenseId]);
   const [scanning, setScanning] = useState(false);
   const [note, setNote] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -82,6 +87,8 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       setCategory(data.category ?? meta.categories[0]);
       setDate(data.expense_date ?? todayISO());
       setNotes(data.notes || "");
+      setPaidWith(normPaid(data.paid_with));
+      wasPaid.current = !!normPaid(data.paid_with);
       setExistingPath(data.receipt_path ?? null);
       if (data.receipt_path) {
         const kept = await browserBlobs.get(`receipts/${data.receipt_path}`).catch(() => null);
@@ -149,6 +156,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
         category,
         expense_date: date,
         notes: notes.trim() || null,
+        ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}),
       };
       const waitingList = await browserOutbox.list().catch(() => []);
       const parents = await waitingParents(browserOutbox, [projectId]);
@@ -255,6 +263,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
               <label className="text-sm font-medium">Date</label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </div>
+            {kind === "personal_trip" && <PaidWithPicker value={paidWith} onChange={setPaidWith} />}
             <div className="space-y-2">
               <label className="text-sm font-medium">Notes <span className="font-normal text-muted-foreground">(optional)</span></label>
               <Input value={notes} onChange={(e) => setNotes(e.target.value)} />

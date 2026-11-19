@@ -106,7 +106,11 @@ need_cols(tbl, col, fix) as (values
   ('supermarket_places','orig_key','migration_places_fix.sql'),
   -- Price tracker
   ('price_checks','product','migration_price_notes.sql'),
-  ('price_checks','photo_path','migration_price_notes.sql')
+  ('price_checks','photo_path','migration_price_notes.sql'),
+  -- Paid with
+  ('grocery_receipts','paid_with','migration_paid_with.sql'),
+  ('grocery_receipts','trip_ref','migration_paid_with.sql'),
+  ('personal_expenses','paid_with','migration_paid_with.sql')
 ),
 col_checks as (
   select 'column' as area, n.tbl || '.' || n.col as item,

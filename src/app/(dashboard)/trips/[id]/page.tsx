@@ -1,3 +1,4 @@
+import { HowYouPaid } from "@/components/personal/HowYouPaid";
 import { PageShell } from "@/components/layout/PageShell";
 import { ExportMenu } from "@/components/trips/ExportMenu";
 import { AccountingExport } from "@/components/accounting/AccountingExport";
@@ -157,6 +158,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
             <ExportMenu tripId={id} className={`${actionBtn} w-full`} />
           </div>
           <AccountingExport target={{ scope: "trip", id }} className={`${actionBtn} w-full`} />
+          <HowYouPaid tripRef={`trip:${id}`} title="Your personal spending on this trip" hint="Personal receipts you tagged to this trip. They are not part of the business report." />
           {trip.notes && <p className="whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">{trip.notes}</p>}
           {info?.summary && (
             <p className="line-clamp-2 px-1 text-xs text-muted-foreground">

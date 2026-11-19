@@ -30,9 +30,12 @@ export const UTILITY_BILL_COLS_REF = `${UTILITY_BILL_COLS_EMAIL}, payment_ref`;
 export const PERSONAL_SPEND_COLS_MID = `${PERSONAL_SPEND_COLS_BASE}, project_id, receipt_path`;
 export const PERSONAL_SPEND_COLS = `${PERSONAL_SPEND_COLS_MID}, house_area`;
 export const PERSONAL_EXPENSE_COLS = "id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path";
+export const PERSONAL_EXPENSE_COLS_PAY = `${PERSONAL_EXPENSE_COLS}, paid_with`;
 
 export const GROCERY_RECEIPT_COLS_BASE = "id, store, purchase_date, total, currency, receipt_path, notes";
 export const GROCERY_RECEIPT_COLS = `${GROCERY_RECEIPT_COLS_BASE}, prices_only`;
+/** paid_with and trip_ref come from migration_paid_with.sql, which an older database may not have yet. */
+export const GROCERY_RECEIPT_COLS_PAY = `${GROCERY_RECEIPT_COLS}, paid_with, trip_ref`;
 export const BUDGET_COLS = "id, month, amount, currency, limits, alert_at_80";
 export const SAVINGS_PLAN_COLS_BASE = "id, name, amount, currency, start_date, end_date, opening_balance, goal, paused_on";
 export const SAVINGS_PLAN_COLS = `${SAVINGS_PLAN_COLS_BASE}, pauses`;

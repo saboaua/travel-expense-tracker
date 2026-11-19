@@ -1,5 +1,6 @@
 "use client";
 
+import { CreditWhileTraveling } from "@/components/personal/CreditWhileTraveling";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Crown, FileSpreadsheet, FileText, Lock } from "lucide-react";
@@ -65,6 +66,8 @@ export default function ReportsPage() {
       )}
 
       {pro === true && <WhereItGoes />}
+
+      <CreditWhileTraveling year={todayISO().slice(0, 4)} />
 
       {pro === true && projects.length > 0 && (
         <section aria-labelledby="rep-projects" className="space-y-2" data-testid="report-projects">

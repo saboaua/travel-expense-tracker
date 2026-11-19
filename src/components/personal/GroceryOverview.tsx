@@ -1,5 +1,6 @@
 "use client";
 
+import { PaidFilter } from "@/components/personal/PaidFilter";
 import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
@@ -168,6 +169,8 @@ export function GroceryOverview() {
               ))}
             </CardContent>
           </Card>
+
+          <PaidFilter receipts={allReceipts} />
         </>
       )}
     </div>

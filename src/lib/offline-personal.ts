@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, withColumnFallback } from "@/lib/columns";
+import { PERSONAL_EXPENSE_COLS, PERSONAL_EXPENSE_COLS_PAY, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, withColumnFallback } from "@/lib/columns";
 import type { PersonalExpense, PersonalKind, PersonalProject } from "@/lib/personal/constants";
 
 /** What the personal screens load, and the key each is kept under on the phone. Shared with the background warm-up. */
@@ -46,7 +46,7 @@ export async function fetchProjects(supabase: SupabaseClient, kind: PersonalKind
 export async function fetchProjectBundle(supabase: SupabaseClient, id: string): Result<ProjectBundle> {
   const [p, e] = await Promise.all([
     withColumnFallback((cols) => supabase.from("personal_projects").select(cols).eq("id", id).single(), PERSONAL_PROJECT_COLS_TYPED, PERSONAL_PROJECT_COLS),
-    supabase.from("personal_expenses").select(PERSONAL_EXPENSE_COLS).eq("project_id", id).order("expense_date", { ascending: false }),
+    withColumnFallback((cols) => supabase.from("personal_expenses").select(cols).eq("project_id", id).order("expense_date", { ascending: false }), PERSONAL_EXPENSE_COLS_PAY, PERSONAL_EXPENSE_COLS),
   ]);
   if (p.error || !p.data) return { data: null, error: p.error ?? new Error("Not found") };
   if (e.error) return { data: null, error: e.error };

@@ -1,5 +1,8 @@
 "use client";
 
+import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
+import { TripPicker, useTripChoices } from "@/components/personal/TripPicker";
+import { lastPaid, normPaid, normTripRef, suggestTrip, type PaidWith } from "@/lib/paid-with";
 import { AiScanMeter } from "@/components/pro/AiScanMeter";
 import { Select } from "@/components/ui/select";
 import { Money } from "@/components/ui/money";
@@ -87,8 +90,19 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   // "Add by hand": no photo step, for when the camera or the scan does not work
   const [manual, setManual] = useState(false);
   // "Just keeping the prices": a receipt for something you did not pay for. Its items feed the Price tracker, but it is never counted as spending.
+  const [paidWith, setPaidWith] = useState<PaidWith | null>(null);
+  const [tripRef, setTripRef] = useState<string | null>(null);
+  const tripTouched = useRef(false);
+  const trips = useTripChoices();
+  const suggestedTrip = useMemo(() => suggestTrip(trips, date)?.ref ?? null, [trips, date]);
+  // A new receipt starts with your last card and the trip that was on that day; an old one keeps what it has
+  const wasSaved = useRef(false);
+  useEffect(() => { if (!receiptId && !wasSaved.current) setPaidWith((p) => p ?? lastPaid()); }, [receiptId]);
+  useEffect(() => { if (!receiptId && !tripTouched.current) setTripRef(suggestedTrip); }, [receiptId, suggestedTrip]);
   const [pricesOnly, setPricesOnly] = useState(false);
   const wasPricesOnly = useRef(false);
+  const wasPaid = useRef(false);
+  const wasTrip = useRef(false);
   // Currency per store: the one used last at that shop is filled in until you choose your own
   const knownReceipts = useRef<{ store: string; currency: string; purchase_date: string }[]>([]);
   const currencyChosen = useRef(false);
@@ -142,6 +156,11 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       setTotal(String(head.total ?? ""));
       setNotes(head.notes || "");
       setPricesOnly(head.prices_only === true);
+      wasSaved.current = true;
+      wasPaid.current = !!normPaid(head.paid_with);
+      wasTrip.current = !!normTripRef(head.trip_ref);
+      setPaidWith(normPaid(head.paid_with));
+      setTripRef(normTripRef(head.trip_ref));
       wasPricesOnly.current = head.prices_only === true;
       currencyChosen.current = true;
       setExistingPath(head.receipt_path ?? null);
@@ -295,7 +314,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       if (!owner) throw new Error("Sign in again to save.");
 
       // Only sent when it matters, so a database without the price-notes migration still saves the receipt
-      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}) };
+      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -421,6 +440,9 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
                 <Input id="gr-total" type="number" step="0.01" min="0" value={total} onChange={(e) => setTotal(e.target.value)} placeholder={itemsSum ? itemsSum.toFixed(2) : "0.00"} />
               </div>
             </div>
+
+            <PaidWithPicker value={paidWith} onChange={setPaidWith} />
+            <TripPicker trips={trips} value={tripRef} suggested={suggestedTrip} onChange={(v) => { tripTouched.current = true; setTripRef(v); }} />
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">

@@ -1,6 +1,7 @@
+import { normPaid, normTripRef, type PaidWith } from "@/lib/paid-with";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, isMissingColumn, withColumnFallback } from "@/lib/columns";
+import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, GROCERY_RECEIPT_COLS_PAY, PRICE_CHECK_COLS, isMissingColumn, withColumnFallback3 } from "@/lib/columns";
 import { checkToTracker, type PriceCheck } from "@/lib/personal/price-notes";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import type { ItemLite, ReceiptLite } from "@/lib/personal/grocery";
@@ -13,10 +14,10 @@ import type { OutboxItem } from "@/lib/outbox";
 
 type Result<T> = Promise<{ data: T | null; error: unknown }>;
 
-export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null };
+export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null };
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
-export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null };
+export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null };
 export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[] };
 
 export const overviewKey = (userId: string) => `${userId}:groceries:overview`;
@@ -37,14 +38,17 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
     const receipts = (cols: string) => fetchAll<OverviewReceipt>((a, b) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b) as never);
     const [r, i] = await Promise.all([
       // Before the price-notes migration there is no prices_only column: everything is spending
-      receipts("id, store, purchase_date, total, currency, prices_only").catch((e) => { if (isMissingColumn({ message: e instanceof Error ? e.message : "" })) return receipts("id, store, purchase_date, total, currency"); throw e; }),
+      receipts("id, store, purchase_date, total, currency, prices_only, paid_with, trip_ref").catch((e) => {
+        if (!isMissingColumn({ message: e instanceof Error ? e.message : "" })) throw e;
+        return receipts("id, store, purchase_date, total, currency, prices_only").catch((e2) => { if (isMissingColumn({ message: e2 instanceof Error ? e2.message : "" })) return receipts("id, store, purchase_date, total, currency"); throw e2; });
+      }),
       fetchAll<ItemLite & { grocery_receipts: unknown }>((a, b) =>
         supabase.from("grocery_items").select("receipt_id, category, name, normalized_name, line_total, grocery_receipts!inner(purchase_date)").gte("grocery_receipts.purchase_date", from).range(a, b)
       ),
     ]);
     return {
       data: {
-        receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true })),
+        receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true, paid_with: normPaid(x.paid_with), trip_ref: normTripRef(x.trip_ref) })),
         items: i.map((x) => ({ receipt_id: x.receipt_id, category: x.category, name: x.name, normalized_name: x.normalized_name, line_total: Number(x.line_total) })),
       },
       error: null,
@@ -91,7 +95,7 @@ export async function fetchPriceMatches(supabase: SupabaseClient, forUser?: stri
 
 export async function fetchReceiptBundle(supabase: SupabaseClient, id: string): Result<ReceiptBundle> {
   const [r, i] = await Promise.all([
-    withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("id", id).single(), GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE),
+    withColumnFallback3((cols) => supabase.from("grocery_receipts").select(cols).eq("id", id).single(), GROCERY_RECEIPT_COLS_PAY, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE),
     supabase.from("grocery_items").select(GROCERY_ITEM_COLS).eq("receipt_id", id).order("created_at"),
   ]);
   if (r.error || !r.data) return { data: null, error: r.error ?? new Error("Receipt not found") };
