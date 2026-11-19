@@ -4,6 +4,7 @@ import { createServerClient } from "@supabase/ssr";
 import { isTempPasswordExpired } from "@/lib/temp-password-config";
 import { canAccessPath, clientRedirect, ruleForPath } from "@/lib/access";
 import { loadPermissions } from "@/lib/access-server";
+import { cachedPermissions, cachedRole, rememberPermissions, rememberRole } from "@/lib/role-cache";
 import { metaFromRequest, writeSecurityEvent } from "@/lib/security-log";
 import { buildCsp, cspHeaderName, makeNonce } from "@/lib/csp";
 
@@ -48,11 +49,12 @@ async function handle(request: NextRequest) {
   );
 
   if (user) {
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, must_change_password")
-      .eq("id", user.id)
-      .single();
+    // A person recently seen with a normal sign-in needs no new database question on every page
+    const knownRole = cachedRole(user.id);
+    const profile: { role?: unknown; must_change_password?: boolean | null } | null = knownRole
+      ? { role: knownRole, must_change_password: false }
+      : (await supabase.from("profiles").select("role, must_change_password").eq("id", user.id).single()).data;
+    if (!knownRole && profile && !profile.must_change_password) rememberRole(user.id, (profile.role as string) || "user");
 
     // Expiry lives in a separate query so the app keeps working if the SQL migration has not run yet
     let expiresAt: string | null = null;
@@ -102,7 +104,8 @@ async function handle(request: NextRequest) {
       return NextResponse.redirect(url);
     }
     if (role !== "admin" && ruleForPath(path).kind !== "open") {
-      const perms = await loadPermissions(supabase, role);
+      const perms = cachedPermissions(role) ?? (await loadPermissions(supabase, role));
+      rememberPermissions(role, perms);
       if (!canAccessPath(role, perms, path)) {
         await writeSecurityEvent(metaFromRequest(request), {
           eventType: "access_denied",

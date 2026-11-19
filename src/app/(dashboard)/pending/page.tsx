@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isExpense, type QueuedExpense } from "@/lib/offline-queue";
 import { browserOutbox, type OutboxItem } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
-import { SYNC_NOW_EVENT } from "@/components/OfflineSync";
+import { SYNC_NOW_EVENT } from "@/lib/sync-event";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";

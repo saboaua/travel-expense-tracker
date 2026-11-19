@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { Bitcoin, Check, Clock, Copy, RotateCcw } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -52,7 +51,7 @@ export function BitcoinPay({ period, pending, confirmations, onChanged }: Props)
   useEffect(() => {
     let off = false;
     if (!uri || !quoting) { setQr(""); return; }
-    QRCode.toDataURL(uri, { margin: 1, width: 240, errorCorrectionLevel: "M" }).then((u) => { if (!off) setQr(u); }).catch(() => { if (!off) setQr(""); });
+    import("qrcode").then(({ default: QRCode }) => QRCode.toDataURL(uri, { margin: 1, width: 240, errorCorrectionLevel: "M" })).then((u) => { if (!off) setQr(u); }).catch(() => { if (!off) setQr(""); });
     return () => { off = true; };
   }, [uri, quoting]);
 

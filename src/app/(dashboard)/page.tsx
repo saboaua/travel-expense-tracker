@@ -28,7 +28,7 @@ import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
 import { DashboardViews } from "@/components/DashboardViews";
-import { WelcomeTour } from "@/components/welcome/WelcomeTour";
+import { WelcomeTourLoader } from "@/components/welcome/WelcomeTourLoader";
 import { GettingStarted } from "@/components/welcome/GettingStarted";
 import { cleanTracks, shouldShowWelcome } from "@/lib/welcome";
 import { buildRows, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
@@ -342,7 +342,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
       {shouldShowWelcome(profile?.welcome_seen_at, forcedTour) && (
-        <WelcomeTour userId={uid} forced={forcedTour} home={{ country: profile?.home_country ?? "", city: profile?.home_city ?? "" }} tracks={cleanTracks(profile?.welcome_tracks)} />
+        <WelcomeTourLoader userId={uid} forced={forcedTour} home={{ country: profile?.home_country ?? "", city: profile?.home_city ?? "" }} tracks={cleanTracks(profile?.welcome_tracks)} />
       )}
       <DashboardHeader
         firstName={firstName}

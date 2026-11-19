@@ -28,7 +28,7 @@ import { enqueueExpense, EXPENSE_KIND, newExpenseId, pushExpense, type Duplicate
 import { imageDhash } from "@/lib/image-hash";
 import { DuplicateList } from "@/components/DuplicateList";
 import { makeSyncApi } from "@/lib/offline-api";
-import { SYNC_NOW_EVENT } from "@/components/OfflineSync";
+import { SYNC_NOW_EVENT } from "@/lib/sync-event";
 
 
 export default function AddExpensePage() {

@@ -9,7 +9,8 @@ import { currentUserOf, makeHandlers } from "@/lib/offline-api";
 import { nounFor, SYNCED_EVENT, syncOutbox } from "@/lib/outbox";
 import { useOutbox } from "@/lib/use-outbox";
 
-export const SYNC_NOW_EVENT = "expense-queue-sync-now";
+import { SYNC_NOW_EVENT } from "@/lib/sync-event";
+export { SYNC_NOW_EVENT };
 
 /**
  * Sends waiting changes (receipts and, as they are added, other kinds) when the connection is back and shows a small "pending sync" pill while any are waiting.

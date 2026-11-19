@@ -142,6 +142,7 @@ const app = spawn("npx", ["next", process.env.E2E_PROD ? "start" : "dev", "-p", 
     NEXT_PUBLIC_SUPABASE_ANON_KEY: ANON_KEY,
     SUPABASE_SERVICE_ROLE_KEY: SERVICE_KEY,
     NEXT_TELEMETRY_DISABLED: "1",
+    ROLE_CACHE_SECONDS: process.env.ROLE_CACHE_SECONDS ?? "0", // the tests change roles and expect it at once
     TURNSTILE_SECRET_KEY: "",
     NEXT_PUBLIC_TURNSTILE_SITE_KEY: "",
     INBOUND_EMAIL_BASE: "@in.example.com",

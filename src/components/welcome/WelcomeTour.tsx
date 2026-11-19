@@ -196,6 +196,9 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
     setPlatform(p);
     setTab(p === "android" ? "android" : "ios");
     const onPrompt = (e: Event) => { e.preventDefault(); deferred.current = e as InstallEvent; setCanInstall(true); };
+    // The offer may have arrived while this code was still loading
+    const early = (window as Window & { __earlyInstall?: Event }).__earlyInstall;
+    if (early) onPrompt(early);
     window.addEventListener("beforeinstallprompt", onPrompt);
     return () => window.removeEventListener("beforeinstallprompt", onPrompt);
   }, []);

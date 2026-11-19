@@ -1,10 +1,8 @@
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { ScrollArea } from "@/components/layout/ScrollArea";
-import { OfflineSync } from "@/components/OfflineSync";
 import { ViewportGuard } from "@/components/layout/ViewportGuard";
-import { OfflineWarm } from "@/components/OfflineWarm";
-import { SharingPopups } from "@/components/sharing/SharingPopups";
+import { DeferredHelpers } from "@/components/layout/DeferredHelpers";
 
 export default function DashboardLayout({
   children,
@@ -20,9 +18,7 @@ export default function DashboardLayout({
         <main className="pb-6 md:pb-8">{children}</main>
       </ScrollArea>
       <MobileNav />
-      <OfflineSync />
-      <OfflineWarm />
-      <SharingPopups />
+      <DeferredHelpers />
       <ViewportGuard />
     </div>
   );

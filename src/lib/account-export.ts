@@ -1,4 +1,3 @@
-import JSZip from "jszip";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, EXPENSE_COLS, GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, PRICE_CHECK_COLS, SAVINGS_PLAN_COLS, SAVINGS_EVENT_COLS, LOYALTY_CARD_COLS, LOYALTY_CARD_COLS_BASE, PERSONAL_EXPENSE_COLS, PERSONAL_PROJECT_COLS, PERSONAL_PROJECT_COLS_TYPED, PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, SUBSCRIPTION_COLS, TRIP_COLS, BUDGET_COLS, FIXED_COST_COLS, FIXED_ENTRY_COLS, UTILITY_BILL_COLS, UTILITY_BILL_COLS_REF, TRIP_COLS_BASE, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
@@ -53,6 +52,8 @@ export async function buildAccountZip(
   userId: string,
   onProgress: (p: ExportProgress) => void = () => {},
 ): Promise<{ blob: Blob; counts: Record<string, number>; missingFiles: number }> {
+  // The ZIP library is only fetched when someone actually asks for their data
+  const { default: JSZip } = await import("jszip");
   const zip = new JSZip();
   const counts: Record<string, number> = {};
   const jobs: { bucket: string; path: string }[] = [];
