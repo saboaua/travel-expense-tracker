@@ -946,6 +946,28 @@ try {
     await ctx.close();
   });
 
+  await test("shopping: a receipt scanned as Shopping starts its lines as Shopping, and Change moves the same photo between Shopping and Groceries", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Zara", date: null, total: 44.8, currency: "USD", source: "ai", items: [item("Linen shirt", 39.9), item("Belt", 4.9)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "shopping", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?area=shopping&quick=1`);
+    await page.getByText("Shopping \u00b7 Personal").waitFor({ timeout: 20_000 });
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByTestId("split-shopping").waitFor({ timeout: 20_000 });
+    assert((await page.getByLabel("Item 1 category").inputValue()) === "Shopping", "an unplaced line starts as Shopping");
+    // Change lists Shopping next to Groceries; Groceries starts the form again with the same photo
+    await page.getByRole("button", { name: "Change" }).first().click();
+    await page.getByRole("radio", { name: /Shopping/ }).waitFor();
+    await page.getByRole("radio", { name: /Groceries/ }).click();
+    await page.getByRole("button", { name: /Save to Groceries/ }).click();
+    await page.waitForURL((u) => u.pathname === "/personal/groceries/new" && !u.search.includes("area=shopping"), { timeout: 20_000 });
+    await page.getByText("Groceries \u00b7 Personal").waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
   await test("scan: rows the second look disagrees with get a Check mark and a Use button, and the total bar turns green once the items add up", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

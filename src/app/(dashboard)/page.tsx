@@ -217,6 +217,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     canTrips: myPerms.has("trips"),
     canPersonal: personalOn,
     canDocuments: myPerms.has("documents"),
+    shopping: true,
   });
 
   // Tiles for the person's own documents (not tied to a trip), soonest to expire first. "Show on" decides which dashboard lists each one.

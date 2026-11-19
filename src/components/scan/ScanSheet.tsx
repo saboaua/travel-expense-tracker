@@ -1,9 +1,9 @@
 "use client";
 
-import { Briefcase, Check, FileText, Globe, Hammer, Loader2, MapPin, ShoppingCart, X } from "lucide-react";
+import { Briefcase, Check, FileText, Globe, Hammer, Loader2, MapPin, ShoppingBag, ShoppingCart, X } from "lucide-react";
 import type { ScanOption } from "@/lib/scan-destination";
 
-const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, document: FileText } as const;
+const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, shopping: ShoppingBag, document: FileText } as const;
 
 /** "Where does this go?" Bottom sheet on phones, centred dialog on larger screens. The best guess is already selected. */
 export function ScanSheet({

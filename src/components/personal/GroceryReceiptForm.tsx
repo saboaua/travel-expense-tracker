@@ -49,7 +49,15 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const groceryCategories = useGroceryCategories();
   const categoryNames = useMemo(() => groceryCategories.map((c) => c.name), [groceryCategories]);
   /** Map a guessed/scanned category onto the admin-managed list (falls back to Other, then the first). */
-  const allowed = (c: string) => categoryNames.find((n) => n.toLowerCase() === c.toLowerCase()) ?? categoryNames.find((n) => n.toLowerCase() === "other") ?? categoryNames[0] ?? c;
+  // Opened as Shopping (?area=shopping): lines that cannot be placed start as Shopping instead of Other
+  const [asShopping, setAsShopping] = useState(false);
+  useEffect(() => { setAsShopping(new URLSearchParams(window.location.search).get("area") === "shopping"); }, []);
+  const allowed = (c: string) => {
+    const hit = categoryNames.find((n) => n.toLowerCase() === c.toLowerCase());
+    const shop = asShopping ? categoryNames.find((n) => n.toLowerCase() === "shopping") : undefined;
+    if (shop && (!hit || hit.toLowerCase() === "other")) return shop;
+    return hit ?? categoryNames.find((n) => n.toLowerCase() === "other") ?? categoryNames[0] ?? c;
+  };
   // Your own category choices (this product is always this category) and which categories count as shopping
   const rulesRef = useRef<Map<string, string>>(new Map());
   const [shop, setShop] = useState<Set<string>>(() => shoppingSet());
@@ -166,7 +174,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     quickHandled.current = true;
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
     // The photo goes to the crop step first, then is read, the same as a photo picked on this screen
-    takeQuickScan("grocery").then((f) => { if (f) setIncoming(f); });
+    takeQuickScan(new URLSearchParams(window.location.search).get("area") === "shopping" ? "shopping" : "grocery").then((f) => { if (f) setIncoming(f); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [categoryNames.length]);
 
@@ -330,7 +338,7 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
       </Link>
       {!receiptId && (
         <div className="mb-4 empty:hidden">
-          <ScanChip currentKey="grocery" label="Groceries \u00b7 Personal" />
+          <ScanChip currentKey={asShopping ? "shopping" : "grocery"} label={asShopping ? "Shopping \u00b7 Personal" : "Groceries \u00b7 Personal"} />
         </div>
       )}
       <Card>

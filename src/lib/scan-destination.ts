@@ -6,9 +6,9 @@
  */
 
 export type ScanOption = {
-  /** "trip:<id>", "project:<id>", "ptrip:<id>", "grocery" or "document" */
+  /** "trip:<id>", "project:<id>", "ptrip:<id>", "grocery", "shopping" or "document" */
   key: string;
-  kind: "trip" | "project" | "ptrip" | "grocery" | "document";
+  kind: "trip" | "project" | "ptrip" | "grocery" | "shopping" | "document";
   id?: string;
   label: string;
   sub: string;
@@ -134,6 +134,9 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   return { pick, confident: false, reason: last ? "Same as last time" : null };
 }
 
+/** Adds a query part to a page address that may already have one (Shopping opens the grocery form with ?area=shopping). */
+export const withQuery = (href: string, part: string) => `${href}${href.includes("?") ? "&" : "?"}${part}`;
+
 /** Builds the list of places a receipt can go from what the person has and may use. */
 export function buildScanOptions(input: {
   trips: { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; range?: string }[];
@@ -141,6 +144,8 @@ export function buildScanOptions(input: {
   canTrips: boolean;
   canPersonal: boolean;
   canDocuments: boolean;
+  /** Offer Shopping next to Groceries. Left off where it is not supported yet (the Telegram bot). */
+  shopping?: boolean;
 }): ScanOption[] {
   const out: ScanOption[] = [];
   if (input.canTrips) {
@@ -150,6 +155,7 @@ export function buildScanOptions(input: {
   }
   if (input.canPersonal) {
     out.push({ key: "grocery", kind: "grocery", label: "Groceries", sub: "Supermarket receipt", href: "/personal/groceries/new" });
+    if (input.shopping) out.push({ key: "shopping", kind: "shopping", label: "Shopping", sub: "Clothes, electronics, home and other stores", href: "/personal/groceries/new?area=shopping" });
     for (const p of input.projects) {
       if ((p.status || "active") !== "active") continue;
       if (p.kind === "home_project") out.push({ key: `project:${p.id}`, kind: "project", id: p.id, label: p.name, sub: "Project", href: `/personal/projects/${p.id}/expense`, destination: p.destination, start: p.start_date, end: p.end_date });

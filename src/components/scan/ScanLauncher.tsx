@@ -7,7 +7,7 @@ import { Camera, ChevronDown, ChevronUp, Loader2, Plus, Upload } from "lucide-re
 import { compressReceiptImage } from "@/lib/compress-image";
 import { getLastScanChoice, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
 import { currentPlace } from "@/lib/scan-place";
-import { suggestDestination, type HomePlace, type ScanOption } from "@/lib/scan-destination";
+import { suggestDestination, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { ScanModeSheet } from "@/components/scan/ScanModeSheet";
 import { LongReceiptFlow } from "@/components/scan/LongReceiptFlow";
@@ -41,7 +41,7 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
     setBusy("save");
     setLastScanChoice(opt.key);
     const stored = await stashQuickScan(file, opt.key, reason);
-    router.push(`${opt.href}${stored ? "?quick=1" : ""}`);
+    router.push(stored ? withQuery(opt.href, "quick=1") : opt.href);
   };
 
   const handle = async (mode: "scan" | "upload", e: React.ChangeEvent<HTMLInputElement>) => {

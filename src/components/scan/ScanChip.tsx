@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, FileText, Globe, Hammer, MapPin, ShoppingCart } from "lucide-react";
+import { Briefcase, FileText, Globe, Hammer, MapPin, ShoppingBag, ShoppingCart } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
 import { peekQuickScan, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
-import { buildScanOptions, type ScanOption } from "@/lib/scan-destination";
+import { buildScanOptions, withQuery, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { formatDateRange } from "@/lib/utils";
 
-const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, document: FileText } as const;
+const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, shopping: ShoppingBag, document: FileText } as const;
 
 /**
  * Shown on the form a Scan or Upload opened. Says where the receipt is going and why, with a Change button that
@@ -47,12 +47,13 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
         canTrips: perms.has("trips"),
         canPersonal: perms.has("personal"),
         canDocuments: perms.has("documents"),
+        shopping: true,
       })
     );
   };
 
   if (!state) return null;
-  const kind = currentKey.startsWith("trip:") ? "trip" : currentKey.startsWith("project:") ? "project" : currentKey.startsWith("ptrip:") ? "ptrip" : currentKey === "document" ? "document" : "grocery";
+  const kind = currentKey.startsWith("trip:") ? "trip" : currentKey.startsWith("project:") ? "project" : currentKey.startsWith("ptrip:") ? "ptrip" : currentKey === "document" ? "document" : currentKey === "shopping" ? "shopping" : "grocery";
   const Icon = ICON[kind];
 
   const move = async () => {
@@ -62,7 +63,10 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
     setBusy(true);
     setLastScanChoice(next.key);
     await stashQuickScan(state.file, next.key, "Changed by you");
-    router.replace(`${next.href}?quick=1`);
+    const target = withQuery(next.href, "quick=1");
+    // Groceries and Shopping are the same page with another start: load it again so the form starts over with the photo
+    if (next.href.split("?")[0] === window.location.pathname) window.location.assign(target);
+    else router.replace(target);
   };
 
   return (

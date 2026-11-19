@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/scan-destination.test.ts
-import { buildScanOptions, destinationMatches, isHome, suggestDestination, countryName } from "../src/lib/scan-destination";
+import { withQuery, buildScanOptions, destinationMatches, isHome, suggestDestination, countryName } from "../src/lib/scan-destination";
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 
 const today = "2026-11-05";
@@ -62,3 +62,13 @@ const u4 = suggestDestination({ mode: "upload", options: all, photoDate: "2026-1
 eq([u4.pick?.key, u4.confident], ["document", false], "upload that looks like an ID: Document suggested, sheet shown");
 const u5 = suggestDestination({ mode: "upload", options: bizOnly, photoDate: "2026-09-01", today });
 eq(u5.pick?.key, "trip:t1", "upload, business only: falls back to the trip");
+
+// Shopping next to Groceries
+const withShop = buildScanOptions({ trips, projects, canTrips: true, canPersonal: true, canDocuments: true, shopping: true });
+eq(withShop.map((o) => o.key), ["trip:t1", "trip:t2", "grocery", "shopping", "project:p1", "ptrip:p2", "document"], "Shopping sits right after Groceries");
+eq(withShop.find((o) => o.key === "shopping")?.href, "/personal/groceries/new?area=shopping", "Shopping opens the grocery form as Shopping");
+eq(buildScanOptions({ trips, projects, canTrips: true, canPersonal: false, canDocuments: false, shopping: true }).some((o) => o.key === "shopping"), false, "no Shopping without personal access");
+eq(withQuery("/personal/groceries/new?area=shopping", "quick=1"), "/personal/groceries/new?area=shopping&quick=1", "quick joins an existing query");
+eq(withQuery("/trips/x/add-expense", "quick=1"), "/trips/x/add-expense?quick=1", "quick starts a query");
+const shopHome = suggestDestination({ mode: "scan", options: withShop, place: { city: "Oranjestad", countryCode: "AW" }, home: { city: "Oranjestad", country: "Aruba" }, today, last: "shopping" });
+eq([shopHome.pick?.key, shopHome.confident], ["shopping", false], "at home the last choice (Shopping) is suggested, with the sheet");
