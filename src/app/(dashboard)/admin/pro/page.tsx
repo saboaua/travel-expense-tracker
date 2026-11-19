@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Banknote, ChevronRight, CircleAlert, Gift, Scale, Users } from "lucide-react";
+import { Banknote, BookOpenCheck, ChevronRight, CircleAlert, Gift, Scale, Users } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Card, CardContent } from "@/components/ui/card";
@@ -30,6 +30,7 @@ export default function AdminProPage() {
     { href: "/admin/pro/payments", icon: Banknote, tone: "money" as const, title: "Prices and payments", sub: "Prices, bank accounts, Bitcoin", status: o.waiting ? `${o.waiting} waiting` : "Nothing waiting", status2: "", id: "payments", alert: o.waiting > 0 },
     { href: "/admin/pro/limits", icon: Scale, tone: "fixed" as const, title: "Free plan limits", sub: "Choose which limits start, and when", status: `${LIMIT_KEYS.filter((k) => limitOn(o.limits, k, o.today)).length} of ${LIMIT_KEYS.length} on`, status2: LIMIT_KEYS.some((k) => limitOn(o.limits, k, o.today)) ? "" : limitsSet(o.limits) ? "Scheduled" : "Not started", id: "limits" },
     { href: "/admin/pro/trial", icon: Gift, tone: "badges" as const, title: "Free Pro month", sub: "New accounts try Pro first", status: o.trial.mode === "off" ? "Off" : o.trial.mode === "always" ? "On" : "Dates", status2: o.trial.mode === "off" ? "" : `${o.trial.days} days`, id: "trial", good: o.trial.mode === "always" },
+    { href: "/admin/pro/accounting", icon: BookOpenCheck, tone: "money" as const, title: "Accounting export", sub: "Formats and the Pro switch", status: "Pro only", status2: "", id: "accounting" },
   ] : [];
 
   return (

@@ -17,6 +17,7 @@ import { ProjectReportList, type ProjectReportRow } from "@/components/reports/P
 import { PROJECT_COLS, projectTotals, type BizProject } from "@/lib/business-projects";
 import { loadLimits, whoIs } from "@/lib/limits-server";
 import { featureLocked } from "@/lib/limits";
+import { AccountingExport } from "@/components/accounting/AccountingExport";
 import { AlertTriangle, ArrowDownRight, Crown, ArrowUpRight, CalendarRange, Download, FileSpreadsheet, Plane, Receipt, TrendingUp, Wallet } from "lucide-react";
 
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string };
@@ -200,6 +201,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
       <Section title="Trip reports" subtitle={`Trips in ${year}. Download Excel, or a ZIP with the Excel and receipt images`}>
         <TripReportList trips={tripRows} year={year} locked={reportsLocked} />
+      </Section>
+
+      <Section title="Accounting" subtitle={`Journal entries of ${year} for Sage, QuickBooks, Xero and more. Part of Pro`}>
+        <AccountingExport target={{ scope: "year", year: String(year) }} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:bg-accent" />
       </Section>
 
       {projRows.length > 0 && (

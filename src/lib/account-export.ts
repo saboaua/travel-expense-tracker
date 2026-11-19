@@ -31,6 +31,8 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "trip_papers", owner: "user_id", bucket: "documents", cols: "id, trip_id, title, note, file_path, created_at" },
   { table: "trip_checklist_items", owner: "user_id", cols: "id, trip_id, title, category, done, sort, created_at" },
   { table: "business_projects", owner: "user_id", cols: "id, name, client_name, contact_name, contact_email, contact_phone, reference, budget, currency, start_date, end_date, status, notes, created_at" },
+  { table: "accounting_settings", owner: "user_id", cols: "user_id, program, credit_code, credit_name, accounts, updated_at", order: "user_id" },
+  { table: "accounting_exports", owner: "user_id", cols: "source, ref, program, exported_at", order: "ref" },
   { table: "business_project_receipts", owner: "user_id", bucket: "receipts", cols: "id, project_id, merchant, amount, currency, exchange_rate, amount_usd, category, expense_date, notes, receipt_path, created_at" },
 ];
 

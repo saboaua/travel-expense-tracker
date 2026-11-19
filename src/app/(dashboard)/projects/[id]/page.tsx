@@ -1,5 +1,6 @@
 "use client";
 
+import { AccountingExport } from "@/components/accounting/AccountingExport";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -131,6 +132,7 @@ export default function ProjectPage() {
 
       <p className="px-0.5 pt-1 text-xs font-bold uppercase tracking-wide text-muted-foreground">Report</p>
       <div className="flex gap-3">{exportLink("pdf", "PDF", Download)}{exportLink("excel", "Excel", FileSpreadsheet)}</div>
+      <AccountingExport target={{ scope: "bproject", id }} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:bg-accent" />
       <p className="text-xs text-muted-foreground">Client details, totals by category and every receipt. {locked ? "Excel and PDF reports are part of Pro." : ""}</p>
 
       <div className="flex flex-col gap-2 pt-2">

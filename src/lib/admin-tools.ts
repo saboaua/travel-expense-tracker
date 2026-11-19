@@ -8,4 +8,4 @@ export const SUPERMARKET_TOOLS = [
 ] as const;
 
 /** The tools inside Global Settings > Pro plan (shown as the count on its card). */
-export const PRO_TOOL_COUNT = 4;
+export const PRO_TOOL_COUNT = 5;

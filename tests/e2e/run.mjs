@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1068,6 +1068,60 @@ try {
     fake.table("business_project_receipts").length = 0;
     fake.table("business_projects").length = 0;
     fake.table("pro_limits").length = 0;
+    await ctx.close();
+  });
+
+  await test("accounting export: Free sees it locked, Pro sets the accounts once, reviews balanced journals, downloads, and exported expenses are skipped next time", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const ids = ["ac000000-0000-4000-8000-000000000001", "ac000000-0000-4000-8000-000000000002"];
+    fake.table("expenses").push(
+      { id: ids[0], trip_id: TRIP_ID, user_id: PAT, merchant: "Hilton", amount: 200, currency: "USD", exchange_rate: 1, amount_usd: 200, category: "Lodging", expense_date: today },
+      { id: ids[1], trip_id: TRIP_ID, user_id: PAT, merchant: "Taverna", amount: 179, currency: "AWG", exchange_rate: 0.558659, amount_usd: 100, category: "Meals", expense_date: today },
+    );
+    const url = `${BASE}/api/accounting/export?scope=trip&id=${TRIP_ID}&program=sage300`;
+    let r = await page.request.get(`${url}&preview=1`);
+    assert(r.status() === 402, "accounting export is Pro: " + r.status());
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByTestId("accounting-row-pro").waitFor();
+    // Pro
+    fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+    r = await page.request.get(url);
+    assert(r.status() === 400, "no download before the accounts are set: " + r.status());
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByTestId("accounting-row").click();
+    await page.getByTestId("accounting-program-sage300").click();
+    await page.getByTestId("accounting-accounts").waitFor();
+    await page.getByTestId("accounting-credit-code").fill("2100");
+    await page.getByTestId("accounting-code-Lodging").fill("6410");
+    await page.getByTestId("accounting-code-Meals").fill("6420");
+    await page.getByTestId("accounting-save").click();
+    await page.getByTestId("accounting-review").waitFor({ timeout: 10_000 }).catch(async () => { throw new Error("no review screen: " + (await page.getByTestId("accounting-sheet").innerText())); });
+    assert((await page.getByTestId("accounting-count").innerText()).trim() === "2", "two expenses");
+    assert((await page.getByTestId("accounting-lines").innerText()).trim() === "4", "four journal lines");
+    await page.getByTestId("accounting-balanced").waitFor();
+    const href = await page.getByTestId("accounting-download").getAttribute("href");
+    r = await page.request.get(`${BASE}${href}`);
+    const body = await r.text();
+    assert(r.status() === 200 && /\.csv"/.test(r.headers()["content-disposition"] || ""), "the file downloads: " + r.status());
+    assert(/BATCHID/.test(body) && /6410/.test(body) && /6420/.test(body) && /2100/.test(body) && /179\.00 AWG/.test(body), "the file holds the lines: " + body);
+    assert(fake.table("accounting_exports").length === 2, "both expenses are marked as exported");
+    assert(fake.table("accounting_settings").find((x) => x.user_id === PAT)?.credit_code === "2100", "the accounts are saved");
+    // next time: set up is remembered and exported expenses are skipped
+    await page.goto(`${BASE}/trips/${TRIP_ID}`);
+    await page.getByTestId("accounting-row").click();
+    await page.getByTestId("accounting-program-xero").click();
+    await page.getByTestId("accounting-review").waitFor();
+    assert((await page.getByTestId("accounting-already").innerText()).trim() === "2", "two already exported");
+    assert((await page.getByTestId("accounting-download").count()) === 0, "nothing new to download");
+    await page.getByTestId("accounting-skip").uncheck();
+    await page.getByTestId("accounting-download").waitFor();
+    // the Reports page and the admin hub
+    await page.goto(`${BASE}/reports`);
+    await page.getByTestId("accounting-row").waitFor();
+    fake.table("expenses").splice(0, fake.table("expenses").length, ...fake.table("expenses").filter((x) => !ids.includes(x.id)));
+    for (const t of ["user_plans", "accounting_exports", "accounting_settings"]) fake.table(t).splice(0);
     await ctx.close();
   });
 
@@ -2472,7 +2526,7 @@ try {
         assert((await ap.getByRole("link", { name: gone }).count()) === 0, `${gone} is no longer a card of its own`);
       }
       assert((await ap.getByTestId("tools-count-supermarkets").innerText()).trim() === "3 tools", "Supermarkets says it holds 3 tools");
-      assert((await ap.getByTestId("tools-count-pro").innerText()).trim() === "4 tools", "Pro plan says it holds 4 tools");
+      assert((await ap.getByTestId("tools-count-pro").innerText()).trim() === "5 tools", "Pro plan says it holds 5 tools");
       await ap.getByRole("link", { name: /Supermarkets/ }).click();
       await ap.waitForURL((u) => u.pathname === "/admin/supermarkets");
       await ap.getByTestId("supermarkets-row-doit").waitFor();

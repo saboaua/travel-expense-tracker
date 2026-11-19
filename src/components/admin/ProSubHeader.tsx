@@ -2,19 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Banknote, Gift, Scale, Users } from "lucide-react";
+import { Banknote, BookOpenCheck, Gift, Scale, Users } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { cn } from "@/lib/utils";
 
-export type ProPart = "people" | "payments" | "limits" | "trial";
+export type ProPart = "people" | "payments" | "limits" | "trial" | "accounting";
 const PARTS: { id: ProPart; href: string; label: string; icon: typeof Users }[] = [
   { id: "people", href: "/admin/pro/people", label: "People", icon: Users },
   { id: "payments", href: "/admin/pro/payments", label: "Payments", icon: Banknote },
   { id: "limits", href: "/admin/pro/limits", label: "Limits", icon: Scale },
   { id: "trial", href: "/admin/pro/trial", label: "Free month", icon: Gift },
+  { id: "accounting", href: "/admin/pro/accounting", label: "Accounting", icon: BookOpenCheck },
 ];
 
-/** The top of every Pro plan sub page: back to the overview, the page title, and chips to jump between the four parts. */
+/** The top of every Pro plan sub page: back to the overview, the page title, and chips to jump between the parts. */
 export function ProSubHeader({ active, title, description }: { active: ProPart; title: string; description: string }) {
   const [waiting, setWaiting] = useState(0);
   useEffect(() => {

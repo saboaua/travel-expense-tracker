@@ -166,7 +166,9 @@ need_tables(tbl, fix) as (values
   ('price_share_seen','migration_badges.sql'),
   ('loyalty_cards','migration_loyalty.sql'),
   ('travel_documents','migration_documents.sql'),
-  ('subscriptions','migration_subscriptions.sql')
+  ('subscriptions','migration_subscriptions.sql'),
+  ('accounting_settings','migration_accounting.sql'),
+  ('accounting_exports','migration_accounting.sql')
 ),
 table_checks as (
   select 'table', n.tbl,

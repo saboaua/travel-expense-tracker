@@ -1,5 +1,6 @@
 import { PageShell } from "@/components/layout/PageShell";
 import { ExportMenu } from "@/components/trips/ExportMenu";
+import { AccountingExport } from "@/components/accounting/AccountingExport";
 import { Money } from "@/components/ui/money";
 import { BackLink } from "@/components/ui/page-header";
 import { ShareWith } from "@/components/sharing/ShareWith";
@@ -155,6 +156,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
             </Link>
             <ExportMenu tripId={id} className={`${actionBtn} w-full`} />
           </div>
+          <AccountingExport target={{ scope: "trip", id }} className={`${actionBtn} w-full`} />
           {trip.notes && <p className="whitespace-pre-wrap rounded-lg bg-muted/50 p-3 text-sm text-muted-foreground">{trip.notes}</p>}
           {info?.summary && (
             <p className="line-clamp-2 px-1 text-xs text-muted-foreground">
