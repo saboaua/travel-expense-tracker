@@ -35,7 +35,10 @@ eq(isHome({ city: "Miami", countryCode: "US" }, { country: "Aruba" }), false, "a
 eq(isHome({ city: "Miami", countryCode: "US" }, null), false, "no home set");
 
 const s1 = suggestDestination({ mode: "scan", options: all, place: { city: "Miami", countryCode: "US" }, home: { country: "Aruba" }, today });
-eq([s1.pick?.key, s1.confident, s1.reason], ["trip:t1", true, "You're in Miami"], "scan in the trip's city: straight through");
+eq([s1.pick?.key, s1.confident, s1.reason], ["trip:t1", false, "You're in Miami"], "scan in the trip's city with Groceries available: the trip is picked but you are asked (free-time shopping)");
+const tripsOnly = all.filter((o) => o.kind === "trip");
+const s1b = suggestDestination({ mode: "scan", options: tripsOnly, place: { city: "Miami", countryCode: "US" }, home: { country: "Aruba" }, today });
+eq([s1b.pick?.key, s1b.confident], ["trip:t1", true], "only business trips to choose from: straight through");
 const s2 = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today });
 eq([s2.pick?.key, s2.confident], ["grocery", false], "scan at home: sheet, groceries first");
 const s2b = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today, last: "project:p1" });
@@ -53,14 +56,14 @@ const s6 = suggestDestination({ mode: "scan", options: twoMiami, place: { city: 
 eq(s6.confident, false, "two trips match the place: ask");
 
 const u1 = suggestDestination({ mode: "upload", options: all, photoDate: "2026-11-04", today: "2026-11-10", place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" } });
-eq([u1.pick?.key, u1.confident], ["trip:t1", true], "upload: photo date inside a trip, even from home later");
+eq([u1.pick?.key, u1.confident], ["trip:t1", false], "upload: photo date inside a trip is picked, and you are asked when personal places exist");
 const u2 = suggestDestination({ mode: "upload", options: all, photoDate: "2026-10-01", today, last: "grocery" });
 eq([u2.pick?.key, u2.confident, u2.reason], ["grocery", false, "Same as last time"], "upload: date outside every trip, last choice");
 const u3 = suggestDestination({ mode: "upload", options: all, photoDate: null, today });
 eq(u3.confident, false, "upload without a date asks");
 const u4 = suggestDestination({ mode: "upload", options: all, photoDate: "2026-11-04", today, looksLikeId: true });
 eq([u4.pick?.key, u4.confident], ["document", false], "upload that looks like an ID: Document suggested, sheet shown");
-const u5 = suggestDestination({ mode: "upload", options: bizOnly, photoDate: "2026-09-01", today });
+const u5 = suggestDestination({ mode: "upload", options: tripsOnly, photoDate: "2026-09-01", today });
 eq(u5.pick?.key, "trip:t1", "upload, business only: falls back to the trip");
 
 // Shopping next to Groceries

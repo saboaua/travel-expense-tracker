@@ -830,7 +830,7 @@ try {
 
   /* ---------- scan and upload ---------- */
   const JPEG = Buffer.from("/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=", "base64");
-  await test("Upload with one active trip goes straight to its form, with a Change button", async () => {
+  await test("Upload with one active trip: the sheet asks, the trip is already chosen, and the form has a Change button", async () => {
     // Earlier tests (the offline ones) add trips; this check needs Pat to have exactly one active trip
     const trips = fake.table("trips");
     for (let i = trips.length - 1; i >= 0; i--) if (trips[i].user_id === PAT && trips[i].id !== TRIP_ID) trips.splice(i, 1);
@@ -839,6 +839,11 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     await page.getByRole("button", { name: "Scan" }).waitFor();
     await page.locator('input[type=file]:not([capture])').setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    // Free-time shopping is possible on a trip, so the question is asked, with the trip already chosen
+    const trip = page.getByRole("radio", { name: /Miami Conference/ });
+    await trip.waitFor({ timeout: 60_000 });
+    assert((await trip.getAttribute("aria-checked")) === "true", "the trip is chosen for you");
+    await page.getByRole("button", { name: /Save to Miami Conference/ }).click();
     await page.waitForURL((u) => u.pathname === `/trips/${TRIP_ID}/add-expense`, { timeout: 60_000 });
     await page.getByText("Miami Conference \u00b7 Business").waitFor();
     await page.getByRole("button", { name: "Change" }).waitFor();
@@ -943,6 +948,22 @@ try {
     await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
     await page.goto(`${BASE}/personal/groceries/new?quick=1`);
     await page.getByText(/Crop/).first().waitFor({ timeout: 20_000 });
+    await ctx.close();
+  });
+
+  await test("receipt warning: a line flagged as counted twice stops being flagged once the items add up", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Super Food", date: null, total: 8.55, currency: "USD", source: "ai", items: [item("Bolsa fitness", 8.55), item("Bolsa fitness again", 8.55)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/groceries/new`);
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    await page.getByText(/may be counted twice/).first().waitFor({ timeout: 20_000 });
+    // Remove the doubled line: the items now equal the total and the warning goes
+    await page.locator("button.text-red-600").nth(1).click();
+    await page.waitForFunction(() => !/may be counted twice/.test(document.body.innerText), null, { timeout: 10_000 });
     await ctx.close();
   });
 
@@ -1191,7 +1212,7 @@ try {
     let r = await page.request.get(`${BASE}/api/export/trip/${TRIP_ID}/excel`);
     assert(r.status() === 200, "Excel works before the start day: " + r.status());
     await page.goto(`${BASE}/trips/${TRIP_ID}`);
-    await page.getByRole("button", { name: /Export/ }).click();
+    await page.getByRole("button", { name: "Export", exact: true }).click();
     await page.getByTestId("export-excel").waitFor();
     // from the start day
     fake.table("pro_limits").push({ id: 1, starts_trip_reports: "2026-01-01" });
@@ -1202,7 +1223,7 @@ try {
     r = await page.request.get(`${BASE}/api/export/trip/${TRIP_ID}/zip`);
     assert(r.status() === 200 && /_receipts\.zip/.test(r.headers()["content-disposition"] || ""), "Free gets the photos ZIP: " + r.status() + " " + r.headers()["content-disposition"]);
     await page.goto(`${BASE}/trips/${TRIP_ID}`);
-    await page.getByRole("button", { name: /Export/ }).click();
+    await page.getByRole("button", { name: "Export", exact: true }).click();
     await page.getByTestId("export-images").waitFor();
     await page.getByTestId("export-excel-pro").waitFor();
     assert((await page.getByTestId("export-excel").count()) === 0, "no plain Excel link for Free");

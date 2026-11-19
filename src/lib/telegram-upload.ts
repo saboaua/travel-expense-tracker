@@ -36,7 +36,7 @@ export function decideUpload(i: {
   const def = i.defaultKey ? i.options.find((o) => o.key === i.defaultKey) ?? null : null;
   if (def && covers(def, i.today)) return make(def, true, "Your default trip");
 
-  const s = suggestDestination({ mode: "upload", options: i.options, photoDate: i.today, today: i.today, last: i.defaultKey && def ? def.key : i.last });
+  const s = suggestDestination({ mode: "upload", trustTrip: true, options: i.options, photoDate: i.today, today: i.today, last: i.defaultKey && def ? def.key : i.last });
   const reason = s.reason?.startsWith("Photo taken during") ? `Trip in progress: ${s.pick?.label}` : s.reason;
   return make(s.pick, s.confident && !!s.pick, reason);
 }

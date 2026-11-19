@@ -89,6 +89,8 @@ export type SuggestInput = {
   last?: string | null;
   /** The upload looks like a passport or ID */
   looksLikeId?: boolean;
+  /** The Telegram bot saves to the trip in progress without asking; it cannot ask about free-time shopping. */
+  trustTrip?: boolean;
 };
 
 export function suggestDestination(i: SuggestInput): Suggestion {
@@ -99,6 +101,8 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   const doc = byKey("document");
   const last = byKey(i.last);
   const firstCovering = (list: ScanOption[], d: string) => list.find((o) => covers(o, d)) ?? null;
+  // With Groceries or Shopping available, being on a trip does not mean the receipt is for the trip (free time, personal shopping): ask
+  const onlyBusiness = (!grocery && !byKey("shopping") && personal.length === 0) || i.trustTrip === true;
 
   if (i.looksLikeId && doc) return { pick: doc, confident: false, reason: "Looks like a passport or ID" };
 
@@ -106,7 +110,7 @@ export function suggestDestination(i: SuggestInput): Suggestion {
     const d = i.photoDate || null;
     if (d) {
       const hits = trips.filter((o) => covers(o, d));
-      if (hits.length === 1) return { pick: hits[0], confident: true, reason: `Photo taken during ${hits[0].label}` };
+      if (hits.length === 1) return { pick: hits[0], confident: onlyBusiness, reason: `Photo taken during ${hits[0].label}` };
       if (hits.length > 1) return { pick: hits[0], confident: false, reason: "Several trips were on that day" };
     }
     const fallback = last ?? (trips.length === 1 && personal.length === 0 && !grocery ? trips[0] : null) ?? grocery ?? trips[0] ?? personal[0] ?? null;
@@ -118,7 +122,7 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   if (place) {
     const hits = trips.filter((o) => destinationMatches(o.destination, place));
     const city = place.city || countryName(place.countryCode) || "this place";
-    if (hits.length === 1) return { pick: hits[0], confident: true, reason: `You're in ${city}` };
+    if (hits.length === 1) return { pick: hits[0], confident: onlyBusiness, reason: `You're in ${city}` };
     if (hits.length > 1) {
       const now = firstCovering(hits, i.today) ?? hits[0];
       return { pick: now, confident: false, reason: `Several trips are in ${city}` };

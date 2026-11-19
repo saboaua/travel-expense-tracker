@@ -279,7 +279,13 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
     }
   };
 
-  const update = (key: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  // Changing a price, quantity or amount settles that row's warning: the person has just looked at it
+  const update = (key: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => {
+    if (r.key !== key) return r;
+    const edited = ("quantity" in patch || "unit_price" in patch || "line_total" in patch) && !("flag" in patch);
+    return { ...r, ...patch, ...(edited ? { flag: undefined, alt: undefined } : {}) };
+  }));
+
 
   const settle = (key: string) => update(key, { flag: undefined, alt: undefined, confirmed: true });
   const takeAlt = (r: Row) => {
@@ -294,6 +300,12 @@ export function GroceryReceiptForm({ receiptId }: { receiptId?: string }) {
   const setLine = (r: Row, v: string) => update(r.key, { line_total: v, unit_price: money(r.quantity) > 0 ? String(r2(money(v) / money(r.quantity))) : r.unit_price });
 
   const itemsSum = useMemo(() => r2(rows.reduce((s, r) => s + money(r.line_total), 0)), [rows]);
+  // "This price equals the extra amount" is about the whole receipt: it goes once the items add up to the total
+  useEffect(() => {
+    const tot = money(total);
+    if (tot <= 0 || Math.abs(itemsSum - tot) > Math.max(0.05, tot * 0.003)) return;
+    setRows((rs) => (rs.some((r) => r.flag?.startsWith("This price equals the extra amount")) ? rs.map((r) => (r.flag?.startsWith("This price equals the extra amount") ? { ...r, flag: undefined, alt: undefined } : r)) : rs));
+  }, [itemsSum, total]);
   const diff = r2(money(total) - itemsSum);
 
   const submit = async (e: React.FormEvent) => {
