@@ -1,5 +1,6 @@
 "use client";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useRef, useState } from "react";
@@ -194,10 +195,15 @@ export default function ProfilePage() {
     "Your Profile";
 
   return (
-    <div className="p-4 md:p-8 max-w-3xl mx-auto space-y-6">
+    <PageShell size="form">
       <PageHeader title="Profile" description={<>Manage your personal information, password, and integrations</>} />
 
+
+      {/* Edit form */}
+      {/* Two columns from 1024px, the same order down a phone. The column break sits after the fifth item. */}
+      <AccordionGroup className="lg:columns-2 lg:gap-4 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
       {/* Avatar + basic info card */}
+      <div className="pb-3 lg:pb-0">
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
@@ -252,9 +258,7 @@ export default function ProfilePage() {
           <PlanCard />
         </CardContent>
       </Card>
-
-      {/* Edit form */}
-      <AccordionGroup>
+      </div>
       <AccordionSection
         id="personal"
         title="Personal information"
@@ -341,7 +345,7 @@ export default function ProfilePage() {
 
       <HomePlaceCard />
 
-      <CommunityCard />
+      <div className="lg:break-after-column"><CommunityCard /></div>
 
       <RecommendCard />
 
@@ -355,6 +359,6 @@ export default function ProfilePage() {
 
       <YourDataCard />
       </AccordionGroup>
-    </div>
+    </PageShell>
   );
 }

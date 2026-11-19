@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/PageShell";
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
 import { BusinessHeader, BusinessTabs } from "@/components/layout/BusinessTabs";
@@ -114,7 +115,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   const empty = s.expenseCount === 0 && tripRows.length === 0;
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 p-4 pb-28 md:p-8">
+    <PageShell size="wide" className="pb-28 md:pb-8">
       <BusinessHeader />
       <BusinessTabs
         title="Reports"
@@ -206,6 +207,6 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <ProjectReportList projects={projRows} locked={reportsLocked} />
         </Section>
       )}
-    </div>
+    </PageShell>
   );
 }

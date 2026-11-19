@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/PageShell";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
@@ -73,7 +74,7 @@ export default async function TripsPage() {
   }));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4 p-4 md:p-8">
+    <PageShell size="wide" className="space-y-4">
       <BusinessHeader />
       <BusinessTabs
         title="Trips"
@@ -99,6 +100,6 @@ export default async function TripsPage() {
       )}
 
       <SharedTrips kind="trip" />
-    </div>
+    </PageShell>
   );
 }

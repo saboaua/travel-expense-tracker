@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/PageShell";
 import { ExportMenu } from "@/components/trips/ExportMenu";
 import { Money } from "@/components/ui/money";
 import { BackLink } from "@/components/ui/page-header";
@@ -110,7 +111,7 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   } else badge = { label: "Passed \u00b7 still active", cls: "bg-amber-500 text-white" };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 pb-28 md:p-8">
+    <PageShell size="wide" className="pb-28 md:pb-8">
       <BackLink href="/trips">Trips</BackLink>
 
       <div className="overflow-hidden rounded-xl border bg-card shadow-sm">
@@ -163,82 +164,85 @@ export default async function TripDetailPage({ params, searchParams }: { params:
         </div>
       </div>
 
-      <TripFlights tripId={id} tripName={trip.name} tripStart={trip.start_date} tripEnd={endDate} userId={user.id} flights={flights} />
+      {/* One column on a phone, in this order. From 1024px: the trip itself on the left, papers, checklist and documents on the right */}
+      <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-x-6 lg:gap-y-6 lg:space-y-0">
+              <TripFlights tripId={id} tripName={trip.name} tripStart={trip.start_date} tripEnd={endDate} userId={user.id} flights={flights} />
 
-      <TripHotel tripId={id} hotel={hotelOf(trip)} />
+              <TripHotel tripId={id} hotel={hotelOf(trip)} />
 
-      <ShareWith kind="trip" itemId={id} />
+              <ShareWith kind="trip" itemId={id} />
 
-      <TripStatusToggle tripId={id} status={trip.status} ended={passed} endLabel={formatDateRange(endDate)} />
+              <TripStatusToggle tripId={id} status={trip.status} ended={passed} endLabel={formatDateRange(endDate)} />
 
-      {/* The second money tile only appears when it says something new: a trip in another currency */}
-      <div className={`grid grid-cols-2 gap-3 md:gap-4 ${primaryOther || (trip.currency && trip.currency !== "USD") ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
-        <Tile wide={!primaryOther && !(trip.currency && trip.currency !== "USD")} label="Total in USD" value={<Money amount={usdTotal} currency="USD" />} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
-        {primaryOther ? (
-          <Tile
-            label={otherCurrencies.length > 1 ? "Other currencies" : `In ${primaryOther[0]}`}
-            value={<Money amount={primaryOther[1]} currency={primaryOther[0]} />}
-            sub={otherCurrencies.length > 1 ? otherCurrencies.map(([c, a]) => `${c} ${formatCurrency(a, c)}`).join(" \u00b7 ") : undefined}
-          />
-        ) : trip.currency && trip.currency !== "USD" ? (
-          <Tile label={`In ${trip.currency}`} value={<Money amount={list.reduce((s, e) => s + Number(e.amount), 0)} currency={trip.currency} />} />
-        ) : null}
-        <Tile label="Expenses" value={String(list.length)} sub={list.length ? `${withReceipts} with receipt photo${withReceipts !== 1 ? "s" : ""}` : "None yet"} />
-        <Tile label="Average per day" value={perDay != null ? <Money amount={perDay} currency="USD" /> : "\u2014"} sub={upcoming ? "Starts soon" : `${elapsedDays} day${elapsedDays !== 1 ? "s" : ""}`} />
-      </div>
+              {/* The second money tile only appears when it says something new: a trip in another currency */}
+              <div className={`grid grid-cols-2 gap-3 md:gap-4 ${primaryOther || (trip.currency && trip.currency !== "USD") ? "lg:grid-cols-2 xl:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-3"}`}>
+                <Tile wide={!primaryOther && !(trip.currency && trip.currency !== "USD")} label="Total in USD" value={<Money amount={usdTotal} currency="USD" />} sub={biggest && list.length > 1 ? `Biggest: ${formatCurrency(usdOf(biggest) ?? 0, "USD")}${biggest.merchant ? ` \u00b7 ${biggest.merchant}` : ""}` : undefined} />
+                {primaryOther ? (
+                  <Tile
+                    label={otherCurrencies.length > 1 ? "Other currencies" : `In ${primaryOther[0]}`}
+                    value={<Money amount={primaryOther[1]} currency={primaryOther[0]} />}
+                    sub={otherCurrencies.length > 1 ? otherCurrencies.map(([c, a]) => `${c} ${formatCurrency(a, c)}`).join(" \u00b7 ") : undefined}
+                  />
+                ) : trip.currency && trip.currency !== "USD" ? (
+                  <Tile label={`In ${trip.currency}`} value={<Money amount={list.reduce((s, e) => s + Number(e.amount), 0)} currency={trip.currency} />} />
+                ) : null}
+                <Tile label="Expenses" value={String(list.length)} sub={list.length ? `${withReceipts} with receipt photo${withReceipts !== 1 ? "s" : ""}` : "None yet"} />
+                <Tile label="Average per day" value={perDay != null ? <Money amount={perDay} currency="USD" /> : "\u2014"} sub={upcoming ? "Starts soon" : `${elapsedDays} day${elapsedDays !== 1 ? "s" : ""}`} />
+              </div>
 
-      {slices.length > 0 && (
-        <section className="rounded-xl border bg-card p-5 shadow-sm">
-          <div className="mb-4">
-            <h2 className="text-base font-semibold">Spending by category</h2>
-            <p className="text-xs text-muted-foreground">Share of this trip&apos;s total in USD</p>
-          </div>
-          <CategoryDonut slices={slices} total={usdTotal} fmt={(n) => formatCurrency(n, "USD")} />
-        </section>
-      )}
-
-      <Link href={`/trips/${id}/papers`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-papers-link">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300" aria-hidden="true"><Ticket className="h-5 w-5" /></span>
-        <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Trip papers{paperCount > 0 && <span className="ml-1.5 text-muted-foreground">{paperCount}</span>}</span><span className="block text-xs text-muted-foreground">Transfers, tickets and booking details. Removed a week after the trip ends.</span></span>
-        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-      </Link>
-
-      {checklist && (
-        <Link href={`/trips/${id}/checklist`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-checklist-link">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true"><ListChecks className="h-5 w-5" /></span>
-          <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Checklist{checklist.total > 0 && <span className="ml-1.5 text-muted-foreground">{checklist.done} of {checklist.total}</span>}</span><span className="block text-xs text-muted-foreground">Things to pack and do before you go. Only you see it.</span></span>
+              {slices.length > 0 && (
+                <section className="rounded-xl border bg-card p-5 shadow-sm">
+                  <div className="mb-4">
+                    <h2 className="text-base font-semibold">Spending by category</h2>
+                    <p className="text-xs text-muted-foreground">Share of this trip&apos;s total in USD</p>
+                  </div>
+                  <CategoryDonut slices={slices} total={usdTotal} fmt={(n) => formatCurrency(n, "USD")} />
+                </section>
+              )}
+        <div className="space-y-6 lg:col-start-2 lg:row-start-1 lg:row-span-6 lg:self-start">
+        <Link href={`/trips/${id}/papers`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-papers-link">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-300" aria-hidden="true"><Ticket className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Trip papers{paperCount > 0 && <span className="ml-1.5 text-muted-foreground">{paperCount}</span>}</span><span className="block text-xs text-muted-foreground">Transfers, tickets and booking details. Removed a week after the trip ends.</span></span>
           <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
-      )}
 
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <div className="mb-3">
-          <h2 className="text-base font-semibold">Documents</h2>
-          <p className="text-xs text-muted-foreground">Tickets, bookings, visa and insurance for this trip, kept private.</p>
-        </div>
-        {Number(docs_failed) > 0 && (
-          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-            {docs_failed} document{Number(docs_failed) !== 1 ? "s" : ""} could not be uploaded when the trip was created. Add {Number(docs_failed) !== 1 ? "them" : "it"} below.
-          </p>
-        )}
-        {passportCheck && !passportCheck.ok && !completed && (
-          <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
-            Your passport expires {formatDate(passport!.expiry_date as string)}. Most destinations want it valid until {formatDate(passportCheck.mustBeValidUntil)} for this trip.{" "}
-            <Link href="/documents" className="font-medium underline">Check my passport</Link>
-          </p>
-        )}
-        <DocumentsManager tripId={id} />
-      </section>
-
-      <section className="rounded-xl border bg-card p-5 shadow-sm">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-base font-semibold">Expenses</h2>
-          <Link href={`/trips/${id}/add-expense`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
-            <Plus className="h-3.5 w-3.5" /> Add
+        {checklist && (
+          <Link href={`/trips/${id}/checklist`} className="flex min-h-16 items-center gap-3 rounded-xl border bg-card p-4 shadow-sm hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" data-testid="trip-checklist-link">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" aria-hidden="true"><ListChecks className="h-5 w-5" /></span>
+            <span className="min-w-0 flex-1"><span className="block text-base font-semibold">Checklist{checklist.total > 0 && <span className="ml-1.5 text-muted-foreground">{checklist.done} of {checklist.total}</span>}</span><span className="block text-xs text-muted-foreground">Things to pack and do before you go. Only you see it.</span></span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
           </Link>
+        )}
+
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="mb-3">
+            <h2 className="text-base font-semibold">Documents</h2>
+            <p className="text-xs text-muted-foreground">Tickets, bookings, visa and insurance for this trip, kept private.</p>
+          </div>
+          {Number(docs_failed) > 0 && (
+            <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+              {docs_failed} document{Number(docs_failed) !== 1 ? "s" : ""} could not be uploaded when the trip was created. Add {Number(docs_failed) !== 1 ? "them" : "it"} below.
+            </p>
+          )}
+          {passportCheck && !passportCheck.ok && !completed && (
+            <p className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+              Your passport expires {formatDate(passport!.expiry_date as string)}. Most destinations want it valid until {formatDate(passportCheck.mustBeValidUntil)} for this trip.{" "}
+              <Link href="/documents" className="font-medium underline">Check my passport</Link>
+            </p>
+          )}
+          <DocumentsManager tripId={id} />
+        </section>
         </div>
-        <ExpenseList expenses={list} currency={trip.currency} tripId={id} />
-      </section>
-    </div>
+        <section className="rounded-xl border bg-card p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-base font-semibold">Expenses</h2>
+            <Link href={`/trips/${id}/add-expense`} className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-semibold text-primary-foreground hover:bg-primary/90">
+              <Plus className="h-3.5 w-3.5" /> Add
+            </Link>
+          </div>
+          <ExpenseList expenses={list} currency={trip.currency} tripId={id} />
+        </section>
+      </div>
+    </PageShell>
   );
 }

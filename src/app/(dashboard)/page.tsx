@@ -1,3 +1,4 @@
+import { PageShell } from "@/components/layout/PageShell";
 import { FlightLine } from "@/components/flights/FlightLine";
 import { Money } from "@/components/ui/money";
 import { flightLine, nextFlight, type TripFlight } from "@/lib/flights";
@@ -340,7 +341,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6">
+    <PageShell size="wide">
       {shouldShowWelcome(profile?.welcome_seen_at, forcedTour) && (
         <WelcomeTourLoader userId={uid} forced={forcedTour} home={{ country: profile?.home_country ?? "", city: profile?.home_city ?? "" }} tracks={cleanTracks(profile?.welcome_tracks)} />
       )}
@@ -376,6 +377,6 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
       ) : (
         businessView
       )}
-    </div>
+    </PageShell>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { useEffect, useState } from "react";
@@ -149,9 +150,10 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-lg mx-auto space-y-6">
+    <PageShell size="form">
       <PageHeader title="Settings" description={<>Profile and Telegram receipt upload</>} />
 
+      <div className="space-y-6 lg:grid lg:grid-cols-2 lg:items-start lg:gap-6 lg:space-y-0">
       <Card>
         <CardHeader>
           <CardTitle>Profile</CardTitle>
@@ -277,6 +279,7 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </PageShell>
   );
 }

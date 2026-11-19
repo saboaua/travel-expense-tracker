@@ -1,5 +1,6 @@
 "use client";
 
+import { PageShell } from "@/components/layout/PageShell";
 import { shiftMonth } from "@/lib/personal/utilities";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
@@ -189,7 +190,7 @@ export default function PersonalHubPage() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-4 md:p-8 lg:max-w-6xl">
+    <PageShell size="wide" className="space-y-4">
       <PageHeader title="Personal" description="Set up everything here. Your dashboard shows what you add." />
       <PersonalTabs />
       <h2 className="sr-only">Organizer</h2>
@@ -233,6 +234,6 @@ export default function PersonalHubPage() {
         <p className="text-[13px] leading-relaxed text-muted-foreground">The soonest few payments, IPTV clients ending (admins) and trips.</p>
       </aside>
       </div>
-    </div>
+    </PageShell>
   );
 }
