@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, Globe2, LocateFixed, X } from "lucide-react";
+import { Check, ChevronDown, Globe2, LocateFixed } from "lucide-react";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { IconTile } from "@/components/ui/icon-tile";
 import { countryName } from "@/lib/scan-destination";
 import { currencyOfCountry, type CountryStat } from "@/lib/country";
@@ -46,22 +47,19 @@ export function CountrySwitch({ state, stats }: { state: CountryState; stats: Co
         <button type="button" onClick={state.locate} disabled={state.locating} className="inline-flex min-h-10 items-center gap-1.5 px-1 text-sm font-bold text-primary" data-testid="country-locate"><LocateFixed className="h-4 w-4" aria-hidden="true" />{state.locating ? "Finding you…" : "Use my exact location"}</button>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/50 px-3 pb-[calc(5.5rem+env(safe-area-inset-bottom))] pt-6 sm:items-center sm:pb-6" role="dialog" aria-modal="true" aria-label="Show prices for" data-testid="country-sheet" onClick={() => setOpen(false)}>
-          <div className="max-h-full w-full max-w-md overflow-y-auto rounded-3xl bg-card p-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between"><p className="text-sm font-bold text-muted-foreground">Show prices for</p><button type="button" onClick={() => setOpen(false)} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-full bg-muted"><X className="h-4 w-4" aria-hidden="true" /></button></div>
-            <ul className="mt-1 divide-y">
-              <li><button type="button" onClick={() => choose(null)} className="flex min-h-16 w-full items-center gap-3 text-left" data-testid="country-auto">
-                <Flag code="GPS" size={44} /><span className="flex-1"><b className="block text-base">Where I am · Automatic</b><span className="text-xs text-muted-foreground">Follows your location</span></span>{source !== "manual" && <Check className="h-5 w-5 text-primary" aria-hidden="true" />}
+        <BottomSheet title="Show prices for" onClose={() => setOpen(false)} testId="country-sheet">
+          <ul className="divide-y">
+            <li><button type="button" onClick={() => choose(null)} className="flex min-h-16 w-full items-center gap-3 text-left" data-testid="country-auto">
+              <Flag code="GPS" size={40} /><span className="flex-1"><b className="block text-base">Where I am · Automatic</b><span className="text-xs text-muted-foreground">Follows your location</span></span>{source !== "manual" && <Check className="h-5 w-5 text-primary" aria-hidden="true" />}
+            </button></li>
+            {rows.map((s) => (
+              <li key={s.country}><button type="button" onClick={() => choose(s.country)} className="flex min-h-16 w-full items-center gap-3 text-left" data-testid={`country-option-${s.country}`}>
+                <Flag code={s.country} size={40} /><span className="flex-1"><b className="block text-base">{label(s.country)}</b><span className="text-xs text-muted-foreground">{s.stores} store{s.stores === 1 ? "" : "s"} · {s.prices.toLocaleString("en-US")} community price{s.prices === 1 ? "" : "s"}</span></span>{source === "manual" && s.country === country && <Check className="h-5 w-5 text-primary" aria-hidden="true" />}
               </button></li>
-              {rows.map((s) => (
-                <li key={s.country}><button type="button" onClick={() => choose(s.country)} className="flex min-h-16 w-full items-center gap-3 text-left" data-testid={`country-option-${s.country}`}>
-                  <Flag code={s.country} size={44} /><span className="flex-1"><b className="block text-base">{label(s.country)}</b><span className="text-xs text-muted-foreground">{s.stores} store{s.stores === 1 ? "" : "s"} · {s.prices.toLocaleString("en-US")} community price{s.prices === 1 ? "" : "s"}</span></span>{source === "manual" && s.country === country && <Check className="h-5 w-5 text-primary" aria-hidden="true" />}
-                </button></li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-muted-foreground">Only countries that have stores or prices are listed.</p>
-          </div>
-        </div>
+            ))}
+          </ul>
+          <p className="mt-3 text-center text-xs text-muted-foreground">Only countries that have stores or prices are listed.</p>
+        </BottomSheet>
       )}
     </div>
   );
