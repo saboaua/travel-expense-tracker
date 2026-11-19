@@ -13,12 +13,13 @@ export const inAruba = (lat: number, lng: number) => lat >= ARUBA.south && lat <
 const pointKey = (lat: number, lng: number) => `${lat.toFixed(5)}|${lng.toFixed(5)}`;
 
 /** Marks each place that sits outside Aruba, or on exactly the same point as a different shop. */
-export function viewPlaces(rows: PlaceRow[]): PlaceView[] {
+/** `country` is the list being looked at: only Aruba has a box to check against, so other countries are never marked "outside". */
+export function viewPlaces(rows: PlaceRow[], country = "AW"): PlaceView[] {
   const at = new Map<string, PlaceRow[]>();
   for (const r of rows) { const k = pointKey(r.lat, r.lng); at.set(k, [...(at.get(k) ?? []), r]); }
   return rows.map((r) => {
     const other = (at.get(pointKey(r.lat, r.lng)) ?? []).find((o) => o.id !== r.id);
-    const flag: PlaceFlag = !inAruba(r.lat, r.lng) ? "outside" : other ? "same" : null;
+    const flag: PlaceFlag = country === "AW" && !inAruba(r.lat, r.lng) ? "outside" : other ? "same" : null;
     return { ...r, fixed: !!r.fixed, flag, sameAs: flag === "same" && other ? other.name : null };
   });
 }

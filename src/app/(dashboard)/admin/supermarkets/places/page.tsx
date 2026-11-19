@@ -6,6 +6,7 @@ import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { CountryField } from "@/components/admin/CountryField";
 import { PlacesFix } from "@/components/admin/PlacesFix";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
@@ -21,17 +22,19 @@ export default function AdminSupermarketsPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [country, setCountry] = useState("AW");
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
-    fetch("/api/admin/supermarket-import").then((r) => r.json()).then((d) => { if (d.error) setError(d.error); else setStatus(d); }).catch(() => setError("Could not load the saved list."));
-  }, []);
+    fetch(`/api/admin/supermarket-import?country=${country}`).then((r) => r.json()).then((d) => { if (d.error) setError(d.error); else setStatus(d); }).catch(() => setError("Could not load the saved list."));
+  }, [country]);
   useEffect(() => { if (role === "admin") load(); }, [role, load]);
 
   const send = async (f: File, mode: "preview" | "import") => {
     const body = new FormData();
     body.set("file", f);
     body.set("mode", mode);
+    body.set("country", country);
     const res = await fetch("/api/admin/supermarket-import", { method: "POST", body });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Something went wrong.");
@@ -63,6 +66,8 @@ export default function AdminSupermarketsPage() {
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success">{done}</Alert>}
 
+      <Card><CardContent className="p-4"><CountryField value={country} onChange={(c) => { setCountry(c); reset(); }} disabled={busy} /></CardContent></Card>
+
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-lg">Saved list</CardTitle></CardHeader>
         <CardContent className="text-sm" data-testid="places-status">
@@ -70,7 +75,7 @@ export default function AdminSupermarketsPage() {
         </CardContent>
       </Card>
 
-      <PlacesFix onChanged={load} />
+      <PlacesFix onChanged={load} country={country} />
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden="true" />How to do it</CardTitle></CardHeader>

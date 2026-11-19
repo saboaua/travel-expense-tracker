@@ -43,5 +43,10 @@ eq("address too long", readFix({ name: "A", address: "x".repeat(201), lat: 12.5,
 eq("bad point", readFix({ name: "A", lat: "x", lng: -70 }).ok, false);
 eq("empty body", readFix(null).ok, false);
 
+// only Aruba has a box: a Suriname list is never marked as outside
+const sr: PlaceRow[] = [{ id: "s1", name: "Tulip", address: null, lat: 5.8520, lng: -55.2038 }];
+eq("Paramaribo is outside the Aruba box", viewPlaces(sr)[0].flag, "outside");
+eq("but not when the list is Suriname's", viewPlaces(sr, "SR")[0].flag, null);
+
 if (fail) process.exit(1);
 console.log("places-fix tests passed");

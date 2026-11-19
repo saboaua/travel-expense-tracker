@@ -1,3 +1,4 @@
+import { normCountry } from "@/lib/country";
 import { NextResponse } from "next/server";
 import { requireAdminService } from "@/lib/admin-roles-api";
 import { logAudit } from "@/lib/audit";
@@ -17,16 +18,18 @@ export async function GET(request: Request) {
   const q = (url.searchParams.get("q") ?? "").slice(0, 80);
   const f = url.searchParams.get("filter");
   const filter = isFilter(f) ? f : "all";
+  const country = normCountry(url.searchParams.get("country")) ?? "AW";
   const rows: PlaceRow[] = [];
   let fixedColumn = true;
   for (let from = 0; from < 10000; from += 1000) {
-    let r = await a.admin.from("supermarket_places").select("id, name, address, lat, lng, fixed").order("id").range(from, from + 999);
+    let r = await a.admin.from("supermarket_places").select("id, name, address, lat, lng, fixed").eq("country", country).order("id").range(from, from + 999);
+    if (r.error && /country/i.test(r.error.message)) r = await a.admin.from("supermarket_places").select("id, name, address, lat, lng, fixed").order("id").range(from, from + 999); // before migration_country.sql
     if (r.error && isMissing(r.error.message)) { fixedColumn = false; r = await a.admin.from("supermarket_places").select("id, name, address, lat, lng").order("id").range(from, from + 999) as typeof r; }
     if (r.error) return NextResponse.json({ error: isMissing(r.error.message) ? "Run supabase/migration_supermarket_places.sql first." : r.error.message }, { status: 500 });
     rows.push(...((r.data ?? []) as unknown as PlaceRow[]));
     if ((r.data ?? []).length < 1000) break;
   }
-  const all = viewPlaces(rows).sort((x, y) => x.name.localeCompare(y.name));
+  const all = viewPlaces(rows, country).sort((x, y) => x.name.localeCompare(y.name));
   const hit = filterPlaces(all, q, filter);
   return NextResponse.json({
     total: all.length, matches: hit.length, shown: Math.min(SHOW, hit.length), setupNeeded: !fixedColumn,

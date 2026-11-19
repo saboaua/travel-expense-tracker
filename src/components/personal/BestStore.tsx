@@ -20,9 +20,12 @@ import { buildProducts, type MatchDecision } from "@/lib/personal/price-compare"
 import type { TrackerRow } from "@/lib/personal/grocery";
 import { externalPrices } from "@/lib/personal/best-prices";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
-import type { CommunityRow } from "@/lib/personal/community";
+import { searchCommunity } from "@/lib/personal/community";
 import { RADII, basketTotals, type ExternalPrice, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
 import { useOnline } from "@/lib/use-online";
+import { useCountry, useCountryStats } from "@/components/personal/use-country";
+import { CountrySwitch } from "@/components/personal/CountrySwitch";
+import { currencyOfCountry, hasPriceData } from "@/lib/country";
 import { formatCurrency } from "@/lib/utils";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-80 w-full animate-pulse sm:h-96 md:h-[30rem] rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -48,17 +51,25 @@ function Level({ level, pct }: { level: Level; pct: number | null }) {
 }
 
 export function BestStore() {
+  const cn = useCountry();
+  const cstats = useCountryStats();
+  const country = cn.country;
   const prices = useCachedQuery<TrackerRow[]>((uid) => pricesKey(uid), (sb) => fetchPrices(sb), []);
   const matches = useCachedQuery<MatchDecision[]>((uid) => priceMatchesKey(uid), (sb) => fetchPriceMatches(sb), []);
   const listQ = useCachedQuery<ListRow[]>((uid) => `${uid}:basket:list`, async (sb) => { const r = await sb.from("shopping_list_items").select("id, product_key, name, qty").order("created_at"); return { data: (r.data ?? []) as ListRow[], error: r.error }; }, []);
   const locQ = useCachedQuery<Loc[]>((uid) => `${uid}:basket:locs`, async (sb) => { const r = await sb.from("store_locations").select("id, name, lat, lng, source"); return { data: (r.data ?? []) as Loc[], error: r.error }; }, []);
 
-  const placesQ = useCachedQuery<Osm[]>((uid) => `${uid}:basket:places`, async (sb) => {
+  const placesQ = useCachedQuery<Osm[]>((uid) => `${uid}:basket:places:${country ?? "all"}`, async (sb) => {
     try {
-      const rows = await fetchAll<{ id: string; name: string; lat: number; lng: number }>((a, b) => sb.from("supermarket_places").select("id, name, lat, lng").order("id").range(a, b));
+      const load = (withCountry: boolean) => fetchAll<{ id: string; name: string; lat: number; lng: number }>((a, b) => {
+        const q = sb.from("supermarket_places").select("id, name, lat, lng");
+        return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b);
+      });
+      // a database without migration_country.sql has no country column: every place then belongs to the one list
+      const rows = await load(true).catch(() => load(false));
       return { data: rows.map((r) => ({ osmId: `place/${r.id}`, name: r.name, lat: r.lat, lng: r.lng })), error: null };
     } catch { return { data: [] as Osm[], error: null }; } // the table is not there until the migration has been run
-  }, []);
+  }, [country]);
 
   const [radius, setRadius] = useState<number>(5);
   const [here, setHere] = useState<LatLng | null>(null);
@@ -79,8 +90,8 @@ export function BestStore() {
   const currency = useMemo(() => {
     const n = new Map<string, number>();
     for (const p of products) n.set(p.currency, (n.get(p.currency) ?? 0) + p.count);
-    return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
-  }, [products]);
+    return currencyOfCountry(country) ?? [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "USD";
+  }, [products, country]);
   const fmt = useCallback((n: number) => formatCurrency(n, currency), [currency]);
   const inCur = useMemo(() => products.filter((p) => p.currency === currency), [products, currency]);
 
@@ -97,8 +108,8 @@ export function BestStore() {
     (async () => {
       const keys = listKey.split("|");
       const [c, o] = await Promise.all([
-        (async () => { try { const r = await createClient().rpc("community_search", { keys }); return r.error ? [] : ((r.data ?? []) as CommunityRow[]); } catch { return [] as CommunityRow[]; } })(),
-        currency === ONLINE_CURRENCY
+        searchCommunity(createClient(), { keys }, country),
+        currency === ONLINE_CURRENCY && (!country || country === "AW")
           ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: inCur.filter((p) => keys.includes(p.key)).map((p) => ({ key: p.key, names: p.names.map((n) => n.name) })) }) })
               .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches ?? {}) : {}))
               .catch(() => ({}) as Record<string, OnlineMatch[]>)
@@ -108,7 +119,7 @@ export function BestStore() {
     })();
     return () => { off = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- listKey is the list of products asked about
-  }, [online, listKey, currency]);
+  }, [online, listKey, currency, country]);
   const stores = useMemo(() => {
     const out = new Map<string, string>();
     for (const n of [...inCur.flatMap((p) => p.stores.map((s) => s.store)), ...external.filter((e) => listKey.split("|").includes(e.key)).map((e) => e.store)]) if (![...out.values()].some((x) => sameStore(x, n))) out.set(n.toLowerCase(), n);
@@ -242,12 +253,23 @@ export function BestStore() {
         <h1 className="mt-1 text-2xl font-bold">Best Prices</h1>
         <p className="text-sm text-muted-foreground">Your receipts, community prices and online price lists</p>
       </div>
-      <PriceSearch products={inCur} currency={products.length ? currency : ONLINE_CURRENCY} />
+      <CountrySwitch state={cn} stats={cstats} />
+      <PriceSearch products={inCur} currency={products.length || country ? currency : ONLINE_CURRENCY} country={country} />
       <OfflineNotice savedAt={prices.savedAt} />
       {(prices.error || msg) && <Alert variant={msg && !prices.error ? "info" : "error"}>{prices.error || msg}</Alert>}
 
       {noReceipts ? (
+        country && cstats && !hasPriceData(cstats, country) ? (
+          <Card data-testid="no-region-prices"><CardContent className="space-y-3 p-5 text-center">
+            <ShoppingBasket className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" />
+            <p className="text-lg font-bold">No community prices available yet for this region</p>
+            <p className="text-sm text-muted-foreground">Scan a grocery receipt and your prices start the ranking. Turn on price sharing to help the community.</p>
+            <Link href="/personal/groceries/new" className="block"><Button className="w-full">Scan a grocery receipt</Button></Link>
+            <Link href="/profile" className="block"><Button variant="outline" className="w-full">Share prices with the community</Button></Link>
+          </CardContent></Card>
+        ) : (
         <Card><CardContent className="space-y-2 p-5 text-center"><ShoppingBasket className="mx-auto h-8 w-8 text-muted-foreground" aria-hidden="true" /><p className="font-semibold">Scan a few receipts first</p><p className="text-sm text-muted-foreground">Your list is priced from what you paid. The more stores you have receipts from, the better the answer.</p><Link href="/personal/groceries/new"><Button>Scan a receipt</Button></Link></CardContent></Card>
+        )
       ) : (
         <>
           <Card data-testid="shopping-list"><CardContent className="space-y-3 p-4">

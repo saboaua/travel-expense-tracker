@@ -32,7 +32,7 @@ const db = {
   eq("each person's list replaces their month", shares.map((s) => [s.args.uid, s.args.replace_month]), [["u1", true], ["u2", true]]);
   const rows = shares[0].args.rows as Record<string, unknown>[];
   eq("one price for the first person, none for the second", [rows.length, (shares[1].args.rows as unknown[]).length], [1, 0]);
-  eq("only the allowed fields are written", Object.keys(rows[0]).sort(), ["currency", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]);
+  eq("only the allowed fields are written", Object.keys(rows[0]).sort(), ["country", "currency", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]);
   eq("nothing failed", r.failed, 0);
   if (fail) { console.error(`${fail} failed`); process.exit(1); }
   console.log("community nightly ok");

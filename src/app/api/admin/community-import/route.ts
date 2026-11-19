@@ -1,3 +1,4 @@
+import { normCountry } from "@/lib/country";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { Readable } from "node:stream";
@@ -74,6 +75,7 @@ export async function POST(request: Request) {
   try { form = await request.formData(); } catch { return NextResponse.json({ error: "No file received." }, { status: 400 }); }
   const file = form.get("file");
   const mode = form.get("mode") === "import" ? "import" : "preview";
+  const country = normCountry(typeof form.get("country") === "string" ? (form.get("country") as string) : null); // every row is for this country; without it the currency decides
   if (!(file instanceof File)) return NextResponse.json({ error: "Choose the Excel or CSV file." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "That file is too big (limit 2 MB)." }, { status: 400 });
 
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
   if (tooMany) return NextResponse.json({ error: `The file has more than ${MAX_PRICE_ROWS.toLocaleString()} rows. Split it and import each part. Nothing was imported.` }, { status: 400 });
   const parsed = parsePrices(head, body);
   if ("error" in parsed) return NextResponse.json({ error: parsed.error }, { status: 400 });
+  if (country) for (const r of parsed.rows) r.country = country;
   if (!parsed.rows.length) return NextResponse.json({ error: "No usable prices found. Nothing was imported." }, { status: 400 });
 
   // The same prices are never counted twice

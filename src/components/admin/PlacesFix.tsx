@@ -18,7 +18,7 @@ type List = { total: number; matches: number; shown: number; counts: { fixed: nu
 const FILTERS: { id: PlaceFilter; label: string }[] = [{ id: "all", label: "All" }, { id: "fixed", label: "Fixed by hand" }, { id: "outside", label: "Outside Aruba" }, { id: "same", label: "Same point twice" }];
 
 /** Admin: search the saved places, see which look wrong, move a pin or remove a place. */
-export function PlacesFix({ onChanged }: { onChanged?: () => void }) {
+export function PlacesFix({ onChanged, country = "AW" }: { onChanged?: () => void; country?: string }) {
   const confirm = useConfirm();
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<PlaceFilter>("all");
@@ -29,12 +29,12 @@ export function PlacesFix({ onChanged }: { onChanged?: () => void }) {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch(`/api/admin/supermarket-places?filter=${filter}&q=${encodeURIComponent(q)}`, { cache: "no-store" });
+      const r = await fetch(`/api/admin/supermarket-places?filter=${filter}&country=${country}&q=${encodeURIComponent(q)}`, { cache: "no-store" });
       const d = await r.json().catch(() => ({}));
       if (!r.ok) { setError(d.error || "Could not load the places."); return; }
       setError(null); setList(d);
     } catch { setError("Could not load the places."); }
-  }, [q, filter]);
+  }, [q, filter, country]);
   useEffect(() => { const t = setTimeout(load, q ? 250 : 0); return () => clearTimeout(t); }, [load, q]);
 
   const remove = async (p: PlaceView) => {

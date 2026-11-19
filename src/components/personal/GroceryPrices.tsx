@@ -18,7 +18,8 @@ import { fetchPriceMatches, fetchPrices, priceMatchesKey, pricesKey } from "@/li
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOnline } from "@/lib/use-online";
 import { createClient } from "@/lib/supabase/client";
-import { groupCommunity, productKey, shopperLabel, type CommunityRow } from "@/lib/personal/community";
+import { useCountry } from "@/components/personal/use-country";
+import { groupCommunity, productKey, searchCommunity, shopperLabel, type CommunityRow } from "@/lib/personal/community";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
@@ -92,13 +93,14 @@ export function GroceryPrices() {
 
   // Community prices (the middle price of 3 or more people) for the same products, beside what you paid. Works whether or not you share.
   const [commRows, setCommRows] = useState<CommunityRow[]>([]);
+  const { country } = useCountry();
   const commKeys = useMemo(() => inCur.map((p) => productKey(p)).slice(0, 150), [inCur]);
   useEffect(() => {
     if (!online || commKeys.length === 0) return;
     let off = false;
-    createClient().rpc("community_search", { keys: commKeys }).then((r) => { if (!off && !r.error) setCommRows((r.data ?? []) as CommunityRow[]); }, () => {});
+    searchCommunity(createClient(), { keys: commKeys }, country).then((rows) => { if (!off) setCommRows(rows); }, () => {});
     return () => { off = true; };
-  }, [online, commKeys]);
+  }, [online, commKeys, country]);
   const community = useMemo(() => {
     const m = new Map<string, { store: string; price: number; reporters: number; confirmed: boolean }>();
     const by = new Map(groupCommunity(commRows).map((g) => [g.key, g]));

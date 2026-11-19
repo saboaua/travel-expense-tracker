@@ -5,10 +5,11 @@
  */
 import { normStore } from "@/lib/personal/basket";
 import { productWords, type Product } from "@/lib/personal/price-compare";
+import { countryForShared } from "@/lib/country";
 
-export type SharedRow = { store_key: string; store_name: string; product_key: string; product_name: string; size_label: string | null; currency: string; price: number };
+export type SharedRow = { store_key: string; store_name: string; product_key: string; product_name: string; size_label: string | null; currency: string; price: number; country?: string | null };
 /** The only fields that may ever be sent. A test checks every row against this list. */
-export const SHARED_FIELDS = ["store_key", "store_name", "product_key", "product_name", "size_label", "currency", "price"] as const;
+export const SHARED_FIELDS = ["store_key", "store_name", "product_key", "product_name", "size_label", "currency", "price", "country"] as const;
 
 /** Same key for the same product however it is printed: "Coca-Cola 33CL" and "COCA COLA 330ML" */
 export const productKey = (p: Pick<Product, "name" | "size" | "currency" | "unit">) => `${p.currency}|${[...productWords(p.name)].sort().join(" ")}|${p.size ?? ""}|${p.unit ?? ""}`;
@@ -17,7 +18,8 @@ export const storeKey = (store: string) => normStore(store).replace(/ /g, "");
 const ageDays = (date: string, now: Date) => Math.round((now.getTime() - Date.parse(`${date}T00:00:00Z`)) / 86400000);
 
 /** One row per product and store: the latest price seen in the last 60 days. */
-export function sharedRows(products: Product[], now: Date): SharedRow[] {
+/** `current` is the country the person is in (or lives in): it is sent for currencies several countries use, like USD. */
+export function sharedRows(products: Product[], now: Date, current: string | null = null): SharedRow[] {
   const out: SharedRow[] = [];
   for (const p of products) {
     if (!productWords(p.name).length) continue;
@@ -26,7 +28,7 @@ export function sharedRows(products: Product[], now: Date): SharedRow[] {
       if (age < 0 || age > 60 || !(s.latest.price > 0) || s.latest.price >= 100000) continue;
       const sk = storeKey(s.store);
       if (!sk) continue;
-      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100 });
+      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100, country: countryForShared(p.currency, current) });
     }
   }
   return out;
@@ -89,8 +91,8 @@ export function lastSharedLabel(at: string | null | undefined, now: Date): strin
 export type ShareResult = { sent: number; ready: number; old: number; error: boolean };
 
 /** Sends the latest prices now. Used when sharing is turned on and by the "Share my prices now" button. */
-export async function shareNow(supabase: SupabaseClient, uid: string, products: Product[], now: Date): Promise<ShareResult> {
-  const rows = sharedRows(products, now);
+export async function shareNow(supabase: SupabaseClient, uid: string, products: Product[], now: Date, country: string | null = null): Promise<ShareResult> {
+  const rows = sharedRows(products, now, country);
   const old = oldPriceCount(products, now);
   let sent = 0;
   for (let i = 0; i < rows.length; i += 300) {
@@ -103,11 +105,26 @@ export async function shareNow(supabase: SupabaseClient, uid: string, products: 
 }
 
 /** Sends the latest prices (once a day at most, unless forced). Returns how many rows were accepted. */
-export async function syncSharedPrices(supabase: SupabaseClient, uid: string, products: Product[], now: Date, force = false): Promise<number> {
+export async function syncSharedPrices(supabase: SupabaseClient, uid: string, products: Product[], now: Date, force = false, country: string | null = null): Promise<number> {
   const stamp = `price-share-sync:${uid}`;
   const today = now.toISOString().slice(0, 10);
   try { if (!force && localStorage.getItem(stamp) === today) return 0; } catch { /* storage can be blocked */ }
   if (!(await sharingOn(supabase, uid))) return 0;
-  const r = await shareNow(supabase, uid, products, now);
+  const r = await shareNow(supabase, uid, products, now, country);
   return r.sent;
+}
+
+/**
+ * community_search for one country. A database that has not had migration_country.sql run yet does not know the country argument:
+ * then the same search is made without it (every country), so nothing stops working before the migration.
+ */
+export async function searchCommunity(supabase: SupabaseClient, args: { q?: string; keys?: string[] }, country: string | null): Promise<CommunityRow[]> {
+  try {
+    if (country) {
+      const r = await supabase.rpc("community_search", { ...args, ctry: country });
+      if (!r.error) return (r.data ?? []) as CommunityRow[];
+    }
+    const r = await supabase.rpc("community_search", args);
+    return r.error ? [] : ((r.data ?? []) as CommunityRow[]);
+  } catch { return []; }
 }

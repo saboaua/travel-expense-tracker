@@ -8,6 +8,7 @@ import { TIERS, plural, progress, readBadge, type BadgeState } from "@/lib/perso
 import { BadgeShield } from "@/components/profile/BadgeShield";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { BadgeShare } from "@/components/profile/BadgeShare";
+import { TravelerRow, TravelerUnlock, useTraveler } from "@/components/profile/TravelerBadge";
 import { Alert } from "@/components/ui/alert";
 
 /** Profile > Your badges: every level, which are earned and what the next one needs. Only you see it. */
@@ -21,10 +22,12 @@ export default function BadgesPage() {
       if (r.error) setMissing(true); else setB(readBadge(r.data));
     })().catch(() => setMissing(true));
   }, []);
+  const traveler = useTraveler();
   const p = progress(b?.total ?? 0);
   return (
     <div className="mx-auto max-w-2xl space-y-4 p-4 md:p-8" data-testid="badge-shelf">
       <LevelUpNotice />
+      <TravelerUnlock />
       <Link href="/profile" className="inline-flex min-h-8 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Profile</Link>
       <div><h1 className="text-2xl font-extrabold">Your badges</h1><p className="text-sm text-muted-foreground">Earned by sharing prices. Only you see them.</p></div>
       {missing && <Alert variant="info">Badges are not set up yet. An admin needs to run supabase/migration_badges.sql.</Alert>}
@@ -48,6 +51,7 @@ export default function BadgesPage() {
               </div>
             );
           })}
+          {traveler && <><h2 className="pt-2 text-sm font-extrabold text-muted-foreground">Special badges</h2><TravelerRow t={traveler} /></>}
           <div className="rounded-2xl border bg-card p-3 text-sm">
             <b>How it counts</b>
             <p className="mt-1 leading-relaxed text-muted-foreground">One price per product and store. Sending a newer price for the same item does not count again, so quality beats volume. The count stays when old prices expire. Delete what you shared and the count starts again at 0; badges you earned stay here.</p>

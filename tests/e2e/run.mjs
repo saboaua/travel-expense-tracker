@@ -83,8 +83,11 @@ let sharedCount = 0;
 let badgeSeen = 0, badgePushed = 0;
 const badgeLevel = (n) => (n >= 4000 ? 5 : n >= 2500 ? 4 : n >= 750 ? 3 : n >= 150 ? 2 : n >= 1 ? 1 : 0);
 let badgeBest = 0;
+const communityCalls = [];
+const travelerCountries = new Set();
+let travelerSeen = false;
 fake.setRpcHook(async (name, body, uid, bearer) => {
-  if (name === "share_prices") { sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
+  if (name === "share_prices") { for (const r of body.rows || []) if (r.country) travelerCountries.add(r.country); sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
   if (name === "my_invite" || name === "reset_my_invite" || name === "set_invite_show_name") {
     const links = fake.table("invite_links");
     let l = links.find((r) => r.user_id === uid);
@@ -99,6 +102,16 @@ fake.setRpcHook(async (name, body, uid, bearer) => {
   if (name === "my_shared_count") return { status: 200, body: sharedCount };
   if (name === "unshare_my_prices") { const n = sharedCount; sharedCount = 0; return { status: 200, body: n }; }
   if (name === "import_prices") { const t = fake.table("shared_prices"); for (const r of body.rows) t.push({ contributor: `import:${body.batch}`, ...r, month: "2026-11-01" }); return { status: 200, body: body.rows.length }; }
+  if (name === "price_countries") {
+    const by = {}; const bump = (c, k, n) => { by[c] ??= { country: c, stores: 0, prices: 0 }; by[c][k] += n; };
+    for (const r of fake.table("supermarket_places")) bump(r.country || "AW", "stores", 1);
+    bump("AW", "prices", 2);
+    return { status: 200, body: Object.values(by) };
+  }
+  if (name === "my_traveler") return { status: 200, body: [{ countries: [...travelerCountries].sort(), seen: travelerSeen }] };
+  if (name === "ack_traveler") { travelerSeen = true; return { status: 200, body: null }; }
+  if (name === "community_search") communityCalls.push(body);
+  if (name === "community_search" && body.ctry && body.ctry !== "AW") return { status: 200, body: [] };
   if (name === "community_search") return { status: 200, body: /coca/i.test(String(body.q)) ? [
     { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "New Ten Sing", price: 1.59, reporters: 7, last_month: "2026-11-01" },
     { product_key: "AWG|coca cola|330 ml|", product_name: "Coca Cola", size_label: "330 ml", currency: "AWG", store_name: "Ling & Sons", price: 1.45, reporters: 12, last_month: "2026-11-01" },
@@ -1514,7 +1527,8 @@ try {
       for (let i = 0; i < 40 && !sharedCalls.length; i++) await page.waitForTimeout(250);
       const rows = sharedCalls.flatMap((c) => c.rows);
       assert(rows.length === 1, `one price is shared (got ${rows.length})`);
-      assert(JSON.stringify(Object.keys(rows[0]).sort()) === JSON.stringify(["currency", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]), "only store, item, price, size and currency are sent");
+      assert(JSON.stringify(Object.keys(rows[0]).sort()) === JSON.stringify(["country", "currency", "price", "product_key", "product_name", "size_label", "store_key", "store_name"]), "only store, item, price, size, currency and country are sent");
+      assert(rows[0].country === "AW", "an AWG price is sent for Aruba");
       assert(rows[0].price === 1.45 && !("month" in rows[0]), "the price is sent with no date at all");
       const sent = JSON.stringify(sharedCalls);
       assert(!sent.includes("pat@example.com") && !sent.includes(PAT) && !sent.includes(rid), "no email, account or receipt id is sent");
@@ -2479,13 +2493,120 @@ try {
     } finally { await ctx.close(); await actx.close(); }
   });
 
+  await test("prices by country: the country switches by itself with an Undo, a country with no prices says so, and the list is for that country only", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    // the person was last in Suriname; the network now says Aruba
+    await ctx.addInitScript(() => { try { localStorage.setItem("lifolio:country:last", "SR"); localStorage.setItem("lifolio:country:detected", JSON.stringify({ c: "AW", t: Date.now() })); localStorage.removeItem("lifolio:country:manual"); } catch {} });
+    const page = await ctx.newPage();
+    const P = fake.table("supermarket_places");
+    P.push({ id: "5b000000-0000-4000-8000-000000000001", name: "Mangusa", name_key: "mangusa", address: null, lat: 12.52, lng: -70.03, fixed: false, country: "AW", imported_at: "2026-11-01T00:00:00.000Z" });
+    const seen = [];
+    page.on("request", (r) => { if (/\/rest\/v1\/supermarket_places/.test(r.url())) seen.push(decodeURIComponent(r.url())); });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/basket`);
+      await page.getByTestId("country-notice").waitFor();
+      assert(/Now showing Aruba prices/.test(await page.getByTestId("country-notice").innerText()), "the message says Aruba prices");
+      assert((await page.getByTestId("country-label").innerText()).trim() === "Aruba · AWG", "the row says Aruba and AWG");
+      await page.waitForFunction(() => true);
+      assert(seen.some((u) => /country=eq\.AW/.test(u)), "only Aruba's places were asked for: " + seen.join(" | "));
+      // Undo goes back to the country before
+      await page.getByTestId("country-undo").click();
+      await page.getByTestId("country-notice").waitFor({ state: "detached" });
+      assert((await page.getByTestId("country-label").innerText()).trim() === "Suriname · SRD", "Undo goes back to Suriname");
+      // Suriname has no stores or prices: the page says so, and offers the next step
+      await page.getByTestId("no-region-prices").waitFor();
+      assert(/No community prices available yet for this region/.test(await page.getByTestId("no-region-prices").innerText()), "the empty message");
+      assert(seen.some((u) => /country=eq\.SR/.test(u)), "Suriname's places were asked for, not Aruba's");
+      // the picker lists the countries that have data and lets the person go back to following the location
+      await page.getByTestId("country-button").click();
+      await page.getByTestId("country-sheet").waitFor();
+      await page.getByTestId("country-option-AW").waitFor();
+      await page.getByTestId("country-option-AW").click();
+      await page.waitForFunction(() => document.querySelector("[data-testid=country-label]")?.textContent?.trim() === "Aruba · AWG");
+      await page.getByTestId("country-button").click();
+      await page.getByTestId("country-auto").click();
+      await page.waitForFunction(() => /Automatic/.test(document.querySelector("[data-testid=country-button]")?.textContent || ""));
+    } finally {
+      await ctx.close();
+      P.splice(0);
+    }
+  });
+
+  await test("prices by country: the Groceries traveler badge is locked with one country, earned with two, and its message shows once", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    travelerCountries.clear(); travelerSeen = false;
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      travelerCountries.add("SR");
+      await page.goto(`${BASE}/profile/badges`);
+      await page.getByTestId("badge-traveler").waitFor();
+      assert(await page.getByTestId("traveler-medal-locked").count() === 1, "one country: the badge is locked");
+      assert((await page.getByTestId("traveler-unlock").count()) === 0, "no message yet");
+      travelerCountries.add("AW");
+      await page.reload();
+      await page.getByTestId("traveler-unlock").waitFor();
+      assert(/Suriname and Aruba|Aruba and Suriname/.test(await page.getByTestId("traveler-unlock").innerText()), "the message names both countries");
+      await page.getByTestId("traveler-done").click();
+      await page.getByTestId("traveler-unlock").waitFor({ state: "detached" });
+      assert(travelerSeen === true, "the message is marked as shown");
+      await page.reload();
+      await page.getByTestId("badge-traveler").waitFor();
+      assert(await page.getByTestId("traveler-medal").count() === 1, "two countries: the badge is earned");
+      assert((await page.getByTestId("traveler-unlock").count()) === 0, "the message does not come back");
+    } finally { await ctx.close(); travelerCountries.clear(); travelerSeen = false; }
+  });
+
+  await test("prices by country: an admin imports places and prices for a country; another country's list is never touched", async () => {
+    const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    actx.setDefaultTimeout(60_000);
+    const ap = await actx.newPage();
+    const P = fake.table("supermarket_places");
+    P.push({ id: "5c000000-0000-4000-8000-000000000001", name: "Super Food Plaza", name_key: "super food plaza", address: null, lat: 12.53, lng: -70.02, fixed: false, country: "AW", imported_at: "2026-11-01T00:00:00.000Z" });
+    const before = fake.table("shared_prices").length;
+    try {
+      await signIn(ap, "admin@example.com", "Admin-Pass-123");
+      await ap.waitForURL((u) => u.pathname === "/");
+      await ap.goto(`${BASE}/admin/supermarkets/places`);
+      await ap.getByTestId("import-country").waitFor();
+      await ap.getByTestId("import-country").selectOption("SR");
+      await ap.getByTestId("places-file").setInputFiles({ name: "sr.csv", mimeType: "text/csv", buffer: Buffer.from("Name,Latitude,Longitude\nTulip Supermarket,5.852,-55.2038\nChoi Supermarket,5.8301,-55.1702\n") });
+      await ap.getByTestId("places-import").click();
+      await ap.getByText(/Imported 2 supermarket places/).waitFor();
+      assert(P.filter((r) => r.country === "SR").length === 2, "both places are saved for Suriname");
+      assert(P.filter((r) => r.country === "AW").length === 1 && P.some((r) => r.name === "Super Food Plaza"), "Aruba's list is still there");
+      // prices for Suriname
+      await ap.goto(`${BASE}/admin/supermarkets/community`);
+      await ap.getByTestId("import-country").selectOption("SR");
+      await ap.getByTestId("prices-file").setInputFiles({ name: "srp.csv", mimeType: "text/csv", buffer: Buffer.from("Store,Product,Price,Currency\nTulip Supermarket,Pasta 500 g,18.5,SRD\nChoi Supermarket,Pasta 500 g,19.9,SRD\n") });
+      await ap.getByTestId("prices-preview").waitFor();
+      await ap.getByTestId("prices-import").click();
+      await ap.waitForFunction((n) => true, before);
+      await ap.waitForTimeout(500);
+      const added = fake.table("shared_prices").slice(before);
+      assert(added.length === 2 && added.every((r) => r.country === "SR"), "the prices are saved for Suriname: " + JSON.stringify(added.map((r) => r.country)));
+      // the hub shows which countries have data
+      await ap.goto(`${BASE}/admin/supermarkets`);
+      await ap.getByTestId("hub-chips-places").waitFor();
+      const chips = await ap.getByTestId("hub-chips-places").innerText();
+      assert(/Aruba/.test(chips) && /Suriname/.test(chips), "the places row shows both countries: " + chips);
+    } finally {
+      await actx.close(); P.splice(0); fake.table("shared_prices").splice(before);
+    }
+  });
+
   await test("supermarket places: an admin finds a wrong point, fixes it, removes a duplicate, and a later import keeps the fix and does not bring the removed one back", async () => {
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     actx.setDefaultTimeout(60_000); ctx.setDefaultTimeout(60_000);
     const ap = await actx.newPage(); const page = await ctx.newPage();
     const P = fake.table("supermarket_places");
-    const mk = (n, name, lat, lng, extra = {}) => ({ id: `5a000000-0000-4000-8000-00000000000${n}`, name, name_key: name.toLowerCase(), address: null, lat, lng, fixed: false, imported_at: "2026-11-01T00:00:00.000Z", ...extra });
+    const mk = (n, name, lat, lng, extra = {}) => ({ id: `5a000000-0000-4000-8000-00000000000${n}`, name, name_key: name.toLowerCase(), address: null, lat, lng, fixed: false, country: "AW", imported_at: "2026-11-01T00:00:00.000Z", ...extra });
     P.push(mk(1, "Super Food Plaza", 12.5301, -70.0261, { fixed: true, orig_lat: 12.53, orig_lng: -70.02, orig_key: "super food plaza" }), mk(2, "Ling & Sons Noord", 52.5186, -70.0358, { address: "Noord" }), mk(3, "Cost-U-Less", 12.5186, -70.0358), mk(4, "Ling & Sons Sasaki", 12.5186, -70.0358));
     try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");

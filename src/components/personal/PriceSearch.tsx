@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 import { useOnline } from "@/lib/use-online";
 import { searchBestPrices, type OfferSource, type PriceGroup } from "@/lib/personal/best-prices";
-import type { CommunityRow } from "@/lib/personal/community";
+import { searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import type { Product } from "@/lib/personal/price-compare";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
 
@@ -21,7 +21,7 @@ const SOURCE_CLS: Record<OfferSource, string> = {
 };
 
 /** Best Prices: look up any item and see the cheapest place, from your receipts, the community and the online price lists. */
-export function PriceSearch({ products, currency }: { products: Product[]; currency: string }) {
+export function PriceSearch({ products, currency, country = null }: { products: Product[]; currency: string; country?: string | null }) {
   const online = useOnline();
   const [q, setQ] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +38,7 @@ export function PriceSearch({ products, currency }: { products: Product[]; curre
     let shops: OnlineMatch[] = [];
     if (online) {
       const [c, o] = await Promise.all([
-        (async () => { try { const r = await createClient().rpc("community_search", { q: text }); return r.error ? [] : ((r.data ?? []) as CommunityRow[]); } catch { return [] as CommunityRow[]; } })(),
+        searchCommunity(createClient(), { q: text }, country),
         currency === ONLINE_CURRENCY
           ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: [{ key: "search", names: [text] }] }) })
               .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches?.search ?? []) : []))

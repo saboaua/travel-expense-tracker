@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchPriceMatches, fetchPrices } from "@/lib/offline-grocery";
 import { buildProducts } from "@/lib/personal/price-compare";
+import { codeOfCountryName } from "@/lib/country";
 import { sharedRows } from "@/lib/personal/community";
 import { sendPush } from "@/lib/push";
 import { readBadge, tierOf } from "@/lib/personal/badges";
@@ -18,7 +19,7 @@ const TIME_BUDGET_MS = 45_000;
 export async function nightlyShare(db: SupabaseClient, now = new Date()): Promise<NightlyResult> {
   const out: NightlyResult = { people: 0, shared: 0, failed: 0, alerts: 0 };
   const started = Date.now();
-  const { data: people, error } = await db.from("profiles").select("id").eq("share_prices", true).order("share_last_at", { ascending: true, nullsFirst: true }).limit(MAX_PEOPLE);
+  const { data: people, error } = await db.from("profiles").select("id, home_country").eq("share_prices", true).order("share_last_at", { ascending: true, nullsFirst: true }).limit(MAX_PEOPLE);
   if (error) throw new Error(error.message);
   for (const p of people ?? []) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
@@ -28,7 +29,7 @@ export async function nightlyShare(db: SupabaseClient, now = new Date()): Promis
       const [prices, matches] = await Promise.all([fetchPrices(db, uid), fetchPriceMatches(db, uid)]);
       if (prices.error || !prices.data) throw new Error("prices");
       const { products } = buildProducts(prices.data, matches.data ?? []);
-      const rows = sharedRows(products, now);
+      const rows = sharedRows(products, now, codeOfCountryName(typeof p.home_country === "string" ? p.home_country : null));
       const r = await db.rpc("share_prices_for", { uid, rows, replace_month: true });
       if (r.error) throw new Error(r.error.message);
       out.shared += Number(r.data) || 0;

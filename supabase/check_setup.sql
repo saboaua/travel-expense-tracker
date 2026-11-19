@@ -91,6 +91,12 @@ need_cols(tbl, col, fix) as (values
   ('profiles','share_last_at','migration_nightly_share.sql'),
   ('profiles','share_last_count','migration_nightly_share.sql'),
   ('profiles','share_last_error','migration_nightly_share.sql'),
+  -- Prices by country
+  ('supermarket_places','country','migration_country.sql'),
+  ('shared_prices','country','migration_country.sql'),
+  ('store_catalog','country','migration_country.sql'),
+  ('profiles','share_countries','migration_country.sql'),
+  ('profiles','traveler_seen','migration_country.sql'),
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
@@ -230,7 +236,12 @@ other_checks as (
                ('sharing_activity_export','migration_sharing_safety.sql'),
                ('share_prices_for','migration_nightly_share.sql'), ('share_failed_for','migration_nightly_share.sql'), ('claim_badge_alert_for','migration_nightly_share.sql'), ('my_badge_for','migration_nightly_share.sql'),
                ('my_badge','migration_badges.sql'), ('ack_badge','migration_badges.sql'), ('claim_badge_alert','migration_badges.sql'), ('_badge_level','migration_badges.sql'),
+               ('price_countries','migration_country.sql'), ('my_traveler','migration_country.sql'), ('ack_traveler','migration_country.sql'), ('_country_of_currency','migration_country.sql'), ('_note_countries','migration_country.sql'),
                ('my_invite','migration_invites.sql'), ('reset_my_invite','migration_invites.sql'), ('set_invite_show_name','migration_invites.sql')) as f(fn, fix)
+  union all
+  select 'function', 'community_search takes a country',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and p.pronargs = 3) then 'OK' else 'MISSING' end,
+         'migration_country.sql'
   union all
   select 'function', 'community_search shows Confirmed',
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and pg_get_function_result(p.oid) like '%confirmed%') then 'OK' else 'MISSING' end,

@@ -5,6 +5,7 @@ import { Download } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { CountryField } from "@/components/admin/CountryField";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
@@ -24,6 +25,7 @@ export default function AdminCommunityPricesPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  const [country, setCountry] = useState("AW");
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -35,6 +37,7 @@ export default function AdminCommunityPricesPage() {
     const body = new FormData();
     body.set("file", f);
     body.set("mode", mode);
+    body.set("country", country);
     const res = await fetch("/api/admin/community-import", { method: "POST", body });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || "Something went wrong.");
@@ -65,6 +68,8 @@ export default function AdminCommunityPricesPage() {
       <PageHeader title="Community prices import" description="Add prices from receipts you typed into Excel. People see them next to the prices from the app." />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success"><span data-testid="prices-done">{done}</span></Alert>}
+
+      <Card><CardContent className="p-4"><CountryField value={country} onChange={(c) => { setCountry(c); reset(); }} disabled={busy} /></CardContent></Card>
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-xs font-bold uppercase tracking-wide text-muted-foreground">So far</CardTitle></CardHeader>

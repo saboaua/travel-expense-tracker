@@ -1,3 +1,4 @@
+import { normCountry, readCountryStats } from "@/lib/country";
 import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { Readable } from "node:stream";
@@ -41,10 +42,14 @@ export async function GET(request: Request) {
   if (new URL(request.url).searchParams.get("template")) {
     return new NextResponse(new Uint8Array(await template()), { headers: { "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "Content-Disposition": 'attachment; filename="supermarket-places-example.xlsx"', "Cache-Control": "no-store" } });
   }
-  const { count, error } = await a.admin.from("supermarket_places").select("id", { count: "exact", head: true });
+  const country = normCountry(new URL(request.url).searchParams.get("country")) ?? "AW";
+  let q = await a.admin.from("supermarket_places").select("id", { count: "exact", head: true }).eq("country", country);
+  if (q.error && /country/i.test(q.error.message)) q = await a.admin.from("supermarket_places").select("id", { count: "exact", head: true }); // before migration_country.sql
+  const { count, error } = q;
   if (error) return NextResponse.json({ error: /relation|schema cache/i.test(error.message) ? "Run supabase/migration_supermarket_places.sql first." : error.message }, { status: 500 });
   const { data } = await a.admin.from("supermarket_places").select("imported_at").order("imported_at", { ascending: false }).limit(1);
-  return NextResponse.json({ rows: count ?? 0, importedAt: data?.[0]?.imported_at ?? null }, { headers: { "Cache-Control": "no-store" } });
+  const stats = await a.admin.rpc("price_countries");
+  return NextResponse.json({ rows: count ?? 0, importedAt: data?.[0]?.imported_at ?? null, country, countries: stats.error ? [] : readCountryStats(stats.data) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** multipart: file (.xlsx or .csv), mode = "preview" or "import" (replaces the saved list). */
@@ -57,6 +62,7 @@ export async function POST(request: Request) {
   try { form = await request.formData(); } catch { return NextResponse.json({ error: "No file received." }, { status: 400 }); }
   const file = form.get("file");
   const mode = form.get("mode") === "import" ? "import" : "preview";
+  const country = normCountry(typeof form.get("country") === "string" ? (form.get("country") as string) : null) ?? "AW"; // every row of the file is for this country
   if (!(file instanceof File)) return NextResponse.json({ error: "Choose the Excel or CSV file." }, { status: 400 });
   if (file.size > MAX_BYTES) return NextResponse.json({ error: "That file is too big (limit 2 MB)." }, { status: 400 });
 
@@ -94,11 +100,12 @@ export async function POST(request: Request) {
   const rows = handled ? parsed.rows.filter((r) => { const k = at(r.name_key, r.lat, r.lng); return !keep.has(k) && !gone.has(k); }) : parsed.rows;
   const stamp = new Date().toISOString();
   for (let i = 0; i < rows.length; i += 500) {
-    const { error } = await a.admin.from("supermarket_places").upsert(rows.slice(i, i + 500).map((r) => ({ ...r, imported_at: stamp })), { onConflict: "name_key,lat,lng" });
-    if (error) return NextResponse.json({ error: /relation|schema cache/i.test(error.message) ? "Run supabase/migration_supermarket_places.sql first." : error.message }, { status: 500 });
+    const { error } = await a.admin.from("supermarket_places").upsert(rows.slice(i, i + 500).map((r) => ({ ...r, country, imported_at: stamp })), { onConflict: "name_key,lat,lng" });
+    if (error) return NextResponse.json({ error: /country/i.test(error.message) ? "Run supabase/migration_country.sql first." : /relation|schema cache/i.test(error.message) ? "Run supabase/migration_supermarket_places.sql first." : error.message }, { status: 500 });
   }
-  const old = a.admin.from("supermarket_places").delete().lt("imported_at", stamp);
+  // only this country's list is replaced: another country's places are never touched
+  const old = a.admin.from("supermarket_places").delete().lt("imported_at", stamp).eq("country", country);
   const { data: gone2 } = await (handled ? old.eq("fixed", false) : old).select("id");
-  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "supermarket_places", entityId: "places", details: { kept: summary.kept, removed: gone2?.length ?? 0 } }).catch(() => {});
+  await logAudit({ actorId: a.me.id, actorEmail: a.me.email, action: "catalog.imported", entityType: "supermarket_places", entityId: "places", details: { country, kept: summary.kept, removed: gone2?.length ?? 0 } }).catch(() => {});
   return NextResponse.json({ mode, ...summary, removed: gone2?.length ?? 0, importedAt: stamp });
 }

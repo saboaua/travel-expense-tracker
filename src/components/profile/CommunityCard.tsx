@@ -8,6 +8,8 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { fetchPriceMatches, fetchPrices } from "@/lib/offline-grocery";
 import { buildProducts } from "@/lib/personal/price-compare";
+import { TravelerUnlock } from "@/components/profile/TravelerBadge";
+import { knownCountry } from "@/components/personal/use-country";
 import { lastSharedLabel, oldPriceCount, sharedRows, shareNow } from "@/lib/personal/community";
 import { AccordionSection } from "@/components/ui/accordion";
 import { TIERS, plural, progress, readBadge, tierOf, type BadgeState } from "@/lib/personal/badges";
@@ -69,7 +71,7 @@ export function CommunityCard() {
       const [p, m] = await Promise.all([fetchPrices(sb), fetchPriceMatches(sb)]);
       if (p.error || !p.data) throw new Error("prices");
       const { products } = buildProducts(p.data, m.data ?? []);
-      const ready = sharedRows(products, new Date()).length;
+      const ready = sharedRows(products, new Date(), knownCountry()).length;
       const old = oldPriceCount(products, new Date());
       if (ready > 0) setMsg(`Sharing is on. Your prices are shared tonight. ${ready} price${ready === 1 ? "" : "s"} from your receipts will be sent in tonight's run.${old ? ` ${old} older than 60 days stay out.` : ""} Want it now? Tap Share my latest prices now.`);
       else if (old > 0) setMsg("Sharing is on. Nothing to share yet: your prices are older than 60 days. Scan a receipt and it is shared the next night.");
@@ -84,7 +86,7 @@ export function CommunityCard() {
       const [p, m] = await Promise.all([fetchPrices(sb), fetchPriceMatches(sb)]);
       if (p.error || !p.data) throw new Error("prices");
       const { products } = buildProducts(p.data, m.data ?? []);
-      const r = await shareNow(sb, uid, products, new Date());
+      const r = await shareNow(sb, uid, products, new Date(), knownCountry());
       if (r.error) { setErr("Could not share your prices. Check your connection and try again."); }
       else {
         const base = justOn ? "Sharing is on. " : "";
@@ -129,6 +131,7 @@ export function CommunityCard() {
   return (
     <>
     <LevelUpNotice check={check} />
+    <TravelerUnlock check={check} />
     <AccordionSection id="community-prices" title="Community prices" icon={<Share2 />} tone="badges" summary={on == null ? "" : on ? "Sharing is on" : "Off"} description="Help everyone find cheaper groceries. Off until you turn it on.">
       <div className="space-y-4" data-testid="community-card">
         {err && <Alert variant="error">{err}</Alert>}
