@@ -23,13 +23,15 @@ async function detect(): Promise<string | null> {
     if (cached && Date.now() - cached.t < FRESH_MS) return cached.c;
   } catch { /* detect again */ }
   let code: string | null = null;
+  // GPS when the person already allowed it: the most exact answer
   try {
     const perm = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
     if (perm?.state === "granted") code = normCountry((await currentPlace())?.countryCode);
   } catch { /* no permissions api */ }
+  // otherwise the country the network says (works with no permission and no coordinates)
   if (!code) {
     try {
-      const r = await fetch("/api/weather", { cache: "no-store", signal: AbortSignal.timeout(4000) });
+      const r = await fetch("/api/country", { cache: "no-store", signal: AbortSignal.timeout(4000) });
       if (r.ok) code = normCountry(((await r.json()) as { countryCode?: string | null }).countryCode);
     } catch { /* offline */ }
   }
@@ -40,6 +42,8 @@ async function detect(): Promise<string | null> {
 export type CountryState = {
   country: string | null;
   source: CountrySource;
+  /** the home country from Profile, when it is known */
+  homeCountry: string | null;
   /** the country just switched to by itself, with the one before it, for the short "Now showing" message */
   notice: { from: string; to: string } | null;
   /** pick a country, or null to follow the location again */
@@ -93,7 +97,7 @@ export function useCountry(): CountryState {
 
   const pick = useCallback((code: string | null) => { const c = normCountry(code); write(MANUAL, c); setManual(c); setNotice(null); }, []);
   const undo = useCallback(() => { if (notice) { write(LAST, notice.from); write(MANUAL, notice.from); setManual(notice.from); setNotice(null); } }, [notice]);
-  return { country, source: choice.source, notice, pick, undo, dismiss: () => setNotice(null), ready };
+  return { country, source: choice.source, homeCountry: home, notice, pick, undo, dismiss: () => setNotice(null), ready };
 }
 
 import type { CountryStat } from "@/lib/country";

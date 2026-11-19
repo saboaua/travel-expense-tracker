@@ -2535,6 +2535,28 @@ try {
     }
   });
 
+  await test("prices by country: in Panama the country comes from the network, with no location permission, and the home point in Aruba is not used", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, extraHTTPHeaders: { "x-vercel-ip-country": "PA" } });
+    ctx.setDefaultTimeout(60_000);
+    await ctx.addInitScript(() => { try { ["lifolio:country:last", "lifolio:country:detected", "lifolio:country:manual"].forEach((k) => localStorage.removeItem(k)); } catch {} });
+    const page = await ctx.newPage();
+    const prof = fake.table("profiles").find((r) => r.id === PAT);
+    const was = { home_country: prof?.home_country, home_lat: prof?.home_lat, home_lng: prof?.home_lng };
+    if (prof) Object.assign(prof, { home_country: "Aruba", home_lat: 12.52, home_lng: -70.03 });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const j = await page.evaluate(async () => (await fetch("/api/country")).json());
+      assert(j.countryCode === "PA", "the network says Panama: " + JSON.stringify(j));
+      await page.goto(`${BASE}/personal/groceries/basket`);
+      await page.waitForFunction(() => /Panama/.test(document.querySelector("[data-testid=country-label]")?.textContent || ""));
+      assert((await page.getByTestId("country-label").innerText()).trim() === "Panama · USD", "Panama and USD, not Aruba");
+    } finally {
+      await ctx.close();
+      if (prof) Object.assign(prof, was);
+    }
+  });
+
   await test("prices by country: the Groceries traveler badge is locked with one country, earned with two, and its message shows once", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     ctx.setDefaultTimeout(60_000);

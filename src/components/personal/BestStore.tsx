@@ -75,7 +75,10 @@ export function BestStore() {
   const [here, setHere] = useState<LatLng | null>(null);
   const [home, setHome] = useState<LatLng | null>(null);
   const [from, setFrom] = useState<"home" | "here">("home");
-  const origin = from === "home" && home ? home : here ?? home;
+  // The saved home point only counts while the person is in their home country; abroad the map follows where they are
+  const away = !!country && !!cn.homeCountry && country !== cn.homeCountry;
+  const homeHere = away ? null : home;
+  const origin = from === "home" && homeHere ? homeHere : here ?? homeHere;
   const me = origin;
   const [geo, setGeo] = useState<"idle" | "asking" | "denied">("idle");
   const [find, setFind] = useState("");
@@ -299,16 +302,16 @@ export function BestStore() {
                 {RADII.map((r) => <Button key={r} type="button" variant={radius === r ? "default" : "outline"} className="h-11 rounded-full" aria-pressed={radius === r} onClick={() => setRadius(r)}>{r} km</Button>)}
               </div>
 
-              {(home || here) && (
+              {(homeHere || here) && (
                 <div className="space-y-1.5" data-testid="origin">
                   <p className={heading}>Measure distance from</p>
-                  {home ? (
+                  {homeHere ? (
                     <div className="grid grid-cols-2 gap-2" role="group" aria-label="Measure distance from">
                       <Button type="button" variant={from === "home" ? "default" : "outline"} className="h-11 gap-2" aria-pressed={from === "home"} onClick={() => setFrom("home")}><MapPin className="h-4 w-4" aria-hidden="true" />Home</Button>
                       <Button type="button" variant={from === "here" ? "default" : "outline"} className="h-11" aria-pressed={from === "here"} onClick={() => { setFrom("here"); if (!here) locate(); }}>{geo === "asking" ? "Finding you…" : "Where I am now"}</Button>
                     </div>
                   ) : null}
-                  {home ? <p className="text-xs text-muted-foreground">{from === "home" ? "Using your saved home point. Nothing is asked of your phone." : here ? "Using where you are now." : "Allow location to use where you are now."}</p> : here && <div className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm"><span>No home point yet. Use here as your home place?</span><Button type="button" variant="outline" size="sm" onClick={() => saveHome(here)} data-testid="save-home">Save as home place</Button></div>}
+                  {homeHere ? <p className="text-xs text-muted-foreground">{from === "home" ? "Using your saved home point. Nothing is asked of your phone." : here ? "Using where you are now." : "Allow location to use where you are now."}</p> : here && <div className="flex items-center justify-between gap-2 rounded-lg border p-3 text-sm"><span>No home point yet. Use here as your home place?</span><Button type="button" variant="outline" size="sm" onClick={() => saveHome(here)} data-testid="save-home">Save as home place</Button></div>}
                 </div>
               )}
 
