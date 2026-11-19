@@ -2497,7 +2497,7 @@ try {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     ctx.setDefaultTimeout(60_000);
     // the person was last in Suriname; the network now says Aruba
-    await ctx.addInitScript(() => { try { localStorage.setItem("lifolio:country:last", "SR"); localStorage.setItem("lifolio:country:detected", JSON.stringify({ c: "AW", t: Date.now() })); localStorage.removeItem("lifolio:country:manual"); } catch {} });
+    await ctx.addInitScript(() => { try { localStorage.setItem("lifolio:country:last", "SR"); localStorage.setItem("lifolio:country:detected", JSON.stringify({ c: "AW", t: Date.now(), h: "gps" })); localStorage.removeItem("lifolio:country:manual"); } catch {} });
     const page = await ctx.newPage();
     const P = fake.table("supermarket_places");
     P.push({ id: "5b000000-0000-4000-8000-000000000001", name: "Mangusa", name_key: "mangusa", address: null, lat: 12.52, lng: -70.03, fixed: false, country: "AW", imported_at: "2026-11-01T00:00:00.000Z" });
@@ -2524,6 +2524,7 @@ try {
       await page.getByTestId("country-button").click();
       await page.getByTestId("country-sheet").waitFor();
       await page.getByTestId("country-option-AW").waitFor();
+      if (process.env.E2E_SHOT) await page.screenshot({ path: process.env.E2E_SHOT });
       await page.getByTestId("country-option-AW").click();
       await page.waitForFunction(() => document.querySelector("[data-testid=country-label]")?.textContent?.trim() === "Aruba · AWG");
       await page.getByTestId("country-button").click();
@@ -2551,6 +2552,8 @@ try {
       await page.goto(`${BASE}/personal/groceries/basket`);
       await page.waitForFunction(() => /Panama/.test(document.querySelector("[data-testid=country-label]")?.textContent || ""));
       assert((await page.getByTestId("country-label").innerText()).trim() === "Panama · USD", "Panama and USD, not Aruba");
+      assert(/from your network/.test(await page.getByTestId("country-button").innerText()), "it says the country came from the network, not the phone's location");
+      await page.getByTestId("country-locate").waitFor();
     } finally {
       await ctx.close();
       if (prof) Object.assign(prof, was);

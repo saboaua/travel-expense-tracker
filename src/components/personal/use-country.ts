@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { currentPlace } from "@/lib/scan-place";
 import { chooseCountry, codeOfCountryName, normCountry, shouldAnnounce, type CountrySource } from "@/lib/country";
 
 const MANUAL = "lifolio:country:manual";
@@ -16,27 +15,40 @@ const write = (k: string, v: string | null) => { try { if (v == null) localStora
 /** The country the person was last in, without waiting for a lookup (for sending prices). */
 export const knownCountry = (): string | null => normCountry(read(LAST));
 
-/** Where the person is, as a country code: GPS when they already allowed it, otherwise the approximate place from the network. */
-async function detect(): Promise<string | null> {
+export type Detected = { code: string; how: "gps" | "network" };
+
+const gps = () => new Promise<{ lat: number; lon: number } | null>((resolve) => {
+  if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
+  navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }), () => resolve(null), { timeout: 8000, maximumAge: 10 * 60 * 1000, enableHighAccuracy: false });
+});
+const countryAt = async (q: string): Promise<string | null> => {
   try {
-    const cached = JSON.parse(read(DETECTED) ?? "null") as { c: string; t: number } | null;
-    if (cached && Date.now() - cached.t < FRESH_MS) return cached.c;
-  } catch { /* detect again */ }
-  let code: string | null = null;
-  // GPS when the person already allowed it: the most exact answer
-  try {
-    const perm = await navigator.permissions?.query({ name: "geolocation" as PermissionName });
-    if (perm?.state === "granted") code = normCountry((await currentPlace())?.countryCode);
-  } catch { /* no permissions api */ }
-  // otherwise the country the network says (works with no permission and no coordinates)
-  if (!code) {
+    const r = await fetch(`/api/country${q}`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
+    return r.ok ? normCountry(((await r.json()) as { countryCode?: string | null }).countryCode) : null;
+  } catch { return null; }
+};
+
+/**
+ * Where the person is, as a country code. The phone's location is asked for (once, by the browser) because the network address can
+ * name another country, for example on a roaming line. When location is off or refused, the country the network says is used.
+ */
+async function detect(force = false): Promise<Detected | null> {
+  if (!force) {
     try {
-      const r = await fetch("/api/country", { cache: "no-store", signal: AbortSignal.timeout(4000) });
-      if (r.ok) code = normCountry(((await r.json()) as { countryCode?: string | null }).countryCode);
-    } catch { /* offline */ }
+      const cached = JSON.parse(read(DETECTED) ?? "null") as { c: string; t: number; h?: "gps" | "network" } | null;
+      if (cached && Date.now() - cached.t < FRESH_MS && cached.h === "gps") return { code: cached.c, how: "gps" };
+    } catch { /* detect again */ }
   }
-  if (code) write(DETECTED, JSON.stringify({ c: code, t: Date.now() }));
-  return code;
+  let perm: PermissionState | null = null;
+  try { perm = (await navigator.permissions?.query({ name: "geolocation" as PermissionName }))?.state ?? null; } catch { /* no permissions api */ }
+  let out: Detected | null = null;
+  if (perm !== "denied") {
+    const at = await gps(); // shows the browser's own question when it has not been asked yet
+    if (at) { const c = await countryAt(`?lat=${at.lat}&lon=${at.lon}`); if (c) out = { code: c, how: "gps" }; }
+  }
+  if (!out) { const c = await countryAt(""); if (c) out = { code: c, how: "network" }; }
+  if (out) write(DETECTED, JSON.stringify({ c: out.code, t: Date.now(), h: out.how }));
+  return out;
 }
 
 export type CountryState = {
@@ -44,6 +56,12 @@ export type CountryState = {
   source: CountrySource;
   /** the home country from Profile, when it is known */
   homeCountry: string | null;
+  /** how the automatic country was found: the phone's location, or only the network address */
+  how: "gps" | "network" | null;
+  /** ask the phone for its exact location again */
+  locate: () => void;
+  /** true while the phone's location is being read */
+  locating: boolean;
   /** the country just switched to by itself, with the one before it, for the short "Now showing" message */
   notice: { from: string; to: string } | null;
   /** pick a country, or null to follow the location again */
@@ -57,6 +75,8 @@ export type CountryState = {
 export function useCountry(): CountryState {
   const [manual, setManual] = useState<string | null>(() => normCountry(read(MANUAL)));
   const [detected, setDetected] = useState<string | null>(null);
+  const [how, setHow] = useState<"gps" | "network" | null>(null);
+  const [locating, setLocating] = useState(false);
   const [home, setHome] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ from: string; to: string } | null>(null);
   const [ready, setReady] = useState(false);
@@ -70,7 +90,7 @@ export function useCountry(): CountryState {
         (async () => { try { const sb = createClient(); const { data: { session } } = await sb.auth.getSession(); if (!session) return null; const r = await sb.from("profiles").select("home_country").eq("id", session.user.id).single(); return codeOfCountryName(r.data?.home_country); } catch { return null; } })(),
       ]);
       if (off) return;
-      setDetected(d); setHome(h); setReady(true);
+      setDetected(d?.code ?? null); setHow(d?.how ?? null); setHome(h); setReady(true);
     })();
     return () => { off = true; };
   }, []);
@@ -95,9 +115,13 @@ export function useCountry(): CountryState {
     return () => clearTimeout(t);
   }, [notice]);
 
+  const locate = useCallback(() => {
+    setLocating(true);
+    detect(true).then((d) => { setDetected(d?.code ?? null); setHow(d?.how ?? null); }).finally(() => setLocating(false));
+  }, []);
   const pick = useCallback((code: string | null) => { const c = normCountry(code); write(MANUAL, c); setManual(c); setNotice(null); }, []);
   const undo = useCallback(() => { if (notice) { write(LAST, notice.from); write(MANUAL, notice.from); setManual(notice.from); setNotice(null); } }, [notice]);
-  return { country, source: choice.source, homeCountry: home, notice, pick, undo, dismiss: () => setNotice(null), ready };
+  return { country, source: choice.source, homeCountry: home, how, locate, locating, notice, pick, undo, dismiss: () => setNotice(null), ready };
 }
 
 import type { CountryStat } from "@/lib/country";
