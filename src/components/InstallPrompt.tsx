@@ -94,7 +94,17 @@ export function InstallPrompt() {
     setHint("Open the browser menu (\u22ee or \u22ef) and choose \u201cInstall app\u201d or \u201cAdd to Home screen\u201d.");
   };
 
-  if (!show) return null;
+  // The tip sits low on the screen, right where a bottom sheet puts its options and Save button: stay out of the way while one is open
+  const [modalOpen, setModalOpen] = useState(false);
+  useEffect(() => {
+    const check = () => setModalOpen(!!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    check();
+    const obs = new MutationObserver(check);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => obs.disconnect();
+  }, []);
+
+  if (!show || modalOpen) return null;
 
   return (
     <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-md md:bottom-4 rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3">

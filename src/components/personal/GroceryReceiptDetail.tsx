@@ -8,7 +8,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CloudOff, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, CloudOff, MapPin, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, receiptKey, type ReceiptBundle } from "@/lib/offline-grocery";
 import { effectiveUnit } from "@/lib/personal/grocery";
@@ -17,11 +17,14 @@ import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, deleteRow, makeRowApi } from "@/lib/row-outbox";
 import { browserBlobs } from "@/lib/offline-store";
 import { browserOutbox } from "@/lib/outbox";
+import { useTripChoices } from "@/components/personal/TripPicker";
+import { normPaid, paidLabel } from "@/lib/paid-with";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
 
 export function GroceryReceiptDetail({ id }: { id: string }) {
+  const tripChoices = useTripChoices();
   const router = useRouter();
   const { data: bundle, loading, error: loadError, savedAt, userId } = useCachedQuery<ReceiptBundle>((uid) => receiptKey(uid, id), (sb) => fetchReceiptBundle(sb, id), [id]);
   const { items: pending } = useOutbox(userId);
@@ -81,6 +84,12 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
         <div>
           <h1 className="text-2xl font-bold">{receipt.store}</h1>
           <p className="text-sm text-muted-foreground">{formatDate(receipt.purchase_date)}</p>
+          {(receipt.paid_with || receipt.trip_ref) && (
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="paid-detail">
+              {receipt.paid_with && <span className="rounded-full bg-muted px-2.5 py-1">{paidLabel(normPaid(receipt.paid_with))}</span>}
+              {receipt.trip_ref && <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1"><MapPin className="h-3 w-3" aria-hidden="true" />{tripChoices.find((t) => t.ref === receipt.trip_ref)?.label ?? "Trip"}</span>}
+            </p>
+          )}
           <p className={`mt-2 text-3xl font-bold ${receipt.prices_only ? "text-muted-foreground" : ""}`}><Money amount={receipt.total} currency={receipt.currency} /></p>
           {receipt.prices_only && <p className="mt-1 text-xs text-muted-foreground" data-testid="prices-only-detail"><span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold">Prices only</span>Kept for its prices. Not counted in your spending.</p>}
           {items.length === 0 && !receipt.prices_only && <p className="mt-1 text-xs text-muted-foreground" data-testid="total-only-detail"><span className="mr-1.5 rounded-full bg-muted px-2 py-0.5 font-semibold">Total only</span>A store and a total, no items. It counts in your budget and never goes to community prices.</p>}

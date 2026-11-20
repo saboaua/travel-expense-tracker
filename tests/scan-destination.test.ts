@@ -51,6 +51,9 @@ const s4 = suggestDestination({ mode: "scan", options: all, place: null, home: {
 eq([s4.pick?.key, s4.confident], ["trip:t1", false], "location blocked, several places to go: sheet");
 const s5 = suggestDestination({ mode: "scan", options: bizOnly, place: null, today });
 eq([s5.pick?.key, s5.confident], ["trip:t1", true], "business-only, one trip, location blocked: same as before");
+const oneTripAndShops = buildScanOptions({ trips: [trips[0]], projects: [], canTrips: true, canPersonal: true, canDocuments: false, shopping: true });
+const s5b = suggestDestination({ mode: "scan", options: oneTripAndShops, place: null, today });
+eq([s5b.pick?.key, s5b.confident], ["trip:t1", false], "location blocked, one trip today, Groceries and Shopping available: the sheet still asks");
 const twoMiami = buildScanOptions({ trips: [trips[0], { ...trips[1], destination: "Miami Beach, USA", start_date: "2026-11-01", end_date: "2026-11-30" }], projects: [], canTrips: true, canPersonal: false, canDocuments: false });
 const s6 = suggestDestination({ mode: "scan", options: twoMiami, place: { city: "Miami", countryCode: "US" }, today });
 eq(s6.confident, false, "two trips match the place: ask");

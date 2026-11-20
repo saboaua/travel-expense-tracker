@@ -133,7 +133,8 @@ export function suggestDestination(i: SuggestInput): Suggestion {
     }
   }
   if (trips.length === 1 && !grocery && personal.length === 0) return { pick: trips[0], confident: true, reason: null };
-  if (!place && trips.length === 1 && trips.every((o) => covers(o, i.today))) return { pick: trips[0], confident: true, reason: null };
+  // No location (denied or slow on a phone): one trip covers today. Ask anyway when Groceries, Shopping or a personal trip is possible.
+  if (!place && trips.length === 1 && trips.every((o) => covers(o, i.today))) return { pick: trips[0], confident: onlyBusiness, reason: null };
   const pick = last ?? firstCovering(trips, i.today) ?? trips[0] ?? grocery ?? personal[0] ?? null;
   return { pick, confident: false, reason: last ? "Same as last time" : null };
 }
