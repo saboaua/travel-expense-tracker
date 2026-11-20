@@ -119,7 +119,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
       </Link>
       <Card>
         <CardHeader>
-          <CardTitle>{projectId ? `Edit ${meta.noun}` : `New ${meta.noun}`}</CardTitle>
+          <CardTitle as="h1">{projectId ? `Edit ${meta.noun}` : `New ${meta.noun}`}</CardTitle>
         </CardHeader>
         <CardContent>
           <OfflineNotice savedAt={savedAt} writable />

@@ -13,15 +13,7 @@ import Link from "next/link";
 import { FEATURE_LABEL, featureLocked, type ProFeature } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
 import { todayISO } from "@/lib/utils";
-
-type TelegramStatus = {
-  linked: boolean;
-  bot: string;
-  botUrl: string;
-  code: string | null;
-  expires: string | null;
-  link: string | null;
-};
+import { useTelegramLink } from "@/components/profile/use-telegram-link";
 
 export default function SettingsPage() {
   const supabase = createClient();
@@ -33,20 +25,7 @@ export default function SettingsPage() {
 
   const lim = useLimits();
   const proOnly = (["telegram_save", "telegram_summary", "doc_reminders"] as ProFeature[]).filter((f) => !!lim && featureLocked(lim.limits, lim.who, f, todayISO()));
-  const [featureOn, setFeatureOn] = useState(false);
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
-  const [linking, setLinking] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  async function loadTelegram() {
-    const res = await fetch("/api/telegram/link");
-    if (!res.ok) {
-      setFeatureOn(false);
-      return;
-    }
-    setFeatureOn(true);
-    setStatus(await res.json());
-  }
+  const { featureOn, status, linking, copied, error: tgError, enable: enableTelegram, copyLink, disconnect } = useTelegramLink();
 
   useEffect(() => {
     async function loadProfile() {
@@ -67,14 +46,7 @@ export default function SettingsPage() {
       }
     }
     loadProfile();
-    loadTelegram();
   }, [supabase]);
-
-  useEffect(() => {
-    if (!status?.link || status.linked) return;
-    const id = setInterval(loadTelegram, 4000);
-    return () => clearInterval(id);
-  }, [status?.link, status?.linked]);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -107,46 +79,6 @@ export default function SettingsPage() {
       setTimeout(() => setSaved(false), 3000);
     }
     setLoading(false);
-  };
-
-  const enableTelegram = async () => {
-    setLinking(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/telegram/link", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not create link");
-      setStatus((prev) => ({
-        linked: prev?.linked || false,
-        bot: data.bot,
-        botUrl: `https://t.me/${data.bot}`,
-        code: data.code,
-        expires: data.expires,
-        link: data.link,
-      }));
-      window.open(data.link, "_blank", "noopener,noreferrer");
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Could not create link");
-    } finally {
-      setLinking(false);
-    }
-  };
-
-  const copyLink = async () => {
-    if (!status?.link) return;
-    await navigator.clipboard.writeText(status.link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const disconnect = async () => {
-    setLinking(true);
-    try {
-      await fetch("/api/telegram/link", { method: "DELETE" });
-      await loadTelegram();
-    } finally {
-      setLinking(false);
-    }
   };
 
   return (
@@ -276,6 +208,7 @@ export default function SettingsPage() {
                 )}
               </>
             )}
+            {tgError && <Alert>{tgError}</Alert>}
           </CardContent>
         </Card>
       )}

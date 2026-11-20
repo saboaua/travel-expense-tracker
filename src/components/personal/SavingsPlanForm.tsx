@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Switch } from "@/components/ui/switch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -18,14 +19,6 @@ const label = "mb-1.5 block text-[13px] font-bold";
 const chip = (on: boolean) =>
   `inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
 const moneyBox = "flex items-center gap-2 rounded-xl border bg-background px-3";
-
-function Toggle({ on, onChange, label: l }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={l} onClick={() => onChange(!on)} className={`flex h-[26px] w-11 shrink-0 items-center rounded-full p-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "justify-end bg-blue-600" : "justify-start bg-slate-300 dark:bg-slate-600"}`}>
-      <span className="h-5 w-5 rounded-full bg-white" />
-    </button>
-  );
-}
 
 /** Add a savings plan, or change one (?id=). One amount, every month with no end or until a date, and an optional starting balance and goal. */
 export function SavingsPlanForm() {
@@ -88,6 +81,7 @@ export function SavingsPlanForm() {
 
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
+      <h1 className="sr-only">{editId ? "Change savings plan" : "Add a savings plan"}</h1>
       <Link href={editId ? `/personal/savings/plan?id=${editId}` : "/personal/savings"} className="mb-2 inline-flex min-h-11 items-center gap-2 text-lg font-bold"><X className="h-5 w-5 text-muted-foreground" aria-hidden="true" /> {editId ? "Change savings plan" : "Add a savings plan"}</Link>
       <p className="text-[13px] leading-snug text-muted-foreground">Set the amount once. It is counted every month from the start date, with nothing to type each time.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
@@ -131,7 +125,7 @@ export function SavingsPlanForm() {
         <div className="rounded-2xl border bg-card p-4">
           <div className="flex items-center gap-3">
             <span className="min-w-0 flex-1"><b className="block text-[15px]">I already have savings</b><span className="block text-[13px] text-muted-foreground">Start from what you have put aside so far.</span></span>
-            <Toggle on={hasOpening} onChange={setHasOpening} label="I already have savings" />
+            <Switch checked={hasOpening} onChange={setHasOpening} label="I already have savings" />
           </div>
           {hasOpening && (
             <div className="mt-3">
@@ -145,7 +139,7 @@ export function SavingsPlanForm() {
         <div className="rounded-2xl border bg-card p-4">
           <div className="flex items-center gap-3">
             <span className="min-w-0 flex-1"><b className="block text-[15px]">Savings goal</b><span className="block text-[13px] text-muted-foreground">Optional. Shows how far along you are.</span></span>
-            <Toggle on={hasGoal} onChange={setHasGoal} label="Savings goal" />
+            <Switch checked={hasGoal} onChange={setHasGoal} label="Savings goal" />
           </div>
           {hasGoal && (
             <div className={`${moneyBox} mt-3`}><input id="sv-goal" aria-label="Goal amount" inputMode="decimal" autoComplete="off" value={goal} onChange={(e) => setGoal(e.target.value)} placeholder="0" className="h-[54px] min-w-0 flex-1 bg-transparent text-xl font-bold tabular-nums outline-none" /><span className="text-sm text-muted-foreground">{currency}</span></div>

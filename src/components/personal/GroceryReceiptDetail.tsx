@@ -6,9 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { BackLink } from "@/components/ui/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, CloudOff, MapPin, Pencil, Trash2 } from "lucide-react";
+import { CloudOff, MapPin, Pencil, Trash2 } from "lucide-react";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { fetchReceiptBundle, itemsWithWaiting, receiptKey, type ReceiptBundle } from "@/lib/offline-grocery";
 import { effectiveUnit } from "@/lib/personal/grocery";
@@ -77,7 +78,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
 
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 pb-28 md:p-8">
-      <Link href={base} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {base.endsWith("shopping") ? "Shopping" : "Groceries"}</Link>
+      <BackLink href={base}>{base.endsWith("shopping") ? "Shopping" : "Groceries"}</BackLink>
       <OfflineNotice savedAt={savedAt} writable />
       {waiting && <p className="flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}
       <div className="flex items-start justify-between gap-3">
@@ -98,7 +99,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
           )}
         </div>
         <div className="flex gap-2">
-          <Link href={`${base}/${id}/edit`}><Button variant="outline" size="icon" aria-label="Edit"><Pencil className="h-4 w-4" /></Button></Link>
+          <Link href={`${base}/${id}/edit`} aria-label="Edit" className={buttonVariants({ variant: "outline", size: "icon" })}><Pencil className="h-4 w-4" aria-hidden="true" /></Link>
           <Button variant="outline" size="icon" className="text-red-600" onClick={remove} aria-label="Delete"><Trash2 className="h-4 w-4" /></Button>
         </div>
       </div>

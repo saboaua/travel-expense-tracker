@@ -1,6 +1,7 @@
 "use client";
 
 import { setupNeeded } from "@/lib/setup-message";
+import { Switch } from "@/components/ui/switch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,14 +17,6 @@ import { todayISO } from "@/lib/utils";
 const label = "mb-1.5 block text-[13px] font-bold";
 const chip = (on: boolean) =>
   `inline-flex min-h-11 items-center rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
-
-function Toggle({ on, onChange, label: l }: { on: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <button type="button" role="switch" aria-checked={on} aria-label={l} onClick={() => onChange(!on)} className={`flex h-[26px] w-11 shrink-0 items-center rounded-full p-[3px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "justify-end bg-blue-600" : "justify-start bg-slate-300 dark:bg-slate-600"}`}>
-      <span className="h-5 w-5 rounded-full bg-white" />
-    </button>
-  );
-}
 
 /** Where you set the monthly budget: the amount, whether it is for every month or one, optional limits for each area, and an alert. */
 export function BudgetForm() {
@@ -132,7 +125,7 @@ export function BudgetForm() {
         <div className="rounded-2xl border bg-card p-4">
           <div className="flex items-center gap-3">
             <span className="min-w-0 flex-1"><b className="block text-[15px]">Limits for each area</b><span className="block text-[13px] text-muted-foreground">Optional. Leave blank for no limit.</span></span>
-            <Toggle on={useLimits} onChange={setUseLimits} label="Limits for each area" />
+            <Switch checked={useLimits} onChange={setUseLimits} label="Limits for each area" />
           </div>
           {useLimits && (
             <div className="mt-2" data-testid="budget-limits">
@@ -152,7 +145,7 @@ export function BudgetForm() {
 
         <div className="flex items-center gap-3 rounded-2xl border bg-card p-4">
           <span className="min-w-0 flex-1"><b className="block text-[15px]">Tell me at 80%</b><span className="block text-[13px] text-muted-foreground">A phone alert when you get close, and again if you go over. It never shows an amount.</span></span>
-          <Toggle on={alertOn} onChange={setAlertOn} label="Tell me at 80%" />
+          <Switch checked={alertOn} onChange={setAlertOn} label="Tell me at 80%" />
         </div>
 
         <Button type="submit" disabled={busy || !loaded || setupMissing} className="h-[52px] w-full text-base lg:col-span-2 lg:w-64" data-testid="budget-save">{busy ? "Saving…" : "Save budget"}</Button>

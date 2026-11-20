@@ -23,7 +23,7 @@ export function PageHeader({ title, description, actions, className, as = "h1" }
 /** The one back link: an arrow and the name of the page it goes to ("Trips", not "Back to trips"). */
 export function BackLink({ href, children, className }: { href: string; children: React.ReactNode; className?: string }) {
   return (
-    <Link href={href} className={cn("inline-flex min-h-9 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground", className)}>
+    <Link href={href} className={cn("inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground", className)}>
       <ArrowLeft className="h-4 w-4" aria-hidden="true" /> {children}
     </Link>
   );

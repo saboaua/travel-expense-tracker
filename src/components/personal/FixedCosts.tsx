@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Switch } from "@/components/ui/switch";
 import { Money as AmountText } from "@/components/ui/money";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -88,9 +89,6 @@ const DaySelect = ({ id, value, onChange }: { id: string; value: number; onChang
 );
 const Seg = ({ options, value, onChange }: { options: { v: string; t: string }[]; value: string; onChange: (v: string) => void }) => (
   <div className="flex gap-2" role="group">{options.map((o) => <button key={o.v} type="button" aria-pressed={value === o.v} onClick={() => onChange(o.v)} className={`min-h-12 flex-1 rounded-xl border px-2 text-sm font-semibold leading-tight ${value === o.v ? "border-blue-700 bg-blue-700 text-white" : "bg-card"}`}>{o.t}</button>)}</div>
-);
-const Switch = ({ on, onChange, text }: { on: boolean; onChange: (v: boolean) => void; text: string }) => (
-  <button type="button" role="switch" aria-checked={on} aria-label={text} onClick={() => onChange(!on)} className={`flex h-[26px] w-11 shrink-0 items-center rounded-full p-[3px] transition-colors ${on ? "justify-end bg-blue-600" : "justify-start bg-slate-300 dark:bg-slate-600"}`}><span className="h-5 w-5 rounded-full bg-white" /></button>
 );
 const Note = ({ children, tone = "info" }: { children: React.ReactNode; tone?: "info" | "good" }) => (
   <p className={`rounded-xl px-3 py-2.5 text-[13px] leading-snug ${tone === "good" ? "bg-green-50 text-green-900 dark:bg-green-950 dark:text-green-100" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200"}`}>{children}</p>
@@ -385,7 +383,7 @@ export function CarForm() {
       {(err || missing) && <Alert>{missing ? SETUP : err}</Alert>}
       <form onSubmit={save} className="space-y-3 lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0" data-testid="car-form">
         <div className="space-y-3 rounded-2xl border bg-card p-4">
-          <div className="flex items-center gap-3"><span className="min-w-0 flex-1"><b className="block text-base">Car loan</b><span className="text-[13px] text-muted-foreground">Optional. Switch off if it is paid.</span></span><Switch on={loanOn} onChange={setLoanOn} text="Car loan" /></div>
+          <div className="flex items-center gap-3"><span className="min-w-0 flex-1"><b className="block text-base">Car loan</b><span className="text-[13px] text-muted-foreground">Optional. Switch off if it is paid.</span></span><Switch checked={loanOn} onChange={setLoanOn} label="Car loan" /></div>
           {loanOn && (<>
             <div><label htmlFor="car-loan" className={label}>Monthly payment</label><Money id="car-loan" value={loan} onChange={setLoan} currency={loanCur} onCurrency={setLoanCur} /></div>
             <div><label htmlFor="car-loan-end" className={label}>Last payment</label><input id="car-loan-end" type="month" value={loanEnd} onChange={(e) => setLoanEnd(e.target.value)} className={field} /></div>

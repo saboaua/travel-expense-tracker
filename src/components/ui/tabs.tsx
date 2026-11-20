@@ -27,8 +27,8 @@ export function Tabs({ options, value, onChange, label, size = "md", fullWidth =
   const item = cn(
     "flex flex-1 items-center justify-center gap-2 whitespace-nowrap font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     size === "lg" && "min-h-12 rounded-xl px-6 text-[15px] sm:flex-none",
-    size === "md" && "min-h-9 rounded-lg px-3.5 text-sm font-medium sm:flex-none",
-    size === "sm" && "min-h-8 rounded-md px-3 text-xs font-medium sm:flex-none"
+    size === "md" && "min-h-11 md:min-h-9 rounded-lg px-3.5 text-sm font-medium sm:flex-none",
+    size === "sm" && "min-h-11 md:min-h-8 rounded-md px-3 text-xs font-medium sm:flex-none"
   );
   const tone = (on: boolean) => (on ? "bg-raised text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground");
   const inner = (o: TabOption, on: boolean) => (

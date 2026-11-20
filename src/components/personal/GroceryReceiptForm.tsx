@@ -378,7 +378,7 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
       )}
       <Card>
         <CardHeader>
-          <CardTitle>{receiptId ? (asShopping ? "Edit shopping receipt" : "Edit grocery receipt") : manual ? "Add receipt by hand" : asShopping ? "Add shopping receipt" : "Add grocery receipt"}</CardTitle>
+          <CardTitle as="h1">{receiptId ? (asShopping ? "Edit shopping receipt" : "Edit grocery receipt") : manual ? "Add receipt by hand" : asShopping ? "Add shopping receipt" : "Add grocery receipt"}</CardTitle>
           <CardDescription>{manual ? "No photo? Type it in. Items you list still show up in the Price tracker. With only a total, it counts toward spending but not price comparison." : (asShopping ? "Scan the receipt, then check the items and pick how you paid." : "Scan the receipt, then check the items. Prices are tracked per item over time.")}</CardDescription>
         </CardHeader>
         <CardContent>

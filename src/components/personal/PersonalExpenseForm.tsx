@@ -208,7 +208,7 @@ export function PersonalExpenseForm({ kind, projectId, expenseId }: { kind: Pers
       )}
       <Card>
         <CardHeader>
-          <CardTitle>{expenseId ? "Edit expense" : "Add expense"}</CardTitle>
+          <CardTitle as="h1">{expenseId ? "Edit expense" : "Add expense"}</CardTitle>
           <CardDescription>Take a photo of the receipt and we will read merchant, amount and date for you.</CardDescription>
         </CardHeader>
         <CardContent>

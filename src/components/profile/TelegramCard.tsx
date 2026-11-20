@@ -1,87 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { AccordionSection } from "@/components/ui/accordion";
 import { Check, Copy, ExternalLink, Send } from "lucide-react";
 import { TelegramPrefs } from "@/components/profile/TelegramPrefs";
-
-type TelegramStatus = {
-  linked: boolean;
-  bot: string;
-  botUrl: string;
-  code: string | null;
-  expires: string | null;
-  link: string | null;
-};
+import { useTelegramLink } from "@/components/profile/use-telegram-link";
 
 export function TelegramCard() {
-  const [featureOn, setFeatureOn] = useState(false);
-  const [status, setStatus] = useState<TelegramStatus | null>(null);
-  const [linking, setLinking] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [tgError, setTgError] = useState<string | null>(null);
-
-  async function loadTelegram() {
-    const res = await fetch("/api/telegram/link");
-    if (!res.ok) {
-      setFeatureOn(false);
-      return;
-    }
-    setFeatureOn(true);
-    setStatus(await res.json());
-  }
-
-  useEffect(() => {
-    loadTelegram();
-  }, []);
-
-  useEffect(() => {
-    if (!status?.link || status.linked) return;
-    const id = setInterval(loadTelegram, 4000);
-    return () => clearInterval(id);
-  }, [status?.link, status?.linked]);
-
-  const enableTelegram = async () => {
-    setLinking(true);
-    setTgError(null);
-    try {
-      const res = await fetch("/api/telegram/link", { method: "POST" });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Could not create link");
-      setStatus((prev) => ({
-        linked: prev?.linked || false,
-        bot: data.bot,
-        botUrl: `https://t.me/${data.bot}`,
-        code: data.code,
-        expires: data.expires,
-        link: data.link,
-      }));
-      window.open(data.link, "_blank", "noopener,noreferrer");
-    } catch (err: unknown) {
-      setTgError(err instanceof Error ? err.message : "Could not create link");
-    } finally {
-      setLinking(false);
-    }
-  };
-
-  const copyLink = async () => {
-    if (!status?.link) return;
-    await navigator.clipboard.writeText(status.link);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const disconnect = async () => {
-    setLinking(true);
-    try {
-      await fetch("/api/telegram/link", { method: "DELETE" });
-      await loadTelegram();
-    } finally {
-      setLinking(false);
-    }
-  };
+  const { featureOn, status, linking, copied, error: tgError, enable: enableTelegram, copyLink, disconnect } = useTelegramLink();
 
   if (!featureOn) return null;
 

@@ -26,7 +26,7 @@ export function CategoryButtons({
             type="button"
             onClick={() => onChange(name)}
             aria-pressed={active}
-            className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+            className={`inline-flex min-h-11 items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition-colors ${
               active
                 ? "border-primary bg-primary text-primary-foreground"
                 : "border-input bg-background hover:bg-accent"

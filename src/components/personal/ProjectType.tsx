@@ -28,7 +28,7 @@ export function TypeChip({ type, className }: { type: ProjectTypeInfo; className
   );
 }
 
-const pill = "inline-flex min-h-[38px] items-center gap-1.5 rounded-xl border px-3 text-[13.5px] font-bold";
+const pill = "inline-flex min-h-11 items-center gap-1.5 rounded-xl border px-3 text-[13.5px] font-bold";
 
 /** Pick one of the ready types, one made before, or make a new one (name, icon, color). */
 export function TypePicker({ value, onChange, custom }: { value: ProjectTypeInfo; onChange: (t: ProjectTypeInfo) => void; custom: ProjectTypeInfo[] }) {

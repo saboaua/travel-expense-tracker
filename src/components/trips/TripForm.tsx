@@ -180,7 +180,7 @@ export function TripForm({ tripId }: { tripId?: string }) {
 
       <Card className="rounded-xl">
         <CardHeader>
-          <CardTitle>{editing ? "Edit trip" : "New trip"}</CardTitle>
+          <CardTitle as="h1">{editing ? "Edit trip" : "New trip"}</CardTitle>
           <CardDescription>{editing ? "Change the name, destination, dates, currency or status" : "Create a business trip to track its expenses"}</CardDescription>
         </CardHeader>
         <CardContent>
