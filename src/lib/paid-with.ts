@@ -36,7 +36,10 @@ export function currenciesOf(rows: { currency: string; amount: number }[]): stri
   return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([c]) => c);
 }
 
-export type TripChoice = { ref: TripRef; label: string; kind: "trip" | "ptrip"; start: string | null; end: string | null };
+export type TripChoice = { ref: TripRef; label: string; kind: "trip" | "ptrip"; start: string | null; end: string | null; /** the trip is marked completed */ done?: boolean };
+
+/** The trips to offer on a receipt: completed ones are left out, unless already chosen or the one that was on that day. */
+export const offerTrips = (trips: TripChoice[], value: string | null, suggested: string | null): TripChoice[] => trips.filter((t) => !t.done || t.ref === value || t.ref === suggested);
 
 /** The trip that was on at this date: a business trip first, then a personal one. Null when none or when several fit a kind (the person picks). */
 export function suggestTrip(trips: TripChoice[], date: string): TripChoice | null {

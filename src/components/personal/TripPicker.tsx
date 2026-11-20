@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { Briefcase, Check, Globe, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { formatDateRange } from "@/lib/utils";
-import type { TripChoice } from "@/lib/paid-with";
+import { offerTrips, type TripChoice } from "@/lib/paid-with";
 
 /** The business and personal trips a receipt can be tagged to. Empty when none can be read (offline, no access). */
 export function useTripChoices(): TripChoice[] {
@@ -15,12 +15,12 @@ export function useTripChoices(): TripChoice[] {
       try {
         const sb = createClient();
         const [t, p] = await Promise.all([
-          sb.from("trips").select("id, name, destination, start_date, end_date").order("start_date", { ascending: false }).limit(12),
-          sb.from("personal_projects").select("id, name, start_date, end_date").eq("kind", "personal_trip").order("start_date", { ascending: false }).limit(12),
+          sb.from("trips").select("id, name, destination, start_date, end_date, status").order("start_date", { ascending: false }).limit(12),
+          sb.from("personal_projects").select("id, name, start_date, end_date, status").eq("kind", "personal_trip").order("start_date", { ascending: false }).limit(12),
         ]);
         if (!live) return;
-        const biz = ((t.data ?? []) as { id: string; name: string; start_date: string | null; end_date: string | null }[]).map((x): TripChoice => ({ ref: `trip:${x.id}`, label: x.name, kind: "trip", start: x.start_date, end: x.end_date }));
-        const per = ((p.data ?? []) as { id: string; name: string; start_date: string | null; end_date: string | null }[]).map((x): TripChoice => ({ ref: `ptrip:${x.id}`, label: x.name, kind: "ptrip", start: x.start_date, end: x.end_date }));
+        const biz = ((t.data ?? []) as { id: string; name: string; start_date: string | null; end_date: string | null; status?: string | null }[]).map((x): TripChoice => ({ ref: `trip:${x.id}`, label: x.name, kind: "trip", start: x.start_date, end: x.end_date, done: x.status === "completed" }));
+        const per = ((p.data ?? []) as { id: string; name: string; start_date: string | null; end_date: string | null; status?: string | null }[]).map((x): TripChoice => ({ ref: `ptrip:${x.id}`, label: x.name, kind: "ptrip", start: x.start_date, end: x.end_date, done: x.status === "completed" }));
         setList([...biz, ...per]);
       } catch { /* offline: the field stays hidden */ }
     })();
@@ -31,9 +31,11 @@ export function useTripChoices(): TripChoice[] {
 
 /** "During trip": a personal receipt can say which trip it was paid on. A label only; it never adds to a business trip. */
 export function TripPicker({ trips, value, suggested, onChange }: { trips: TripChoice[]; value: string | null; suggested: string | null; onChange: (v: string | null) => void }) {
-  if (!trips.length) return null;
+  // A completed trip is not offered, unless it is the one already chosen or the one that was on that day
+  const open = offerTrips(trips, value, suggested);
+  if (!open.length) return null;
   // The chosen and suggested trips first, then the most recent
-  const ordered = [...trips].sort((a, b) => Number(b.ref === value || b.ref === suggested) - Number(a.ref === value || a.ref === suggested)).slice(0, 4);
+  const ordered = [...open].sort((a, b) => Number(b.ref === value || b.ref === suggested) - Number(a.ref === value || a.ref === suggested)).slice(0, 4);
   return (
     <div className="space-y-2">
       <p className="text-sm font-medium" id="during-trip-label">During trip <span className="font-normal text-muted-foreground">(optional)</span></p>

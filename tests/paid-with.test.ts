@@ -1,4 +1,4 @@
-import { currenciesOf, filterReceipts, normPaid, normTripRef, paidLabel, paidTotals, suggestTrip, type TripChoice } from "../src/lib/paid-with";
+import { currenciesOf, filterReceipts, normPaid, normTripRef, paidLabel, paidTotals, offerTrips, suggestTrip, type TripChoice } from "../src/lib/paid-with";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -37,3 +37,12 @@ eq("not on a trip", filterReceipts(rc, { paid: null, trip: "none" }).length, 2);
 
 if (fail) { console.error(`${fail} failed`); process.exit(1); }
 console.log("PASS paid-with");
+
+// Completed trips are not offered on a receipt, unless chosen already or the one that was on that day
+const mixed: TripChoice[] = [
+  { ref: "trip:a", label: "Open", kind: "trip", start: "2026-11-01", end: "2026-11-30" },
+  { ref: "trip:b", label: "Done", kind: "trip", start: "2026-10-11", end: "2026-10-19", done: true },
+];
+eq("a completed trip is left out", offerTrips(mixed, null, null).map((t) => t.label), ["Open"]);
+eq("a completed trip that is already chosen stays", offerTrips(mixed, "trip:b", null).map((t) => t.label), ["Open", "Done"]);
+eq("a completed trip that was on that day is offered", offerTrips(mixed, null, "trip:b").map((t) => t.label), ["Open", "Done"]);
