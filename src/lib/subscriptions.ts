@@ -4,6 +4,7 @@
  */
 import { CURRENCIES } from "@/lib/currencies";
 import { addMonths, daysBetween, isDay } from "@/lib/iptv";
+import { normPaid, type PaidWith } from "@/lib/paid-with";
 
 export const CYCLES = [
   { key: "weekly", label: "Weekly", perMonth: 52 / 12, step: { weeks: 1 } },
@@ -19,7 +20,7 @@ export const TRIAL_WARNING_DAYS = 2;
 export type Sub = {
   id: string; name: string; price: number; currency: string; cycle: Cycle; next_payment: string; category: string | null;
   status: "active" | "paused" | "cancelled"; trial_ends: string | null; split_count: number; remind_days: number;
-  cancel_url: string | null; notes: string | null; price_history: { price: number; at: string }[]; reminded_for?: string | null;
+  cancel_url: string | null; notes: string | null; price_history: { price: number; at: string }[]; reminded_for?: string | null; paid_with?: PaidWith | null;
 };
 
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);
@@ -210,4 +211,42 @@ export function buildIcs(subs: Sub[], today: string): string {
   }
   lines.push("END:VCALENDAR");
   return lines.join("\r\n");
+}
+
+/** How a subscription is paid: Credit card unless the person chose another (and for rows from before the choice existed). */
+export const subPaid = (s: { paid_with?: unknown }): PaidWith => normPaid(s.paid_with) ?? "credit";
+
+/** The days in a month ("YYYY-MM") a subscription is charged, counted from the date entered in either direction. Based on the subscription as it is now. */
+export function chargesInMonth(s: Pick<Sub, "next_payment" | "cycle" | "trial_ends">, month: string): string[] {
+  const from = `${month}-01`;
+  const to = `${month}-31`;
+  const out: string[] = [];
+  const weekly = s.cycle === "weekly";
+  const step = weekly ? 0 : (CYCLES.find((c) => c.key === s.cycle)!.step as { months: number }).months;
+  const at = (k: number) => (weekly ? addDays(s.next_payment, k * 7) : addMonths(s.next_payment, k * step));
+  const gap = weekly ? 7 : step * 28;
+  let k = Math.floor(daysBetween(s.next_payment, from) / gap) - 1;
+  for (let i = 0; i < 12; i++, k++) {
+    const d = at(k);
+    if (d > to) break;
+    if (d >= from && (!s.trial_ends || d >= s.trial_ends)) out.push(d);
+  }
+  return out;
+}
+
+export type SubOnCard = { id: string; name: string; paid: PaidWith; amount: number };
+/** What the active subscriptions in one currency charge in a month, by how they are paid. My share only (a split plan counts once). */
+export function subsOnCards(subs: Sub[], month: string, currency: string): { items: SubOnCard[]; total: Record<PaidWith, number> } {
+  const items: SubOnCard[] = [];
+  const total: Record<PaidWith, number> = { credit: 0, debit: 0, cash: 0 };
+  for (const s of subs) {
+    if (s.status !== "active" || s.currency !== currency) continue;
+    const n = chargesInMonth(s, month).length;
+    if (!n) continue;
+    const amount = Math.round(myShare(s) * n * 100) / 100;
+    const paid = subPaid(s);
+    items.push({ id: s.id, name: s.name, paid, amount });
+    total[paid] = Math.round((total[paid] + amount) * 100) / 100;
+  }
+  return { items, total };
 }

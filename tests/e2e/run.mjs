@@ -1032,6 +1032,44 @@ try {
     await ctx.close();
   });
 
+  await test("cards this month: Shopping shows credit and debit with subscriptions on the credit card, Groceries default to debit and subscriptions to credit card", async () => {
+    const { ctx, page } = await newPage();
+    const recs = fake.table("grocery_receipts"), subsT = fake.table("subscriptions");
+    const r0 = recs.length, s0 = subsT.length;
+    const day = `${today.slice(0, 8)}01`;
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const rec = (id, store, total, paid) => recs.push({ id, user_id: PAT, store, purchase_date: day, total, currency: "USD", notes: null, prices_only: false, area: "shopping", paid_with: paid, trip_ref: null, created_at: `${day}T10:00:00Z` });
+      rec("c0000000-0000-4000-8000-000000000001", "Zara Test", 100, "credit");
+      rec("c0000000-0000-4000-8000-000000000002", "Best Buy Test", 40, "debit");
+      subsT.push({ id: "b0000000-0000-4000-8000-000000000001", user_id: PAT, name: "Netflix Test", price: 20, currency: "USD", cycle: "monthly", next_payment: `${today.slice(0, 8)}05`, category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], paid_with: "credit" });
+      subsT.push({ id: "b0000000-0000-4000-8000-000000000002", user_id: PAT, name: "Gym Test", price: 10, currency: "USD", cycle: "monthly", next_payment: `${today.slice(0, 8)}01`, category: null, status: "active", trial_ends: null, split_count: 1, remind_days: 3, cancel_url: null, notes: null, price_history: [], paid_with: "debit" });
+      await page.goto(`${BASE}/personal/shopping`);
+      const card = page.getByTestId("cards-this-month");
+      await card.waitFor({ timeout: 30_000 });
+      await page.waitForFunction(() => /Subscriptions \(1\)/.test(document.querySelector('[data-testid="cards-line-credit"]')?.textContent || ""), null, { timeout: 30_000 });
+      const credit = (await page.getByTestId("cards-line-credit").innerText()).replace(/\s+/g, " ");
+      const debit = (await page.getByTestId("cards-line-debit").innerText()).replace(/\s+/g, " ");
+      assert(/120\.00/.test(credit) && /100\.00/.test(credit) && /20\.00/.test(credit), "credit card is shopping 100 plus subscriptions 20: " + credit);
+      assert(/50\.00/.test(debit) && /40\.00/.test(debit) && /10\.00/.test(debit), "debit card is shopping 40 plus subscriptions 10: " + debit);
+      assert((await page.getByTestId("cards-subs-link").count()) === 1, "a link to the subscriptions on the credit card");
+      assert(/Spent this month/.test(await page.getByTestId("month-summary").innerText()), "one summary card");
+      // Groceries: a new receipt starts as Debit card
+      await page.goto(`${BASE}/personal/groceries/new`);
+      await page.getByTestId("paid-debit").waitFor({ timeout: 30_000 });
+      await page.waitForFunction(() => document.querySelector('[data-testid="paid-debit"]')?.getAttribute("aria-checked") === "true", null, { timeout: 10_000 }).catch(() => { throw new Error("a new grocery receipt does not start as Debit card"); });
+      // Subscriptions: a new one starts as Credit card
+      await page.goto(`${BASE}/personal/subscriptions`);
+      await page.getByRole("button", { name: /Add/ }).first().click();
+      await page.getByTestId("paid-credit").waitFor({ timeout: 20_000 });
+      assert((await page.getByTestId("paid-credit").getAttribute("aria-checked")) === "true", "a new subscription starts as Credit card");
+    } finally {
+      await ctx.close();
+      recs.splice(r0, recs.length); subsT.splice(s0, subsT.length);
+    }
+  });
+
   await test("scan: rows the second look disagrees with get a Check mark and a Use button, and the total bar turns green once the items add up", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

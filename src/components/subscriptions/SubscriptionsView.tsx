@@ -5,7 +5,9 @@ import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CalendarPlus, ExternalLink, Plus, TrendingUp, Upload, X, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { SUBSCRIPTION_COLS } from "@/lib/columns";
+import { SUBSCRIPTION_COLS, SUBSCRIPTION_COLS_PAY, isMissingColumn } from "@/lib/columns";
+import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
+import { paidLabel, type PaidWith } from "@/lib/paid-with";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
@@ -14,7 +16,7 @@ import { useConfirm } from "@/components/ui/confirm";
 import { cn, formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { CURRENCIES } from "@/lib/currencies";
 import {
-  CYCLES, alerts, approxUsd, buildIcs, cycleLabel, daysUntil, importCsv, myShare, nextDue, totalsByCurrency, upcoming, validateSub, withPrice,
+  CYCLES, alerts, approxUsd, buildIcs, cycleLabel, daysUntil, importCsv, myShare, nextDue, subPaid, totalsByCurrency, upcoming, validateSub, withPrice,
   type Sub, type SubInput,
 } from "@/lib/subscriptions";
 
@@ -37,13 +39,18 @@ export function SubscriptionsView() {
   const [filter, setFilter] = useState<string>("All");
   const [category, setCategory] = useState<string | null>(null);
   const [editing, setEditing] = useState<{ id: string | null; form: SubInput } | null>(null);
+  const [paid, setPaid] = useState<PaidWith>("credit");
+  const [hasPaid, setHasPaid] = useState(true);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    const { data, error: e } = await supabase.from("subscriptions").select(SUBSCRIPTION_COLS).order("name");
+    let r = await supabase.from("subscriptions").select(SUBSCRIPTION_COLS_PAY).order("name");
+    // Until migration_subscription_paid_with.sql has run, subscriptions load without how they are paid
+    if (r.error && isMissingColumn(r.error)) { setHasPaid(false); r = (await supabase.from("subscriptions").select(SUBSCRIPTION_COLS).order("name")) as unknown as typeof r; }
+    const { data, error: e } = r as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
     if (e) return setError(/does not exist|schema cache/i.test(e.message) ? "Subscriptions are not set up yet. Ask your administrator to run the latest database update." : "Could not load your subscriptions. Try again.");
     setError("");
     setSubs((data ?? []).map((r) => ({ ...r, price: Number(r.price), price_history: Array.isArray(r.price_history) ? r.price_history : [] })) as Sub[]);
@@ -67,6 +74,7 @@ export function SubscriptionsView() {
 
   const open = (s?: Sub) => {
     setFormError("");
+    setPaid(s ? subPaid(s) : "credit");
     setEditing(s ? { id: s.id, form: { name: s.name, price: String(s.price), currency: s.currency, cycle: s.cycle, next_payment: s.next_payment, category: s.category ?? "", trial_ends: s.trial_ends ?? "", split_count: String(s.split_count), remind_days: String(s.remind_days), cancel_url: s.cancel_url ?? "", notes: s.notes ?? "" } } : { id: null, form: blank(today) });
   };
 
@@ -77,10 +85,11 @@ export function SubscriptionsView() {
     setSaving(true);
     const existing = subs?.find((s) => s.id === editing.id);
     const history = withPrice(existing?.price_history ?? [], v.value.price, today);
-    const row = { ...v.value, price_history: history, reminded_for: null };
-    const { error: e } = editing.id
-      ? await supabase.from("subscriptions").update(row).eq("id", editing.id)
-      : await supabase.from("subscriptions").insert({ ...row, status: "active", user_id: (await supabase.auth.getUser()).data.user?.id });
+    const base = { ...v.value, price_history: history, reminded_for: null };
+    const uid = editing.id ? null : (await supabase.auth.getUser()).data.user?.id;
+    const write = (row: Record<string, unknown>) => (editing.id ? supabase.from("subscriptions").update(row).eq("id", editing.id) : supabase.from("subscriptions").insert({ ...row, status: "active", user_id: uid }));
+    let { error: e } = await write(hasPaid ? { ...base, paid_with: paid } : base);
+    if (e && hasPaid && isMissingColumn(e)) { setHasPaid(false); ({ error: e } = await write(base)); }
     setSaving(false);
     if (e) return setFormError("Could not save. Check your connection and try again.");
     setEditing(null);
@@ -185,7 +194,7 @@ export function SubscriptionsView() {
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">{s.name.slice(0, 1).toUpperCase()}</span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}</span>
-                    <span className="block text-sm text-muted-foreground">{whenText(daysUntil(s, today))} · {cycleLabel(s.cycle).toLowerCase()}{s.split_count > 1 ? ` · split ${s.split_count} ways` : ""}</span>
+                    <span className="block text-sm text-muted-foreground">{whenText(daysUntil(s, today))} · {cycleLabel(s.cycle).toLowerCase()}{hasPaid ? ` · ${paidLabel(subPaid(s))}` : ""}{s.split_count > 1 ? ` · split ${s.split_count} ways` : ""}</span>
                     <RenewalBar s={s} today={today} />
                   </span>
                   <span className="text-right text-sm font-semibold"><Money amount={myShare(s)} currency={s.currency} />{s.split_count > 1 && <span className="block text-xs font-normal text-muted-foreground">of {formatCurrency(s.price, s.currency)}</span>}</span>
@@ -259,6 +268,7 @@ export function SubscriptionsView() {
               <label className={field}>Split between (people)<Input inputMode="numeric" value={form.split_count} onChange={(e) => set("split_count", e.target.value)} /></label>
               <label className={field}><span className="flex items-center gap-1"><Bell className="h-3.5 w-3.5" /> Remind me (days before)</span><Input inputMode="numeric" value={form.remind_days} onChange={(e) => set("remind_days", e.target.value)} /></label>
             </div>
+            {hasPaid && <PaidWithPicker value={paid} onChange={(v) => v && setPaid(v)} required remember={false} />}
             <label className={field}>Category<Input value={form.category} onChange={(e) => set("category", e.target.value)} maxLength={40} placeholder="Streaming, Software…" /></label>
             <label className={field}>Cancel link<Input value={form.cancel_url} onChange={(e) => set("cancel_url", e.target.value)} placeholder="https://" /></label>
             <label className={field}>Notes<Input value={form.notes} onChange={(e) => set("notes", e.target.value)} maxLength={500} /></label>

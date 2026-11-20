@@ -98,7 +98,7 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
   const suggestedTrip = useMemo(() => suggestTrip(trips, date)?.ref ?? null, [trips, date]);
   // A new receipt starts with your last card and the trip that was on that day; an old one keeps what it has
   const wasSaved = useRef(false);
-  useEffect(() => { if (!receiptId && !wasSaved.current) setPaidWith((p) => p ?? lastPaid()); }, [receiptId]);
+  useEffect(() => { if (!receiptId && !wasSaved.current) setPaidWith((p) => p ?? (area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping" ? lastPaid() : "debit")); }, [receiptId]);
   useEffect(() => { if (!receiptId && !tripTouched.current) setTripRef(suggestedTrip); }, [receiptId, suggestedTrip]);
   const [pricesOnly, setPricesOnly] = useState(false);
   const wasPricesOnly = useRef(false);

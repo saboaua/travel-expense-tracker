@@ -1,6 +1,7 @@
 "use client";
 
 import { PaidFilter } from "@/components/personal/PaidFilter";
+import { CardsThisMonth } from "@/components/personal/CardsThisMonth";
 import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
@@ -8,7 +9,7 @@ import { Alert } from "@/components/ui/alert";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBag, Map as MapIcon } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
@@ -19,7 +20,7 @@ import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { isSpending } from "@/lib/personal/price-notes";
-import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
+import { formatDate, todayISO } from "@/lib/utils";
 
 type Receipt = ReceiptLite & { store: string; prices_only?: boolean | null };
 
@@ -97,7 +98,6 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
   const top = useMemo(() => topItems(receipts, items, month, cur), [receipts, items, month, cur]);
   const monthReceipts = allReceipts.filter((r) => r.currency === cur && monthOf(r.purchase_date) === month);
   const trend = totals.slice(-6).map((t) => ({ label: monthLabel(t.month).split(" ")[0], value: t.total }));
-  const fmt = (n: number) => formatCurrency(n, cur);
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 pb-28 md:p-8">
@@ -153,14 +153,20 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
             )}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Card><CardHeader className="pb-2"><CardDescription>Spent this month</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold"><Money amount={thisMonth?.total || 0} currency={cur} /></p><p className="text-xs text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</p></CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardDescription>vs last month</CardDescription></CardHeader><CardContent>
-              {change == null ? <p className="text-3xl font-bold">—</p> : <p className={`text-3xl font-bold ${change > 0 ? "text-red-600" : "text-emerald-600"}`}>{change > 0 ? "+" : ""}{change}%</p>}
-              <p className="text-xs text-muted-foreground">{prevMonth ? `Last month ${fmt(prevMonth.total)}` : "No data last month"}</p>
-            </CardContent></Card>
-            <Card><CardHeader className="pb-2"><CardDescription>{shopping ? "Average per receipt" : "Average per shop"}</CardDescription></CardHeader><CardContent><p className="text-3xl font-bold">{thisMonth ? <Money amount={thisMonth.total / thisMonth.count} currency={cur} /> : "—"}</p></CardContent></Card>
-          </div>
+          <Card data-testid="month-summary">
+            <CardContent className="p-5">
+              <p className="text-sm text-muted-foreground">Spent this month</p>
+              <p className="mt-1 text-3xl font-bold md:text-4xl"><Money amount={thisMonth?.total || 0} currency={cur} /></p>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className="rounded-full bg-muted px-2.5 py-1 font-semibold text-muted-foreground">{thisMonth?.count || 0} receipt{(thisMonth?.count || 0) !== 1 ? "s" : ""}</span>
+                {thisMonth && <span className="rounded-full bg-muted px-2.5 py-1 font-semibold text-muted-foreground">Average <Money amount={thisMonth.total / thisMonth.count} currency={cur} /> {shopping ? "per receipt" : "per shop"}</span>}
+                {change != null && <span className={`rounded-full border px-2.5 py-1 font-bold ${change > 0 ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300" : "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300"}`}>{change > 0 ? `${change}% more` : change < 0 ? `${Math.abs(change)}% less` : "Same"} than last month</span>}
+                {change == null && <span className="text-muted-foreground">No data last month</span>}
+              </div>
+            </CardContent>
+          </Card>
+
+          <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent><Bars rows={catRows} currency={cur} /></CardContent></Card>
