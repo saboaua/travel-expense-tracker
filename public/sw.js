@@ -10,7 +10,7 @@ const CACHE = "expense-tracker-v6";
 const PAGES = "expense-pages-v1"; // keep in step with PAGES_CACHE in src/lib/offline-store.ts
 const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"]; // keep in step with src/lib/offline-warm.ts
 // Trip pages are kept as they are visited (and the recent ones ahead of time); keep in step with KEPT_PAGE in src/lib/offline-warm.ts
-const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|papers|checklist|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
+const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|papers|checklist|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?|personal\/shopping(?:\/new|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
 const MAX_TRIP_PAGES = 150;
 const SLOW_NETWORK_MS = 6000;
 const isKept = (pathname) => OFFLINE_PAGES.includes(pathname) || KEPT_PAGE.test(pathname);
@@ -28,6 +28,7 @@ const hubPage = () =>
       '<a href="/trips" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Trips</a>' +
       '<a href="/personal/projects" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Home projects</a>' +
       '<a href="/personal/groceries" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Groceries</a>' +
+      '<a href="/personal/shopping" style="display:block;margin:0 0 10px;padding:12px;border-radius:10px;background:#4f46e5;color:#fff;text-decoration:none;font-weight:600">Shopping</a>' +
       '<p style="margin:16px 0 0;font-size:14px">Receipts you save offline are sent when you are back online.</p></div></body></html>',
     { status: 200, headers: { "Content-Type": "text/html; charset=utf-8" } }
   );
@@ -71,10 +72,19 @@ async function openPage(event) {
   const network = (event.preloadResponse ? event.preloadResponse.then((r) => r || fetch(req)) : fetch(req))
     .then((res) => { if (keep && storable(res)) keepPage(event, url.pathname, res); return res; })
     .catch(() => null);
-  if (!keep) return (await network) || hubPage();
+  // With a weak or no signal the request can hang for a minute or more, which shows as a black screen when the app opens.
+  // Wait a little, then show the offline page (its links go to the saved pages).
+  const orHub = async () => {
+    let t;
+    const wait = new Promise((resolve) => { t = setTimeout(() => resolve(null), SLOW_NETWORK_MS + 2000); });
+    const r = await Promise.race([network, wait]);
+    clearTimeout(t);
+    return r || hubPage();
+  };
+  if (!keep) return orHub();
 
   const saved = await caches.open(PAGES).then((c) => c.match(url.pathname, { ignoreVary: true }));
-  if (!saved) return (await network) || hubPage();
+  if (!saved) return orHub();
   // A saved copy exists: if the network is slow or down, show it instead of waiting
   let timer;
   const slow = new Promise((resolve) => { timer = setTimeout(() => resolve(null), SLOW_NETWORK_MS); });
