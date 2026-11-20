@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/client";
 import { chooseCountry, codeOfCountryName, normCountry, shouldAnnounce, type CountrySource } from "@/lib/country";
 
 const MANUAL = "lifolio:country:manual";
+/** Where the person was when they picked by hand: a pick lasts until they are somewhere else. */
+const MANUAL_AT = "lifolio:country:manualAt";
 const LAST = "lifolio:country:last";
 const DETECTED = "lifolio:country:detected";
 const FRESH_MS = 10 * 60 * 1000;
@@ -90,6 +92,9 @@ export function useCountry(): CountryState {
         (async () => { try { const sb = createClient(); const { data: { session } } = await sb.auth.getSession(); if (!session) return null; const r = await sb.from("profiles").select("home_country").eq("id", session.user.id).single(); return codeOfCountryName(r.data?.home_country); } catch { return null; } })(),
       ]);
       if (off) return;
+      // A hand-picked country is for the place it was picked in; once the location is another country (back home), follow the location again
+      const at = normCountry(read(MANUAL_AT));
+      if (d?.code && at && at !== normCountry(d.code)) { write(MANUAL, null); write(MANUAL_AT, null); setManual(null); }
       setDetected(d?.code ?? null); setHow(d?.how ?? null); setHome(h); setReady(true);
     })();
     return () => { off = true; };
@@ -119,8 +124,8 @@ export function useCountry(): CountryState {
     setLocating(true);
     detect(true).then((d) => { setDetected(d?.code ?? null); setHow(d?.how ?? null); }).finally(() => setLocating(false));
   }, []);
-  const pick = useCallback((code: string | null) => { const c = normCountry(code); write(MANUAL, c); setManual(c); setNotice(null); }, []);
-  const undo = useCallback(() => { if (notice) { write(LAST, notice.from); write(MANUAL, notice.from); setManual(notice.from); setNotice(null); } }, [notice]);
+  const pick = useCallback((code: string | null) => { const c = normCountry(code); write(MANUAL, c); write(MANUAL_AT, c ? detected : null); setManual(c); setNotice(null); }, [detected]);
+  const undo = useCallback(() => { if (notice) { write(LAST, notice.from); write(MANUAL, notice.from); write(MANUAL_AT, detected); setManual(notice.from); setNotice(null); } }, [notice, detected]);
   return { country, source: choice.source, homeCountry: home, how, locate, locating, notice, pick, undo, dismiss: () => setNotice(null), ready };
 }
 

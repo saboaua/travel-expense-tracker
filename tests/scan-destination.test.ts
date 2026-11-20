@@ -40,9 +40,9 @@ const tripsOnly = all.filter((o) => o.kind === "trip");
 const s1b = suggestDestination({ mode: "scan", options: tripsOnly, place: { city: "Miami", countryCode: "US" }, home: { country: "Aruba" }, today });
 eq([s1b.pick?.key, s1b.confident], ["trip:t1", true], "only business trips to choose from: straight through");
 const s2 = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today });
-eq([s2.pick?.key, s2.confident], ["grocery", false], "scan at home: sheet, groceries first");
+eq([s2.pick?.key, s2.confident], ["grocery", true], "scan at home: straight to groceries, Change is there");
 const s2b = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today, last: "project:p1" });
-eq([s2b.pick?.key, s2b.confident], ["project:p1", false], "scan at home: last personal choice wins");
+eq([s2b.pick?.key, s2b.confident], ["project:p1", true], "scan at home: last personal choice wins");
 const s2c = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today, last: "trip:t1" });
 eq(s2c.pick?.key, "grocery", "scan at home: a last business choice does not drag you back to the trip");
 const s3 = suggestDestination({ mode: "scan", options: all, place: { city: "Panama City", countryCode: "PA" }, home: { country: "Aruba" }, today });
@@ -77,4 +77,12 @@ eq(buildScanOptions({ trips, projects, canTrips: true, canPersonal: false, canDo
 eq(withQuery("/personal/shopping/new?x=1", "quick=1"), "/personal/shopping/new?x=1&quick=1", "quick joins an existing query");
 eq(withQuery("/trips/x/add-expense", "quick=1"), "/trips/x/add-expense?quick=1", "quick starts a query");
 const shopHome = suggestDestination({ mode: "scan", options: withShop, place: { city: "Oranjestad", countryCode: "AW" }, home: { city: "Oranjestad", country: "Aruba" }, today, last: "shopping" });
-eq([shopHome.pick?.key, shopHome.confident], ["shopping", false], "at home the last choice (Shopping) is suggested, with the sheet");
+eq([shopHome.pick?.key, shopHome.confident], ["shopping", true], "at home the last choice (Shopping) is suggested, straight to the form");
+
+// A trip in the home town that is over (still open for late receipts) does not take today's receipt
+const winlott = { id: "w1", name: "Winlott Meeting 2026", destination: "Oranjestad, Aruba", start_date: "2026-10-28", end_date: "2026-11-02", range: "28 Oct - 2 Nov" };
+const withWinlott = buildScanOptions({ trips: [winlott], projects: [], canTrips: true, canPersonal: true, canDocuments: false, shopping: true });
+const wHome = suggestDestination({ mode: "scan", options: withWinlott, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today });
+eq([wHome.pick?.key, wHome.confident], ["grocery", true], "home: an ended trip in the home town is not suggested");
+const wLive = suggestDestination({ mode: "scan", options: withWinlott, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today: "2026-11-01" });
+eq([wLive.pick?.key, wLive.confident], ["trip:w1", false], "home: a trip that is on today is still offered, with the sheet");

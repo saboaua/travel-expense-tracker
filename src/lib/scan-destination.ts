@@ -120,16 +120,19 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   // scan
   const place = i.place ?? null;
   if (place) {
-    const hits = trips.filter((o) => destinationMatches(o.destination, place));
+    const home = isHome(place, i.home);
+    // At home, a trip that is over (still open for late receipts) or not started is not where today's receipt belongs
+    const hits = trips.filter((o) => destinationMatches(o.destination, place) && (!home || covers(o, i.today)));
     const city = place.city || countryName(place.countryCode) || "this place";
     if (hits.length === 1) return { pick: hits[0], confident: onlyBusiness, reason: `You're in ${city}` };
     if (hits.length > 1) {
       const now = firstCovering(hits, i.today) ?? hits[0];
       return { pick: now, confident: false, reason: `Several trips are in ${city}` };
     }
-    if (isHome(place, i.home) && (grocery || personal.length)) {
+    if (home && (grocery || personal.length)) {
+      // Home is the default: straight to the form, and the Change button is there when it is something else
       const pick = last && last.kind !== "trip" && last.kind !== "document" ? last : grocery ?? personal[0];
-      return { pick, confident: false, reason: `You're home in ${city}` };
+      return { pick, confident: true, reason: `You're home in ${city}` };
     }
   }
   if (trips.length === 1 && !grocery && personal.length === 0) return { pick: trips[0], confident: true, reason: null };
