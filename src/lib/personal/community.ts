@@ -104,16 +104,6 @@ export async function shareNow(supabase: SupabaseClient, uid: string, products: 
   return { sent, ready: rows.length, old, error: false };
 }
 
-/** Sends the latest prices (once a day at most, unless forced). Returns how many rows were accepted. */
-export async function syncSharedPrices(supabase: SupabaseClient, uid: string, products: Product[], now: Date, force = false, country: string | null = null): Promise<number> {
-  const stamp = `price-share-sync:${uid}`;
-  const today = now.toISOString().slice(0, 10);
-  try { if (!force && localStorage.getItem(stamp) === today) return 0; } catch { /* storage can be blocked */ }
-  if (!(await sharingOn(supabase, uid))) return 0;
-  const r = await shareNow(supabase, uid, products, now, country);
-  return r.sent;
-}
-
 /**
  * community_search for one country. A database that has not had migration_country.sql run yet does not know the country argument:
  * then the same search is made without it (every country), so nothing stops working before the migration.

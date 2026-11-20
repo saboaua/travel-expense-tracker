@@ -1,7 +1,4 @@
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { compressReceiptImage } from "@/lib/compress-image";
-import type { DocKind, TravelDocument } from "@/lib/documents";
-import { DOCUMENT_COLS, DOCUMENT_COLS_BASE } from "@/lib/columns";
 
 export const DOC_BUCKET = "documents";
 export const MAX_DOC_BYTES = 10 * 1024 * 1024;
@@ -32,58 +29,6 @@ export function compressDocImage(file: File, q: DocQuality = "standard"): Promis
 }
 
 export const safeName = (n: string) => n.replace(/[^\w.\-]+/g, "_").slice(-80) || "file";
-
-type NewDocument = {
-  tripId?: string | null;
-  kind: DocKind;
-  title: string;
-  document_number?: string | null;
-  issuing_country?: string | null;
-  expiry_date?: string | null;
-  notes?: string | null;
-  file?: File | null;
-  /** The photo was already cropped and compressed by the form, so it is uploaded as is. */
-  prepared?: boolean;
-};
-
-/** Uploads the file (images are compressed, PDFs are kept as is) and records the document row. */
-export async function saveTravelDocument(supabase: SupabaseClient, userId: string, input: NewDocument): Promise<TravelDocument> {
-  let path: string | null = null;
-  if (input.file) {
-    let file = input.file;
-    if (!ALLOWED.has(file.type)) throw new Error("Use a PDF or a photo (JPG, PNG, WebP or HEIC).");
-    if (!input.prepared && file.type.startsWith("image/") && file.type !== "image/heic" && file.type !== "image/heif") {
-      // Larger and sharper than receipts: passport pages must stay readable
-      file = await compressReceiptImage(file, { maxSide: 2200, quality: 0.85 }).catch(() => file);
-    }
-    if (file.size > MAX_DOC_BYTES) throw new Error("That file is over 10 MB. Use a smaller photo or PDF.");
-    path = `${userId}/${input.tripId || "general"}/${crypto.randomUUID()}-${safeName(file.name)}`;
-    const { error } = await supabase.storage.from(DOC_BUCKET).upload(path, file, { contentType: file.type, upsert: false });
-    if (error) throw new Error(/bucket/i.test(error.message) ? "Documents storage is not set up yet. Run supabase/migration_documents.sql." : error.message);
-  }
-
-  const { data, error } = await supabase
-    .from("travel_documents")
-    .insert({
-      user_id: userId,
-      trip_id: input.tripId || null,
-      kind: input.kind,
-      title: input.title.trim().slice(0, 120),
-      ...(input.document_number?.trim() ? { document_number: input.document_number.trim().slice(0, 40) } : {}),
-      issuing_country: input.issuing_country?.trim() || null,
-      expiry_date: input.expiry_date || null,
-      notes: input.notes?.trim() || null,
-      file_path: path,
-    })
-    // document_number only exists after migration_documents_number.sql; ask for it back only when it was sent
-    .select(input.document_number?.trim() ? DOCUMENT_COLS : DOCUMENT_COLS_BASE)
-    .single();
-  if (error) {
-    if (path) await supabase.storage.from(DOC_BUCKET).remove([path]).catch(() => {});
-    throw new Error(dbMessage(error.message));
-  }
-  return data as unknown as TravelDocument;
-}
 
 export const dbMessage = (m: string) =>
   /document_number/i.test(m)

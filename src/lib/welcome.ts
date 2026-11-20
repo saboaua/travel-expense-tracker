@@ -36,7 +36,6 @@ export function installPlatform(ua: string, maxTouchPoints = 0): Platform {
 }
 
 export const TOUR_STEPS = ["welcome", "highlights", "track", "home", "install"] as const;
-export type TourStep = (typeof TOUR_STEPS)[number];
 
 /** The highlight slides. Each links to its Help guide. */
 export const HIGHLIGHTS = [

@@ -14,7 +14,7 @@
 
 import { enqueue, newId, runOutbox, syncOutbox, type Handlers, type OutboxItem, type OutboxStore, type PushOutcome as Outcome, type SyncResult } from "@/lib/outbox";
 
-export { browserOutbox as browserStore, QUEUE_EVENT } from "@/lib/outbox";
+export { QUEUE_EVENT } from "@/lib/outbox";
 export type { QueueStatus, SyncResult } from "@/lib/outbox";
 
 export const EXPENSE_KIND = "expense.create";

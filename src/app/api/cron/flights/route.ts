@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
+import { cronAuthorized } from "@/lib/cron-auth";
 import { createClient } from "@supabase/supabase-js";
-import { timingSafeEqual } from "crypto";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { sendPush } from "@/lib/push";
 import { FLIGHT_COLS } from "@/lib/columns";
@@ -10,21 +10,13 @@ import { lookupFlight, flightLookupConfigured } from "@/lib/flights-server";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-function authorized(req: Request) {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false; // fail closed
-  const given = req.headers.get("authorization") || "";
-  const want = `Bearer ${secret}`;
-  return given.length === want.length && timingSafeEqual(Buffer.from(given), Buffer.from(want));
-}
-
 /**
  * Daily: asks the flight service about every flight that leaves within 2 days and has alerts on, saves the newest answer,
  * and sends one phone alert per person when a flight's status, delay, gate or terminal changed since the last alert.
  * The alert text never says which flight or what changed; the person opens the app for that.
  */
 export async function GET(req: Request) {
-  if (!authorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!cronAuthorized(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) return NextResponse.json({ error: "Service role key missing" }, { status: 503 });
   if (!flightLookupConfigured()) return NextResponse.json({ ok: true, skipped: "flight lookup is not configured" });
   const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });

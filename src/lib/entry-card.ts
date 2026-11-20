@@ -7,8 +7,6 @@ import { addDaysISO } from "@/lib/utils";
 
 export const ENTRY_CARD_URL = "https://edcardaruba.aw/form";
 export const ENTRY_CARD_TITLE = "Aruba re-entry card";
-export const DETAILS_TABLE = "entry_card_details";
-export const DONE_TABLE = "trip_entry_cards";
 export const DETAILS_COLS = "last_name, first_name, passport_number, nationality, birth_date, gender, birth_country, email";
 /** The days before the flight the phone reminders go out. */
 export const ENTRY_REMIND_DAYS = [5, 2] as const;

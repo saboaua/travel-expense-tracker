@@ -13,7 +13,6 @@ export const CATEGORIES = [
 ] as const;
 export type ChecklistCategory = (typeof CATEGORIES)[number]["id"];
 const CATEGORY_IDS = new Set<string>(CATEGORIES.map((c) => c.id));
-export const categoryLabel = (c: string) => CATEGORIES.find((x) => x.id === c)?.label ?? "Other";
 export const cleanCategory = (v: unknown): ChecklistCategory => (typeof v === "string" && CATEGORY_IDS.has(v) ? (v as ChecklistCategory) : "other");
 
 export type ChecklistItem = { id: string; trip_id: string; title: string; category: ChecklistCategory; done: boolean; sort: number; created_at: string };
