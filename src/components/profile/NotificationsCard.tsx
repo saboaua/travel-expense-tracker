@@ -103,6 +103,7 @@ export function NotificationsCard() {
       { key: "flights", title: "Flight changes", hint: "Tells you a flight on your trip changed. Wording unchanged for now.", example: "\u201cA flight on your trip changed. Open the app to check it.\u201d" },
       { key: "flightTomorrow", title: "Flight tomorrow", hint: "One reminder the day before you fly.", example: "\u201cFlight tomorrow: CM 312 AUA to PTY, 9:45 AM.\u201d", isNew: true },
       { key: "checklist", title: "Trip checklist", hint: "If things are still not ticked: 2 days and 1 day before you leave. It only says how many are left.", example: "\u201cWinlott Meeting: 6 things not ticked yet. You leave tomorrow. Open your checklist to finish.\u201d", isNew: true },
+      { key: "entryCard", title: "Aruba re-entry card", hint: "If the card is not marked done: 5 days and 2 days before the flight home. It never includes your details.", example: "\u201cPanama City: your Aruba re-entry card is not done yet. You fly in 2 days. It takes about 3 minutes.\u201d", isNew: true },
       { key: "afterTrip", title: "After the trip", hint: "One reminder to add the last receipts and mark the trip completed.", example: "\u201cWinlott Meeting ended. Add your last receipts.\u201d", isNew: true },
     ] },
     { title: "Money and papers", rows: [

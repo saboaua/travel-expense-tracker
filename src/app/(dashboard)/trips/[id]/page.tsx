@@ -25,6 +25,8 @@ import { hotelOf } from "@/lib/hotel";
 import { TripHotel } from "@/components/trips/TripHotel";
 import { TripFlights } from "@/components/flights/TripFlights";
 import type { TripFlight } from "@/lib/flights";
+import { EntryCardTile } from "@/components/trips/EntryCardTile";
+import { DETAILS_COLS, cleanDetails, entryStatus, homeFlight, isConfirmationPaper, missingDetails } from "@/lib/entry-card";
 
 function Tile({ label, value, sub, wide }: { label: string; value: React.ReactNode; sub?: string; wide?: boolean }) {
   return (
@@ -62,6 +64,26 @@ export default async function TripDetailPage({ params, searchParams }: { params:
   const flights = (flightRows ?? []) as unknown as TripFlight[];
   const { count: paperRows } = await supabase.from("trip_papers").select("id", { count: "exact", head: true }).eq("trip_id", id);
   const paperCount = paperRows ?? 0;
+  // The Aruba re-entry card: only when the trip ends with a flight home to Aruba, and only once its table exists
+  const home = homeFlight(flights);
+  let entryCard: { status: ReturnType<typeof entryStatus>; flightText: string } | null = null;
+  if (home && trip.status !== "completed") {
+    const [det, doneRow, paperTitles] = await Promise.all([
+      supabase.from("entry_card_details").select(DETAILS_COLS).eq("user_id", user.id).maybeSingle(),
+      supabase.from("trip_entry_cards").select("done_at").eq("trip_id", id).maybeSingle(),
+      supabase.from("trip_papers").select("title").eq("trip_id", id),
+    ]);
+    if (!det.error && !doneRow.error) {
+      const done = !!doneRow.data || (paperTitles.data ?? []).some((p) => isConfirmationPaper(String(p.title ?? "")));
+      const flightDay = home.flight_date;
+      if (flightDay >= todayISO() || done) {
+        entryCard = {
+          status: entryStatus({ today: todayISO(), flightDay, done, missing: missingDetails(cleanDetails(det.data), passport?.expiry_date ?? null) }),
+          flightText: `Flight ${home.flight_number} \u00b7 ${formatDate(flightDay)}`,
+        };
+      }
+    }
+  }
   const checklistRows = await supabase.from("trip_checklist_items").select("done").eq("trip_id", id);
   const checklist = checklistRows.error ? null : { total: (checklistRows.data ?? []).length, done: (checklistRows.data ?? []).filter((r) => r.done).length };
 
@@ -171,6 +193,8 @@ export default async function TripDetailPage({ params, searchParams }: { params:
       {/* One column on a phone, in this order. From 1024px: the trip itself on the left, papers, checklist and documents on the right */}
       <div className="space-y-6 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-x-6 lg:gap-y-6 lg:space-y-0">
               <TripFlights tripId={id} tripName={trip.name} tripStart={trip.start_date} tripEnd={endDate} userId={user.id} flights={flights} />
+
+              {entryCard && <EntryCardTile tripId={id} status={entryCard.status} flightText={entryCard.flightText} />}
 
               <TripHotel tripId={id} hotel={hotelOf(trip)} />
 

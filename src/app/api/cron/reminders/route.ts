@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { notifyJobFailure } from "@/lib/telegram-alerts";
 import { flushHeldPushes, sendPush } from "@/lib/push";
-import { budgetAlerts, gamblingAlerts, paymentDayAlerts, yearlyBillAlerts, utilityReminders, documentsExpiring, flightsTomorrow, tripStartingSoon, tripsEnded, checklistReminders } from "@/lib/push-reminders";
+import { budgetAlerts, gamblingAlerts, paymentDayAlerts, yearlyBillAlerts, utilityReminders, documentsExpiring, flightsTomorrow, tripStartingSoon, tripsEnded, checklistReminders, entryCardReminders } from "@/lib/push-reminders";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { dueForReminder as dueSubs, nextDue, type Sub } from "@/lib/subscriptions";
 import { dueForReminder as dueClients } from "@/lib/iptv";
@@ -71,10 +71,11 @@ export async function GET(req: Request) {
     const flights = await flightsTomorrow(db, today);
     const ended = await tripsEnded(db, today);
     const checklists = await checklistReminders(db, today);
+    const entryCards = await entryCardReminders(db, today).catch((e) => { console.error("[cron] entry card reminders", e instanceof Error ? e.message : e); return -1; });
     const documents = await documentsExpiring(db, today);
     // Reminder keys older than half a year are not needed any more
     await db.from("push_sent_log").delete().lt("sent_at", new Date(Date.now() - 180 * 86400_000).toISOString());
-    return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, checklists, documents, utilities, budgets, gambling, yearly, payments, held });
+    return NextResponse.json({ ok: true, people, clients, travellers, flights, ended, checklists, entryCards, documents, utilities, budgets, gambling, yearly, payments, held });
   } catch (e) {
     console.error("[cron] reminders", e instanceof Error ? e.message : e);
     await notifyJobFailure(db, "Subscription and IPTV reminders");

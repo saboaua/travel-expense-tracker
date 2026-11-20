@@ -19,7 +19,7 @@ import { useLimits } from "@/lib/use-limits";
 export default function NewTripPaperPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(() => (typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("title") ?? "").slice(0, 120)));
   const [note, setNote] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);

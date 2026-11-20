@@ -20,6 +20,7 @@ import { SharingCard } from "@/components/profile/SharingCard";
 import { NotificationsCard } from "@/components/profile/NotificationsCard";
 import { YourDataCard } from "@/components/profile/YourDataCard";
 import { CommunityCard } from "@/components/profile/CommunityCard";
+import { EntryCardLink } from "@/components/profile/EntryCardLink";
 import { EmailCard } from "@/components/profile/EmailCard";
 import { BadgeChip } from "@/components/profile/BadgeChip";
 import { RecommendCard } from "@/components/profile/RecommendCard";
@@ -344,6 +345,8 @@ export default function ProfilePage() {
       <SharingCard />
 
       <HomePlaceCard />
+
+      <EntryCardLink />
 
       <div className="lg:break-after-column"><CommunityCard /></div>
 

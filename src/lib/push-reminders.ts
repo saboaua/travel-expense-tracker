@@ -7,6 +7,7 @@ import { kindLabel } from "@/lib/documents";
 import { isLocked } from "@/lib/limits-server";
 import { addDaysISO } from "@/lib/utils";
 import { REMINDER_DAYS, reminderDue } from "@/lib/trip-checklist";
+import { entryReminderDue, isConfirmationPaper, reminderDaysWindow } from "@/lib/entry-card";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
 import { gamblingState, KIND_LABEL, costName, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
@@ -71,6 +72,34 @@ export async function checklistReminders(db: SupabaseClient, today: string): Pro
     if (!(await claimOnce(t.user_id, `checklist:${t.id}:${days}`))) continue;
     done.add(t.user_id);
     n += await sendPush(t.user_id, "checklist", "checklist", { trip: t.name, count: left.get(t.id), days, date: t.start_date }, { today });
+  }
+  return n;
+}
+
+/** 5 days and 2 days before a flight home to Aruba, while the re-entry card is not marked done (or its confirmation kept in the trip papers). Names the trip, never a detail. */
+export async function entryCardReminders(db: SupabaseClient, today: string): Promise<number> {
+  const fl = await db.from("trip_flights").select("trip_id, user_id, flight_date, arr_iata").eq("arr_iata", "AUA").neq("status", "cancelled").in("flight_date", reminderDaysWindow(today)).limit(5000);
+  if (fl.error) { if (missing(fl.error.message)) return 0; throw new Error(fl.error.message); }
+  const rows = (fl.data ?? []) as { trip_id: string; user_id: string; flight_date: string }[];
+  if (!rows.length) return 0;
+  const ids = [...new Set(rows.map((r) => r.trip_id))];
+  const [done, papers, trips] = await Promise.all([
+    db.from("trip_entry_cards").select("trip_id").in("trip_id", ids),
+    db.from("trip_papers").select("trip_id, title").in("trip_id", ids),
+    db.from("trips").select("id, name, status").in("id", ids),
+  ]);
+  if (done.error) { if (missing(done.error.message)) return 0; throw new Error(done.error.message); }
+  const doneIds = new Set((done.data ?? []).map((r) => (r as { trip_id: string }).trip_id));
+  for (const p of (papers.data ?? []) as { trip_id: string; title: string }[]) if (isConfirmationPaper(p.title ?? "")) doneIds.add(p.trip_id);
+  const info = new Map(((trips.data ?? []) as { id: string; name: string; status: string }[]).map((t) => [t.id, t]));
+  let n = 0;
+  for (const r of rows) {
+    const t = info.get(r.trip_id);
+    if (!t || t.status === "completed") continue;
+    const days = entryReminderDue(r.flight_date, today, doneIds.has(r.trip_id));
+    if (days == null) continue;
+    if (!(await claimOnce(r.user_id, `entry-card:${r.trip_id}:${days}`))) continue;
+    n += await sendPush(r.user_id, "entryCard", "entryCard", { trip: t.name, days, date: r.flight_date }, { today });
   }
   return n;
 }

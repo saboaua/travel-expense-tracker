@@ -30,6 +30,8 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "travel_documents", owner: "user_id", bucket: "documents", cols: DOCUMENT_COLS, base: DOCUMENT_COLS_BASE },
   { table: "trip_papers", owner: "user_id", bucket: "documents", cols: "id, trip_id, title, note, file_path, created_at" },
   { table: "trip_checklist_items", owner: "user_id", cols: "id, trip_id, title, category, done, sort, created_at" },
+  { table: "entry_card_details", owner: "user_id", cols: "user_id, last_name, first_name, passport_number, nationality, birth_date, gender, birth_country, email, updated_at", order: "user_id" },
+  { table: "trip_entry_cards", owner: "user_id", cols: "trip_id, user_id, done_at", order: "trip_id" },
   { table: "business_projects", owner: "user_id", cols: "id, name, client_name, contact_name, contact_email, contact_phone, reference, budget, currency, start_date, end_date, status, notes, created_at" },
   { table: "accounting_settings", owner: "user_id", cols: "user_id, program, credit_code, credit_name, accounts, updated_at", order: "user_id" },
   { table: "accounting_exports", owner: "user_id", cols: "source, ref, program, exported_at", order: "ref" },

@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -5180,6 +5180,56 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["grocery_receipts", "grocery_items", "grocery_price_matches"]) { const rows = fake.table(t); for (let i = rows.length - 1; i >= 0; i--) if (/^9[cd]0000/.test(String(rows[i].id ?? rows[i].key_a ?? "")) || t === "grocery_price_matches") rows.splice(i, 1); }
+    }
+  });
+
+  await test("entry card: the trip shows the Aruba re-entry card red 2 days before the flight, the answers copy in the site's order, and Mark as done turns it green", async () => {
+    const { ctx, page } = await newPage();
+    const flights = fake.table("trip_flights"), docs = fake.table("travel_documents");
+    const hadDocs = docs.length;
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await ctx.grantPermissions(["clipboard-read", "clipboard-write"]).catch(() => {});
+      flights.push({ id: "f0000000-0000-4000-8000-000000000001", trip_id: TRIP_ID, user_id: PAT, leg: "return", flight_number: "CM 348", airline: "Copa Airlines", aircraft: null, flight_date: addDays(today, 2), dep_iata: "PTY", dep_city: "Panama City", dep_name: null, dep_local: `${addDays(today, 2)}T09:40`, dep_est_local: null, dep_offset: -300, dep_terminal: null, dep_gate: null, arr_iata: "AUA", arr_city: "Oranjestad", arr_name: null, arr_local: `${addDays(today, 2)}T13:10`, arr_est_local: null, arr_offset: -240, arr_terminal: null, arr_gate: null, status: "scheduled", pnr: null, seat: null, cabin: null, source: "manual", alerts: true, last_synced_at: null });
+      docs.push({ id: "d0000000-0000-4000-8000-0000000000e1", user_id: PAT, kind: "passport", title: "Passport", expiry_date: "2031-03-14" });
+      // details first: the page saves them
+      await page.goto(`${BASE}/profile/entry-card`);
+      await page.getByLabel("Last name(s)").fill("Sabo");
+      await page.getByLabel("First name(s)").fill("Patrick");
+      await page.getByLabel("Passport number").fill("ab 12 34");
+      await page.getByLabel("Nationality").fill("Aruban");
+      await page.getByLabel("Date of birth").fill("1984-06-12");
+      await page.getByLabel("Gender").selectOption("Male");
+      await page.getByLabel("Country of birth").fill("Aruba");
+      await page.getByLabel("Email address").fill("pat@example.com");
+      await page.getByRole("button", { name: "Save my details" }).click();
+      await page.getByText("Saved.").waitFor({ timeout: 60000 });
+      const saved = fake.table("entry_card_details").find((r) => r.user_id === PAT);
+      assert(saved && saved.passport_number === "AB1234" && saved.birth_date === "1984-06-12", "details saved for this person: " + JSON.stringify(saved));
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      const tile = page.getByTestId("entry-card-tile");
+      await tile.waitFor({ timeout: 60000 });
+      assert((await tile.getAttribute("data-state")) === "red", "2 days before the flight and not done: red");
+      await tile.getByRole("link", { name: /Get my card answers/ }).click();
+      await page.getByTestId("section-passport").waitFor({ timeout: 60000 });
+      const order = await page.locator("[data-testid^=section-] h2").allInnerTexts();
+      assert(order.join("|") === "Start|Passport details|Arrival details|Contact information|Review and submit", "sections follow the site: " + order.join("|"));
+      assert(!(await page.getByTestId("section-passport").innerText()).includes("AB1234"), "the passport number is hidden until Show");
+      assert((await page.getByTestId("answer-airline").innerText()).includes("Copa Airlines") && (await page.getByTestId("answer-flight").innerText()).includes("348"), "airline and number come from the flight");
+      await page.getByRole("button", { name: "Copy Last name(s)" }).click();
+      await page.getByText("Copied").first().waitFor();
+      await page.getByRole("button", { name: "Mark card as done" }).click();
+      await page.getByRole("button", { name: /Card is done/ }).waitFor({ timeout: 60000 });
+      assert(fake.table("trip_entry_cards").some((r) => r.trip_id === TRIP_ID && r.user_id === PAT), "marked done in the database");
+      await page.goto(`${BASE}/trips/${TRIP_ID}`);
+      await page.getByTestId("entry-card-tile").waitFor({ timeout: 60000 });
+      assert((await page.getByTestId("entry-card-tile").getAttribute("data-state")) === "green", "done: green");
+    } finally {
+      await ctx.close();
+      flights.splice(0, flights.length);
+      docs.splice(hadDocs, docs.length);
+      for (const n of ["entry_card_details", "trip_entry_cards"]) { const t = fake.table(n); t.splice(0, t.length); }
     }
   });
 
