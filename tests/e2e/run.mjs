@@ -1055,6 +1055,8 @@ try {
       assert(/50\.00/.test(debit) && /40\.00/.test(debit) && /10\.00/.test(debit), "debit card is shopping 40 plus subscriptions 10: " + debit);
       assert((await page.getByTestId("cards-subs-link").count()) === 1, "a link to the subscriptions on the credit card");
       assert(/Spent this month/.test(await page.getByTestId("month-summary").innerText()), "one summary card");
+      assert((await page.getByTestId("paid-icon-credit").count()) >= 1 && (await page.getByTestId("paid-icon-debit").count()) >= 1, "each receipt in the list shows how it was paid");
+      assert(/Paid with credit card/.test((await page.getByTestId("paid-icon-credit").first().getAttribute("aria-label")) || ""), "the icon has a text label");
       // Groceries: a new receipt starts as Debit card
       await page.goto(`${BASE}/personal/groceries/new`);
       await page.getByTestId("paid-debit").waitFor({ timeout: 30_000 });

@@ -21,8 +21,10 @@ import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { isSpending } from "@/lib/personal/price-notes";
 import { formatDate, todayISO } from "@/lib/utils";
+import { PaidIcon } from "@/components/personal/PaidIcon";
+import type { PaidWith } from "@/lib/paid-with";
 
-type Receipt = ReceiptLite & { store: string; prices_only?: boolean | null };
+type Receipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null };
 
 const monthLabel = (m: string) => new Date(`${m}-01T00:00:00Z`).toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" });
 function shift(m: string, delta: number) {
@@ -43,8 +45,8 @@ function ActionTile({ href, label, tint, testid, children }: { href: string; lab
 
 function ReceiptRow({ id, unsent, base, children }: { id: string; unsent: boolean; base: string; children: React.ReactNode }) {
   return unsent
-    ? <div className="flex items-center justify-between rounded-xl border p-3">{children}</div>
-    : <Link href={`${base}/${id}`} className="flex items-center justify-between rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
+    ? <div className="flex min-h-16 items-center rounded-xl border p-3">{children}</div>
+    : <Link href={`${base}/${id}`} className="flex min-h-16 items-center rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
 }
 
 export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "shopping" }) {
@@ -182,7 +184,8 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
             <CardContent className="space-y-2">
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} base={base} unsent={unsent.has(r.id)}>
-                  <div className="min-w-0"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
+                  <PaidIcon paid={r.paid_with} />
+                  <div className="min-w-0 flex-1"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
                   <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}><Money amount={r.total} currency={cur} /></p>
                 </ReceiptRow>
               ))}
