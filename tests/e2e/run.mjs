@@ -989,7 +989,7 @@ try {
     await ctx.close();
   });
 
-  await test("paid with: a Shopping receipt on a work trip keeps Credit card and the trip, shows under By card and trip and on the trip page, and stays out of the business totals", async () => {
+  await test("paid with: a Shopping receipt on a work trip keeps Credit card and the trip, shows under By card and trip (not on the business trip page), and stays out of the business totals", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
     await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Zara Panama", date: null, total: 84.5, currency: "USD", source: "ai", items: [item("Linen shirt", 84.5)] } } }));
@@ -1023,10 +1023,10 @@ try {
     assert(/84\.50/.test(await page.getByTestId("pf-total").innerText()), "the total for credit card is shown: " + (await page.getByTestId("pf-total").innerText()));
     await page.getByTestId("pf-paid-cash").click();
     assert(/No receipts/.test(await page.getByTestId("pf-total").innerText()), "cash has none");
-    // The trip page shows it as personal spending, apart from the business totals
+    // The business trip page does not show personal spending: it lives on the personal side only
     await page.goto(`${BASE}/trips/${TRIP_ID}`);
-    await page.getByTestId("how-you-paid").waitFor({ timeout: 20_000 });
-    assert(/Credit card/.test(await page.getByTestId("paid-line-credit").innerText()) && /84\.50/.test(await page.getByTestId("paid-line-credit").innerText()), "credit card line on the trip");
+    await page.getByRole("heading", { name: /Spending by category|Expenses/ }).first().waitFor({ timeout: 20_000 }).catch(() => {});
+    assert((await page.getByTestId("how-you-paid").count()) === 0, "no personal spending card on the business trip page");
     assert(fake.table("expenses").length === spendBefore, "no business expense was created");
     fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Zara Panama"));
     await ctx.close();
