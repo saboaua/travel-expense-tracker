@@ -37,6 +37,7 @@ import { hotelOf } from "@/lib/hotel";
 import { PAPER_COLS, latestPapers, type TripPaper } from "@/lib/trip-papers";
 import { cardChecklist } from "@/lib/trip-checklist";
 import { onlySpending } from "@/lib/personal/price-notes";
+import { fetchDashboardItems } from "@/lib/personal/dashboard-items";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PROFILE_HOME_WELCOME_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
 
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
@@ -139,7 +140,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     wantsDash ? supabase.from("personal_expenses").select("project_id, merchant, amount, currency, amount_usd, category, expense_date").eq("user_id", uid).order("expense_date", { ascending: false }).limit(5000) : null,
     wantsDash ? withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", uid).order("purchase_date", { ascending: false }).limit(5000), "id, store, purchase_date, total, currency, prices_only", "id, store, purchase_date, total, currency").then((r) => onlySpending<{ id: string; store: string; purchase_date: string; total: number; currency: string }>(r)) : null,
     // The lines of those receipts, so the dashboard can show where grocery money goes by category
-    wantsDash ? supabase.from("grocery_items").select("receipt_id, category, line_total").eq("user_id", uid).limit(20000) : null,
+    wantsDash ? fetchDashboardItems(supabase, uid) : null,
     wantsDash ? supabase.from("personal_projects").select("id, name, kind, status, destination, start_date, end_date").eq("user_id", uid) : null,
     wantsDash ? supabase.from("currencies").select("code, usd_rate") : null,
     featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,

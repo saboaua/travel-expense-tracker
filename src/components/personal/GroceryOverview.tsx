@@ -13,7 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBag, Map as MapIcon } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
-import { fetchOverview, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
+import { fetchMonthItems, fetchOverview, monthItemsKey, monthItemsLoaded, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
+import { browserKv, loadWithCache } from "@/lib/offline-store";
+import { createClient } from "@/lib/supabase/client";
+import type { ItemLite } from "@/lib/personal/grocery";
 import { isTotalOnly } from "@/lib/personal/quick-targets";
 import { useCachedQuery } from "@/lib/use-cached-query";
 import { useOutbox } from "@/lib/use-outbox";
@@ -67,7 +70,19 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
   const inArea = useMemo(() => new Set(allReceipts.map((r) => r.id)), [allReceipts]);
   // Receipts kept only for their prices are listed, but never counted in the totals, categories or top items
   const receipts = useMemo(() => allReceipts.filter(isSpending), [allReceipts]);
-  const items = useMemo(() => overviewItemsWithWaiting(data?.items ?? [], pending).filter((x) => inArea.has(x.receipt_id)), [data, pending, inArea]);
+  // The overview brings the lines of this month and the one before; an older month loads its lines when it is opened
+  const [older, setOlder] = useState<Record<string, ItemLite[]>>({});
+  const [olderFailed, setOlderFailed] = useState<string | null>(null);
+  const itemsReady = !data || monthItemsLoaded(data.itemsFrom, month, Object.keys(older));
+  useEffect(() => {
+    if (itemsReady || !userId) return;
+    let live = true;
+    loadWithCache<ItemLite[]>(browserKv, monthItemsKey(userId, month), () => fetchMonthItems(createClient(), month))
+      .then((r) => { if (!live) return; if (r.ok) setOlder((o) => ({ ...o, [month]: r.data })); else setOlderFailed(month); })
+      .catch(() => { if (live) setOlderFailed(month); });
+    return () => { live = false; };
+  }, [itemsReady, userId, month]);
+  const items = useMemo(() => overviewItemsWithWaiting([...(data?.items ?? []), ...Object.values(older).flat()], pending).filter((x) => inArea.has(x.receipt_id)), [data, older, pending, inArea]);
   const withItems = useMemo(() => new Set(items.map((x) => x.receipt_id)), [items]);
   const waitingReceipts = useMemo(() => waitingRowIds(pending, "grocery_receipts"), [pending]);
   // A receipt that has not reached the server has no page of its own yet
@@ -96,7 +111,7 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
   const cats = useMemo(() => categoryTotals(receipts, items, month, cur), [receipts, items, month, cur]);
   const itemised = cats.reduce((s, c) => s + c.total, 0);
   const unitemised = thisMonth ? Math.round((thisMonth.total - itemised) * 100) / 100 : 0;
-  const catRows = [...cats.map((c) => ({ label: c.category, value: c.total })), ...(unitemised > 0.01 ? [{ label: "Tax / not itemised", value: unitemised }] : [])];
+  const catRows = [...cats.map((c) => ({ label: c.category, value: c.total })), ...(itemsReady && unitemised > 0.01 ? [{ label: "Tax / not itemised", value: unitemised }] : [])];
   const top = useMemo(() => topItems(receipts, items, month, cur), [receipts, items, month, cur]);
   const monthReceipts = allReceipts.filter((r) => r.currency === cur && monthOf(r.purchase_date) === month);
   const trend = totals.slice(-6).map((t) => ({ label: monthLabel(t.month).split(" ")[0], value: t.total }));
@@ -171,11 +186,11 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
           <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
 
           <div className="grid gap-4 md:grid-cols-2">
-            <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent><Bars rows={catRows} currency={cur} /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent>{itemsReady ? <Bars rows={catRows} currency={cur} /> : <p className="text-sm text-muted-foreground" data-testid="items-loading" role="status">{olderFailed === month ? "This month's lines are not saved on this phone. Connect to see them." : "Loading this month's lines…"}</p>}</CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Last months</CardTitle></CardHeader><CardContent><Bars rows={trend} currency={cur} /></CardContent></Card>
           </div>
 
-          {top.length > 0 && (
+          {itemsReady && top.length > 0 && (
             <Card><CardHeader><CardTitle className="text-base">Where the money went (top items)</CardTitle></CardHeader><CardContent><Bars rows={top.map((t) => ({ label: `${t.name} (${t.count}x)`, value: t.total }))} currency={cur} /></CardContent></Card>
           )}
 
@@ -185,7 +200,7 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
               {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} base={base} unsent={unsent.has(r.id)}>
                   <PaidIcon paid={r.paid_with} />
-                  <div className="min-w-0 flex-1"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
+                  <div className="min-w-0 flex-1"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{itemsReady && isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
                   <p className={`shrink-0 whitespace-nowrap pl-3 font-semibold ${r.prices_only ? "text-muted-foreground" : ""}`}><Money amount={r.total} currency={cur} /></p>
                 </ReceiptRow>
               ))}

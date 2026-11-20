@@ -18,9 +18,14 @@ export type GroceryReceipt = { id: string; store: string; purchase_date: string;
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
 export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null; area?: string | null };
-export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[] };
+/** itemsFrom: the first month (YYYY-MM) whose receipt lines are in `items`; older months are fetched when opened. Missing: all of them are there. */
+export type Overview = { receipts: OverviewReceipt[]; items: ItemLite[]; itemsFrom?: string };
+
+/** Are the receipt lines of this month (YYYY-MM) on hand? The overview brings its first months; older ones are fetched when opened. */
+export const monthItemsLoaded = (itemsFrom: string | undefined, month: string, fetched: string[]): boolean => !itemsFrom || month >= itemsFrom || fetched.includes(month);
 
 export const overviewKey = (userId: string) => `${userId}:groceries:overview`;
+export const monthItemsKey = (userId: string, month: string) => `${userId}:groceries:items:${month}`;
 export const pricesKey = (userId: string) => `${userId}:groceries:prices`;
 export const priceMatchesKey = (userId: string) => `${userId}:groceries:price-matches`;
 export const receiptKey = (userId: string, id: string) => `${userId}:groceries:receipt:${id}`;
@@ -31,9 +36,31 @@ const shift = (m: string, delta: number) => {
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
 };
 
+const liteItem = (x: ItemLite): ItemLite => ({ receipt_id: x.receipt_id, category: x.category, name: x.name, normalized_name: x.normalized_name, line_total: Number(x.line_total) });
+
+/** The lines of the receipts bought on or after `from` (YYYY-MM-DD) and before `before` when given. */
+async function fetchItems(supabase: SupabaseClient, from: string, before?: string): Promise<ItemLite[]> {
+  const rows = await fetchAll<ItemLite & { grocery_receipts: unknown }>((a, b) => {
+    let q = supabase.from("grocery_items").select("receipt_id, category, name, normalized_name, line_total, grocery_receipts!inner(purchase_date)").gte("grocery_receipts.purchase_date", from);
+    if (before) q = q.lt("grocery_receipts.purchase_date", before);
+    return q.range(a, b);
+  });
+  return rows.map(liteItem);
+}
+
+/** The lines of one month (YYYY-MM), for a month older than the ones the overview loads at first. */
+export async function fetchMonthItems(supabase: SupabaseClient, month: string): Result<ItemLite[]> {
+  try {
+    return { data: await fetchItems(supabase, `${month}-01`, `${shift(month, 1)}-01`), error: null };
+  } catch (error) {
+    return { data: null, error };
+  }
+}
+
 export async function fetchOverview(supabase: SupabaseClient, today: string): Result<Overview> {
   // Last 14 months are plenty for monthly comparison and keep the page quick
   const from = `${shift(today.slice(0, 7), -13)}-01`;
+  const itemsFrom = shift(today.slice(0, 7), -1);
   try {
     const receipts = (cols: string) => fetchAll<OverviewReceipt>((a, b) => supabase.from("grocery_receipts").select(cols).gte("purchase_date", from).order("purchase_date", { ascending: false }).range(a, b) as never);
     const [r, i] = await Promise.all([
@@ -45,14 +72,14 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
         if (!isMissingColumn({ message: e instanceof Error ? e.message : "" })) throw e;
         return receipts("id, store, purchase_date, total, currency, prices_only").catch((e2) => { if (isMissingColumn({ message: e2 instanceof Error ? e2.message : "" })) return receipts("id, store, purchase_date, total, currency"); throw e2; });
       }),
-      fetchAll<ItemLite & { grocery_receipts: unknown }>((a, b) =>
-        supabase.from("grocery_items").select("receipt_id, category, name, normalized_name, line_total, grocery_receipts!inner(purchase_date)").gte("grocery_receipts.purchase_date", from).range(a, b)
-      ),
+      // Receipt lines are only needed for the month on screen: this month and the one before. Older months load when opened.
+      fetchItems(supabase, `${itemsFrom}-01`),
     ]);
     return {
       data: {
         receipts: r.map((x) => ({ ...x, total: Number(x.total), prices_only: x.prices_only === true, paid_with: normPaid(x.paid_with), trip_ref: normTripRef(x.trip_ref), area: x.area === "shopping" ? "shopping" : "groceries" })),
-        items: i.map((x) => ({ receipt_id: x.receipt_id, category: x.category, name: x.name, normalized_name: x.normalized_name, line_total: Number(x.line_total) })),
+        items: i,
+        itemsFrom,
       },
       error: null,
     };
