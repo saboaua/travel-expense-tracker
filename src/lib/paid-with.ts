@@ -38,14 +38,14 @@ export function currenciesOf(rows: { currency: string; amount: number }[]): stri
 
 export type TripChoice = { ref: TripRef; label: string; kind: "trip" | "ptrip"; start: string | null; end: string | null; /** the trip is marked completed */ done?: boolean };
 
-/** The trips to offer on a receipt: completed ones are left out, unless already chosen or the one that was on that day. */
-export const offerTrips = (trips: TripChoice[], value: string | null, suggested: string | null): TripChoice[] => trips.filter((t) => !t.done || t.ref === value || t.ref === suggested);
+/** The trips to offer on a receipt: completed ones are left out, except the one this receipt already has. */
+export const offerTrips = (trips: TripChoice[], value: string | null): TripChoice[] => trips.filter((t) => !t.done || t.ref === value);
 
 /** The trip that was on at this date: a business trip first, then a personal one. Null when none or when several fit a kind (the person picks). */
 export function suggestTrip(trips: TripChoice[], date: string): TripChoice | null {
   const on = (t: TripChoice) => !!t.start && t.start <= date && date <= (t.end || t.start);
   for (const kind of ["trip", "ptrip"] as const) {
-    const hits = trips.filter((t) => t.kind === kind && on(t));
+    const hits = trips.filter((t) => !t.done && t.kind === kind && on(t));
     if (hits.length === 1) return hits[0];
     if (hits.length > 1) return null;
   }

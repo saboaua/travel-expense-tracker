@@ -38,11 +38,11 @@ eq("not on a trip", filterReceipts(rc, { paid: null, trip: "none" }).length, 2);
 if (fail) { console.error(`${fail} failed`); process.exit(1); }
 console.log("PASS paid-with");
 
-// Completed trips are not offered on a receipt, unless chosen already or the one that was on that day
+// Completed trips are not offered on a receipt, except the one it already has
 const mixed: TripChoice[] = [
   { ref: "trip:a", label: "Open", kind: "trip", start: "2026-11-01", end: "2026-11-30" },
   { ref: "trip:b", label: "Done", kind: "trip", start: "2026-10-11", end: "2026-10-19", done: true },
 ];
-eq("a completed trip is left out", offerTrips(mixed, null, null).map((t) => t.label), ["Open"]);
-eq("a completed trip that is already chosen stays", offerTrips(mixed, "trip:b", null).map((t) => t.label), ["Open", "Done"]);
-eq("a completed trip that was on that day is offered", offerTrips(mixed, null, "trip:b").map((t) => t.label), ["Open", "Done"]);
+eq("a completed trip is left out", offerTrips(mixed, null).map((t) => t.label), ["Open"]);
+eq("a completed trip that is already chosen stays", offerTrips(mixed, "trip:b").map((t) => t.label), ["Open", "Done"]);
+eq("a completed trip is not suggested for its dates", suggestTrip(mixed, "2026-10-15"), null);

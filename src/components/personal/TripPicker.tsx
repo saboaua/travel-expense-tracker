@@ -31,8 +31,8 @@ export function useTripChoices(): TripChoice[] {
 
 /** "During trip": a personal receipt can say which trip it was paid on. A label only; it never adds to a business trip. */
 export function TripPicker({ trips, value, suggested, onChange }: { trips: TripChoice[]; value: string | null; suggested: string | null; onChange: (v: string | null) => void }) {
-  // A completed trip is not offered, unless it is the one already chosen or the one that was on that day
-  const open = offerTrips(trips, value, suggested);
+  // A completed trip is not offered, unless it is the one this receipt already has
+  const open = offerTrips(trips, value);
   if (!open.length) return null;
   // The chosen and suggested trips first, then the most recent
   const ordered = [...open].sort((a, b) => Number(b.ref === value || b.ref === suggested) - Number(a.ref === value || a.ref === suggested)).slice(0, 4);
