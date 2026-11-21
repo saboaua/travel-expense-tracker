@@ -8,7 +8,7 @@ import { saveReceiptType } from "@/lib/receipt-types-data";
 import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 
 /** Name, icon, colour and whether the type gets its own line in the monthly budget. Used in the scan sheet and in Settings. */
-export function NewTypeForm({ existing, editing, onSaved, onCancel }: { existing: ReceiptType[]; editing?: ReceiptType | null; onSaved: (id: string) => void; onCancel: () => void }) {
+export function NewTypeForm({ existing, editing, onSaved, onCancel }: { existing: ReceiptType[]; editing?: ReceiptType | null; onSaved: (id: string, type: ReceiptType) => void; onCancel: () => void }) {
   const [name, setName] = useState(editing?.name ?? "");
   const [icon, setIcon] = useState<string>(editing?.icon ?? "heart");
   const [color, setColor] = useState<string>(editing?.color ?? TYPE_COLORS[0]);
@@ -25,7 +25,7 @@ export function NewTypeForm({ existing, editing, onSaved, onCancel }: { existing
     const out = await saveReceiptType(createClient(), res.row, editing?.id);
     setSaving(false);
     if (out.error || !out.id) return setError(out.error ?? "Could not save. Try again.");
-    onSaved(out.id);
+    onSaved(out.id, { id: out.id, ...res.row, sort_order: editing?.sort_order ?? existing.length });
   };
 
   return (

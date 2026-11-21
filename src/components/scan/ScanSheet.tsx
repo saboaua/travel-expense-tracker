@@ -21,7 +21,7 @@ export function ScanSheet({
   onClose,
   title = "Where does this go?",
   types,
-  onTypesChanged,
+  onTypeCreated,
 }: {
   options: ScanOption[];
   selected: string;
@@ -34,7 +34,8 @@ export function ScanSheet({
   title?: string;
   /** Your receipt types: when given, an "Other" row opens them. */
   types?: ReceiptType[];
-  onTypesChanged?: () => void;
+  /** A type was just made in the sheet: the caller adds it to its list at once. */
+  onTypeCreated?: (t: ReceiptType) => void;
 }) {
   const [view, setView] = useState<"main" | "types" | "new">("main");
   const typeOptions = options.filter((o) => o.kind === "type");
@@ -66,7 +67,7 @@ export function ScanSheet({
         {view === "new" && types && (
           <div className="min-h-0 flex-1 overflow-y-auto pb-1">
             <p className="mb-3 text-base font-bold">New type</p>
-            <NewTypeForm existing={types} onCancel={() => setView("types")} onSaved={(id) => { onTypesChanged?.(); onSelect(`type:${id}`); setView("main"); }} />
+            <NewTypeForm existing={types} onCancel={() => setView("types")} onSaved={(id, t) => { onTypeCreated?.(t); onSelect(`type:${id}`); setView("main"); }} />
           </div>
         )}
         {view === "types" && types && (

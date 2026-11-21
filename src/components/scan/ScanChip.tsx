@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Briefcase, FileText, Globe, Hammer, MapPin, MoreHorizontal, ShoppingBag, ShoppingCart } from "lucide-react";
+import type { ReceiptType } from "@/lib/receipt-types";
 import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
@@ -27,6 +28,7 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
   const [pick, setPick] = useState(currentKey);
   const [busy, setBusy] = useState(false);
   const { types, reload: reloadTypes } = useReceiptTypes();
+  const [created, setCreated] = useState<ReceiptType[]>([]);
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
@@ -54,7 +56,8 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
     );
   };
 
-  const allOptions = options ? (perms.has("personal") ? [...options, ...typeScanOptions(types)] : options) : null;
+  const allTypes = [...types, ...created.filter((c) => !types.some((t) => t.id === c.id))];
+  const allOptions = options ? (perms.has("personal") ? [...options, ...typeScanOptions(allTypes)] : options) : null;
   if (!state) return null;
   const kind = currentKey.startsWith("trip:") ? "trip" : currentKey.startsWith("project:") ? "project" : currentKey.startsWith("ptrip:") ? "ptrip" : currentKey === "document" ? "document" : currentKey === "shopping" ? "shopping" : currentKey.startsWith("type:") ? "type" : "grocery";
   const Icon = ICON[kind];
@@ -93,8 +96,8 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
         <ScanSheet
           title="Move this receipt to…"
           options={allOptions ?? []}
-          types={perms.has("personal") ? types : undefined}
-          onTypesChanged={reloadTypes}
+          types={perms.has("personal") ? allTypes : undefined}
+          onTypeCreated={(t) => { setCreated((c) => [...c, t]); reloadTypes(); }}
           selected={pick}
           onSelect={setPick}
           reason={null}

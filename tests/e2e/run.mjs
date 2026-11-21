@@ -1094,7 +1094,14 @@ try {
     await page.getByTestId("nt-save").click();
     await page.getByText("Other: Massage").waitFor({ timeout: 20_000 });
     assert(fake.table("receipt_types").some((t) => t.name === "Massage" && t.show_in_budget === true), "a new type is saved with its budget switch on");
-    await page.getByRole("button", { name: "Cancel" }).first().click();
+    // Confirming goes to the type just made, not to the old choice
+    await page.getByRole("button", { name: /Save to Massage/ }).click();
+    await page.waitForURL((u) => /^\/personal\/types\/[^/]+\/new$/.test(u.pathname), { timeout: 20_000 });
+    await page.getByText(/Add massage receipt/i).first().waitFor({ timeout: 20_000 });
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?quick=1`);
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByTestId("not-groceries").waitFor({ timeout: 20_000 });
     await page.getByTestId("ng-move").click();
     assert((await page.getByTestId("not-groceries").count()) === 0, "the banner closes after Move it");
     const before = fake.table("grocery_receipts").length;

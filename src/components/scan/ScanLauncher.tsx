@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReceiptType } from "@/lib/receipt-types";
 import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -32,7 +33,10 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
   const { types, reload: reloadTypes } = useReceiptTypes();
   // Your receipt types are only offered where Groceries is (Personal is on)
   const personal = baseOptions.some((o) => o.kind === "grocery");
-  const options = useMemo(() => (personal ? [...baseOptions, ...typeScanOptions(types)] : baseOptions), [baseOptions, personal, types]);
+  // A type made in the sheet counts at once, before the saved list has come back
+  const [created, setCreated] = useState<ReceiptType[]>([]);
+  const allTypes = useMemo(() => [...types, ...created.filter((c) => !types.some((t) => t.id === c.id))], [types, created]);
+  const options = useMemo(() => (personal ? [...baseOptions, ...typeScanOptions(allTypes)] : baseOptions), [baseOptions, personal, allTypes]);
   const camera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"scan" | "upload" | "save" | null>(null);
@@ -121,7 +125,7 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
     setPending({ file: processed, options: shown, pick: sug.pick.key, reason: sug.reason, preview: URL.createObjectURL(processed) });
   };
 
-  const chosen = pending?.options.find((o) => o.key === pending.pick);
+  const chosen = pending ? options.find((o) => o.key === pending.pick) ?? pending.options.find((o) => o.key === pending.pick) : undefined;
   const canScan = options.some((o) => o.kind !== "document");
   const canUpload = options.length > 0;
   if (!canUpload && !showNewTrip) return null;
@@ -169,8 +173,8 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
       {pending && (
         <ScanSheet
           options={pending.options.length === 1 && pending.options[0].kind === "document" ? pending.options : options}
-          types={personal ? types : undefined}
-          onTypesChanged={reloadTypes}
+          types={personal ? allTypes : undefined}
+          onTypeCreated={(t) => { setCreated((c) => [...c, t]); reloadTypes(); }}
           selected={pending.pick}
           onSelect={(k) => setPending({ ...pending, pick: k })}
           reason={pending.reason}
