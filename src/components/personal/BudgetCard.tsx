@@ -89,7 +89,7 @@ function TypeRow({ t, amount, v }: { t: ReceiptType; amount: number; v: BudgetVi
       <div className="flex items-center gap-2.5">
         <TypeIcon icon={t.icon} color={t.color} className="h-8 w-8" />
         <b className="flex-1 text-[15px]">{t.name}</b>
-        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} over={over} />{limit ? <span className="text-[13px] text-muted-foreground"> of {formatCurrency(limit, v.currency)}</span> : null}</span>
+        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} over={over} /><span className="text-[13px] text-muted-foreground">{limit ? ` of ${formatCurrency(limit, v.currency)}` : " no limit"}</span></span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>
       {limit ? (

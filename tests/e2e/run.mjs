@@ -1125,6 +1125,17 @@ try {
     await page.getByTestId(`budget-type-${care.id}`).waitFor({ timeout: 20_000 });
     assert(/60/.test(await page.getByTestId(`budget-type-${care.id}`).innerText()), "the Personal care line shows 60: " + (await page.getByTestId(`budget-type-${care.id}`).innerText()));
     assert(/60/.test(await page.getByTestId("budget-line").innerText()), "the total counts it: " + (await page.getByTestId("budget-line").innerText()));
+    // A limit for the type is set from Set or change budget and shows on its dashboard line
+    await page.goto(`${BASE}/personal/budget`);
+    await page.locator("#bg-amount").fill("1000");
+    const lim = page.getByRole("switch", { name: "Limits for each area" });
+    if ((await lim.getAttribute("aria-checked")) !== "true") await lim.click();
+    await page.locator(`#bg-type-limit-${care.id}`).fill("150");
+    await page.getByTestId("budget-save").click();
+    await page.waitForURL((u) => u.pathname === "/", { timeout: 20_000 });
+    assert(fake.table("receipt_types").find((t) => t.id === care.id)?.monthly_limit === 150, "the type limit is saved on the type");
+    await page.getByTestId(`budget-type-${care.id}`).waitFor({ timeout: 20_000 });
+    assert(/150/.test(await page.getByTestId(`budget-type-${care.id}`).innerText()), "the dashboard line shows its limit");
     // Switch it off on the Other page: it moves into the Other line
     await page.goto(`${BASE}/personal/types`);
     await page.getByRole("switch", { name: /Show Personal care on the dashboard/ }).click();

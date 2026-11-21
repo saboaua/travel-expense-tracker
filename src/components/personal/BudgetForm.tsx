@@ -13,6 +13,9 @@ import { BUDGET_AREAS, parseBudgetInput, pickBudget, type BudgetCurrency, type B
 import { fetchBudgets } from "@/lib/personal/budget-data";
 import { AREA_STYLE } from "@/components/personal/BudgetCard";
 import { todayISO } from "@/lib/utils";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
+import { saveReceiptType } from "@/lib/receipt-types-data";
+import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 
 const label = "mb-1.5 block text-[13px] font-bold";
 const chip = (on: boolean) =>
@@ -33,6 +36,10 @@ export function BudgetForm() {
   const [useLimits, setUseLimits] = useState(false);
   const [limits, setLimits] = useState<Record<string, string>>({});
   const [alertOn, setAlertOn] = useState(false);
+  const { types, reload: reloadTypes } = useReceiptTypes();
+  const [typeLimits, setTypeLimits] = useState<Record<string, string>>({});
+  const onDashboard = types.filter((t) => t.show_in_budget).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  const typeLimitText = (t: { id: string; monthly_limit: number | null }) => typeLimits[t.id] ?? (t.monthly_limit ? String(t.monthly_limit) : "");
   const [busy, setBusy] = useState(false);
 
   const fill = (b: BudgetSetting | null) => {
@@ -71,6 +78,16 @@ export function BudgetForm() {
     if (useLimits) for (const a of BUDGET_AREAS) { const n = parseBudgetInput(limits[a.key] ?? ""); if (n != null) out[a.key] = n; }
     setBusy(true);
     const supabase = createClient();
+    // Limits for your own types live on the type itself, so the type page and this form always agree
+    if (useLimits) {
+      for (const t of onDashboard) {
+        const n = parseBudgetInput(typeLimitText(t));
+        if (n === t.monthly_limit || (n == null && !t.monthly_limit)) continue;
+        const r = await saveReceiptType(supabase, { name: t.name, icon: t.icon, color: t.color, show_in_budget: t.show_in_budget, monthly_limit: n }, t.id);
+        if (r.error) { setBusy(false); return setError("Could not save the limit for " + t.name + ". Check your connection."); }
+      }
+      reloadTypes();
+    }
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { setBusy(false); return setError("Sign in again to save."); }
     const month = onlyThisMonth ? thisMonth : null;
@@ -139,6 +156,19 @@ export function BudgetForm() {
                   </div>
                 );
               })}
+              {onDashboard.length > 0 && (
+                <div className="mt-2 border-t pt-3" data-testid="budget-type-limits">
+                  <p className="text-[13px] font-bold text-muted-foreground">Your own types on the dashboard</p>
+                  {onDashboard.map((t, i) => (
+                    <div key={t.id} className={`flex min-h-[60px] items-center gap-2.5 ${i ? "border-t" : ""}`}>
+                      <TypeIcon icon={t.icon} color={t.color} className="h-8 w-8" />
+                      <label htmlFor={`bg-type-limit-${t.id}`} className="flex-1 text-[15px] font-bold">{t.name}</label>
+                      <input id={`bg-type-limit-${t.id}`} inputMode="decimal" autoComplete="off" value={typeLimitText(t)} onChange={(e) => setTypeLimits({ ...typeLimits, [t.id]: e.target.value })} placeholder="No limit" className="h-11 w-28 rounded-xl border bg-background px-3 text-[15px] tabular-nums" />
+                    </div>
+                  ))}
+                  <p className="pt-2 text-xs leading-snug text-muted-foreground">Types with the dashboard switch off share the Other line, which has no limit of its own. Turn a type on in Personal &gt; Other to give it one.</p>
+                </div>
+              )}
             </div>
           )}
         </div>
