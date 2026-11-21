@@ -101,9 +101,9 @@ input[type="date"]::-webkit-date-and-time-value {
   margin: 0 !important;
 }
 
-/* Pages outside the app frame (login, reset password...) keep clear of the notch and the status bar too */
+/* Pages outside the app frame (login, reset password...) keep clear of the notch in landscape too */
 body:not(:has(.app-frame)) {
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) 0 env(safe-area-inset-left);
+  padding: 0 env(safe-area-inset-right) 0 env(safe-area-inset-left);
 }
 
 /* Native controls (date pickers, select menus, scrollbars, the keyboard) follow the page's own theme, not only the phone's */

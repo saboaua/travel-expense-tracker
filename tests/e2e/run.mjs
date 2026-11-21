@@ -355,8 +355,6 @@ try {
     }));
     assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
     assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
-    assert((await page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute("content")) === "black-translucent", "the iPhone status bar lets the app paint behind it");
-    assert((await page.locator('[data-testid="status-band"]').count()) === 1, "a band paints the strip behind the status bar");
     const vp = await page.evaluate(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") || "");
     assert(/viewport-fit=cover/.test(vp), `the page reaches the screen edges so the safe-area padding works (got ${vp})`);
     assert((await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === "light", "native controls are light in the light theme");
@@ -1092,8 +1090,8 @@ try {
       assert(/50\.00/.test(debit) && /40\.00/.test(debit) && /10\.00/.test(debit), "debit card is shopping 40 plus subscriptions 10: " + debit);
       assert((await page.getByTestId("cards-subs-link").count()) === 1, "a link to the subscriptions on the credit card");
       assert(/Spent this month/.test(await page.getByTestId("month-summary").innerText()), "one summary card");
-      assert((await page.getByTestId("paid-icon-credit").count()) >= 1 && (await page.getByTestId("paid-icon-debit").count()) >= 1, "each receipt in the list shows how it was paid");
-      assert(/Paid with credit card/.test((await page.getByTestId("paid-icon-credit").first().getAttribute("aria-label")) || ""), "the icon has a text label");
+      assert((await page.getByTestId("paid-tag-credit").count()) >= 1 && (await page.getByTestId("paid-tag-debit").count()) >= 1, "each receipt in the list shows how it was paid");
+      assert(/^Credit card$/.test(((await page.getByTestId("paid-tag-credit").first().textContent()) || "").trim()), "the tag says it in words");
       // Groceries: a new receipt starts as Debit card
       await page.goto(`${BASE}/personal/groceries/new`);
       await page.getByTestId("paid-debit").waitFor({ timeout: 30_000 });
