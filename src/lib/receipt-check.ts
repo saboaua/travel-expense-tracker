@@ -31,7 +31,8 @@ export function checkGrocery(scan: Checkable): ScanCheck {
   let score = 0;
 
   scan.items.forEach((it, i) => {
-    const expected = r2(it.quantity * it.unit_price);
+    // A printed line discount (20%) is why unit price x quantity is more than the line total
+    const expected = r2(it.quantity * it.unit_price * (it.discount && it.discount > 0 && it.discount < 100 ? 1 - it.discount / 100 : 1));
     if (Math.abs(expected - it.line_total) > Math.max(0.03, it.line_total * 0.01)) {
       flagged[i] = `${it.quantity} x ${it.unit_price.toFixed(2)} is ${expected.toFixed(2)}, but the line says ${it.line_total.toFixed(2)}`;
       score += 2;

@@ -65,3 +65,9 @@ const d2 = diffReadings([L("Milk", 2.49), L("Bread", 8.1)], [L("Milk", 2.49), L(
 eq(d2.alts, { 1: 3.1 }, "a renamed row of the same length is matched by position");
 const d3 = diffReadings([L("Milk", 2.49)], [L("Milk", 2.49), L("Butter", 5.25)]);
 eq([d3.alts, d3.added], [{}, 1], "a line only the second look found is counted");
+
+// a printed line discount is not a mismatch: 1 x 355.00 less 20% is 284.00
+c = checkGrocery({ items: [{ ...L("Iso-100 Vanilla 5Lbs", 284, 1, 355), discount: 20 }, { ...L("Magnesium Glycinate", 55.49, 1, 61.65), discount: 10 }, { ...L("LIPO-6 Black", 58.1, 1, 64.55), discount: 10 }], total: 397.59 });
+eq([c.ok, Object.keys(c.flagged).length], [true, 0], "unit price, discount percent and a lower total are not flagged");
+c = checkGrocery({ items: [L("Iso-100", 284, 1, 355)], total: 284 });
+eq(Object.keys(c.flagged).length, 1, "without a printed discount the same line is still flagged");

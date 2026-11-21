@@ -80,6 +80,8 @@ export type GroceryLine = {
   unit_price: number;
   line_total: number;
   category: string;
+  /** Percent taken off this line on the receipt (20 for "20%"): unit_price is the price before it, line_total after. */
+  discount?: number;
   /** "kg" / "lb" / ... when quantity is a weight; null for counted items. */
   unit?: string | null;
   /** Set by the scan checks: why this row deserves a second look (never saved). */

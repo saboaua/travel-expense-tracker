@@ -414,14 +414,16 @@ function buildGroceryPrompt(hints: OcrHints, today: string) {
     '    { "name": product name written out in readable words (expand obvious abbreviations, keep it short),',
     '      "quantity": number bought (the weight for weighed items), "unit": "kg" | "lb" | "g" for weighed items otherwise null,',
     '      "unit_price": price per unit (per kg/lb for weighed items) as a number,',
-    '      "line_total": amount charged for that line as a number,',
+    '      "line_total": amount charged for that line as a number (after any discount on the line),',
+    '      "discount_percent": the percent discount printed on that line (20 for "20%"), or null when there is none,',
     `      "category": exactly one of ${JSON.stringify(groceryCategoryList(hints))} }`,
     "Rules:",
     '- A weighed item prints a second line such as "0.1219 kg for AWG 36.60/kg". That is NOT a separate item: use it for the product above (quantity 0.1219, unit "kg", unit_price 36.60) and never list it on its own.',
     "- Product names must not contain units or currency codes (drop trailing KG, AWG, USD).",
     "- Do NOT include subtotal, tax, total, payment, change, loyalty points or store messages as items.",
     "- Discount or coupon lines: subtract them from the product they belong to when obvious, otherwise leave them out.",
-    "- unit_price x quantity should equal line_total; if only line_total is printed use quantity 1 or the printed quantity.",
+    "- When a line prints a unit price, a discount percent and a lower total (355.00, 20%, 284.00), keep unit_price as the printed price before the discount, set discount_percent, and line_total as the printed total after it. Do not change the prices to make them match.",
+    "- unit_price x quantity (less discount_percent, when there is one) should equal line_total; if only line_total is printed use quantity 1 or the printed quantity.",
     `- If a numeric date like 03/04/2026 is ambiguous assume ${hints.currency && !MONTH_FIRST.has(hints.currency) ? "day first (DD/MM)" : "month first (MM/DD)"}. Today is ${today}; a date is never in the future.`,
     "- Use null for unreadable top-level fields. Never invent items.",
   ].join("\n");
@@ -474,7 +476,9 @@ function parseGroceryAnswer(raw: Record<string, unknown>, hints: OcrHints, today
       typeof r.category === "string" ? groceryCategoryList(hints).find((c) => c.toLowerCase() === (r.category as string).toLowerCase()) : undefined;
     const rawUnit = typeof r.unit === "string" ? r.unit.toLowerCase().trim() : "";
     const weightUnit = ["kg", "lb", "g", "oz"].includes(rawUnit) ? rawUnit : null;
-    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit });
+    const dp = typeof r.discount_percent === "number" ? r.discount_percent : parseFloat(String(r.discount_percent ?? ""));
+    const discount = Number.isFinite(dp) && dp > 0 && dp < 100 ? Math.round(dp * 100) / 100 : undefined;
+    items.push({ name, quantity: qty, unit_price: unit, line_total: total, category: category ?? guessGroceryCategory(name), unit: weightUnit, ...(discount ? { discount } : {}) });
   }
 
   const bareDollar = raw.bare_dollar === true;
@@ -493,7 +497,7 @@ export async function extractGroceryWithAi(
 function buildRefinePrompt(hints: OcrHints, today: string, prev: GroceryScan, problems: string[]) {
   const first = {
     store: prev.store, date: prev.date, total: prev.total, subtotal: prev.subtotal ?? null, tax: prev.tax ?? null, currency: prev.currency, bare_dollar: prev.bareDollar === true,
-    items: prev.items.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit ?? null, unit_price: i.unit_price, line_total: i.line_total, category: i.category })),
+    items: prev.items.map((i) => ({ name: i.name, quantity: i.quantity, unit: i.unit ?? null, unit_price: i.unit_price, line_total: i.line_total, category: i.category, ...(i.discount ? { discount: i.discount } : {}) })),
   };
   return [
     buildGroceryPrompt(hints, today),
