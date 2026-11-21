@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useState } from "react";
 import { CalendarPlus, Plane, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -16,6 +17,7 @@ const time = (local: string | null) => { const c = clock(local); return c ? `${c
 
 /** Add one flight to the phone's calendar: Apple / Google / file, with a reminder. Works for your own flights and for a partner's shared ones. */
 export function FlightCalendarSheet({ flight, onClose, onAdded }: { flight: CalendarFlight; onClose: () => void; onAdded: (message: string) => void }) {
+  const { appName } = useBrand();
   const [iPhone, setIPhone] = useState(false);
   const [target, setTarget] = useState<CalendarTarget>("apple");
   const [reminder, setReminder] = useState<FlightReminder>("3h");
@@ -41,7 +43,7 @@ export function FlightCalendarSheet({ flight, onClose, onAdded }: { flight: Cale
   function add() {
     try { localStorage.setItem(PREFS, JSON.stringify({ target, reminder })); } catch { /* ignore */ }
     if (target === "google") {
-      const url = googleFlightUrl(flight, `${window.location.origin}/trips`);
+      const url = googleFlightUrl(flight, `${window.location.origin}/trips`, appName);
       if (url) window.open(url, "_blank", "noopener");
     } else {
       // iPhone opens its own "Add to Calendar" screen for the file; elsewhere it downloads

@@ -30,14 +30,14 @@ eq(nextDay("2026-11-20"), "2026-11-21", "next day");
 eq(nextDay("2026-12-31"), "2027-01-01", "next day across years");
 eq(nextDay("2028-02-28"), "2028-02-29", "next day leap year");
 
-const ics = buildTripIcs(trip, { reminder: "1d", details: true, link: "https://app.example/trips/x", now });
+const ics = buildTripIcs(trip, { reminder: "1d", details: true, link: "https://app.example/trips/x", now, appName: "Vifolio" });
 has(ics, "DTSTART;VALUE=DATE:20261117", "all-day start");
 has(ics, "DTEND;VALUE=DATE:20261121", "end is the morning after the last day");
 has(ics, "SUMMARY:Winlott Meeting 2026", "title");
 has(ics, "LOCATION:Panama", "location");
 has(ics, `UID:trip-${trip.id}@lifolio`, "stable UID per trip");
 has(ics, "TRIGGER:-PT15H", "1 day reminder at 9 AM the day before");
-has(ics.replace(/\r\n /g, ""), "DESCRIPTION:Hotel: Central\\, room booked\\n\\nOpen in Lifolio: https://app.example/trips/x", "notes and link, escaped");
+has(ics.replace(/\r\n /g, ""), "DESCRIPTION:Hotel: Central\\, room booked\\n\\nOpen in Vifolio: https://app.example/trips/x", "notes and link, escaped");
 has(ics, "DTSTAMP:20261108T150000Z", "timestamp");
 eq(ics.split("\r\n").every((l) => new TextEncoder().encode(l).length <= 75), true, "every line at most 75 bytes");
 eq(ics.endsWith("END:VCALENDAR\r\n"), true, "CRLF line endings");

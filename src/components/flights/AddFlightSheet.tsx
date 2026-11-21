@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useRef, useState } from "react";
 import { Camera, Check, Loader2, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -72,6 +73,7 @@ export function AddFlightSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { appName } = useBrand();
   const editing = !!existing;
   const [leg, setLeg] = useState<FlightLeg>(existing?.leg ?? defaultLeg ?? "outbound");
   const [mode, setMode] = useState<"find" | "manual">(existing?.source === "manual" ? "manual" : "find");
@@ -95,14 +97,14 @@ export function AddFlightSheet({
   const file = useRef<HTMLInputElement>(null);
   const autoManual = useRef(false);
 
-  // A flight further ahead than the service can see goes straight to entering it by hand; on the day Lifolio fills in the rest
+  // A flight further ahead than the service can see goes straight to entering it by hand; on the day the app fills in the rest
   useEffect(() => {
     if (editing) return;
     const early = tooEarlyToLook(date, Date.now());
     if (early && mode === "find" && !found) {
       autoManual.current = true;
       setMode("manual");
-      setNotice({ tone: "info", text: "Live flight details can only be looked up close to the flight. Enter it now; on the day Lifolio fills in the live times, gate and status." });
+      setNotice({ tone: "info", text: "Live flight details can only be looked up close to the flight. Enter it now; on the day " + appName + " fills in the live times, gate and status." });
     } else if (!early && autoManual.current && mode === "manual") {
       autoManual.current = false;
       setMode("find");
@@ -149,9 +151,9 @@ export function AddFlightSheet({
       if (res.ok && body.flight) { setFound(body.flight); setNumber(body.flight.flight_number); return true; }
       setFound(null);
       const pretty = parseFlightNumber(n)?.display ?? n;
-      if (body.reason === "too_early") { autoManual.current = true; setNotice({ tone: "info", text: "Live flight details can only be looked up close to the flight. Enter it now; on the day Lifolio fills in the live times, gate and status." }); }
+      if (body.reason === "too_early") { autoManual.current = true; setNotice({ tone: "info", text: "Live flight details can only be looked up close to the flight. Enter it now; on the day " + appName + " fills in the live times, gate and status." }); }
       else if (body.reason === "not_configured") setNotice({ tone: "info", text: "Flight lookup is not set up yet. Enter the details yourself." });
-      else if (body.reason === "not_found") setNotice({ tone: "warn", text: `We couldn't find ${pretty} on that date. Check the number and date, or enter the details yourself. On the day of the flight Lifolio tries again and fills in the live details.` });
+      else if (body.reason === "not_found") setNotice({ tone: "warn", text: `We couldn't find ${pretty} on that date. Check the number and date, or enter the details yourself. On the day of the flight ${appName} tries again and fills in the live details.` });
       else if (body.reason === "limit") setNotice({ tone: "warn", text: "Too many lookups this hour. Enter the details yourself, or try again later." });
       else if (res.status === 400) setError(body.error || "Check the flight number and date.");
       else if (body.code === "invalid_access_key" || body.code === "missing_access_key") setNotice({ tone: "warn", text: "The flight service key is not valid, so lookups are off. Enter the details yourself." });
@@ -308,7 +310,7 @@ export function AddFlightSheet({
                 <label><span className={label}>Arrives</span><input data-testid="flight-arr-time" type="time" className={input} value={arrTime} onChange={(e) => setArrTime(e.target.value)} /></label>
               </div>
               <label><span className={label}>Arrival date <span className="font-normal text-muted-foreground">(only if a different day)</span></span><input data-testid="flight-arr-date" type="date" className={input} value={arrDate} min={date} onChange={(e) => setArrDate(e.target.value)} /></label>
-              <p className="text-[13px] text-muted-foreground">Times are local to each airport. Close to the flight, Lifolio looks it up and fills in the live times, gate and status.</p>
+              <p className="text-[13px] text-muted-foreground">Times are local to each airport. Close to the flight, {appName} looks it up and fills in the live times, gate and status.</p>
             </div>
           )}
 

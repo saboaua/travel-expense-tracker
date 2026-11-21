@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Share2 } from "lucide-react";
@@ -18,6 +19,7 @@ import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 
 /** Profile > Community prices: the switch for sharing receipt prices (store, item name and price only), and a way to delete what was shared. */
 export function CommunityCard() {
+  const { appName } = useBrand();
   const [on, setOn] = useState<boolean | null>(null);
   const [available, setAvailable] = useState(true);
   const [mine, setMine] = useState<number | null>(null);
@@ -157,7 +159,7 @@ export function CommunityCard() {
         <p className="text-sm text-muted-foreground">Your prices join a shared price list that nobody can trace back to you, so others can see when an item is cheaper somewhere else.</p>
         <ul className="space-y-1.5 rounded-xl bg-slate-50 p-3 text-sm dark:bg-slate-800/50">
           <li><b className="text-emerald-600">✓</b> Shared: the store name, the item name, its size and the price. Nothing else.</li>
-          <li><b className="text-emerald-600">✓</b> Read each night: if sharing is on, Lifolio reads your latest prices on the server to build that list. Receipts are never copied or stored by it.</li>
+          <li><b className="text-emerald-600">✓</b> Read each night: if sharing is on, {appName} reads your latest prices on the server to build that list. Receipts are never copied or stored by it.</li>
           <li><b className="text-red-600">✕</b> Never shared: your name, email, receipts, dates, location or totals.</li>
           <li><b className="text-emerald-600">✓</b> Only prices from the last 60 days are shared.</li>
           <li><b className="text-emerald-600">✓</b> A price shows to others after the first shopper. It gets a Confirmed badge once 3 shoppers paid about the same price.</li>

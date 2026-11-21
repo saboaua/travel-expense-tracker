@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useState } from "react";
 import { Copy, Share2, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -10,8 +11,9 @@ import { inviteMessage, inviteUrl } from "@/lib/invite";
 
 type Invite = { code: string; show_name: boolean; friends: number };
 
-/** Profile > Recommend Lifolio: a personal link to copy or share, and how many friends asked for an account with it. */
+/** Profile > Recommend the app: a personal link to copy or share, and how many friends asked for an account with it. */
 export function RecommendCard() {
+  const { appName } = useBrand();
   const [invite, setInvite] = useState<Invite | null>(null);
   const [available, setAvailable] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -37,7 +39,7 @@ export function RecommendCard() {
   };
   const share = async () => {
     setErr(null);
-    try { await navigator.share({ title: "Lifolio", text: inviteMessage(url), url }); }
+    try { await navigator.share({ title: appName, text: inviteMessage(url, appName), url }); }
     catch (e) { if ((e as Error)?.name !== "AbortError") setErr("Could not open the share menu. Use Copy instead."); }
   };
   const toggleName = async () => {
@@ -60,17 +62,17 @@ export function RecommendCard() {
 
   if (!available) {
     return (
-      <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} tone="invite" summary="Not set up yet" description="Share a link with a friend.">
+      <AccordionSection id="recommend" title={`Recommend ${appName}`} icon={<Users />} tone="invite" summary="Not set up yet" description="Share a link with a friend.">
         <Alert variant="info">Recommend is not set up yet. An admin needs to run supabase/migration_invites.sql.</Alert>
       </AccordionSection>
     );
   }
   return (
-    <AccordionSection id="recommend" title="Recommend Lifolio" icon={<Users />} tone="invite" summary={invite ? (invite.friends ? `${invite.friends} friend${invite.friends === 1 ? "" : "s"} asked` : "Share a link") : ""} description="Send your link. Your friend sees what Lifolio does and can ask for an account.">
+    <AccordionSection id="recommend" title={`Recommend ${appName}`} icon={<Users />} tone="invite" summary={invite ? (invite.friends ? `${invite.friends} friend${invite.friends === 1 ? "" : "s"} asked` : "Share a link") : ""} description="Send your link. Your friend sees what {appName} does and can ask for an account.">
       <div className="space-y-4" data-testid="recommend-card">
         {err && <Alert variant="error">{err}</Alert>}
         {msg && <Alert variant="success">{msg}</Alert>}
-        <p className="text-sm text-muted-foreground">Your friend sees what Lifolio does and can ask for an account. An administrator then sets it up.</p>
+        <p className="text-sm text-muted-foreground">Your friend sees what {appName} does and can ask for an account. An administrator then sets it up.</p>
         <div className="flex items-center gap-2 rounded-xl border bg-slate-50 p-1.5 pl-3 dark:bg-slate-800/50">
           <span className="min-w-0 flex-1 break-all text-sm" data-testid="invite-link">{url || "…"}</span>
           <Button type="button" variant="outline" className="h-10 shrink-0 gap-1.5" onClick={copy} disabled={!url} data-testid="invite-copy"><Copy className="h-4 w-4" aria-hidden="true" />Copy</Button>
@@ -79,10 +81,10 @@ export function RecommendCard() {
         {canShare && <p className="text-center text-xs text-muted-foreground">Opens your phone share menu: WhatsApp, Messages, email and more.</p>}
         <div>
           <p className="text-sm font-bold">What your friend receives</p>
-          <p className="mt-1.5 rounded-xl bg-slate-100 p-3 text-sm leading-relaxed dark:bg-slate-800">{url ? inviteMessage(url) : "…"}</p>
+          <p className="mt-1.5 rounded-xl bg-slate-100 p-3 text-sm leading-relaxed dark:bg-slate-800">{url ? inviteMessage(url, appName) : "…"}</p>
         </div>
         <div className="flex items-center justify-between gap-3">
-          <div><label htmlFor="invite-show-name" className="text-base font-semibold">Show my first name</label><p className="text-sm text-muted-foreground">The invite page says &quot;{"{first name}"} recommends Lifolio&quot;</p></div>
+          <div><label htmlFor="invite-show-name" className="text-base font-semibold">Show my first name</label><p className="text-sm text-muted-foreground">The invite page says &quot;{"{first name}"} recommends {appName}&quot;</p></div>
           <button id="invite-show-name" type="button" role="switch" aria-checked={invite?.show_name === true} disabled={busy || !invite} onClick={toggleName} data-testid="invite-show-name" className={`relative h-8 w-14 shrink-0 rounded-full transition-colors disabled:opacity-60 ${invite?.show_name ? "bg-emerald-600" : "bg-slate-300 dark:bg-slate-600"}`}>
             <span className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition-all ${invite?.show_name ? "left-7" : "left-1"}`} />
             <span className="sr-only">{invite?.show_name ? "On" : "Off"}</span>

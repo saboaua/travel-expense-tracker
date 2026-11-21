@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useRef, useState } from "react";
 import { Download, Share2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 
 /** Share a badge: a picture made on the phone (badge and count only), sent through the phone's own share menu. */
 export function BadgeShare({ level, total, onClose }: { level: number; total: number; onClose: () => void }) {
+  const { appName } = useBrand();
   const t = tierOf(level);
   const canvas = useRef<HTMLCanvasElement | null>(null);
   const [first, setFirst] = useState<string>("");
@@ -35,21 +37,21 @@ export function BadgeShare({ level, total, onClose }: { level: number; total: nu
   useEffect(() => {
     const c = canvas.current ?? document.createElement("canvas");
     canvas.current = c;
-    drawBadgeCard(c, { level, total, firstName: useName ? first : null, link });
+    drawBadgeCard(c, { level, total, firstName: useName ? first : null, link, appName });
     setSrc(c.toDataURL("image/png"));
-  }, [level, total, useName, first, link]);
+  }, [level, total, useName, first, link, appName]);
 
   if (!t) return null;
   const blob = () => new Promise<Blob | null>((res) => { if (canvas.current) canvas.current.toBlob((b) => res(b), "image/png"); else res(null); });
   const save = async () => {
     const b = await blob(); if (!b) return;
-    const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = shareFileName(t.name); document.body.appendChild(a); a.click(); a.remove();
+    const a = document.createElement("a"); a.href = URL.createObjectURL(b); a.download = shareFileName(t.name, appName); document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 4000); setMsg("Saved. Find it in your photos or downloads.");
   };
   const share = async () => {
     setMsg(null);
     const b = await blob(); if (!b) return;
-    const file = new File([b], shareFileName(t.name), { type: "image/png" });
+    const file = new File([b], shareFileName(t.name, appName), { type: "image/png" });
     try {
       if (navigator.canShare?.({ files: [file] })) await navigator.share({ files: [file], text: link ? `${shareTitle(t.name, useName ? first : null)} ${link}` : undefined });
       else await save();

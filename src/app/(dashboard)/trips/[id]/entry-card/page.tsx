@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -38,6 +39,7 @@ function Row({ r, copied, onCopy }: { r: AnswerRow; copied: boolean; onCopy: (r:
 }
 
 export default function EntryCardPage() {
+  const { appName } = useBrand();
   const { id } = useParams<{ id: string }>();
   const [state, setState] = useState<"loading" | "ready" | "setup" | "error">("loading");
   const [details, setDetails] = useState<EntryDetails>(EMPTY_DETAILS);
@@ -105,7 +107,7 @@ export default function EntryCardPage() {
         <>
           <div className="flex gap-3 rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm leading-relaxed text-blue-950 dark:border-blue-900 dark:bg-blue-950/40 dark:text-blue-100">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            <p>Lifolio does not fill in or send the card. You paste the answers, check the last page and tap Submit yourself.</p>
+            <p>{appName} does not fill in or send the card. You paste the answers, check the last page and tap Submit yourself.</p>
           </div>
           {!flight && <Alert variant="warning">Add your flight home to this trip to get the arrival answers.</Alert>}
           {missing.length > 0 && (

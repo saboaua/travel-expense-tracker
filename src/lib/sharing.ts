@@ -135,7 +135,7 @@ export function statusForCode(code: string | null): number {
   return 400;
 }
 
-export const INVITE_SENT_MESSAGE = "Invite sent. If this person uses Lifolio, they will see it on their bell. It stays open for 14 days.";
+export const inviteSentMessage = (appName: string) => `Invite sent. If this person uses ${appName}, they will see it on their bell. It stays open for 14 days.`;
 export const kindLabel = (k: ShareKind) => (k === "loyalty_card" ? "card" : "trip");
 
 /* ---------------- the bell ---------------- */

@@ -75,11 +75,11 @@ function stamp(d: Date): string {
 }
 
 /** What goes in the event's notes: the trip's own notes and a link back to it. */
-export function eventDetails(trip: CalendarTrip, opts: { details: boolean; link?: string | null }): string {
+export function eventDetails(trip: CalendarTrip, opts: { details: boolean; link?: string | null; appName?: string }): string {
   if (!opts.details) return "";
   const parts: string[] = [];
   if (trip.notes?.trim()) parts.push(trip.notes.trim());
-  if (opts.link) parts.push(`Open in Lifolio: ${opts.link}`);
+  if (opts.link) parts.push(`Open in ${opts.appName ?? "the app"}: ${opts.link}`);
   return parts.join("\n\n");
 }
 
@@ -89,7 +89,7 @@ export function eventDetails(trip: CalendarTrip, opts: { details: boolean; link?
  */
 export function buildTripIcs(
   trip: CalendarTrip,
-  opts: { reminder: Reminder; details: boolean; link?: string | null; now?: Date }
+  opts: { reminder: Reminder; details: boolean; link?: string | null; now?: Date; appName?: string }
 ): string {
   const now = opts.now ?? new Date();
   const updated = trip.updated_at ? Date.parse(trip.updated_at) : NaN;
@@ -123,7 +123,7 @@ export function buildTripIcs(
 }
 
 /** Google Calendar's "new event" page, filled in. Google applies the person's own default reminders. */
-export function googleCalendarUrl(trip: CalendarTrip, opts: { details: boolean; link?: string | null }): string {
+export function googleCalendarUrl(trip: CalendarTrip, opts: { details: boolean; link?: string | null; appName?: string }): string {
   const p = new URLSearchParams({
     action: "TEMPLATE",
     text: trip.name,

@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useState } from "react";
 import { Bitcoin, Check, Clock, Copy, RotateCcw } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
@@ -28,6 +29,7 @@ async function post(url: string, body: Record<string, unknown>): Promise<{ ok: b
 
 /** The Bitcoin tab on the Get Pro page: ask for an amount, pay it, say you paid, wait. */
 export function BitcoinPay({ period, pending, confirmations, onChanged }: Props) {
+  const { appName } = useBrand();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [txid, setTxid] = useState("");
@@ -47,7 +49,7 @@ export function BitcoinPay({ period, pending, confirmations, onChanged }: Props)
     return () => clearInterval(t);
   }, [quoting]);
 
-  const uri = live?.btc_address && live.btc_amount != null ? bip21(live.btc_address, Number(live.btc_amount)) : "";
+  const uri = live?.btc_address && live.btc_amount != null ? bip21(live.btc_address, Number(live.btc_amount), `${appName} Pro`) : "";
   useEffect(() => {
     let off = false;
     if (!uri || !quoting) { setQr(""); return; }

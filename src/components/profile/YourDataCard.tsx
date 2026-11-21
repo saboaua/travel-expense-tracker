@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useState } from "react";
 import { DatabaseBackup, Download, Loader2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -7,6 +8,7 @@ import { AccordionSection } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Modal } from "@/components/sharing/Modal";
+import { fileSlug } from "@/lib/brand-name";
 import { buildAccountZip } from "@/lib/account-export";
 import { sharingAction } from "@/lib/use-sharing";
 
@@ -16,6 +18,7 @@ type Counts = { trips: number; expenses: number; cards: number; documents: numbe
 
 /** Profile > Your data: download everything as one ZIP, or schedule the account for deletion (7 days, cancellable). */
 export function YourDataCard() {
+  const { appName } = useBrand();
   const [busy, setBusy] = useState<string | null>(null);
   const [progress, setProgress] = useState<string | null>(null);
   const [ready, setReady] = useState<{ url: string; size: number; name: string; missing: number } | null>(null);
@@ -45,8 +48,8 @@ export function YourDataCard() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Please sign in again.");
-      const { blob, missingFiles } = await buildAccountZip(supabase, user.id, (p) => setProgress(p.total > 1 ? `${p.step} (${p.done} of ${p.total})` : p.step));
-      const name = `lifolio-data-${new Date().toLocaleDateString("en-CA")}.zip`;
+      const { blob, missingFiles } = await buildAccountZip(supabase, user.id, (p) => setProgress(p.total > 1 ? `${p.step} (${p.done} of ${p.total})` : p.step), appName);
+      const name = `${fileSlug(appName)}-data-${new Date().toLocaleDateString("en-CA")}.zip`;
       setReady({ url: URL.createObjectURL(blob), size: blob.size, name, missing: missingFiles });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not prepare your download.");

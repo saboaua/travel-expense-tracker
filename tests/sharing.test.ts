@@ -1,5 +1,5 @@
 import {
-  INVITE_SENT_MESSAGE, SHARING_LIMITS, activePartners, buildSharingNotifications, cleanSharedCards, cleanSharedTrips, isUuid,
+  inviteSentMessage, SHARING_LIMITS, activePartners, buildSharingNotifications, cleanSharedCards, cleanSharedTrips, isUuid,
   isValidEmail, nextInvitePopup, normalizeEmail, sharedWith, sharingErrorCode, sharingMessage, statusForCode, type SharingOverview,
 } from "../src/lib/sharing";
 import { sameOrigin, callSharing } from "../src/lib/sharing-server";
@@ -29,8 +29,8 @@ eq("limit message", sharingMessage("daily_limit"), "You can send up to 5 invites
 eq("partner limit message", sharingMessage("partner_limit"), "You can have up to 4 partners.");
 eq("status for limits", [statusForCode("daily_limit"), statusForCode("partner_limit"), statusForCode("pending_limit")], [429, 429, 429]);
 eq("status others", [statusForCode("sharing_off"), statusForCode("not_found"), statusForCode("bad_email"), statusForCode(null), statusForCode("not_signed_in")], [403, 404, 400, 500, 401]);
-eq("invite message is the same wording the roadmap promised", INVITE_SENT_MESSAGE.startsWith("Invite sent."), true);
-eq("no message ever says whether an email has an account", /no user|not found|does not exist|no account/i.test(INVITE_SENT_MESSAGE), false);
+eq("invite message is the same wording the roadmap promised", inviteSentMessage("Vifolio").startsWith("Invite sent.") && inviteSentMessage("Vifolio").includes("uses Vifolio"), true);
+eq("no message ever says whether an email has an account", /no user|not found|does not exist|no account/i.test(inviteSentMessage("Vifolio")), false);
 
 // a shared trip never carries more than its fields, even if the database returned extra columns
 const trips = cleanSharedTrips([{ share_id: "s", kind: "trip", trip_id: "t", name: "Miami", destination: "FL", start_date: "2026-12-01", end_date: "2026-12-08", shared_by: "Alice", budget: 5000, notes: "private", expenses: [{ amount: 9 }], receipt_path: "a/b.jpg", user_id: "u" }]);

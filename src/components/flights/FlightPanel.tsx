@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, Plane, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 /** One flight: airline and live status, the route in local times, then the booking details. */
 export function FlightPanel({ flight: f }: { flight: TripFlight }) {
+  const { appName } = useBrand();
   const [showPnr, setShowPnr] = useState(false);
   const [now, setNow] = useState(0);
   useEffect(() => setNow(Date.now()), []);
@@ -142,7 +144,7 @@ export function FlightPanel({ flight: f }: { flight: TripFlight }) {
             {synced ? `Live status updated ${synced}. ` : "Live status. "}Seat and confirmation come from you.
           </>
         ) : (
-          "Added by hand. Close to the flight, Lifolio looks it up and fills in the live details."
+          "Added by hand. Close to the flight, " + appName + " looks it up and fills in the live details."
         )}
       </p>
     </div>

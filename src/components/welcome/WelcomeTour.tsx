@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Camera, Check, ChevronRight, Coins, Home, MapPin, Plane, Plus, Send, Share, ShoppingCart, Users, Wallet, Wifi, X, Zap, Mail, Download, ShoppingBag, Award, BedDouble, Briefcase, CreditCard, FileText, PiggyBank } from "lucide-react";
@@ -176,6 +177,7 @@ function Slide({ id }: { id: HighlightId }) {
 }
 
 export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; forced: boolean; home: { country: string; city: string }; tracks: TrackId[] }) {
+  const { appName } = useBrand();
   const router = useRouter();
   const [open, setOpen] = useState(true);
   const [step, setStep] = useState(0);
@@ -293,7 +295,7 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
               <div className="flex h-[150px] items-center justify-center gap-3 rounded-3xl bg-gradient-to-br from-blue-700 to-sky-400" aria-hidden="true">
                 {[Plane, Wallet, ShoppingCart].map((I, i) => <span key={i} className="flex h-[62px] w-[62px] items-center justify-center rounded-[18px] bg-white/20 text-white"><I className="h-8 w-8" /></span>)}
               </div>
-              <Title sub="Your trips, spending and home bills in one place. Takes one minute to set up.">Welcome to Lifolio</Title>
+              <Title sub="Your trips, spending and home bills in one place. Takes one minute to set up.">Welcome to {appName}</Title>
               <Feature icon={<Camera className="h-5 w-5" />} title="Snap a receipt" text="It reads the store, date and total for you." />
               <Feature icon={<Wallet className="h-5 w-5" />} title="See where it goes" text="Budgets, bills and groceries add up on their own." />
               <Feature icon={<Check className="h-5 w-5" />} title="You stay in charge" text="Nothing is saved until you check it." />
@@ -328,7 +330,7 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
           {name === "install" && (
             <>
               <div className="flex justify-center" aria-hidden="true"><div className="flex h-[84px] w-[84px] items-center justify-center rounded-[22px] bg-gradient-to-br from-blue-700 to-sky-400 text-white shadow-lg"><Wallet className="h-10 w-10" /></div></div>
-              <Title sub="Opens like an app, full screen, and works offline. It is free and takes 10 seconds.">Add Lifolio to your home screen</Title>
+              <Title sub="Opens like an app, full screen, and works offline. It is free and takes 10 seconds.">Add {appName} to your home screen</Title>
               <div className="flex rounded-[14px] bg-muted p-1" role="tablist" aria-label="Your phone">
                 {(["ios", "android"] as const).map((t) => <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)} data-testid={`tour-tab-${t}`} className={cn("min-h-10 flex-1 rounded-[11px] text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", tab === t ? "bg-background font-bold shadow-sm" : "text-muted-foreground")}>{t === "ios" ? "iPhone" : "Android"}</button>)}
               </div>
@@ -338,24 +340,24 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
                     {stepNo(1, <>Open this page in <b>Safari</b></>)}
                     {stepNo(2, <>Tap Share {glyph(<Share className="h-5 w-5" />)} at the bottom</>)}
                     {stepNo(3, <>Scroll and tap <b>Add to Home Screen</b> {glyph(<Plus className="h-5 w-5" />)}</>)}
-                    {stepNo(4, <>Tap <b>Add</b>. Lifolio is now on your phone</>)}
+                    {stepNo(4, <>Tap <b>Add</b>. {appName} is now on your phone</>)}
                   </>
                 ) : (
                   <>
                     {canInstall ? (
-                      <Button type="button" className="min-h-12 w-full text-base" onClick={() => void install()} data-testid="tour-install"><Download className="mr-2 h-5 w-5" aria-hidden="true" />Install Lifolio</Button>
+                      <Button type="button" className="min-h-12 w-full text-base" onClick={() => void install()} data-testid="tour-install"><Download className="mr-2 h-5 w-5" aria-hidden="true" />Install {appName}</Button>
                     ) : (
                       <>
                         {stepNo(1, <>Open this page in <b>Chrome</b></>)}
                         {stepNo(2, <>Tap the menu <b>⋮</b> at the top right</>)}
                         {stepNo(3, <>Tap <b>Install app</b> or <b>Add to Home screen</b></>)}
-                        {stepNo(4, <>Tap <b>Install</b>. Lifolio is now on your phone</>)}
+                        {stepNo(4, <>Tap <b>Install</b>. {appName} is now on your phone</>)}
                       </>
                     )}
                   </>
                 )}
               </div>
-              {platform === "other" && <p className="text-center text-xs leading-relaxed text-muted-foreground">On a computer you can skip this. Open Lifolio on your phone to add it.</p>}
+              {platform === "other" && <p className="text-center text-xs leading-relaxed text-muted-foreground">On a computer you can skip this. Open {appName} on your phone to add it.</p>}
               <Learn slug="add-to-home-screen" label="Add the app to your home screen" />
             </>
           )}

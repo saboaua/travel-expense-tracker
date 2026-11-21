@@ -1,8 +1,9 @@
+import { getBrand } from "@/lib/brand-icon";
 import nodemailer from "nodemailer";
 
 /**
  * Sending email. Gmail is used when GMAIL_USER and GMAIL_APP_PASSWORD are set (a Google "App password", 2-step
- * verification on); otherwise Resend. Needs RESEND_API_KEY and EMAIL_FROM (for example "Lifolio <login@yourdomain.com>").
+ * verification on); otherwise Resend. Needs RESEND_API_KEY and EMAIL_FROM (for example "Your App <login@yourdomain.com>").
  * Without them nothing is sent and the admin pages keep working with "show it here".
  * RESEND_API_URL is only there so tests can point at a fake server.
  */
@@ -30,7 +31,7 @@ async function sendGmail(msg: { to: string; subject: string; html: string; text:
       connectionTimeout: 10_000,
       socketTimeout: 15_000,
     });
-    await t.sendMail({ from: `Lifolio <${process.env.GMAIL_USER}>`, to: msg.to, subject: msg.subject, text: msg.text, html: msg.html });
+    await t.sendMail({ from: `${(await getBrand().then((b) => b.appName, () => null)) || "App"} <${process.env.GMAIL_USER}>`, to: msg.to, subject: msg.subject, text: msg.text, html: msg.html });
     return { ok: true };
   } catch (e) {
     const code = (e as { responseCode?: number }).responseCode;

@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { AccordionSection } from "@/components/ui/accordion";
@@ -200,6 +201,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 function StyleChoice({ id, current, onPick, title, sub, sample }: { id: PushDetail; current: PushDetail; onPick: (d: PushDetail) => void; title: string; sub: string; sample: string }) {
+  const { appName } = useBrand();
   const on = current === id;
   return (
     <button type="button" role="radio" aria-checked={on} onClick={() => onPick(id)} data-testid={`push-style-${id}`}
@@ -210,7 +212,7 @@ function StyleChoice({ id, current, onPick, title, sub, sample }: { id: PushDeta
       </span>
       <span className="mt-2.5 flex items-start gap-2 rounded-2xl border bg-muted/60 p-2.5">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground" aria-hidden="true"><Bell className="h-4 w-4" /></span>
-        <span className="text-[13px] leading-snug"><span className="block font-semibold">Lifolio</span>{sample}</span>
+        <span className="text-[13px] leading-snug"><span className="block font-semibold">{appName}</span>{sample}</span>
       </span>
     </button>
   );

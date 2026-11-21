@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useState } from "react";
 import { Mail } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +22,7 @@ export function emailChangeProblem(e: unknown): string {
 
 /** Profile > Sign-in email: change the email you sign in with. The new address must confirm with a link; until then the old one keeps working. */
 export function EmailCard() {
+  const { appName } = useBrand();
   const [current, setCurrent] = useState("");
   const [pending, setPending] = useState<string | null>(null);
   const [next, setNext] = useState("");
@@ -66,7 +68,7 @@ export function EmailCard() {
   };
 
   return (
-    <AccordionSection id="email" title="Sign-in email" icon={<Mail />} tone="mail" summary={current} description="The email you sign in with and where Lifolio writes to you.">
+    <AccordionSection id="email" title="Sign-in email" icon={<Mail />} tone="mail" summary={current} description={`The email you sign in with and where ${appName} writes to you.`}>
       <form onSubmit={submit} noValidate className="space-y-4" data-testid="email-card">
         {err && <Alert variant="error">{err}</Alert>}
         {msg && <Alert variant="success">{msg}</Alert>}

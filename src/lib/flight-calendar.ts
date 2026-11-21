@@ -48,19 +48,19 @@ const when = (local: string | null) => { const c = clock(local); return c ? `${c
 
 export const flightTitle = (f: CalendarFlight) => `${f.flight_number} ${f.dep_iata ?? "?"} to ${f.arr_iata ?? "?"}`;
 
-export function flightDetails(f: CalendarFlight, link?: string | null): string {
+export function flightDetails(f: CalendarFlight, link?: string | null, appName = "the app"): string {
   const line = (label: string, iata: string | null, name: string | null, city: string | null, local: string | null, term: string | null, gate: string | null) =>
     `${label}: ${[when(local), place(iata, name, city)].filter(Boolean).join(" ")}${term ? ` · Terminal ${term}` : ""}${gate ? ` · Gate ${gate}` : ""}`;
   return [
     f.airline ? `${f.airline} ${f.flight_number}` : f.flight_number,
     line("Departs", f.dep_iata, f.dep_name, f.dep_city, shownDeparture(f), f.dep_terminal, f.dep_gate),
     line("Arrives", f.arr_iata, f.arr_name, f.arr_city, shownArrival(f), f.arr_terminal, f.arr_gate),
-    "Times are local to each airport and can change. Check Lifolio or the airline for the latest.",
-    ...(link ? [`Open in Lifolio: ${link}`] : []),
+    `Times are local to each airport and can change. Check ${appName} or the airline for the latest.`,
+    ...(link ? [`Open in ${appName}: ${link}`] : []),
   ].join("\n");
 }
 
-export function buildFlightIcs(f: CalendarFlight, opts: { reminder: FlightReminder; link?: string | null; now?: Date }): string | null {
+export function buildFlightIcs(f: CalendarFlight, opts: { reminder: FlightReminder; link?: string | null; now?: Date; appName?: string }): string | null {
   const t = flightTimes(f);
   if (!t) return null;
   const now = opts.now ?? new Date();
@@ -77,7 +77,7 @@ export function buildFlightIcs(f: CalendarFlight, opts: { reminder: FlightRemind
     `DTEND:${t.end}`,
     `SUMMARY:${escapeIcsText(flightTitle(f))}`,
     ...(place(f.dep_iata, f.dep_name, f.dep_city) ? [`LOCATION:${escapeIcsText(place(f.dep_iata, f.dep_name, f.dep_city) + (f.dep_terminal ? ` Terminal ${f.dep_terminal}` : ""))}`] : []),
-    `DESCRIPTION:${escapeIcsText(flightDetails(f, opts.link))}`,
+    `DESCRIPTION:${escapeIcsText(flightDetails(f, opts.link, opts.appName))}`,
     ...(opts.link ? [`URL:${opts.link}`] : []),
     "TRANSP:OPAQUE",
     ...(opts.reminder !== "none" ? ["BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${escapeIcsText(flightTitle(f))}`, `TRIGGER:${TRIGGER[opts.reminder]}`, "END:VALARM"] : []),
@@ -86,10 +86,10 @@ export function buildFlightIcs(f: CalendarFlight, opts: { reminder: FlightRemind
   return lines.map(foldIcsLine).join("\r\n") + "\r\n";
 }
 
-export function googleFlightUrl(f: CalendarFlight, link?: string | null): string | null {
+export function googleFlightUrl(f: CalendarFlight, link?: string | null, appName?: string): string | null {
   const t = flightTimes(f);
   if (!t) return null;
-  const p = new URLSearchParams({ action: "TEMPLATE", text: flightTitle(f), dates: `${t.start}/${t.end}`, details: flightDetails(f, link) });
+  const p = new URLSearchParams({ action: "TEMPLATE", text: flightTitle(f), dates: `${t.start}/${t.end}`, details: flightDetails(f, link, appName) });
   const loc = place(f.dep_iata, f.dep_name, f.dep_city);
   if (loc) p.set("location", loc);
   return `https://calendar.google.com/calendar/render?${p.toString()}`;

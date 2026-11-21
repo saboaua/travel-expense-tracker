@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { setupNeeded } from "@/lib/setup-message";
 import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
@@ -40,6 +41,7 @@ export function PlanCard({ plan, events, today }: { plan: SavingsPlan; events: S
 
 /** Everything you save: the total so far, a chart of it month by month and each plan. */
 export function SavingsOverview() {
+  const { appName } = useBrand();
   const today = todayISO();
   const [data, setData] = useState<{ plans: SavingsPlan[]; events: SavingsEvent[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function SavingsOverview() {
           <div className="rounded-2xl border bg-card p-4 text-center">
             <span className="inline-flex h-14 w-14 items-center justify-center rounded-2xl" style={{ background: "#ccfbf1", color: TEAL }}><PiggyBank className="h-7 w-7" aria-hidden="true" /></span>
             <p className="mt-2.5 text-lg font-bold">Put money aside every month</p>
-            <p className="mt-1.5 text-sm leading-snug text-muted-foreground">Set an amount once. Lifolio counts it every month and keeps your total, so you can see how much you have saved.</p>
+            <p className="mt-1.5 text-sm leading-snug text-muted-foreground">Set an amount once. {appName} counts it every month and keeps your total, so you can see how much you have saved.</p>
             <Link href="/personal/savings/add" className={`${btn} mt-4`} data-testid="savings-add"><Plus className="h-4 w-4" aria-hidden="true" /> Add a savings plan</Link>
           </div>
           <div className="rounded-2xl border bg-card p-4"><b className="block text-[15px]">Already saving somewhere?</b><p className="mt-1.5 text-sm leading-snug text-muted-foreground">When you add a plan, turn on <b className="text-foreground">I already have savings</b> and type what you have so far. The monthly amount starts from the date you choose.</p></div>

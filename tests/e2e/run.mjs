@@ -354,7 +354,7 @@ try {
       manifest: document.querySelector('link[rel="manifest"]')?.getAttribute("href"),
     }));
     assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
-    assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
+    assert(head.title === "E2E Expense App", `the home screen name follows the app name set in Admin > Branding (got ${head.title})`);
     const vp = await page.evaluate(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") || "");
     assert(/viewport-fit=cover/.test(vp), `the page reaches the screen edges so the safe-area padding works (got ${vp})`);
     assert((await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === "light", "native controls are light in the light theme");
@@ -368,7 +368,7 @@ try {
     assert(/max-age=300/.test(plainRes.headers()["cache-control"] || ""), "an unversioned manifest address is only kept briefly");
     const m = await mres.json();
     assert(m.display === "standalone" && m.id === "/" && m.start_url === "/" && m.scope === "/", "the manifest asks for a standalone app inside this site");
-    assert(m.short_name === "Lifolio", "the manifest short name is Lifolio");
+    assert(m.short_name === "E2E Expense App", "the manifest short name follows the app name set in Admin > Branding");
     assert(m.orientation === "any", `Android may rotate like iPhone (got ${m.orientation})`);
     assert(Array.isArray(m.shortcuts) && m.shortcuts.length >= 3 && m.shortcuts.every((x) => x.name && x.url.startsWith("/")), "long-pressing the icon offers shortcuts");
     assert(m.share_target?.action === "/share-target" && m.share_target.method === "POST" && /multipart/.test(m.share_target.enctype) && m.share_target.params.files[0].accept.includes("image/*"), "Android's share sheet can send a photo or PDF to the app");
@@ -2554,7 +2554,7 @@ try {
       await signIn(page, "pat@example.com", "Correct-Horse-1");
       await page.waitForURL((u) => u.pathname === "/");
       await page.goto(`${BASE}/profile`);
-      await page.getByRole("button", { name: /Recommend Lifolio/ }).click();
+      await page.getByRole("button", { name: /Recommend E2E Expense App/ }).click();
       const link = page.getByTestId("invite-link");
       await link.waitFor();
       assert((await link.innerText()).endsWith("/invite/K7M2QX9A0B"), "the personal link is shown");
@@ -2576,7 +2576,7 @@ try {
       assert(saved && saved.referred_by === PAT, "the request keeps who recommended");
       // Pat sees only a count
       await page.reload();
-      await page.getByRole("button", { name: /Recommend Lifolio/ }).click();
+      await page.getByRole("button", { name: /Recommend E2E Expense App/ }).click();
       await page.getByTestId("invite-count").waitFor();
       const count = await page.getByTestId("invite-count").innerText();
       assert(/1 friend/.test(count) && !/Lisa|lisa@/.test(await page.locator("main").innerText()), "Pat sees a count, never names");

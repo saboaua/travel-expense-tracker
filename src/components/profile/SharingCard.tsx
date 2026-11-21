@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -11,13 +12,14 @@ import { AccordionSection } from "@/components/ui/accordion";
 import { useConfirm } from "@/components/ui/confirm";
 import { Modal } from "@/components/sharing/Modal";
 import { InviteAnswer } from "@/components/sharing/InviteAnswer";
-import { INVITE_SENT_MESSAGE, SHARING_LIMITS, isValidEmail, normalizeEmail, type Partner, type ShareRow } from "@/lib/sharing";
+import { inviteSentMessage, SHARING_LIMITS, isValidEmail, normalizeEmail, type Partner, type ShareRow } from "@/lib/sharing";
 import { sharingAction, useSharing } from "@/lib/use-sharing";
 
 type Names = Record<string, string>;
 
 /** Profile > Sharing: turn sharing on, add a partner, answer invites, see what is shared and stop it. Hidden when the role does not have sharing. */
 export function SharingCard() {
+  const { appName } = useBrand();
   const { overview, refresh } = useSharing();
   const router = useRouter();
   const confirm = useConfirm();
@@ -228,7 +230,7 @@ export function SharingCard() {
       )}
       {adding === "done" && (
         <Modal title="Invite sent" onClose={closeAdd}>
-          <p className="text-sm text-muted-foreground">{INVITE_SENT_MESSAGE}</p>
+          <p className="text-sm text-muted-foreground">{inviteSentMessage(appName)}</p>
           <div className="mt-4 flex justify-end"><Button type="button" onClick={closeAdd}>OK</Button></div>
         </Modal>
       )}

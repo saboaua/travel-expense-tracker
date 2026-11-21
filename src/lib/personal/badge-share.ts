@@ -1,4 +1,5 @@
 import { tierOf, plural } from "@/lib/personal/badges";
+import { fileSlug } from "@/lib/brand-name";
 
 /** What the shared badge picture says. No stores, no prices: only the level and the count. Pure, so it is unit-tested. */
 export function shareTitle(levelName: string, firstName?: string | null): string {
@@ -7,14 +8,14 @@ export function shareTitle(levelName: string, firstName?: string | null): string
 }
 export const shareLine = (total: number) => `${plural(total)} shared.`;
 export const shareSub = "Helping people find cheaper groceries.";
-export const shareFooter = "I share grocery prices on Lifolio";
-export const shareFileName = (levelName: string) => `lifolio-${levelName.toLowerCase()}-badge.png`;
+export const shareFooter = (appName: string) => `I share grocery prices on ${appName}`;
+export const shareFileName = (levelName: string, appName = "app") => `${fileSlug(appName)}-${levelName.toLowerCase()}-badge.png`;
 
 const SHIELD = "M32 3 56 11v20c0 14-10 24-24 30C18 55 8 45 8 31V11z";
 const STAR = "M32 15l4.2 8.6 9.4 1.3-6.8 6.6 1.6 9.4L32 36.4l-8.4 4.5 1.6-9.4-6.8-6.6 9.4-1.3z";
 
 /** Draws the picture (1080 x 1350) on a canvas, on the phone. Browser only. */
-export function drawBadgeCard(canvas: HTMLCanvasElement, o: { level: number; total: number; firstName?: string | null; link?: string | null }): void {
+export function drawBadgeCard(canvas: HTMLCanvasElement, o: { level: number; total: number; firstName?: string | null; link?: string | null; appName?: string }): void {
   const t = tierOf(o.level);
   const ctx = canvas.getContext("2d");
   if (!t || !ctx) return;
@@ -47,7 +48,7 @@ export function drawBadgeCard(canvas: HTMLCanvasElement, o: { level: number; tot
   ctx.fillText(shareSub, W / 2, 1115);
   ctx.globalAlpha = 0.35; ctx.fillRect(110, 1170, W - 220, 3); ctx.globalAlpha = 0.95;
   ctx.font = "700 44px Inter, system-ui, sans-serif";
-  ctx.fillText(shareFooter, W / 2, 1245);
+  ctx.fillText(shareFooter(o.appName || "this app"), W / 2, 1245);
   if (o.link) { ctx.font = "500 34px Inter, system-ui, sans-serif"; ctx.fillText(o.link.replace(/^https?:\/\//, ""), W / 2, 1300); }
   ctx.globalAlpha = 1;
 }

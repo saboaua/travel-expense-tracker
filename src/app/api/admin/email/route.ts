@@ -1,3 +1,4 @@
+import { getBrand } from "@/lib/brand-icon";
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { loadPermissions } from "@/lib/access-server";
@@ -23,7 +24,7 @@ export async function GET() {
 export async function POST() {
   const user = await who();
   if (!user?.email) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-  const r = await sendEmail({ to: user.email, subject: "Lifolio test email", text: "Email sending works. New people can now get their login by email.", html: "<p>Email sending works. New people can now get their login by email.</p>" });
+  const r = await sendEmail({ to: user.email, subject: `${(await getBrand()).appName || "App"} test email`, text: "Email sending works. New people can now get their login by email.", html: "<p>Email sending works. New people can now get their login by email.</p>" });
   if (!r.ok) return NextResponse.json({ error: r.error }, { status: 502 });
   return NextResponse.json({ ok: true, to: user.email });
 }

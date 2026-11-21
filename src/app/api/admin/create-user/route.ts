@@ -6,6 +6,7 @@ import { canAssignRole, type UserRole } from "@/lib/roles";
 import { loadPermissions } from "@/lib/access-server";
 import { createUserAccount } from "@/lib/user-admin";
 import { emailConfigured, sendEmail } from "@/lib/email";
+import { getBrand } from "@/lib/brand-icon";
 import { loginEmail } from "@/lib/login-email";
 
 export async function POST(request: Request) {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
     let emailed = false;
     let emailError: string | undefined;
     if (wantEmail) {
-      const mail = await sendEmail({ to: email, ...loginEmail({ email, firstName, password, expiresAt }) });
+      const mail = await sendEmail({ to: email, ...loginEmail({ email, firstName, password, expiresAt, appName: (await getBrand()).appName || undefined }) });
       emailed = mail.ok;
       if (!mail.ok) emailError = mail.error;
     }

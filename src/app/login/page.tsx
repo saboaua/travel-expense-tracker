@@ -37,7 +37,7 @@ export default function LoginPage() {
   const onCaptchaToken = useCallback((t: string | null) => setCaptchaToken(t), []);
   const onCaptchaError = useCallback(() => setError("The security check could not load. Please refresh and try again."), []);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
-  const [appName, setAppName] = useState("Lifolio");
+  const [appName, setAppName] = useState("");
   const [primaryColor, setPrimaryColor] = useState("#4f46e5");
   const [logoSize, setLogoSize] = useState(56);
   const supabase = createClient();
@@ -142,7 +142,7 @@ export default function LoginPage() {
             Every trip, receipt and bill, in one place.
           </h2>
           <p className="mt-4 max-w-[430px] text-[17px] leading-relaxed text-white/85">
-            From the flight to the groceries. {appName} keeps your travel and your household in order.
+            From the flight to the groceries. {appName || "The app"} keeps your travel and your household in order.
           </p>
           <ul className="mt-8 grid max-w-[520px] grid-cols-2 gap-3">
             {FEATURES.map((f) => (

@@ -4,7 +4,7 @@
  * "Authentication-Results" line) to the app with the person's private key. The key is the only secret in it.
  */
 export function gmailScript(key: string, endpoint: string): string {
-  return `// Lifolio bill emails. Your private key is in this script: keep it to yourself.
+  return `// Bill emails. Your private key is in this script: keep it to yourself.
 const KEY = ${JSON.stringify(key)};
 const ENDPOINT = ${JSON.stringify(endpoint)};
 

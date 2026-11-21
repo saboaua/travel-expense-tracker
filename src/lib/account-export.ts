@@ -56,6 +56,7 @@ export async function buildAccountZip(
   supabase: SupabaseClient,
   userId: string,
   onProgress: (p: ExportProgress) => void = () => {},
+  appName = "the app",
 ): Promise<{ blob: Blob; counts: Record<string, number>; missingFiles: number }> {
   // The ZIP library is only fetched when someone actually asks for their data
   const { default: JSZip } = await import("jszip");
@@ -95,7 +96,7 @@ export async function buildAccountZip(
   };
   await Promise.all([worker(), worker(), worker(), worker()]);
 
-  zip.file("README.txt", `Your Lifolio data, exported ${new Date().toISOString()}.\n\ndata/   one JSON file per kind of record\nfiles/  your photos and documents\n${missing ? `\n${missing} file(s) could not be fetched and are not included.\n` : ""}`);
+  zip.file("README.txt", `Your ${appName} data, exported ${new Date().toISOString()}.\n\ndata/   one JSON file per kind of record\nfiles/  your photos and documents\n${missing ? `\n${missing} file(s) could not be fetched and are not included.\n` : ""}`);
   onProgress({ step: "Packing your download", done: 1, total: 1 });
   return { blob: await zip.generateAsync({ type: "blob", compression: "DEFLATE" }), counts, missingFiles: missing };
 }

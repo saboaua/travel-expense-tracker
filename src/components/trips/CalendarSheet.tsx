@@ -1,5 +1,6 @@
 "use client";
 
+import { useBrand } from "@/lib/use-brand";
 import { useEffect, useState } from "react";
 import { CalendarCheck, CalendarPlus, Check, CloudOff, MapPin, RefreshCw, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -34,6 +35,7 @@ export function CalendarSheet({
   onClose: () => void;
   onAdded: (message: string) => void;
 }) {
+  const { appName } = useBrand();
   const [iPhone, setIPhone] = useState(false);
   const [target, setTarget] = useState<CalendarTarget>("apple");
   const [reminder, setReminder] = useState<Reminder>("1d");
@@ -75,7 +77,7 @@ export function CalendarSheet({
     writePrefs({ reminder, details, target });
     const link = `${window.location.origin}/trips/${trip.id}`;
     if (target === "google") {
-      window.open(googleCalendarUrl(trip, { details, link }), "_blank", "noopener");
+      window.open(googleCalendarUrl(trip, { details, link, appName }), "_blank", "noopener");
     } else {
       // iPhone opens its own "Add to Calendar" screen for the file; elsewhere it downloads
       window.location.href = icsPath(trip.id, { reminder, details, download: target === "ics" });

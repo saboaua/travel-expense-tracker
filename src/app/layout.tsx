@@ -26,7 +26,7 @@ export async function generateMetadata(): Promise<Metadata> {
     appleWebApp: {
       capable: true,
       statusBarStyle: "default",
-      title: "Lifolio",
+      title: appName || "Travel Expense Tracker",
       startupImage: startupImages,
     },
     // iOS decides "open as a web app" from this legacy tag too; Next only writes the newer mobile-web-app-capable

@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
   const manifest = {
     name: clientLink ? "My subscriptions" : name,
-    short_name: clientLink ? "My IPTV" : "Lifolio",
+    short_name: clientLink ? "My IPTV" : name,
     description: "Scan receipts, track business travel expenses, and generate reports",
     id: clientLink ?? "/",
     start_url: clientLink ?? "/",
@@ -37,7 +37,7 @@ export async function GET(request: Request) {
         { name: "New shopping receipt", short_name: "Shopping", url: "/personal/shopping/new" },
         { name: "New business trip", short_name: "New trip", url: "/trips/new" },
       ],
-      // Share a photo or PDF from the gallery or another app straight into Lifolio (Android); see public/sw.js
+      // Share a photo or PDF from the gallery or another app straight into the app (Android); see public/sw.js
       share_target: {
         action: "/share-target",
         method: "POST",

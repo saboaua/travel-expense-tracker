@@ -1,3 +1,4 @@
+import { getBrand } from "@/lib/brand-icon";
 import * as webpush from "web-push";
 import { createClient } from "@supabase/supabase-js";
 
@@ -58,6 +59,9 @@ export async function sendPushDetailed(userId: string | null | undefined, kind: 
     if (!subs?.length) return { sent: 0, reason: "no_devices", devices: 0 };
     webpush.setVapidDetails(process.env.VAPID_SUBJECT || "mailto:admin@example.com", process.env.VAPID_PUBLIC_KEY!, process.env.VAPID_PRIVATE_KEY!);
     const message = pushMessage(kind, data, settings.detail, opts.today);
+    // Every alert carries the name set in Admin > Branding
+    const appName = await getBrand().then((b) => b.appName, () => null);
+    if (appName) message.title = appName;
     const payload = JSON.stringify({ ...message, url: PUSH_URL[kind] ?? "/profile", tag: kind });
     let sent = 0;
     let status: number | undefined;
