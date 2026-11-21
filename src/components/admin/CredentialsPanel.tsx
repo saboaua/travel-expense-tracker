@@ -1,5 +1,6 @@
 "use client";
 
+import { SITE_URL } from "@/lib/site-url";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Clock, Copy } from "lucide-react";
@@ -9,7 +10,7 @@ import type { Credentials } from "@/components/admin/user-status";
 
 const fmt = formatDateTime;
 /** Where people sign in. Shown and copied with the login so the new person gets everything in one message. */
-export const APP_LINK = "https://lifolio-woad.vercel.app/";
+export const APP_LINK = SITE_URL;
 export const credentialsText = (c: Credentials) => `link: ${APP_LINK}\nuser: ${c.email}\ntemp password: ${c.password}`;
 
 export function CredentialsPanel({ credentials }: { credentials: Credentials }) {

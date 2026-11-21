@@ -2616,7 +2616,7 @@ try {
       await ap.getByText("Share these credentials").waitFor();
       await ap.getByRole("button", { name: "Copy credentials" }).click();
       const text = await ap.evaluate(() => navigator.clipboard.readText());
-      assert(/^link: https:\/\/lifolio-woad\.vercel\.app\/\nuser: copyme@example\.com\ntemp password: \S+/.test(text), `copied text has link, user and temp password (got ${JSON.stringify(text.slice(0, 120))})`);
+      assert(/^link: https:\/\/vifolio-woad\.vercel\.app\/\nuser: copyme@example\.com\ntemp password: \S+/.test(text), `copied text has link, user and temp password (got ${JSON.stringify(text.slice(0, 120))})`);
     } finally { await actx.close(); }
   });
 

@@ -45,7 +45,7 @@ const HELP = [
 ].join("\n");
 
 /** What the bot says to a Free person who asks for a Pro feature. Trip reminders still work. */
-const PRO_TEXT = (what: string) => `${what} a Pro feature. Your trip reminders still work.\n\nGet Pro: ${process.env.NEXT_PUBLIC_SITE_URL || "https://lifolio-woad.vercel.app"}/personal/pro`;
+const PRO_TEXT = (what: string) => `${what} a Pro feature. Your trip reminders still work.\n\nGet Pro: ${process.env.NEXT_PUBLIC_SITE_URL || "https://vifolio-woad.vercel.app"}/personal/pro`;
 
 const ADMIN_HELP = ["", "Admins:", "/health — app health summary", "/newuser email [role:name] First Last — create an account", "/role email rolename — change a role"].join("\n");
 

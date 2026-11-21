@@ -1,6 +1,7 @@
 import { TEMP_PASSWORD_TTL_HOURS } from "@/lib/temp-password-config";
 
-export const APP_LINK = "https://lifolio-woad.vercel.app/";
+import { SITE_URL } from "@/lib/site-url";
+export const APP_LINK = SITE_URL;
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
 /** The email that carries a new person's temporary login. Plain text and HTML versions. */

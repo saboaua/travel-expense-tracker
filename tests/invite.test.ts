@@ -5,7 +5,7 @@ eq("lowercase is not a code", isInviteCode("k7m2qx9a0b"), false);
 eq("too short", isInviteCode("K7M2"), false);
 eq("symbols", isInviteCode("K7M2QX9A0/"), false);
 eq("not a string", isInviteCode(undefined), false);
-eq("url", inviteUrl("https://lifolio-woad.vercel.app/", "K7M2QX9A0B"), "https://lifolio-woad.vercel.app/invite/K7M2QX9A0B");
+eq("url", inviteUrl("https://vifolio-woad.vercel.app/", "K7M2QX9A0B"), "https://vifolio-woad.vercel.app/invite/K7M2QX9A0B");
 eq("message", inviteMessage("https://x.y/invite/AAAAAAAAAA").endsWith("https://x.y/invite/AAAAAAAAAA"), true);
 eq("first name", firstNameOf("Pat", "Pat Fortin"), "Pat");
 eq("from full name", firstNameOf(null, "Maria Croes"), "Maria");
