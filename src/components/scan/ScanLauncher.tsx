@@ -9,7 +9,7 @@ import { compressReceiptImage } from "@/lib/compress-image";
 import { getLastScanChoice, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
 import { currentPlace } from "@/lib/scan-place";
 import { takeSharedFile } from "@/lib/share-target";
-import { suggestDestination, typeScanOptions, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
+import { suggestDestination, typeScanOptions, visibleOptions, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { ScanModeSheet } from "@/components/scan/ScanModeSheet";
 import { LongReceiptFlow } from "@/components/scan/LongReceiptFlow";
@@ -101,9 +101,11 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
   };
 
   const choose = async (processed: File, mode: "scan" | "upload", placeResult: Awaited<ReturnType<typeof currentPlace>> | null, photoDate: string | null) => {
+    // At home, trips that are not on today (coming up, finished, somewhere else) are not offered
+    const shown = mode === "scan" ? visibleOptions(options, placeResult, home, todayISO()) : options;
     const sug = suggestDestination({
       mode,
-      options,
+      options: shown,
       place: placeResult,
       home,
       photoDate,
@@ -116,7 +118,7 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
     }
     if (sug.confident) return go(processed, sug.pick, sug.reason);
     setBusy(null);
-    setPending({ file: processed, options, pick: sug.pick.key, reason: sug.reason, preview: URL.createObjectURL(processed) });
+    setPending({ file: processed, options: shown, pick: sug.pick.key, reason: sug.reason, preview: URL.createObjectURL(processed) });
   };
 
   const chosen = pending?.options.find((o) => o.key === pending.pick);

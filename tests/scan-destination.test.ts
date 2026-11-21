@@ -1,5 +1,5 @@
 // Run with: npx tsx tests/scan-destination.test.ts
-import { withQuery, buildScanOptions, destinationMatches, isHome, suggestDestination, countryName } from "../src/lib/scan-destination";
+import { visibleOptions, withQuery, buildScanOptions, destinationMatches, isHome, suggestDestination, countryName } from "../src/lib/scan-destination";
 const eq = (a: unknown, b: unknown, m: string) => { const ok = JSON.stringify(a) === JSON.stringify(b); console.log(ok ? "PASS" : "FAIL", m, ok ? "" : `got ${JSON.stringify(a)} want ${JSON.stringify(b)}`); if (!ok) process.exitCode = 1; };
 
 const today = "2026-11-05";
@@ -40,9 +40,9 @@ const tripsOnly = all.filter((o) => o.kind === "trip");
 const s1b = suggestDestination({ mode: "scan", options: tripsOnly, place: { city: "Miami", countryCode: "US" }, home: { country: "Aruba" }, today });
 eq([s1b.pick?.key, s1b.confident], ["trip:t1", true], "only business trips to choose from: straight through");
 const s2 = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today });
-eq([s2.pick?.key, s2.confident], ["grocery", true], "scan at home: straight to groceries, Change is there");
+eq([s2.pick?.key, s2.confident], ["grocery", false], "scan at home: Groceries is pre-selected and the choices still show");
 const s2b = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today, last: "project:p1" });
-eq([s2b.pick?.key, s2b.confident], ["project:p1", true], "scan at home: last personal choice wins");
+eq([s2b.pick?.key, s2b.confident], ["project:p1", false], "scan at home: last personal choice wins");
 const s2c = suggestDestination({ mode: "scan", options: all, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today, last: "trip:t1" });
 eq(s2c.pick?.key, "grocery", "scan at home: a last business choice does not drag you back to the trip");
 const s3 = suggestDestination({ mode: "scan", options: all, place: { city: "Panama City", countryCode: "PA" }, home: { country: "Aruba" }, today });
@@ -77,12 +77,22 @@ eq(buildScanOptions({ trips, projects, canTrips: true, canPersonal: false, canDo
 eq(withQuery("/personal/shopping/new?x=1", "quick=1"), "/personal/shopping/new?x=1&quick=1", "quick joins an existing query");
 eq(withQuery("/trips/x/add-expense", "quick=1"), "/trips/x/add-expense?quick=1", "quick starts a query");
 const shopHome = suggestDestination({ mode: "scan", options: withShop, place: { city: "Oranjestad", countryCode: "AW" }, home: { city: "Oranjestad", country: "Aruba" }, today, last: "shopping" });
-eq([shopHome.pick?.key, shopHome.confident], ["shopping", true], "at home the last choice (Shopping) is suggested, straight to the form");
+eq([shopHome.pick?.key, shopHome.confident], ["shopping", false], "at home the last choice (Shopping) is pre-selected and the choices still show");
 
 // A trip in the home town that is over (still open for late receipts) does not take today's receipt
 const winlott = { id: "w1", name: "Winlott Meeting 2026", destination: "Oranjestad, Aruba", start_date: "2026-10-28", end_date: "2026-11-02", range: "28 Oct - 2 Nov" };
 const withWinlott = buildScanOptions({ trips: [winlott], projects: [], canTrips: true, canPersonal: true, canDocuments: false, shopping: true });
 const wHome = suggestDestination({ mode: "scan", options: withWinlott, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today });
-eq([wHome.pick?.key, wHome.confident], ["grocery", true], "home: an ended trip in the home town is not suggested");
+eq([wHome.pick?.key, wHome.confident], ["grocery", false], "home: an ended trip in the home town is not suggested");
 const wLive = suggestDestination({ mode: "scan", options: withWinlott, place: { city: "Oranjestad", countryCode: "AW" }, home: { country: "Aruba" }, today: "2026-11-01" });
 eq([wLive.pick?.key, wLive.confident], ["trip:w1", false], "home: a trip that is on today is still offered, with the sheet");
+
+// At home the sheet hides trips that are not on today
+{
+  const home = { city: "Oranjestad", country: "Aruba" }, atHome = { city: "Oranjestad", countryCode: "AW" };
+  const away = buildScanOptions({ trips: [{ id: "f", name: "Future Miami", destination: "Miami, USA", start_date: "2026-12-01", end_date: "2026-12-05" }, { id: "p", name: "Past Panama", destination: "Panama City", start_date: "2026-10-01", end_date: "2026-10-05" }, { id: "l", name: "Local meeting", destination: "Oranjestad, Aruba", start_date: "2026-11-01", end_date: "2026-11-03" }], projects: [], canTrips: true, canPersonal: true, canDocuments: true, shopping: true });
+  eq(visibleOptions(away, atHome, home, "2026-11-02").map((o) => o.key), ["trip:l", "grocery", "shopping", "document"], "at home: future, finished and faraway trips are hidden; a local trip on today stays");
+  eq(visibleOptions(away, atHome, home, "2026-11-20").map((o) => o.key), ["grocery", "shopping", "document"], "at home: a local trip that is over is hidden too");
+  eq(visibleOptions(away, { city: "Miami", countryCode: "US" }, home, "2026-12-02").length, away.length, "away from home nothing is hidden");
+  eq(visibleOptions(away, null, home, "2026-11-02").length, away.length, "unknown place hides nothing");
+}

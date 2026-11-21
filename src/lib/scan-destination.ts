@@ -130,9 +130,9 @@ export function suggestDestination(i: SuggestInput): Suggestion {
       return { pick: now, confident: false, reason: `Several trips are in ${city}` };
     }
     if (home && (grocery || personal.length)) {
-      // Home is the default: straight to the form, and the Change button is there when it is something else
+      // Home: Groceries (or what you used last) is pre-selected, but a receipt can be Shopping, a trip or one of your own types, so the choices still show
       const pick = last && last.kind !== "trip" && last.kind !== "document" ? last : grocery ?? personal[0];
-      return { pick, confident: true, reason: `You're home in ${city}` };
+      return { pick, confident: false, reason: `You're home in ${city}` };
     }
   }
   if (trips.length === 1 && !grocery && personal.length === 0) return { pick: trips[0], confident: true, reason: null };
@@ -140,6 +140,15 @@ export function suggestDestination(i: SuggestInput): Suggestion {
   if (!place && trips.length === 1 && trips.every((o) => covers(o, i.today))) return { pick: trips[0], confident: onlyBusiness, reason: null };
   const pick = last ?? firstCovering(trips, i.today) ?? trips[0] ?? grocery ?? personal[0] ?? null;
   return { pick, confident: false, reason: last ? "Same as last time" : null };
+}
+
+/**
+ * What the sheet offers. At home, a trip that has not started, one that is over, or one somewhere else is hidden: a receipt
+ * paid at home does not belong to it. Only a trip to your own town that is on today stays. With no known place nothing is hidden.
+ */
+export function visibleOptions(options: ScanOption[], place: Place | null | undefined, home: HomePlace | null | undefined, today: string): ScanOption[] {
+  if (!place || !isHome(place, home)) return options;
+  return options.filter((o) => (o.kind !== "trip" && o.kind !== "ptrip") || (covers(o, today) && destinationMatches(o.destination, place)));
 }
 
 /** Adds a query part to a page address that may already have one . */
