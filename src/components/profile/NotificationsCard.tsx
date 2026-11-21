@@ -6,7 +6,8 @@ import { AccordionSection } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { useAccess } from "@/lib/use-access";
-import { currentSubscription, keyToBytes, pushSupport, type PushSupport } from "@/lib/push-client";
+import { currentSubscription, enablePush, isRegistered, pushSupport, type PushSupport } from "@/lib/push-client";
+import { pushState, type PushState } from "@/lib/push-state";
 import { DEFAULT_PUSH_SETTINGS, hourLabel, type PushDetail, type PushPref, type PushSettings } from "@/lib/push-prefs";
 import { Select } from "@/components/ui/select";
 
@@ -31,6 +32,7 @@ export function NotificationsCard() {
   const { role } = useAccess();
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [on, setOn] = useState(false);
+  const [state, setState] = useState<PushState | null>(null);
   const [prefs, setPrefs] = useState<Prefs>(DEFAULTS);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
@@ -44,29 +46,22 @@ export function NotificationsCard() {
     setConfigured(Boolean(k.configured));
     const p = await fetch("/api/push/prefs", { cache: "no-store" }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
     if (p?.prefs) setPrefs({ ...DEFAULTS, ...p.prefs });
-    if (support === "ok") setOn(Boolean(await currentSubscription()) && Notification.permission === "granted");
+    if (support === "ok") {
+      const sub = await currentSubscription();
+      const st = pushState({ support, permission: Notification.permission, hasSub: !!sub, registered: sub ? await isRegistered(sub.endpoint) : false, wanted: Boolean(p?.prefs?.wanted) });
+      setState(st);
+      setOn(st === "on" || st === "repair");
+    }
   }, [support]);
   useEffect(() => { load(); }, [load]);
 
   async function turnOn() {
     setBusy(true);
     setMsg(null);
-    try {
-      const k = await fetch("/api/push/key", { cache: "no-store" }).then((r) => r.json());
-      if (!k.configured) throw new Error("Alerts are not set up on the server yet.");
-      const perm = await Notification.requestPermission();
-      if (perm !== "granted") throw new Error("Alerts are blocked for this app. Switch them on in your phone's Settings, then try again.");
-      const reg = await navigator.serviceWorker.ready;
-      const sub = (await reg.pushManager.getSubscription()) ?? (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyToBytes(k.key) as BufferSource }));
-      const r = await post("/api/push/subscribe", { subscription: sub.toJSON() });
-      if (!r.ok) throw new Error("Could not save this device. Please try again.");
-      setOn(true);
-      setMsg({ tone: "ok", text: "Alerts are on for this device." });
-    } catch (e) {
-      setMsg({ tone: "bad", text: e instanceof Error ? e.message : "Could not turn alerts on." });
-    } finally {
-      setBusy(false);
-    }
+    const out = await enablePush();
+    if (out.ok) { setOn(true); setState("on"); setMsg({ tone: "ok", text: "Alerts are on for this device." }); }
+    else setMsg({ tone: "bad", text: out.error });
+    setBusy(false);
   }
   async function turnOff() {
     setBusy(true);
@@ -75,6 +70,7 @@ export function NotificationsCard() {
       const sub = await currentSubscription();
       if (sub) { await post("/api/push/unsubscribe", { endpoint: sub.endpoint }); await sub.unsubscribe(); }
       setOn(false);
+      setState("off");
     } catch {
       setMsg({ tone: "bad", text: "Could not turn alerts off. Please try again." });
     } finally {
@@ -128,7 +124,7 @@ export function NotificationsCard() {
       { key: "iptv" as const, title: "IPTV clients expiring", hint: "Within 15 days.", example: "\u201c3 IPTV clients expire within 15 days. First: Nov 20.\u201d" },
     ] }] : []),
   ];
-  const status = !support ? "" : support === "ok" ? (on ? "On for this device" : "Off") : support === "needs-install" ? "Add to Home Screen first" : "Not available here";
+  const status = !support ? "" : support === "ok" ? (state === "repair" ? "Needs repair" : state === "restore" ? "Off on this device. You had alerts on before" : state === "blocked" ? "Blocked in your phone's settings" : on ? "On for this device" : "Off") : support === "needs-install" ? "Add to Home Screen first" : "Not available here";
 
   return (
     <AccordionSection id="notifications" title="Notifications" icon={<Bell />} tone="notifications" summary={configured === false ? "Not set up yet" : status} description="Get a message on this device when something needs you, even when the app is closed.">
@@ -141,7 +137,9 @@ export function NotificationsCard() {
           <span className="flex-1"><span className="block font-semibold">Alerts on this device</span><span className={on ? "text-sm font-medium text-green-700 dark:text-green-400" : "text-sm text-muted-foreground"}>{status}</span></span>
           <Switch checked={on} label="Alerts on this device" disabled={busy || support !== "ok" || configured === false} onChange={(v) => (v ? turnOn() : turnOff())} />
         </div>
-        {on && <Button type="button" variant="outline" className="min-h-[44px]" onClick={test} disabled={busy}>Send a test alert</Button>}
+        {state === "repair" && <Button type="button" className="min-h-[44px]" onClick={turnOn} disabled={busy} data-testid="push-repair">Repair alerts on this device</Button>}
+        {state === "restore" && <Button type="button" className="min-h-[44px]" onClick={turnOn} disabled={busy} data-testid="push-restore-card">Turn alerts back on</Button>}
+        {on && state !== "repair" && <Button type="button" variant="outline" className="min-h-[44px]" onClick={test} disabled={busy}>Send a test alert</Button>}
         {msg && <p role={msg.tone === "bad" ? "alert" : "status"} className={msg.tone === "bad" ? "text-sm text-destructive" : "text-sm text-green-700 dark:text-green-400"}>{msg.text}</p>}
 
         <Section title="What the message shows">

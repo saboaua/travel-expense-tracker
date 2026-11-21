@@ -163,6 +163,20 @@ self.addEventListener("push", (event) => {
   const body = typeof data.body === "string" ? data.body : "Something needs your attention.";
   event.waitUntil(self.registration.showNotification(title, { body, tag: typeof data.tag === "string" ? data.tag : "lifolio", icon: "/icon-192.png", badge: "/icon-192.png", data: { url: typeof data.url === "string" && data.url.startsWith("/") ? data.url : "/" } }));
 });
+// The phone's alert service changed or dropped this device's address: get a new one and save it, so alerts keep coming without opening the app.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil((async () => {
+    try {
+      const k = await fetch("/api/push/key", { cache: "no-store" }).then((r) => r.json());
+      if (!k.configured) return;
+      const pad = "=".repeat((4 - (k.key.length % 4)) % 4);
+      const raw = atob((k.key + pad).replace(/-/g, "+").replace(/_/g, "/"));
+      const key = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+      const sub = event.newSubscription || (await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
+      await fetch("/api/push/subscribe", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "same-origin", body: JSON.stringify({ subscription: sub.toJSON() }) });
+    } catch { /* the daily check when the app opens tries again */ }
+  })());
+});
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const url = (event.notification.data && event.notification.data.url) || "/";

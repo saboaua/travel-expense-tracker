@@ -15,6 +15,7 @@ export function DeferredHelpers() {
         import("@/components/OfflineSync").then((m) => m.OfflineSync),
         import("@/components/OfflineWarm").then((m) => m.OfflineWarm),
         import("@/components/sharing/SharingPopups").then((m) => m.SharingPopups),
+        import("@/components/PushKeeper").then((m) => m.PushKeeper),
       ])
         .then((list) => { if (!off) setParts(list); })
         .catch(() => { /* offline on a first visit: they load next time */ });

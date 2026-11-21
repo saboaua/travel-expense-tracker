@@ -5,12 +5,12 @@ export type PushPref = (typeof PUSH_PREF_KEYS)[number];
 export type PushPrefs = Record<PushPref, boolean>;
 export type PushDetail = "details" | "private";
 export type QuietHours = { on: boolean; start: number; end: number };
-export type PushSettings = PushPrefs & { detail: PushDetail; quiet: QuietHours };
+export type PushSettings = PushPrefs & { detail: PushDetail; quiet: QuietHours; /** you turned alerts on at least once and have not turned them off: lets a new install or a reset phone offer to bring them back */ wanted: boolean };
 
 export const DEFAULT_PUSH_PREFS: PushPrefs = {
   invites: true, shared: true, views: false, reminders: true, iptv: true, trips: true, flights: true, flightTomorrow: true, afterTrip: true, checklist: true, entryCard: true, documents: true, support: true, budget: true, gambling: true, yearlyBills: true, paymentDay: false, accountRequests: true, badges: true,
 };
-export const DEFAULT_PUSH_SETTINGS: PushSettings = { ...DEFAULT_PUSH_PREFS, detail: "details", quiet: { on: false, start: 22, end: 7 } };
+export const DEFAULT_PUSH_SETTINGS: PushSettings = { ...DEFAULT_PUSH_PREFS, detail: "details", wanted: false, quiet: { on: false, start: 22, end: 7 } };
 
 /** The time zone quiet hours are counted in (the same one Telegram quiet hours use). */
 export const PUSH_TZ = "America/Aruba";
@@ -30,6 +30,7 @@ export function normalizePushSettings(saved: unknown): PushSettings {
   // Budget alerts used to follow the Subscription payments switch; keep what the person had
   if (typeof s.budget !== "boolean" && typeof s.reminders === "boolean") out.budget = s.reminders;
   if (s.detail === "private" || s.detail === "details") out.detail = s.detail;
+  if (typeof s.wanted === "boolean") out.wanted = s.wanted;
   const q = s.quiet as Partial<QuietHours> | undefined;
   if (q && typeof q === "object") out.quiet = { on: q.on === true, start: hour(q.start, 22), end: hour(q.end, 7) };
   return out;
@@ -44,6 +45,10 @@ export function parsePushPatch(body: unknown): Partial<PushSettings> | null {
     if (b[k] === undefined) continue;
     if (typeof b[k] !== "boolean") return null;
     out[k] = b[k] as boolean;
+  }
+  if (b.wanted !== undefined) {
+    if (typeof b.wanted !== "boolean") return null;
+    out.wanted = b.wanted;
   }
   if (b.detail !== undefined) {
     if (b.detail !== "details" && b.detail !== "private") return null;

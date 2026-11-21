@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseDevice } from "@/lib/push-client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
@@ -25,6 +26,7 @@ export function Sidebar() {
   const { appName, logoUrl, personalEnabled } = useBrand();
 
   const handleLogout = async () => {
+    await releaseDevice(); // this phone stops getting your alerts; signing back in puts them back
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await clearOfflineData();
     resetAccessCache();

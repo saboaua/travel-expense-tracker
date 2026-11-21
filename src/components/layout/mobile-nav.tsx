@@ -1,5 +1,6 @@
 "use client";
 
+import { releaseDevice } from "@/lib/push-client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -32,6 +33,7 @@ export function MobileNav() {
   useEffect(() => { setOpen(false); }, [pathname]);
 
   const logout = async () => {
+    await releaseDevice(); // this phone stops getting your alerts; signing back in puts them back
     await fetch("/api/auth/logout-event", { method: "POST" }).catch(() => {});
     await clearOfflineData();
     resetAccessCache();
