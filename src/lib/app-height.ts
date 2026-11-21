@@ -11,3 +11,13 @@ export function appHeight(visual: number | null | undefined, inner: number, edit
   if (v < w * 0.75 && !editing) return w; // a transient value, not a keyboard
   return Math.min(v, w);
 }
+
+/**
+ * The installed iPhone app with the see-through status bar: the window height reported by iOS leaves out the status bar strip, so a frame
+ * that long stops short of the bottom (the menu floats above the screen edge). The app really covers the whole screen, so use the screen's
+ * long side in portrait and its short side in landscape (iOS never swaps screen.width/height when rotating).
+ */
+export function standaloneHeight(screenW: number, screenH: number, landscape: boolean, editing: boolean): number {
+  if (editing || !(screenW > 0) || !(screenH > 0)) return 0;
+  return Math.round(landscape ? Math.min(screenW, screenH) : Math.max(screenW, screenH));
+}
