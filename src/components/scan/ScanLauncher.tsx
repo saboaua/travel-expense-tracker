@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Camera, ChevronDown, ChevronUp, Loader2, Plus, Upload } from "lucide-react";
@@ -8,7 +9,7 @@ import { compressReceiptImage } from "@/lib/compress-image";
 import { getLastScanChoice, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
 import { currentPlace } from "@/lib/scan-place";
 import { takeSharedFile } from "@/lib/share-target";
-import { suggestDestination, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
+import { suggestDestination, typeScanOptions, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { ScanModeSheet } from "@/components/scan/ScanModeSheet";
 import { LongReceiptFlow } from "@/components/scan/LongReceiptFlow";
@@ -26,8 +27,12 @@ const localDate = (ms: number) => {
  * When the app is sure where the receipt goes it opens the form straight away (the form has a Change button);
  * otherwise it shows one sheet with the best guess already selected.
  */
-export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOption[]; home: HomePlace | null; showNewTrip: boolean }) {
+export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { options: ScanOption[]; home: HomePlace | null; showNewTrip: boolean }) {
   const router = useRouter();
+  const { types, reload: reloadTypes } = useReceiptTypes();
+  // Your receipt types are only offered where Groceries is (Personal is on)
+  const personal = baseOptions.some((o) => o.kind === "grocery");
+  const options = useMemo(() => (personal ? [...baseOptions, ...typeScanOptions(types)] : baseOptions), [baseOptions, personal, types]);
   const camera = useRef<HTMLInputElement>(null);
   const gallery = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<"scan" | "upload" | "save" | null>(null);
@@ -161,7 +166,9 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
 
       {pending && (
         <ScanSheet
-          options={pending.options}
+          options={pending.options.length === 1 && pending.options[0].kind === "document" ? pending.options : options}
+          types={personal ? types : undefined}
+          onTypesChanged={reloadTypes}
           selected={pending.pick}
           onSelect={(k) => setPending({ ...pending, pick: k })}
           reason={pending.reason}

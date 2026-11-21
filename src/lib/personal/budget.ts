@@ -52,7 +52,7 @@ export function readBudget(r: { id?: string; month?: string | null; amount: numb
 }
 
 export type MonthInputs = {
-  groceries: { total: number | string; currency: string }[];
+  groceries: { total: number | string; currency: string; area?: string | null; type_id?: string | null }[];
   /** utility bills PAID in the month */
   utilities: { amount_usd: number | string | null }[];
   /** utility bills not paid yet: not counted, only mentioned (optional) */
@@ -77,7 +77,7 @@ export const isHouseSpend = (s: { category: string; project_id?: string | null; 
 export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): ByArea {
   const out: ByArea = { groceries: 0, utilities: 0, quick: 0, fuel: 0, house: 0, savings: 0, shopping: 0 };
   const add = (k: SpentArea, v: number | null) => { if (v != null && Number.isFinite(v)) out[k] += v; };
-  for (const g of inp.groceries) add("groceries", convert(Number(g.total), g.currency, currency));
+  for (const g of inp.groceries) if (!(g.area === "other" && g.type_id)) add("groceries", convert(Number(g.total), g.currency, currency));
   for (const x of inp.shopping ?? []) { const v = convert(Number(x.amount), x.currency, currency); add("shopping", v); add("groceries", v == null ? null : -v); }
   for (const u of inp.utilities) add("utilities", convert(Number(u.amount_usd) || 0, "USD", currency));
   for (const s of inp.spends) add(isHouseSpend(s) ? "house" : "quick", convert(Number(s.amount), s.currency, currency, s.amount_usd == null ? null : Number(s.amount_usd)));
@@ -87,6 +87,17 @@ export function spentByArea(inp: MonthInputs, currency: BudgetCurrency): ByArea 
   const fx = totalsByCategory(inp.fixed ?? [], currency);
   if (inp.fixed) for (const k of FIXED_AREAS) out[k] = fx[k];
   for (const k of Object.keys(out) as (SpentArea | FixedCategory)[]) out[k] = round2(out[k] ?? 0);
+  return out;
+}
+
+/** What your own receipt types added this month (by type id), in the budget's currency. Receipts of a type that was deleted count as Groceries. */
+export function spentByTypeId(inp: MonthInputs, currency: BudgetCurrency): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const g of inp.groceries) {
+    if (g.area !== "other" || !g.type_id) continue;
+    const v = convert(Number(g.total), g.currency, currency);
+    if (v != null && Number.isFinite(v)) out[g.type_id] = round2((out[g.type_id] ?? 0) + v);
+  }
   return out;
 }
 
@@ -121,6 +132,8 @@ export type BudgetView = {
   pace: number;
   /** entries left out because their currency could not be converted */
   uncounted: number;
+  /** what each of your receipt types added (by type id); already part of spent */
+  byType: Record<string, number>;
 };
 
 export function daysInMonthOf(today: string): number {
@@ -128,8 +141,8 @@ export function daysInMonthOf(today: string): number {
   return new Date(Date.UTC(y, m, 0)).getUTCDate();
 }
 
-export function budgetView(setting: BudgetSetting, byArea: ByArea, today: string, uncounted = 0): BudgetView {
-  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + (byArea[a.key] ?? 0), 0) + (byArea.savings ?? 0) + (byArea.shopping ?? 0) + FIXED_AREAS.reduce((t, k) => t + (byArea[k] ?? 0), 0));
+export function budgetView(setting: BudgetSetting, byArea: ByArea, today: string, uncounted = 0, byType: Record<string, number> = {}): BudgetView {
+  const spent = round2(BUDGET_AREAS.reduce((t, a) => t + (byArea[a.key] ?? 0), 0) + (byArea.savings ?? 0) + (byArea.shopping ?? 0) + FIXED_AREAS.reduce((t, k) => t + (byArea[k] ?? 0), 0) + Object.values(byType).reduce((t, v) => t + v, 0));
   const dim = daysInMonthOf(today), day = Number(today.slice(8, 10));
   const daysLeft = dim - day + 1;
   const left = round2(Math.max(0, setting.amount - spent));
@@ -138,7 +151,7 @@ export function budgetView(setting: BudgetSetting, byArea: ByArea, today: string
     state: budgetState(spent, setting.amount), byArea, limits: setting.limits, daysLeft, daysInMonth: dim,
     perDay: left > 0 && daysLeft > 0 ? Math.round(left / daysLeft) : null,
     pace: Math.min(1, Math.max(0, (day - 1) / dim)),
-    uncounted,
+    uncounted, byType,
   };
 }
 

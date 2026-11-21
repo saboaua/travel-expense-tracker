@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, FileText, Globe, Hammer, MapPin, ShoppingBag, ShoppingCart } from "lucide-react";
+import { Briefcase, FileText, Globe, Hammer, MapPin, MoreHorizontal, ShoppingBag, ShoppingCart } from "lucide-react";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { PERSONAL_PROJECT_COLS } from "@/lib/columns";
 import { peekQuickScan, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
-import { buildScanOptions, withQuery, type ScanOption } from "@/lib/scan-destination";
+import { buildScanOptions, typeScanOptions, withQuery, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { formatDateRange } from "@/lib/utils";
 
-const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, shopping: ShoppingBag, document: FileText } as const;
+const ICON = { trip: Briefcase, project: Hammer, ptrip: Globe, grocery: ShoppingCart, shopping: ShoppingBag, type: MoreHorizontal, document: FileText } as const;
 
 /**
  * Shown on the form a Scan or Upload opened. Says where the receipt is going and why, with a Change button that
@@ -25,6 +26,7 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
   const [open, setOpen] = useState(false);
   const [pick, setPick] = useState(currentKey);
   const [busy, setBusy] = useState(false);
+  const { types, reload: reloadTypes } = useReceiptTypes();
 
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
@@ -52,12 +54,13 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
     );
   };
 
+  const allOptions = options ? (perms.has("personal") ? [...options, ...typeScanOptions(types)] : options) : null;
   if (!state) return null;
-  const kind = currentKey.startsWith("trip:") ? "trip" : currentKey.startsWith("project:") ? "project" : currentKey.startsWith("ptrip:") ? "ptrip" : currentKey === "document" ? "document" : currentKey === "shopping" ? "shopping" : "grocery";
+  const kind = currentKey.startsWith("trip:") ? "trip" : currentKey.startsWith("project:") ? "project" : currentKey.startsWith("ptrip:") ? "ptrip" : currentKey === "document" ? "document" : currentKey === "shopping" ? "shopping" : currentKey.startsWith("type:") ? "type" : "grocery";
   const Icon = ICON[kind];
 
   const move = async () => {
-    const next = options?.find((o) => o.key === pick);
+    const next = allOptions?.find((o) => o.key === pick);
     if (!next) return;
     if (next.key === currentKey) return setOpen(false);
     setBusy(true);
@@ -89,7 +92,9 @@ export function ScanChip({ currentKey, label }: { currentKey: string; label: str
       {open && (
         <ScanSheet
           title="Move this receipt to…"
-          options={options ?? []}
+          options={allOptions ?? []}
+          types={perms.has("personal") ? types : undefined}
+          onTypesChanged={reloadTypes}
           selected={pick}
           onSelect={setPick}
           reason={null}

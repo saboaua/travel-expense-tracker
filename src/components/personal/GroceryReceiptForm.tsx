@@ -17,6 +17,9 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { AlertTriangle, ArrowLeft, Check, Eye, Plus, Sparkles, Trash2 } from "lucide-react";
 import { ReceiptCapture } from "@/components/personal/ReceiptCapture";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
+import { suggestType, typeFromHistory } from "@/lib/receipt-types";
+import { NotGroceriesBanner } from "@/components/receipt-types/NotGroceriesBanner";
 import { ScanChip } from "@/components/scan/ScanChip";
 import { takeQuickScan } from "@/lib/quick-scan";
 import { useGroceryCategories } from "@/lib/use-categories";
@@ -45,7 +48,7 @@ const money = (s: string) => {
 };
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; area?: "shopping" }) {
+export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { receiptId?: string; area?: "shopping" | "other"; typeId?: string }) {
   const router = useRouter();
   const currencies = useCurrencies();
   const groceryCategories = useGroceryCategories();
@@ -55,7 +58,12 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
   // A receipt belongs to Shopping when opened from the Shopping pages (or the older ?area=shopping link), or when it was saved there
   const [asShopping, setAsShopping] = useState(area === "shopping");
   useEffect(() => { if (new URLSearchParams(window.location.search).get("area") === "shopping") setAsShopping(true); }, []);
-  const BACK = asShopping ? "/personal/shopping" : "/personal/groceries";
+  const { types } = useReceiptTypes();
+  const [typeId, setTypeId] = useState<string | null>(typeProp ?? null);
+  const rtype = types.find((t) => t.id === typeId) ?? null;
+  // After a scan read as Groceries: a receipt that looks like something else (a massage, a clinic) is offered a better home. Nothing moves without a tap.
+  const [nudge, setNudge] = useState<{ pick: string; why: string } | null>(null);
+  const BACK = typeId ? `/personal/types/${typeId}` : asShopping ? "/personal/shopping" : "/personal/groceries";
   const allowed = (c: string) => {
     const hit = categoryNames.find((n) => n.toLowerCase() === c.toLowerCase());
     const shop = asShopping ? categoryNames.find((n) => n.toLowerCase() === "shopping") : undefined;
@@ -160,7 +168,8 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
       setPricesOnly(head.prices_only === true);
       wasSaved.current = true;
       if (head.area === "shopping") setAsShopping(true);
-      wasArea.current = head.area === "shopping";
+      if (head.area === "other" && (head as { type_id?: string | null }).type_id) setTypeId((head as { type_id?: string | null }).type_id ?? null);
+      wasArea.current = head.area === "shopping" || head.area === "other";
       wasPaid.current = !!normPaid(head.paid_with);
       wasTrip.current = !!normTripRef(head.trip_ref);
       setPaidWith(normPaid(head.paid_with));
@@ -197,7 +206,7 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
     quickHandled.current = true;
     if (new URLSearchParams(window.location.search).get("quick") !== "1") return;
     // The photo goes to the crop step first, then is read, the same as a photo picked on this screen
-    takeQuickScan(area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping" ? "shopping" : "grocery").then((f) => { if (f) setIncoming(f); });
+    takeQuickScan(typeProp ? `type:${typeProp}` : area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping" ? "shopping" : "grocery").then((f) => { if (f) setIncoming(f); });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, guarded by quickHandled
   }, [categoryNames.length]);
 
@@ -226,6 +235,18 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
     if (extra) setNote((cur) => (cur ? `${cur} ${extra}` : extra));
   };
 
+  /** Looks at the store and the lines: if they point to one of your types, the banner offers it. */
+  const suggestHome = async (storeName: string, names: string[]) => {
+    let hit = null as { id: string; name: string } | null; let why = "";
+    try {
+      const { data } = await createClient().from("grocery_receipts").select("store, type_id, area").eq("area", "other").limit(500);
+      const past = typeFromHistory(storeName, (data ?? []) as { store?: string | null; type_id?: string | null; area?: string | null }[], types);
+      if (past) { hit = past; why = `You filed ${storeName} under ${past.name} before.`; }
+    } catch { /* offline: the words on the receipt still work */ }
+    if (!hit) { const k = suggestType(storeName, names, types); if (k) { hit = k; why = "The store and the items point to a different kind of receipt."; } }
+    setNudge(hit ? { pick: hit.id, why } : null);
+  };
+
   const scan = async (f: File) => {
     setScanning(true);
     setNote(null);
@@ -238,6 +259,7 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
     try {
       const r = await extractGroceryReceipt(f, { currency, categories: categoryNames }, (u) => applyLate(id, u));
       if (r.store && !store) setStore(r.store);
+      if (!typeId && !asShopping && !receiptId) void suggestHome(r.store || store, r.items.map((it) => it.name));
       if (r.date) setDate(r.date);
       if (r.total != null) setTotal(r.total.toFixed(2));
       const known = (c: string) => currencies.some((x) => x.code === c);
@@ -330,7 +352,7 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
       if (!owner) throw new Error("Sign in again to save.");
 
       // Only sent when it matters, so a database without the price-notes migration still saves the receipt
-      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || wasArea.current ? { area: asShopping ? "shopping" : "groceries" } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
+      const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || typeId || wasArea.current ? { area: typeId ? "other" : asShopping ? "shopping" : "groceries", type_id: typeId } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -373,12 +395,15 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
       </Link>
       {!receiptId && (
         <div className="mb-4 empty:hidden">
-          <ScanChip currentKey={asShopping ? "shopping" : "grocery"} label={asShopping ? "Shopping \u00b7 Personal" : "Groceries \u00b7 Personal"} />
+          <ScanChip currentKey={typeId ? `type:${typeId}` : asShopping ? "shopping" : "grocery"} label={rtype ? `${rtype.name} \u00b7 Personal` : asShopping ? "Shopping \u00b7 Personal" : "Groceries \u00b7 Personal"} />
         </div>
+      )}
+      {nudge && !typeId && !asShopping && (
+        <NotGroceriesBanner key={nudge.pick} types={types} pick={nudge.pick} why={nudge.why} onKeep={() => setNudge(null)} onMove={(c) => { setNudge(null); if (c === "shopping") setAsShopping(true); else setTypeId(c); }} />
       )}
       <Card>
         <CardHeader>
-          <CardTitle as="h1">{receiptId ? (asShopping ? "Edit shopping receipt" : "Edit grocery receipt") : manual ? "Add receipt by hand" : asShopping ? "Add shopping receipt" : "Add grocery receipt"}</CardTitle>
+          <CardTitle as="h1">{receiptId ? (rtype ? `Edit ${rtype.name.toLowerCase()} receipt` : asShopping ? "Edit shopping receipt" : "Edit grocery receipt") : manual ? "Add receipt by hand" : rtype ? `Add ${rtype.name.toLowerCase()} receipt` : asShopping ? "Add shopping receipt" : "Add grocery receipt"}</CardTitle>
           <CardDescription>{manual ? "No photo? Type it in. Items you list still show up in the Price tracker. With only a total, it counts toward spending but not price comparison." : (asShopping ? "Scan the receipt, then check the items and pick how you paid." : "Scan the receipt, then check the items. Prices are tracked per item over time.")}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -459,9 +484,10 @@ export function GroceryReceiptForm({ receiptId, area }: { receiptId?: string; ar
 
             <div className="space-y-2">
               <label htmlFor="gr-area" className="text-sm font-medium">Shows up in</label>
-              <Select id="gr-area" value={asShopping ? "shopping" : "groceries"} onChange={(e) => setAsShopping(e.target.value === "shopping")}>
+              <Select id="gr-area" value={typeId ? `type:${typeId}` : asShopping ? "shopping" : "groceries"} onChange={(e) => { const v = e.target.value; setNudge(null); if (v.startsWith("type:")) { setTypeId(v.slice(5)); setAsShopping(false); } else { setTypeId(null); setAsShopping(v === "shopping"); } }}>
                 <option value="groceries">Groceries</option>
                 <option value="shopping">Shopping</option>
+                {types.map((t) => <option key={t.id} value={`type:${t.id}`}>{t.name}</option>)}
               </Select>
             </div>
             <PaidWithPicker value={paidWith} onChange={setPaidWith} />

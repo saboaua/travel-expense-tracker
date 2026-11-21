@@ -6,20 +6,21 @@ import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { spentByArea, uncountedEntries, utilitiesDueAmount, type SpentArea } from "@/lib/personal/budget";
+import { spentByArea, spentByTypeId, uncountedEntries, utilitiesDueAmount, type SpentArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
-import { slices, pieSlices } from "@/lib/personal/where-it-goes";
+import { slices, pieSlices, type PieKey } from "@/lib/personal/where-it-goes";
 import { AREA_STYLE } from "@/components/personal/BudgetCard";
 import { formatCurrency, todayISO } from "@/lib/utils";
 import { dominantCurrency, type BudgetCurrency } from "@/lib/personal/money";
 
-const LABEL: Record<SpentArea, string> = { groceries: "Groceries", shopping: "Shopping", utilities: "Utilities", quick: "Quick spend", fuel: "Fuel", house: "House & repairs", savings: "Savings" };
-const HREF: Record<SpentArea, string> = { groceries: "/personal/groceries", shopping: "/personal/shopping", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
+const LABEL: Record<PieKey, string> = { types: "Receipt types", groceries: "Groceries", shopping: "Shopping", utilities: "Utilities", quick: "Quick spend", fuel: "Fuel", house: "House & repairs", savings: "Savings" };
+const HREF: Record<PieKey, string> = { types: "/personal/types", groceries: "/personal/groceries", shopping: "/personal/shopping", utilities: "/personal/utilities", quick: "/personal/spend", fuel: "/personal/fuel", house: "/personal/house", savings: "/personal/savings" };
+const colorOf = (k: PieKey) => (k === "types" ? "#64748b" : AREA_STYLE[k].color);
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
 /** Where this month's money went: groceries, utilities, savings, house and quick spends, each counted once (same rules as the budget). */
 export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) {
-  const [data, setData] = useState<{ by: Record<SpentArea, number>; uncounted: number; due: number; cur: BudgetCurrency } | null>(null);
+  const [data, setData] = useState<{ by: Record<SpentArea, number> & { types: number }; uncounted: number; due: number; cur: BudgetCurrency } | null>(null);
   const today = todayISO(), month = `${today.slice(0, 7)}-01`;
   const monthName = MONTHS[Number(today.slice(5, 7)) - 1];
 
@@ -29,7 +30,7 @@ export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) 
     (async () => {
       const inputs = await fetchMonthInputs(createClient(), month);
       const cur = currency ?? dominantCurrency([...inputs.groceries, ...inputs.spends]);
-      if (alive) setData({ by: spentByArea(inputs, cur), uncounted: uncountedEntries(inputs, cur), due: utilitiesDueAmount(inputs, cur), cur });
+      if (alive) setData({ by: { ...spentByArea(inputs, cur), types: Object.values(spentByTypeId(inputs, cur)).reduce((t, v) => t + v, 0) }, uncounted: uncountedEntries(inputs, cur), due: utilitiesDueAmount(inputs, cur), cur });
     })().catch(() => { if (alive) setData(null); });
     return () => { alive = false; };
   }, [currency, month]);
@@ -58,7 +59,7 @@ export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) 
         <div className="lg:flex lg:items-center lg:gap-8">
           <div className="mt-3 flex flex-col items-center lg:mt-0 lg:shrink-0">
             <svg viewBox="0 0 200 200" width="220" height="220" role="img" aria-label={`Where ${monthName} went: ${list.map((s) => `${LABEL[s.key]} ${s.percent}%`).join(", ")}`} data-testid="where-pie">
-              {paths.map((p) => <path key={p.key} d={p.d} fill={AREA_STYLE[p.key].color} />)}
+              {paths.map((p) => <path key={p.key} d={p.d} fill={colorOf(p.key)} />)}
               {paths.filter((p) => p.label).map((p) => <text key={`t${p.key}`} x={p.label!.x} y={p.label!.y + 5} textAnchor="middle" fontSize="15" fontWeight="700" fill="#fff">{p.percent}%</text>)}
             </svg>
             <p className="mt-1 text-center text-[13px] text-muted-foreground">Spent in {monthName} <b className="ml-1 text-lg tabular-nums text-foreground" data-testid="where-total"><Money amount={total} currency={currencyShown} /></b></p>
@@ -67,7 +68,7 @@ export function WhereItGoes({ currency }: { currency?: BudgetCurrency | null }) 
             {list.map((s, i) => (
               <li key={s.key} className={i ? "border-t" : ""}>
                 <Link href={HREF[s.key]} data-testid={`where-${s.key}`} className="flex min-h-12 items-center gap-2.5 py-2 hover:bg-accent/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-                  <span className="h-3 w-3 shrink-0 rounded" style={{ background: AREA_STYLE[s.key].color }} aria-hidden="true" />
+                  <span className="h-3 w-3 shrink-0 rounded" style={{ background: colorOf(s.key) }} aria-hidden="true" />
                   <b className="flex-1 text-[15px]">{LABEL[s.key]}</b>
                   <b className="text-[15px] tabular-nums"><Money amount={s.value} currency={currencyShown} /></b>
                   <span className="w-10 text-right text-[13px] font-bold tabular-nums text-muted-foreground">{s.percent}%</span>

@@ -1,13 +1,14 @@
 /** Pure helpers for the "Where it goes" pie on Personal. */
 import type { SpentArea } from "./budget";
 
-export type Slice = { key: SpentArea; value: number; percent: number };
-export type PieSlice = { key: SpentArea; percent: number; d: string; label: { x: number; y: number } | null };
+export type PieKey = SpentArea | "types";
+export type Slice = { key: PieKey; value: number; percent: number };
+export type PieSlice = { key: PieKey; percent: number; d: string; label: { x: number; y: number } | null };
 
-const AREAS: SpentArea[] = ["groceries", "shopping", "utilities", "quick", "fuel", "house", "savings"];
+const AREAS: PieKey[] = ["groceries", "shopping", "utilities", "quick", "fuel", "house", "savings", "types"];
 
 /** The parts that have money, biggest first. Percentages are whole numbers that add up to 100 (largest remainder). */
-export function slices(by: Record<SpentArea, number>): Slice[] {
+export function slices(by: Record<SpentArea, number> & { types?: number }): Slice[] {
   const parts = AREAS.map((key) => ({ key, value: Math.max(0, Number(by[key]) || 0) })).filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
   const total = parts.reduce((t, p) => t + p.value, 0);
   if (!total) return [];

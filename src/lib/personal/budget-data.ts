@@ -31,7 +31,7 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
   const end = monthEnd(monthStart);
   const mine = <T,>(q: T): T => (userId ? (q as unknown as { eq: (c: string, v: string) => T }).eq("user_id", userId) : q);
   const [g, u, ud, s, pr, fu] = await Promise.all([
-    withColumnFallback((cols) => mine(supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000)), "total, currency, prices_only", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
+    withColumnFallback3((cols) => mine(supabase.from("grocery_receipts").select(cols).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000)), "total, currency, prices_only, area, type_id", "total, currency, prices_only, area", "total, currency").then((r) => onlySpending<{ total: number; currency: string }>(r)),
     // utilities count in the month they were PAID; bills not paid yet are only reported as "still due"
     mine(supabase.from("utility_bills").select("amount_usd").gte("paid_on", monthStart).lte("paid_on", end).limit(200)),
     mine(supabase.from("utility_bills").select("amount_usd").is("paid_on", null).limit(200)),
@@ -42,10 +42,10 @@ export async function fetchMonthInputs(supabase: SupabaseClient, monthStart: str
   ]);
   // receipt lines in a shopping category (notebooks, clothes...) count under Shopping, not Groceries
   const shopNames = await fetchShoppingList(supabase);
-  const sh = await mine(supabase.from("grocery_items").select("category, line_total, grocery_receipts!inner(purchase_date, currency, prices_only)").in("category", shopNames).gte("grocery_receipts.purchase_date", monthStart).lte("grocery_receipts.purchase_date", end).limit(2000));
-  const shopping = sh.error ? [] : ((sh.data ?? []) as unknown as { line_total: number | string; grocery_receipts: { currency: string; prices_only?: boolean | null } | { currency: string; prices_only?: boolean | null }[] }[])
+  const sh = await mine(supabase.from("grocery_items").select("category, line_total, grocery_receipts!inner(purchase_date, currency, prices_only, area)").in("category", shopNames).gte("grocery_receipts.purchase_date", monthStart).lte("grocery_receipts.purchase_date", end).limit(2000));
+  const shopping = sh.error ? [] : ((sh.data ?? []) as unknown as { line_total: number | string; grocery_receipts: { currency: string; prices_only?: boolean | null; area?: string | null } | { currency: string; prices_only?: boolean | null; area?: string | null }[] }[])
     .map((r) => ({ amount: r.line_total, rc: Array.isArray(r.grocery_receipts) ? r.grocery_receipts[0] : r.grocery_receipts }))
-    .filter((r) => r.rc && !r.rc.prices_only)
+    .filter((r) => r.rc && !r.rc.prices_only && r.rc.area !== "other")
     .map((r) => ({ amount: r.amount, currency: r.rc.currency }));
   const homeIds = new Set(((pr.data ?? []) as { id: string }[]).map((p) => p.id));
   let projects: MonthInputs["projects"] = [];

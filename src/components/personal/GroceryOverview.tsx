@@ -24,6 +24,8 @@ import { applyRows, isRowSave, waitingRowIds } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { isSpending } from "@/lib/personal/price-notes";
 import { formatDate, todayISO } from "@/lib/utils";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
+import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 import { PaidTag, StoreTile } from "@/components/personal/PaidIcon";
 import type { PaidWith } from "@/lib/paid-with";
 
@@ -52,9 +54,12 @@ function ReceiptRow({ id, unsent, base, children }: { id: string; unsent: boolea
     : <Link href={`${base}/${id}`} className="flex min-h-16 items-center rounded-xl border p-3 transition-colors hover:bg-accent">{children}</Link>;
 }
 
-export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "shopping" }) {
-  const shopping = area === "shopping";
-  const base = shopping ? "/personal/shopping" : "/personal/groceries";
+export function GroceryOverview({ area = "groceries", typeId }: { area?: "groceries" | "shopping"; typeId?: string }) {
+  const typed = !!typeId;
+  const shopping = area === "shopping" || typed; // a receipt type page reads like Shopping: no grocery price tools
+  const { types } = useReceiptTypes();
+  const rtype = typed ? types.find((t) => t.id === typeId) ?? null : null;
+  const base = typed ? `/personal/types/${typeId}` : shopping ? "/personal/shopping" : "/personal/groceries";
   const today = todayISO();
   const { data, loading, error, savedAt, userId } = useCachedQuery<Overview>((uid) => overviewKey(uid), (sb) => fetchOverview(sb, today), []);
   const { items: pending } = useOutbox(userId);
@@ -64,8 +69,8 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
 
   const allReceipts = useMemo(
     () => (applyRows(data?.receipts ?? [], pending, "grocery_receipts").map((r) => ({ ...r, total: Number(r.total) })) as (Receipt & { area?: string | null })[])
-      .filter((r) => (r.area === "shopping") === shopping),
-    [data, pending, shopping]
+      .filter((r) => typed ? r.area === "other" && (r as { type_id?: string | null }).type_id === typeId : r.area !== "other" && (r.area === "shopping") === shopping),
+    [data, pending, shopping, typed, typeId]
   );
   const inArea = useMemo(() => new Set(allReceipts.map((r) => r.id)), [allReceipts]);
   // Receipts kept only for their prices are listed, but never counted in the totals, categories or top items
@@ -123,10 +128,10 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
       <div className="space-y-4 border-b pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="text-2xl font-bold md:text-3xl">{shopping ? "Shopping" : "Groceries"}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{shopping ? "Clothes, electronics, home and other stores" : "Monthly spending, categories and item price changes"}</p>
+            <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl">{rtype && <TypeIcon icon={rtype.icon} color={rtype.color} className="h-10 w-10" />}{typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"}</h1>
+            <p className="mt-1 text-sm text-muted-foreground">{typed ? "Your receipts of this type, month by month" : shopping ? "Clothes, electronics, home and other stores" : "Monthly spending, categories and item price changes"}</p>
           </div>
-          <Link href={`${base}/new`} className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> {shopping ? "Scan shopping receipt" : "Scan receipt"}</Button></Link>
+          <Link href={`${base}/new`} className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> {typed ? "Scan receipt" : shopping ? "Scan shopping receipt" : "Scan receipt"}</Button></Link>
         </div>
         {!shopping && (
           <div className="grid grid-cols-3 gap-3 md:gap-4">
@@ -150,8 +155,8 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
       {!loading && !error && allReceipts.length === 0 && (
         <Card><CardContent className="py-16 text-center">
           <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <p className="mb-4 text-muted-foreground">{shopping ? "No shopping receipts yet" : "No grocery receipts yet"}</p>
-          <Link href={`${base}/new`}><Button><Plus className="mr-2 h-4 w-4" /> {shopping ? "Scan your first shopping receipt" : "Scan your first receipt"}</Button></Link>
+          <p className="mb-4 text-muted-foreground">{typed ? "No receipts of this type yet" : shopping ? "No shopping receipts yet" : "No grocery receipts yet"}</p>
+          <Link href={`${base}/new`}><Button><Plus className="mr-2 h-4 w-4" /> {typed ? "Scan your first receipt" : shopping ? "Scan your first shopping receipt" : "Scan your first receipt"}</Button></Link>
         </CardContent></Card>
       )}
 
@@ -183,7 +188,7 @@ export function GroceryOverview({ area = "groceries" }: { area?: "groceries" | "
             </CardContent>
           </Card>
 
-          <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
+          <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
 
           <div className="grid gap-4 md:grid-cols-2">
             <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent>{itemsReady ? <Bars rows={catRows} currency={cur} /> : <p className="text-sm text-muted-foreground" data-testid="items-loading" role="status">{olderFailed === month ? "This month's lines are not saved on this phone. Connect to see them." : "Loading this month's lines…"}</p>}</CardContent></Card>

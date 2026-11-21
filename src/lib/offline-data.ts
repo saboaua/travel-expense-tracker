@@ -171,7 +171,7 @@ export async function warmGroceries(supabase: SupabaseClient, userId: string): P
     const bundle = await fetchReceiptBundle(supabase, r.id);
     if (!bundle.data) continue;
     await browserKv.set(receiptKey(userId, r.id), bundle.data).catch(() => {});
-    const at = r.area === "shopping" ? "/personal/shopping" : "/personal/groceries";
+    const at = r.area === "shopping" ? "/personal/shopping" : r.area === "other" && r.type_id ? `/personal/types/${r.type_id}` : "/personal/groceries";
     pages.push(`${at}/${r.id}`, `${at}/${r.id}/edit`);
   }
   await warmPages(pages);

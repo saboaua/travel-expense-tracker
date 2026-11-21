@@ -6,10 +6,13 @@ import Link from "next/link";
 import { ChevronRight, Coins, Dices, Fuel, FileCheck2, Home, Landmark, CreditCard, PiggyBank, Settings, ShoppingBag, ShoppingCart, Zap, Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
-import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
+import { BUDGET_AREAS, budgetView, pickBudget, spentByArea, spentByTypeId, uncountedEntries, utilitiesDueAmount, type BudgetView, type SpentArea } from "@/lib/personal/budget";
 import { fetchBudgets, fetchFixedCosts, fetchMonthInputs } from "@/lib/personal/budget-data";
 import { CATEGORY_LABEL, configuredCategories, nextYearly, costName, MONTHS, type FixedCategory, type FixedCost } from "@/lib/personal/fixed-costs";
 import { convert } from "@/lib/personal/money";
+import { typeBudgetLines, type ReceiptType } from "@/lib/receipt-types";
+import { fetchReceiptTypes } from "@/lib/receipt-types-data";
+import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 import { formatCurrency, todayISO } from "@/lib/utils";
 
 export const AREA_STYLE: Record<SpentArea, { color: string; icon: typeof Zap }> = {
@@ -40,12 +43,13 @@ const STATE_CLASS = {
 } as const;
 
 /** One bar for the whole budget: a colour for each area, a grey tick for today and a dark tick where the budget ends once you pass it. */
-function TotalBar({ v }: { v: BudgetView }) {
+function TotalBar({ v, types }: { v: BudgetView; types: ReceiptType[] }) {
   const scale = Math.max(v.spent, v.budget) || 1;
   return (
     <div className="relative" role="img" aria-label={`${formatCurrency(v.spent, v.currency)} of ${formatCurrency(v.budget, v.currency)} used`}>
       <div className="flex h-3.5 overflow-hidden rounded-full bg-muted">
         {BAR_AREAS.map((k) => v.byArea[k] > 0 ? <div key={k} style={{ width: `${(v.byArea[k] / scale) * 100}%`, background: AREA_STYLE[k].color }} /> : null)}
+        {types.map((t) => (v.byType[t.id] ?? 0) > 0 ? <div key={t.id} style={{ width: `${((v.byType[t.id] ?? 0) / scale) * 100}%`, background: t.color }} /> : null)}
         {FIXED_ORDER.map((k) => (v.byArea[k] ?? 0) > 0 ? <div key={k} style={{ width: `${((v.byArea[k] ?? 0) / scale) * 100}%`, background: FIXED_STYLE[k].color }} /> : null)}
       </div>
       {v.over > 0 && <div className="absolute -bottom-1 -top-1 w-0.5 bg-foreground" style={{ left: `${(v.budget / scale) * 100}%` }} />}
@@ -76,6 +80,41 @@ function AreaRow({ k, v }: { k: SpentArea; v: BudgetView }) {
   );
 }
 
+/** A receipt type with its own line: its amount this month, its optional limit, and a link to its receipts. */
+function TypeRow({ t, amount, v }: { t: ReceiptType; amount: number; v: BudgetView }) {
+  const limit = t.monthly_limit;
+  const over = !!limit && amount > limit;
+  return (
+    <Link href={`/personal/types/${t.id}`} className="block min-h-12 border-t py-2.5 hover:bg-accent/40" data-testid={`budget-type-${t.id}`} aria-label={`${t.name}: open`}>
+      <div className="flex items-center gap-2.5">
+        <TypeIcon icon={t.icon} color={t.color} className="h-8 w-8" />
+        <b className="flex-1 text-[15px]">{t.name}</b>
+        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} over={over} />{limit ? <span className="text-[13px] text-muted-foreground"> of {formatCurrency(limit, v.currency)}</span> : null}</span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </div>
+      {limit ? (
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted" data-testid={`budget-type-bar-${t.id}`} data-over={over || undefined}>
+          <div className="h-full" style={{ width: `${Math.min(100, (amount / limit) * 100)}%`, background: over ? "#dc2626" : t.color }} />
+        </div>
+      ) : null}
+    </Link>
+  );
+}
+
+/** Types without their own line, added up in one row that lists their names. */
+function OtherTypesRow({ amount, names, v }: { amount: number; names: string[]; v: BudgetView }) {
+  return (
+    <Link href="/personal/types" className="block min-h-12 border-t py-2.5 hover:bg-accent/40" data-testid="budget-other-types" aria-label="Other types: open">
+      <div className="flex items-center gap-2.5">
+        <TypeIcon icon="tag" color="#64748b" className="h-8 w-8" />
+        <span className="min-w-0 flex-1"><b className="block text-[15px]">Other types</b><span className="block truncate text-xs text-muted-foreground">{names.join(", ")}</span></span>
+        <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} /></span>
+        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+      </div>
+    </Link>
+  );
+}
+
 function FixedRow({ k, v, limit }: { k: FixedCategory; v: BudgetView; limit: number | null }) {
   const { color, icon: Icon, href } = FIXED_STYLE[k];
   const amount = v.byArea[k] ?? 0;
@@ -99,6 +138,7 @@ export function BudgetCard() {
   const [none, setNone] = useState(false);
   const [hidden, setHidden] = useState(false);
   const [costs, setCosts] = useState<FixedCost[]>([]);
+  const [types, setTypes] = useState<ReceiptType[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -110,11 +150,12 @@ export function BudgetCard() {
       if (missing) return setHidden(true);
       const setting = pickBudget(rows, month);
       if (!setting) return setNone(true);
-      const [inputs, fx] = await Promise.all([fetchMonthInputs(supabase, month), fetchFixedCosts(supabase)]);
+      const [inputs, fx, ty] = await Promise.all([fetchMonthInputs(supabase, month), fetchFixedCosts(supabase), fetchReceiptTypes(supabase)]);
       if (!alive) return;
       setCosts(fx.costs);
+      setTypes(ty.data?.types ?? []);
       setDue(utilitiesDueAmount(inputs, setting.currency));
-      setView(budgetView(setting, spentByArea(inputs, setting.currency), today, uncountedEntries(inputs, setting.currency)));
+      setView(budgetView(setting, spentByArea(inputs, setting.currency), today, uncountedEntries(inputs, setting.currency), spentByTypeId(inputs, setting.currency)));
     })().catch(() => { if (alive) setHidden(true); });
     return () => { alive = false; };
   }, []);
@@ -133,6 +174,7 @@ export function BudgetCard() {
   }
   if (!view) return <Card className="min-h-[220px] rounded-2xl lg:col-span-2" aria-hidden="true">&nbsp;</Card>;
 
+  const lines = typeBudgetLines(types, view.byType);
   const soon = comingUpNote(costs, todayISO(), view.currency);
   const month = new Date(`${todayISO().slice(0, 7)}-01T12:00:00`).toLocaleString("en-US", { month: "long" });
   return (
@@ -144,7 +186,7 @@ export function BudgetCard() {
       <p className="mt-2.5 text-[30px] font-bold leading-none tabular-nums" data-testid="budget-headline">
         {view.over > 0 ? <><span className="text-red-700 dark:text-red-300"><span className="text-sm font-bold">Over by</span> <Money amount={view.over} currency={view.currency} /></span> <span className="text-sm font-medium text-muted-foreground">of {formatCurrency(view.budget, view.currency)}</span></> : <><Money amount={view.left} currency={view.currency} /> <span className="text-sm font-medium text-muted-foreground">left of {formatCurrency(view.budget, view.currency)}</span></>}
       </p>
-      <div className="mb-1.5 mt-3"><TotalBar v={view} /></div>
+      <div className="mb-1.5 mt-3"><TotalBar v={view} types={types} /></div>
       <p className="mb-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground" data-testid="budget-legend">
         <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-muted-foreground/70" aria-hidden="true" />Where today is in the month</span>
         {view.over > 0 && <span className="inline-flex items-center gap-1.5"><span className="h-3 w-0.5 bg-foreground" aria-hidden="true" />Your budget</span>}
@@ -155,6 +197,8 @@ export function BudgetCard() {
       {BUDGET_AREAS.map((a) => <AreaRow key={a.key} k={a.key} v={view} />)}
       {view.byArea.shopping > 0 && <AreaRow k="shopping" v={view} />}
       {view.byArea.savings > 0 && <AreaRow k="savings" v={view} />}
+      {lines.own.map((l) => <TypeRow key={l.type.id} t={l.type} amount={l.amount} v={view} />)}
+      {lines.others.amount > 0 && <OtherTypesRow amount={lines.others.amount} names={lines.others.names} v={view} />}
       {FIXED_ORDER.filter((k) => (view.byArea[k] ?? 0) > 0 || configuredCategories(costs).includes(k)).map((k) => <FixedRow key={k} k={k} v={view} limit={k === "gambling" ? gamblingLimit(costs, view.currency) : null} />)}
       {view.byArea.savings > 0 && <p className="mt-1 rounded-lg bg-teal-50 px-3 py-2 text-xs leading-snug text-teal-900 dark:bg-teal-950 dark:text-teal-100" data-testid="budget-savings-note">Savings counts as spending: that money is already set aside for your plans.</p>}
       {due > 0 && <p className="mt-1 rounded-lg bg-amber-50 px-3 py-2 text-xs leading-snug text-amber-900 dark:bg-amber-950 dark:text-amber-100" data-testid="budget-due-note">{formatCurrency(due, view.currency)} more is due in utilities. It counts once you pay it.</p>}

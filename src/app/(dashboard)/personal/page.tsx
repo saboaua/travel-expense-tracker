@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet, ShoppingBag } from "lucide-react";
+import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet, ShoppingBag, Tag } from "lucide-react";
 import { PersonalTabs } from "@/components/layout/PersonalTabs";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
@@ -89,7 +89,7 @@ export default function PersonalHubPage() {
       const savings = sv.failed ? null : savingsSummary(sv.plans, sv.events, todayISO(), cur);
       const houseRows = houseSpends(spendRows, todayISO().slice(0, 7));
       const house = q.error ? null : { count: houseRows.length, total: round2(houseRows.reduce((t, r) => t + (convert(Number(r.amount), r.currency, cur, r.amount_usd == null ? null : Number(r.amount_usd)) ?? 0), 0)) };
-      setStats({ shopping: summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area === "shopping"), [], cur).grocery, ...summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area !== "shopping"), withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(quickSpends(q.data as unknown as SpendRow[]), cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
+      setStats({ shopping: summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area === "shopping"), [], cur).grocery, ...summarizePersonal((g.data ?? []).filter((x: { area?: string | null }) => x.area !== "shopping" && x.area !== "other"), withLinkedTotals((p.data ?? []) as { id?: string; personal_expenses?: { amount_usd: number | string | null }[] | null }[], lk) as never, cur), documents: d.error ? null : d.count ?? 0, cards: l.error ? null : l.count ?? 0, spends: q.error ? null : summarizeSpends(quickSpends(q.data as unknown as SpendRow[]), cur), utilities: u.error ? null : { total: toCur((u.data ?? []).reduce((t, r) => t + (Number((r as { amount_usd: number | string | null }).amount_usd) || 0), 0)), count: (u.data ?? []).length }, savings, currency: cur, converted: convertedCount(money, cur), house });
     })();
   }, []);
 
@@ -149,6 +149,7 @@ export default function PersonalHubPage() {
       text: !stats ? "\u00a0" : grocery ? `${formatCurrency(grocery.total, grocery.currency)} this month \u00b7 ${plural(grocery.count, "receipt")}` : "Receipts and item prices", add: { href: "/personal/groceries/new", label: "Scan", aria: "Scan receipt" } },
     { href: "/personal/shopping", title: "Shopping", icon: ShoppingBag, tone: "projects", strong: !!stats?.shopping, testId: "shopping-tile",
       text: !stats ? "\u00a0" : stats.shopping ? `${formatCurrency(stats.shopping.total, stats.shopping.currency)} this month \u00b7 ${plural(stats.shopping.count, "receipt")}` : "Clothes, electronics, home and other stores", add: { href: "/personal/shopping/new", label: "Scan", aria: "Scan shopping receipt" } },
+    { href: "/personal/types", title: "Receipt types", icon: Tag, tone: "projects", testId: "types-tile", text: "Personal care, health, pets and your own. Choose which get a budget line" },
     { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
     ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/fuel" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
   ];

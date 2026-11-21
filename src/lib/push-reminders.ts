@@ -8,7 +8,7 @@ import { isLocked } from "@/lib/limits-server";
 import { addDaysISO } from "@/lib/utils";
 import { REMINDER_DAYS, reminderDue } from "@/lib/trip-checklist";
 import { entryReminderDue, isConfirmationPaper, reminderDaysWindow } from "@/lib/entry-card";
-import { budgetState, budgetView, pickBudget, readBudget, spentByArea } from "@/lib/personal/budget";
+import { budgetState, budgetView, pickBudget, readBudget, spentByArea, spentByTypeId } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
 import { gamblingState, KIND_LABEL, costName, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
 import { convert, round2 } from "@/lib/personal/money";
@@ -173,7 +173,8 @@ export async function budgetAlerts(db: SupabaseClient, today: string): Promise<n
     try {
       const setting = pickBudget(rows, month);
       if (!setting || !setting.alert_at_80) continue;
-      const view = budgetView(setting, spentByArea(await fetchMonthInputs(db, month, userId), setting.currency), today);
+      const inputsNow = await fetchMonthInputs(db, month, userId);
+      const view = budgetView(setting, spentByArea(inputsNow, setting.currency), today, 0, spentByTypeId(inputsNow, setting.currency));
       const state = budgetState(view.spent, view.budget);
       if (state === "ok") continue;
       if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;

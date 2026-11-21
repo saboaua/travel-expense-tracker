@@ -116,6 +116,7 @@ need_cols(tbl, col, fix) as (values
   ('subscriptions','paid_with','migration_subscription_paid_with.sql'),
   ('subscriptions','logo','migration_logo_library.sql'),
   ('subscriptions','website','migration_logo_library.sql'),
+  ('grocery_receipts','type_id','migration_receipt_types.sql'),
   ('grocery_receipts','area','migration_shopping_area.sql')
 ),
 col_checks as (
@@ -128,6 +129,7 @@ col_checks as (
 ),
 need_tables(tbl, fix) as (values
   ('logo_library','migration_logo_library.sql'),
+  ('receipt_types','migration_receipt_types.sql'),
   ('house_areas','migration_house_areas.sql'),
   ('user_plans','migration_project_types_plans.sql'),
   ('payment_settings','migration_pro_payments.sql'),

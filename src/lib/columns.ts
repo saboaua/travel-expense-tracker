@@ -117,3 +117,6 @@ export const SUBSCRIPTION_COLS_LOGO = `${SUBSCRIPTION_COLS_PAY}, logo, website`;
 export const IPTV_CLIENT_COLS = "id, customer_id, plan, model, order_no, donation, portal, mac, device_id, location, date_subscribed, frequency, renewal_date, expire_date, notes";
 export const IPTV_CUSTOMER_COLS = "id, name, contact, share_enabled, client_user_id";
 export const IPTV_RENEWAL_COLS = "id, renewed_on, frequency, expires_after";
+
+/** Your own receipt types (migration_receipt_types.sql). */
+export const RECEIPT_TYPE_COLS = "id, name, icon, color, show_in_budget, monthly_limit, sort_order";

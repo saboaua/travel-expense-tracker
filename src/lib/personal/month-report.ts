@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID, withColumnFallback3 } from "@/lib/columns";
 import { isHouseSpend, round2, type SpentArea } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
 import { fetchShoppingList } from "@/lib/personal/item-rules";
@@ -10,7 +10,7 @@ import { kindLabel } from "@/lib/personal/utilities";
 /** Every expense of one month, one line each, counted by the same rules as "Where it goes" and the budget. */
 
 export type MonthRaw = {
-  receipts: { id: string; store: string | null; purchase_date: string; total: number | string; currency: string }[];
+  receipts: { id: string; store: string | null; purchase_date: string; total: number | string; currency: string; area?: string | null; type_name?: string | null }[];
   /** receipt lines in a shopping category: they count under Shopping and come out of that receipt's Groceries */
   shopItems: { receipt_id: string; name: string; category: string | null; line_total: number | string; purchase_date: string; store: string | null; currency: string }[];
   utilities: { kind: string; provider: string | null; paid_on: string; amount_usd: number | string | null }[];
@@ -45,6 +45,11 @@ export function monthReport(raw: MonthRaw, currency: BudgetCurrency, month: stri
   }
   for (const r of raw.receipts) {
     const t = convert(Number(r.total), r.currency, currency);
+    if (r.area === "other" && r.type_name) {
+      // a receipt of one of your own types counts under that type's name
+      if (t == null) uncounted++; else lines.push({ date: r.purchase_date, area: r.type_name, name: r.store || `${r.type_name} receipt`, category: r.type_name, amount: round2(t) });
+      continue;
+    }
     add("groceries", r.purchase_date, r.store || "Grocery receipt", "Groceries", t == null ? null : t - (shopByReceipt.get(r.id) ?? 0));
   }
   for (const u of raw.utilities) add("utilities", u.paid_on, [kindLabel(u.kind), u.provider].filter(Boolean).join(" - "), "Utilities", convert(Number(u.amount_usd) || 0, "USD", currency));
@@ -73,13 +78,15 @@ export async function fetchMonthRaw(supabase: SupabaseClient, monthStart: string
   const inputs = await fetchMonthInputs(supabase, monthStart, userId);
   const shopNames = await fetchShoppingList(supabase);
   const [rc, ut, sp, pr, fu] = await Promise.all([
-    withColumnFallback((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", userId).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000), "id, store, purchase_date, total, currency, prices_only", "id, store, purchase_date, total, currency"),
+    withColumnFallback3((cols) => supabase.from("grocery_receipts").select(cols).eq("user_id", userId).gte("purchase_date", monthStart).lte("purchase_date", end).limit(2000), "id, store, purchase_date, total, currency, prices_only, area, type_id", "id, store, purchase_date, total, currency, prices_only", "id, store, purchase_date, total, currency"),
     supabase.from("utility_bills").select("kind, provider, paid_on, amount_usd").eq("user_id", userId).gte("paid_on", monthStart).lte("paid_on", end).limit(500),
     withColumnFallback3((cols) => supabase.from("personal_spends").select(cols).eq("user_id", userId).gte("expense_date", monthStart).lte("expense_date", end).limit(2000), PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_MID, PERSONAL_SPEND_COLS_BASE),
     supabase.from("personal_projects").select("id, name").eq("user_id", userId).eq("kind", "home_project").limit(500),
     supabase.from("fuel_fillups").select("fill_date, station, amount, currency, amount_usd").eq("user_id", userId).gte("fill_date", monthStart).lte("fill_date", end).limit(500),
   ]);
-  const receipts = ((rc.data ?? []) as unknown as (MonthRaw["receipts"][number] & { prices_only?: boolean | null })[]).filter((r) => !r.prices_only);
+  const typeRows = await supabase.from("receipt_types").select("id, name").eq("user_id", userId).limit(100);
+  const typeNames = new Map(typeRows.error ? [] : ((typeRows.data ?? []) as { id: string; name: string }[]).map((t) => [t.id, t.name] as const));
+  const receipts = ((rc.data ?? []) as unknown as (MonthRaw["receipts"][number] & { prices_only?: boolean | null; type_id?: string | null })[]).filter((r) => !r.prices_only).map((r) => ({ ...r, type_name: r.area === "other" && r.type_id ? typeNames.get(r.type_id) ?? null : null }));
   const names = new Map(((pr.data ?? []) as { id: string; name: string }[]).map((p) => [p.id, p.name]));
   let projectExpenses: MonthRaw["projectExpenses"] = [];
   if (names.size) {
@@ -88,8 +95,8 @@ export async function fetchMonthRaw(supabase: SupabaseClient, monthStart: string
       .filter((x) => names.has(x.project_id)).map((x) => ({ ...x, project_name: names.get(x.project_id)! }));
   }
   let shopItems: MonthRaw["shopItems"] = [];
-  if (shopNames.length && receipts.length) {
-    const ids = new Set(receipts.map((r) => r.id));
+  if (shopNames.length && receipts.some((r) => r.area !== "other")) {
+    const ids = new Set(receipts.filter((r) => r.area !== "other").map((r) => r.id));
     const it = await supabase.from("grocery_items").select("receipt_id, name, category, line_total").eq("user_id", userId).in("category", shopNames).in("receipt_id", [...ids]).limit(5000);
     const byId = new Map(receipts.map((r) => [r.id, r]));
     shopItems = it.error ? [] : ((it.data ?? []) as { receipt_id: string; name: string; category: string | null; line_total: number | string }[]).map((x) => ({ ...x, purchase_date: byId.get(x.receipt_id)!.purchase_date, store: byId.get(x.receipt_id)!.store, currency: byId.get(x.receipt_id)!.currency }));

@@ -6,9 +6,9 @@
  */
 
 export type ScanOption = {
-  /** "trip:<id>", "project:<id>", "ptrip:<id>", "grocery", "shopping" or "document" */
+  /** "trip:<id>", "project:<id>", "ptrip:<id>", "grocery", "shopping", "type:<id>" or "document" */
   key: string;
-  kind: "trip" | "project" | "ptrip" | "grocery" | "shopping" | "document";
+  kind: "trip" | "project" | "ptrip" | "grocery" | "shopping" | "type" | "document";
   id?: string;
   label: string;
   sub: string;
@@ -172,4 +172,9 @@ export function buildScanOptions(input: {
   }
   if (input.canDocuments) out.push({ key: "document", kind: "document", label: "Document", sub: "Passport, ID, driver's license…", href: "/documents" });
   return out;
+}
+
+/** Your own receipt types as places a receipt can go. They sit behind the "Other" row of the sheet. */
+export function typeScanOptions(types: { id: string; name: string }[]): ScanOption[] {
+  return types.map((t) => ({ key: `type:${t.id}`, kind: "type" as const, id: t.id, label: t.name, sub: "Your receipt type", href: `/personal/types/${t.id}/new` }));
 }

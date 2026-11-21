@@ -70,7 +70,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
     router.refresh();
   };
 
-  const base = receipt?.area === "shopping" ? "/personal/shopping" : "/personal/groceries";
+  const base = receipt?.area === "shopping" ? "/personal/shopping" : receipt?.area === "other" && receipt.type_id ? `/personal/types/${receipt.type_id}` : "/personal/groceries";
   if (error || (loadError && !receipt)) return <div className="p-8 text-sm text-red-600">{error || loadError}</div>;
   if (loading || !receipt) return <div className="p-8 text-sm text-muted-foreground">Loading…</div>;
   const fmt = (n: number) => formatCurrency(n, receipt.currency);

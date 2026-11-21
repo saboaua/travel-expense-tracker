@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library"]) fake.table(t);
+for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -657,7 +657,6 @@ try {
     await ctx2.addInitScript(() => { try { localStorage.setItem("force-sw", "1"); } catch {} });
     const page = await ctx2.newPage();
     if (process.env.E2E_DEBUG) {
-      page.on("console", (m) => console.log("[console]", m.type(), m.text().slice(0, 200)));
       page.on("pageerror", (e) => console.log("[pageerror]", String(e.stack || e).slice(0, 600)));
       page.on("response", async (r) => { const u = r.url(); if (/\/_next\/static\/.*\.js/.test(u)) { const ct = r.headers()["content-type"] || ""; const body = await r.text().catch(() => ""); if (!/javascript/.test(ct) || body.startsWith("<")) console.log("[badjs]", r.status(), r.fromServiceWorker(), ct, u.slice(0, 120), JSON.stringify(body.slice(0, 80))); } });
       page.on("requestfailed", (r) => console.log("[reqfailed]", r.url().slice(0, 120), r.failure()?.errorText));
@@ -1064,6 +1063,68 @@ try {
     assert((await page.getByTestId("how-you-paid").count()) === 0, "no personal spending card on the business trip page");
     assert(fake.table("expenses").length === spendBefore, "no business expense was created");
     fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Zara Panama"));
+    await ctx.close();
+  });
+
+  await test("receipt types: a massage receipt goes to a new Personal care type (not Groceries), gets its own budget line, and the manager lists it", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Zen Body Massage", date: null, total: 60, currency: "USD", source: "ai", items: [item("Massage 60 min", 60)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    const budgetsBefore = fake.table("personal_budgets").splice(0);
+    fake.table("personal_budgets").push({ id: "bud-rt", user_id: PAT, month: null, amount: 500, currency: "USD", limits: {}, alert_at_80: false });
+    // Starters are offered once; open the manager
+    await page.goto(`${BASE}/personal/types`);
+    await page.getByTestId("receipt-types").waitFor({ timeout: 20_000 });
+    for (let i = 0; i < 40 && fake.table("receipt_types").length < 4; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const care = fake.table("receipt_types").find((t) => t.name === "Personal care");
+    assert(care && care.show_in_budget === true && fake.table("receipt_types").find((t) => t.name === "Health")?.show_in_budget === false, "starter types are offered once: " + JSON.stringify(fake.table("receipt_types")));
+    // A massage scanned into Groceries: the banner offers Personal care, and nothing moves until Move it
+    await page.evaluate((b64) => sessionStorage.setItem("quick-scan-v2", JSON.stringify({ key: "grocery", name: "receipt.jpg", type: "image/jpeg", dataUrl: `data:image/jpeg;base64,${b64}`, at: Date.now(), reason: null })), JPEG.toString("base64"));
+    await page.goto(`${BASE}/personal/groceries/new?quick=1`);
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByTestId("not-groceries").waitFor({ timeout: 20_000 });
+    assert((await page.getByRole("radio", { name: "Personal care" }).getAttribute("aria-checked")) === "true", "the best guess is selected");
+    // The scan sheet has an Other row with your types and a New type made in place
+    await page.getByRole("button", { name: "Change" }).first().click();
+    await page.getByTestId("scan-other").click();
+    await page.getByTestId("new-type").click();
+    await page.locator("#nt-name").fill("Massage");
+    await page.getByTestId("nt-save").click();
+    await page.getByText("Other: Massage").waitFor({ timeout: 20_000 });
+    assert(fake.table("receipt_types").some((t) => t.name === "Massage" && t.show_in_budget === true), "a new type is saved with its budget switch on");
+    await page.getByRole("button", { name: "Cancel" }).first().click();
+    await page.getByTestId("ng-move").click();
+    assert((await page.getByTestId("not-groceries").count()) === 0, "the banner closes after Move it");
+    const before = fake.table("grocery_receipts").length;
+    await page.getByRole("button", { name: "Save receipt" }).click();
+    for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const saved = fake.table("grocery_receipts").find((r) => r.store === "Zen Body Massage");
+    assert(saved && saved.area === "other" && saved.type_id === care.id, "saved as a Personal care receipt: " + JSON.stringify(saved));
+    // It is on the type page, not in Groceries
+    await page.goto(`${BASE}/personal/types/${care.id}`);
+    await page.getByRole("heading", { name: "Personal care" }).waitFor({ timeout: 20_000 });
+    await page.getByText("Zen Body Massage").first().waitFor();
+    await page.goto(`${BASE}/personal/groceries`);
+    await page.getByTestId("to-shopping").waitFor({ timeout: 20_000 });
+    assert((await page.getByText("Zen Body Massage").count()) === 0, "Groceries does not list it");
+    // The budget has its own Personal care line and counts it in the total
+    await page.goto(`${BASE}/`);
+    await page.getByTestId(`budget-type-${care.id}`).waitFor({ timeout: 20_000 });
+    assert(/60/.test(await page.getByTestId(`budget-type-${care.id}`).innerText()), "the Personal care line shows 60: " + (await page.getByTestId(`budget-type-${care.id}`).innerText()));
+    assert(/60/.test(await page.getByTestId("budget-line").innerText()), "the total counts it: " + (await page.getByTestId("budget-line").innerText()));
+    // Switch it off in the manager: it moves into Other types
+    await page.goto(`${BASE}/personal/types`);
+    await page.getByRole("switch", { name: /Personal care/ }).click();
+    for (let i = 0; i < 40 && fake.table("receipt_types").find((t) => t.id === care.id)?.show_in_budget !== false; i++) await new Promise((ok) => setTimeout(ok, 250));
+    await page.goto(`${BASE}/`);
+    await page.getByTestId("budget-other-types").waitFor({ timeout: 20_000 });
+    assert(/Personal care/.test(await page.getByTestId("budget-other-types").innerText()), "Other types lists the name");
+    fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Zen Body Massage"));
+    fake.table("grocery_items").splice(0, fake.table("grocery_items").length, ...fake.table("grocery_items").filter((r) => r.receipt_id !== saved.id));
+    fake.table("receipt_types").splice(0);
+    fake.table("personal_budgets").splice(0, fake.table("personal_budgets").length, ...budgetsBefore);
     await ctx.close();
   });
 
