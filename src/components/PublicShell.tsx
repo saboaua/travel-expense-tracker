@@ -23,13 +23,13 @@ export function PublicShell({
     <>
       {branding.logo_url ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={branding.logo_url} alt={branding.app_name} className={brandInCard ? "h-14 w-auto max-w-[200px] object-contain" : "h-10 w-auto max-w-[160px] object-contain"} />
+        <img src={branding.logo_url} alt={branding.app_name} className={brandInCard ? "h-[68px] w-auto max-w-[200px] object-contain" : "h-10 w-auto max-w-[160px] object-contain"} />
       ) : (
         <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ backgroundColor: branding.primary_color }}>
           <Plane className="h-5 w-5 text-white" />
         </div>
       )}
-      <span className="font-semibold text-slate-900 dark:text-slate-100">{branding.app_name}</span>
+      <span className={`font-semibold text-slate-900 dark:text-slate-100${brandInCard && branding.logo_url ? " -mt-3" : ""}`}>{branding.app_name}</span>
     </>
   );
   return (
