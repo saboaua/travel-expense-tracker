@@ -1135,6 +1135,35 @@ try {
     await ctx.close();
   });
 
+  await test("receipt types: Scan on the dashboard, Other, a type, Save: the photo arrives on that type's form and starts reading", async () => {
+    const { ctx, page } = await newPage();
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Corner Deli", date: null, total: 12, currency: "USD", source: "ai", items: [{ name: "Lunch", quantity: 1, unit_price: 12, line_total: 12, category: "Other", unit: null }] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    for (let i = 0; i < 40 && fake.table("receipt_types").length < 4; i++) await new Promise((ok) => setTimeout(ok, 250));
+    await page.locator("input[type=file]:not([capture])").first().setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByTestId("scan-other").waitFor({ timeout: 20_000 });
+    await page.getByTestId("scan-other").click();
+    await page.getByTestId("types-list").getByRole("radio", { name: "Health" }).click();
+    await page.getByRole("button", { name: /Save to Health/ }).click();
+    await page.waitForURL((u) => /^\/personal\/types\/[^/]+\/new$/.test(u.pathname), { timeout: 20_000 });
+    await page.getByRole("button", { name: "Use full image" }).waitFor({ timeout: 30_000 });
+    // The same with a type made in the sheet itself
+    await page.goto(`${BASE}/`);
+    await page.locator("input[type=file]:not([capture])").first().setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByTestId("scan-other").waitFor({ timeout: 20_000 });
+    await page.getByTestId("scan-other").click();
+    await page.getByTestId("new-type").click();
+    await page.locator("#nt-name").fill("Food");
+    await page.getByTestId("nt-save").click();
+    await page.getByText("Other: Food").waitFor({ timeout: 20_000 });
+    await page.getByRole("button", { name: /Save to Food/ }).click();
+    await page.waitForURL((u) => /^\/personal\/types\/[^/]+\/new$/.test(u.pathname), { timeout: 20_000 });
+    await page.getByRole("button", { name: "Use full image" }).waitFor({ timeout: 30_000 });
+    fake.table("receipt_types").splice(0);
+    await ctx.close();
+  });
+
   await test("cards this month: Shopping shows credit and debit with subscriptions on the credit card, Groceries default to debit and subscriptions to credit card", async () => {
     const { ctx, page } = await newPage();
     const recs = fake.table("grocery_receipts"), subsT = fake.table("subscriptions");
