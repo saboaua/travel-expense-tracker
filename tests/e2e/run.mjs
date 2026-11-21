@@ -1278,7 +1278,7 @@ try {
       assert((await page.getByTestId("about-logo").count()) + (await page.getByTestId("about-logo-placeholder").count()) === 1, "the app logo or its placeholder is shown");
       assert(/^\d+\.\d+\.\d+/.test(await page.getByTestId("about-version").innerText()), "the version number is shown");
       assert((await page.getByTestId("about-build").innerText()).length > 0, "the build is shown");
-      assert((await page.getByTestId("about-privacy").getAttribute("href")) === "/privacy", "the privacy policy is linked");
+      assert((await page.getByTestId("about-privacy").getAttribute("href")) === "/privacy?from=about", "the privacy policy is linked");
       await page.getByTestId("check-updates").click();
       await page.waitForFunction(() => (document.querySelector('[data-testid="update-result"]')?.textContent || "").length > 0, null, { timeout: 15_000 });
     } finally {

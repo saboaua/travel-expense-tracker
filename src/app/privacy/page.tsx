@@ -5,12 +5,13 @@ import { getPublicBranding } from "@/lib/public-branding";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Privacy Policy" };
 
-export default async function PrivacyPage() {
+export default async function PrivacyPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
+  const { from } = await searchParams;
   const branding = await getPublicBranding();
   const text = branding.privacy_policy?.trim();
 
   return (
-    <PublicShell branding={branding} title="Privacy Policy">
+    <PublicShell branding={branding} title="Privacy Policy" brandInCard back={from === "about" ? { href: "/about", label: "About" } : undefined}>
       {text ? (
         <div className="whitespace-pre-wrap break-words text-sm leading-relaxed text-slate-700">{text}</div>
       ) : (
