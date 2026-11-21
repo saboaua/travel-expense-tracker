@@ -101,6 +101,14 @@ input[type="date"]::-webkit-date-and-time-value {
   margin: 0 !important;
 }
 
+/* Native controls (date pickers, select menus, scrollbars, the keyboard) follow the page's own theme, not only the phone's */
+html {
+  color-scheme: light;
+}
+html.dark {
+  color-scheme: dark;
+}
+
 /* Touch behaviour that makes the installed app feel like an app and not a web page */
 html {
   -webkit-tap-highlight-color: transparent;

@@ -8,6 +8,7 @@
 
 const CACHE = "expense-tracker-v6";
 const PAGES = "expense-pages-v1"; // keep in step with PAGES_CACHE in src/lib/offline-store.ts
+const SHARE = "lifolio-share"; // a photo or PDF shared to the app from another app (Android); keep in step with SHARE_CACHE in src/lib/share-target.ts
 const OFFLINE_PAGES = ["/personal/loyalty", "/documents", "/personal", "/pending"]; // keep in step with src/lib/offline-warm.ts
 // Trip pages are kept as they are visited (and the recent ones ahead of time); keep in step with KEPT_PAGE in src/lib/offline-warm.ts
 const KEPT_PAGE = /^\/(?:trips(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|add-expense|papers|checklist|expenses\/[0-9a-f-]{36}))?)?|personal\/(?:projects|travel)(?:\/new|\/[0-9a-f-]{36}(?:\/(?:edit|expense(?:\/[0-9a-f-]{36})?))?)?|personal\/groceries(?:\/new|\/prices|\/[0-9a-f-]{36}(?:\/edit)?)?|personal\/shopping(?:\/new|\/[0-9a-f-]{36}(?:\/edit)?)?)$/;
@@ -44,7 +45,7 @@ self.addEventListener("activate", (event) => {
     Promise.all([
       // Start the page request while the worker is still waking up, which shortens the blank moment when the app opens
       self.registration.navigationPreload ? self.registration.navigationPreload.enable().catch(() => {}) : null,
-      caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PAGES).map((k) => caches.delete(k)))),
+      caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== CACHE && k !== PAGES && k !== SHARE).map((k) => caches.delete(k)))),
     ]).then(() => self.clients.claim())
   );
 });
@@ -93,8 +94,31 @@ async function openPage(event) {
   return res || saved;
 }
 
+/**
+ * Android's share sheet posts the shared photo or PDF to /share-target. It is kept on the phone for a moment and the
+ * app is opened on the dashboard, which picks it up and sends it through the same steps as Upload. Nothing is read or
+ * sent anywhere here.
+ */
+async function takeShare(req) {
+  try {
+    const form = await req.formData();
+    const file = form.getAll("file").find((f) => typeof f !== "string");
+    if (file) {
+      const cache = await caches.open(SHARE);
+      await cache.put("/shared-file", new Response(file, { headers: { "Content-Type": file.type || "application/octet-stream", "X-File-Name": encodeURIComponent(file.name || "shared"), "X-Last-Modified": String(file.lastModified || Date.now()) } }));
+      return Response.redirect(new URL("/?shared=1", self.location.origin).href, 303);
+    }
+  } catch { /* fall through: nothing usable was shared */ }
+  return Response.redirect(new URL("/?shared=none", self.location.origin).href, 303);
+}
+
 self.addEventListener("fetch", (event) => {
   const req = event.request;
+  if (req.method === "POST") {
+    const u = new URL(req.url);
+    if (u.origin === self.location.origin && u.pathname === "/share-target") event.respondWith(takeShare(req));
+    return;
+  }
   if (req.method !== "GET") return;
   const url = new URL(req.url);
 

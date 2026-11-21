@@ -132,6 +132,7 @@ export async function clearOfflineData(): Promise<void> {
     browserKv.clear(),
     browserBlobs.clear(),
     typeof caches !== "undefined" ? caches.delete(PAGES_CACHE) : Promise.resolve(),
+    typeof caches !== "undefined" ? caches.delete("lifolio-share") : Promise.resolve(), // a photo shared in but not yet used
   ]);
   try { localStorage.removeItem(WARM_KEY); } catch { /* private mode */ }
 }

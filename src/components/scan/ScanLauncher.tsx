@@ -7,6 +7,7 @@ import { Camera, ChevronDown, ChevronUp, Loader2, Plus, Upload } from "lucide-re
 import { compressReceiptImage } from "@/lib/compress-image";
 import { getLastScanChoice, setLastScanChoice, stashQuickScan } from "@/lib/quick-scan";
 import { currentPlace } from "@/lib/scan-place";
+import { takeSharedFile } from "@/lib/share-target";
 import { suggestDestination, withQuery, type HomePlace, type ScanOption } from "@/lib/scan-destination";
 import { ScanSheet } from "@/components/scan/ScanSheet";
 import { ScanModeSheet } from "@/components/scan/ScanModeSheet";
@@ -34,6 +35,19 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
   const [notice, setNotice] = useState<string | null>(null);
   const [mode, setMode] = useState<"menu" | "long" | null>(null);
 
+  // Something shared to the app from another app (Android share sheet): handled like an Upload, once
+  const shared = useRef(false);
+  useEffect(() => {
+    if (shared.current) return;
+    const flag = new URLSearchParams(window.location.search).get("shared");
+    if (!flag) return;
+    shared.current = true;
+    window.history.replaceState(null, "", window.location.pathname);
+    if (flag !== "1") return setNotice("Nothing usable was shared. Share a photo of a receipt, or a PDF.");
+    void takeSharedFile().then((file) => (file ? processFile("upload", file) : setNotice("Nothing usable was shared. Share a photo of a receipt, or a PDF.")));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Free the preview URL when the sheet closes
   useEffect(() => () => { if (pending?.preview) URL.revokeObjectURL(pending.preview); }, [pending]);
 
@@ -48,6 +62,11 @@ export function ScanLauncher({ options, home, showNewTrip }: { options: ScanOpti
     const selected = e.target.files?.[0];
     e.target.value = "";
     if (!selected) return;
+    await processFile(mode, selected);
+  };
+
+  /** A photo or PDF, from the camera, the gallery or another app's share sheet: it goes the same way. */
+  const processFile = async (mode: "scan" | "upload", selected: File) => {
     setNotice(null);
     setBusy(mode);
 

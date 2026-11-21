@@ -41,6 +41,8 @@ export async function generateMetadata(): Promise<Metadata> {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  // Let the page reach the screen edges so env(safe-area-inset-*) reports the home indicator and notch; the padding for them is already in the bottom menu, sheets and toasts
+  viewportFit: "cover",
   // No themeColor here: the head script below writes the one theme-color tag for the screen's real theme
 };
 

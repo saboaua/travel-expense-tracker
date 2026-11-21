@@ -30,6 +30,21 @@ export async function GET(request: Request) {
     background_color: "#ffffff",
     theme_color: theme,
     orientation: "portrait-primary",
+    // Long-press the app icon on Android (not for a client's own app)
+    ...(clientLink ? {} : {
+      shortcuts: [
+        { name: "New grocery receipt", short_name: "Groceries", url: "/personal/groceries/new" },
+        { name: "New shopping receipt", short_name: "Shopping", url: "/personal/shopping/new" },
+        { name: "New business trip", short_name: "New trip", url: "/trips/new" },
+      ],
+      // Share a photo or PDF from the gallery or another app straight into Lifolio (Android); see public/sw.js
+      share_target: {
+        action: "/share-target",
+        method: "POST",
+        enctype: "multipart/form-data",
+        params: { files: [{ name: "file", accept: ["image/*", "application/pdf"] }] },
+      },
+    }),
     icons: [
       {
         src: icon(192),

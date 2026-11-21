@@ -355,6 +355,11 @@ try {
     }));
     assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
     assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
+    const vp = await page.evaluate(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") || "");
+    assert(/viewport-fit=cover/.test(vp), `the page reaches the screen edges so the safe-area padding works (got ${vp})`);
+    assert((await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === "light", "native controls are light in the light theme");
+    assert((await page.evaluate(() => { document.documentElement.classList.add("dark"); const c = getComputedStyle(document.documentElement).colorScheme; document.documentElement.classList.remove("dark"); return c; })) === "dark", "native controls turn dark with the dark theme");
+    assert((await page.locator('link[rel="apple-touch-startup-image"][href$="launch-1260x2736.png"]').count()) === 1, "the iPhone Air has its own opening screen");
     assert(/^\/api\/icon\?v=\w+&size=180$/.test(head.touch || ""), `the touch icon is a 180 PNG link (got ${head.touch})`);
     assert(/^\/api\/manifest\?v=\w+$/.test(head.manifest || ""), `the manifest link carries a version (got ${head.manifest})`);
     const mres = await page.request.get(`${BASE}${head.manifest}`);
@@ -364,6 +369,12 @@ try {
     const m = await mres.json();
     assert(m.display === "standalone" && m.id === "/" && m.start_url === "/" && m.scope === "/", "the manifest asks for a standalone app inside this site");
     assert(m.short_name === "Lifolio", "the manifest short name is Lifolio");
+    assert(Array.isArray(m.shortcuts) && m.shortcuts.length >= 3 && m.shortcuts.every((x) => x.name && x.url.startsWith("/")), "long-pressing the icon offers shortcuts");
+    assert(m.share_target?.action === "/share-target" && m.share_target.method === "POST" && /multipart/.test(m.share_target.enctype) && m.share_target.params.files[0].accept.includes("image/*"), "Android's share sheet can send a photo or PDF to the app");
+    const clientM = await (await page.request.get(`${BASE}/api/manifest?s=${"a".repeat(32)}`)).json();
+    assert(!clientM.share_target && !clientM.shortcuts, "a client's own app has no receipt shortcuts or share target");
+    const posted = await page.request.post(`${BASE}/share-target`, { multipart: { file: { name: "r.jpg", mimeType: "image/jpeg", buffer: Buffer.from("x") } }, maxRedirects: 0 });
+    assert(posted.status() >= 300 && posted.status() < 400, `a share that reaches the server is answered with a redirect, not an error (got ${posted.status()})`);
     const maskable = m.icons.find((i) => i.purpose === "maskable"), plain = m.icons.filter((i) => i.purpose === "any");
     assert(maskable && /maskable=1/.test(maskable.src) && plain.every((i) => !/maskable/.test(i.src)), "the maskable icon is its own image");
     for (const src of [head.touch, maskable.src]) {
@@ -847,6 +858,29 @@ try {
     await page.waitForURL((u) => u.pathname === `/trips/${TRIP_ID}/add-expense`, { timeout: 60_000 });
     await page.getByText("Miami Conference \u00b7 Business").waitFor();
     await page.getByRole("button", { name: "Change" }).waitFor();
+    await ctx.close();
+  });
+
+  await test("shared to the app: a photo from another app's share sheet goes through the same steps as Upload, once", async () => {
+    const trips = fake.table("trips");
+    for (let i = trips.length - 1; i >= 0; i--) if (trips[i].user_id === PAT && trips[i].id !== TRIP_ID) trips.splice(i, 1);
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByRole("button", { name: "Scan" }).waitFor();
+    const keep = (name, bytes) => page.evaluate(async ({ name, bytes }) => {
+      const cache = await caches.open("lifolio-share");
+      await cache.put("/shared-file", new Response(new Uint8Array(bytes), { headers: { "Content-Type": "image/jpeg", "X-File-Name": encodeURIComponent(name), "X-Last-Modified": String(Date.now()) } }));
+    }, { name, bytes: [...JPEG] });
+    await keep("from-gallery.jpg", JPEG);
+    await page.goto(`${BASE}/?shared=1`);
+    const trip = page.getByRole("radio", { name: /Miami Conference/ });
+    await trip.waitFor({ timeout: 60_000 });
+    assert((await trip.getAttribute("aria-checked")) === "true", "the shared photo asks where it goes, with the trip already chosen");
+    assert(!/shared=/.test(page.url()), "the share marker is removed from the address");
+    assert((await page.evaluate(async () => !(await (await caches.open("lifolio-share")).match("/shared-file")))), "the shared file is removed once it has been taken");
+    await page.goto(`${BASE}/?shared=none`);
+    await page.getByText(/Nothing usable was shared/).waitFor({ timeout: 30_000 });
     await ctx.close();
   });
 
