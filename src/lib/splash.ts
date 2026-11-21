@@ -42,15 +42,41 @@ export const SPLASH_CSS = `@media all and (display-mode: standalone), all and (d
   #app-splash.app-splash-gone {
     display: none;
   }
+  .app-splash-logo {
+    width: 128px;
+    height: 86px;
+    object-fit: contain;
+  }
+  .app-splash-ph {
+    width: 96px;
+    height: 96px;
+    border-radius: 24px;
+    border: 2px dashed #cbd5e1;
+    background: #f8fafc;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .app-splash-name {
+    margin-top: 14px;
+    max-width: 80vw;
+    text-align: center;
+    font-size: 30px;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #000000;
+  }
   .app-splash-dots {
     display: flex;
     gap: 10px;
+    margin-top: 34px;
   }
   .app-splash-dots i {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
     border-radius: 50%;
-    background: #4f46e5;
+    background: var(--splash-accent, #4f46e5);
     animation: app-splash-bounce 1.1s ease-in-out infinite;
   }
   .app-splash-dots i:nth-child(2) { animation-delay: 0.15s; }
@@ -65,7 +91,8 @@ export const SPLASH_CSS = `@media all and (display-mode: standalone), all and (d
 }
 @media all and (display-mode: standalone), all and (display-mode: fullscreen) {
   html.dark #app-splash { background: #0b1020; }
-  html.dark .app-splash-dots i { background: #818cf8; }
+  html.dark .app-splash-name { color: #ffffff; }
+  html.dark .app-splash-ph { border-color: #334155; background: #111833; color: #64748b; }
 }
 @media (prefers-reduced-motion: reduce) {
   .app-splash-dots i { animation-duration: 2.4s; }

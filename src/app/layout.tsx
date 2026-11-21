@@ -79,7 +79,7 @@ export default async function RootLayout({
         <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.className} antialiased`}>
-        <AppSplash />
+        <AppSplash logoUrl={brand.logoUrl} appName={brand.appName ?? ""} primaryColor={brand.primaryColor} />
         <ConfirmProvider>{children}</ConfirmProvider>
         <ServiceWorkerRegister />
         <InstallPrompt />
