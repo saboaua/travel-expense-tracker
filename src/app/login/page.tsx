@@ -118,10 +118,10 @@ export default function LoginPage() {
     "w-full h-[52px] pl-11 rounded-[14px] border border-[#D5E2EE] dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all";
   const brand = (size: number, light: boolean) =>
     logoUrl ? (
-      <span className="flex flex-col items-center gap-2.5 lg:items-start">
+      <span className="flex flex-col items-center gap-0 lg:items-start">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logoUrl} alt="" style={{ height: Math.min(Math.max(logoSize, size), size * 1.2), width: "auto", maxWidth: "100%" }} className="object-contain" />
-        <span className={`font-[family-name:var(--font-login-display)] font-semibold tracking-[-0.035em] ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.46 }}>
+        <span className={`-mt-3 font-[family-name:var(--font-login-display)] font-semibold tracking-[-0.035em] ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.46 }}>
           {appName}
         </span>
       </span>
@@ -172,10 +172,10 @@ export default function LoginPage() {
 
       <main className="relative flex flex-1 flex-col bg-white dark:bg-slate-950">
         {/* Sea header, phone and tablet */}
-        <div className="relative h-[350px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
+        <div className="relative h-[336px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
           <Waves />
           <div className="absolute inset-x-0 top-12 flex justify-center">{brand(72, true)}</div>
-          <h2 className="absolute inset-x-7 top-[212px] text-center font-[family-name:var(--font-login-display)] text-[26px] font-light leading-[1.18] tracking-[-0.03em] text-white">
+          <h2 className="absolute inset-x-7 top-[196px] text-center font-[family-name:var(--font-login-display)] text-[26px] font-light leading-[1.18] tracking-[-0.03em] text-white">
             Every trip, receipt and bill, <b className="font-semibold">in one place.</b>
           </h2>
         </div>
