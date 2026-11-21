@@ -3,14 +3,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { createClient as createServiceClient } from "@supabase/supabase-js";
-import { Bricolage_Grotesque, Figtree } from "next/font/google";
+import { Manrope } from "next/font/google";
 import { FEATURES, IconTile, Waves } from "@/components/login/LoginArt";
 import { firstNameOf, isInviteCode } from "@/lib/invite";
 import { getPublicBranding } from "@/lib/public-branding";
 
 export const dynamic = "force-dynamic";
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-login-display" });
-const body = Figtree({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-login-body" });
+const manrope = Manrope({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-login-display" });
+const ONE_FONT = { "--font-login-body": "var(--font-login-display)" } as React.CSSProperties;
 
 // The preview a friend sees in WhatsApp or Messages never names the person who shared
 export async function generateMetadata(): Promise<Metadata> {
@@ -45,7 +45,7 @@ export default async function InvitePage({ params }: { params: Promise<{ code: s
   const color = branding.primary_color;
   const request = `/login?ref=${code}&request=1`;
   return (
-    <div className={`${display.variable} ${body.variable} min-h-screen bg-white font-[family-name:var(--font-login-body)] text-slate-900`}>
+    <div style={ONE_FONT} className={`${manrope.variable} min-h-screen bg-white font-[family-name:var(--font-login-body)] text-slate-900`}>
       <div className="relative mx-auto flex min-h-screen max-w-[460px] flex-col">
         <div className="relative h-[290px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8]">
           <Waves />

@@ -39,7 +39,7 @@ export function RequestAccountForm({ primaryColor, inputCls, refCode, onBack }: 
     return (
       <div className="flex flex-col items-center gap-3 py-3 text-center" data-testid="request-sent">
         <span className="flex h-14 w-14 items-center justify-center rounded-full bg-emerald-600 text-white"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="m6 12.5 4 4 8-8.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" /></svg></span>
-        <h1 className="font-[family-name:var(--font-login-display)] text-2xl font-extrabold tracking-tight">Request sent</h1>
+        <h1 className="font-[family-name:var(--font-login-display)] text-2xl font-semibold tracking-[-0.025em]">Request sent</h1>
         <p className="text-[15px] leading-relaxed text-slate-600 dark:text-slate-300">Thank you, {name.trim().split(" ")[0]}. An administrator will contact you on {sent} to set up your account.</p>
         <button type="button" onClick={onBack} className="mt-2 flex h-[50px] w-full items-center justify-center rounded-[15px] border-[1.5px] border-[#D5E2EE] text-[15px] font-bold dark:border-slate-700">Back to sign in</button>
       </div>
@@ -48,7 +48,7 @@ export function RequestAccountForm({ primaryColor, inputCls, refCode, onBack }: 
 
   return (
     <>
-      <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-extrabold tracking-tight lg:text-4xl">Request an account</h1>
+      <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-semibold tracking-[-0.025em] lg:text-4xl">Request an account</h1>
       <p className="mt-1 hidden text-base text-slate-500 dark:text-slate-400 lg:block">Tell us how to reach you. We will set you up.</p>
       <form onSubmit={submit} className="mt-4 space-y-4 lg:mt-6" noValidate>
         {error && <Alert className="border border-red-100">{error}</Alert>}

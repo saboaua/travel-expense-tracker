@@ -5,14 +5,21 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Turnstile } from "@/components/Turnstile";
-import { Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, ArrowRight, Plane, Receipt, Zap } from "lucide-react";
 import { NETWORK_MESSAGE } from "@/lib/password-policy";
-import { Bricolage_Grotesque, Figtree } from "next/font/google";
-import { FEATURES, IconTile, Waves } from "@/components/login/LoginArt";
+import { Manrope } from "next/font/google";
+import { Waves } from "@/components/login/LoginArt";
 import { RequestAccountForm } from "@/components/login/RequestAccountForm";
 
-const display = Bricolage_Grotesque({ subsets: ["latin"], weight: ["600", "700", "800"], variable: "--font-login-display" });
-const body = Figtree({ subsets: ["latin"], weight: ["400", "500", "600", "700"], variable: "--font-login-body" });
+// One slim family for the whole sign-in screen: light for the big line, semibold for names, labels and buttons
+const manrope = Manrope({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-login-display" });
+const ONE_FONT = { "--font-login-body": "var(--font-login-display)" } as React.CSSProperties;
+
+const QUIET_FEATURES = [
+  { icon: Plane, title: "Trips", text: "Flights, hotels and what you spend, per trip." },
+  { icon: Receipt, title: "Receipts", text: "Scan once. Groceries, shopping and your own types." },
+  { icon: Zap, title: "Bills", text: "Utilities and fixed costs, with a reminder before they are due." },
+];
 
 const EXPIRED_MESSAGE =
   "Your temporary password has expired. Please ask an administrator to generate a new one.";
@@ -108,49 +115,49 @@ export default function LoginPage() {
   };
 
   const inputCls =
-    "w-full h-[50px] pl-11 rounded-[14px] border-[1.5px] border-[#D5E2EE] dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all";
+    "w-full h-[52px] pl-11 rounded-[14px] border border-[#D5E2EE] dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all";
   const brand = (size: number, light: boolean) =>
     logoUrl ? (
       // eslint-disable-next-line @next/next/no-img-element
-      <img src={logoUrl} alt={appName} style={{ height: Math.min(logoSize, 72), width: "auto", maxWidth: "100%" }} className="object-contain" />
+      <img src={logoUrl} alt={appName} style={{ height: Math.min(Math.max(logoSize, size), size * 1.3), width: "auto", maxWidth: "100%" }} className="object-contain" />
     ) : (
-      <span className="flex items-center gap-3">
+      <span className="flex items-center gap-3.5">
         <svg className="shrink-0" width={size} height={size} viewBox="0 0 64 64" aria-hidden="true">
           <defs>
-            <linearGradient id="lg-logo" x1="0" y1="0" x2="1" y2="1">
+            <linearGradient id={`lg-logo-${size}`} x1="0" y1="0" x2="1" y2="1">
               <stop offset="0" stopColor="#0B63CE" />
               <stop offset="1" stopColor="#22D3EE" />
             </linearGradient>
           </defs>
-          <path d="M14 4 34 12V46L14 56z" fill="url(#lg-logo)" />
+          <path d="M14 4 34 12V46L14 56z" fill={`url(#lg-logo-${size})`} />
           <path d="M34 30 60 40 34 58 20 52z" fill="#22D3EE" opacity=".9" />
         </svg>
-        <span className={`font-[family-name:var(--font-login-display)] font-bold tracking-tight ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.62 }}>
+        <span className={`font-[family-name:var(--font-login-display)] font-semibold tracking-[-0.035em] ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.52 }}>
           {appName}
         </span>
       </span>
     );
 
   return (
-    <div className={`${display.variable} ${body.variable} flex min-h-screen font-[family-name:var(--font-login-body)] text-slate-900 dark:text-slate-100`}>
+    <div style={ONE_FONT} className={`${manrope.variable} flex min-h-screen font-[family-name:var(--font-login-body)] text-slate-900 dark:text-slate-100`}>
       {/* Ocean panel, desktop only */}
       <aside className="relative hidden w-[46%] max-w-[640px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:block">
         <Waves />
         <div className="relative flex h-full flex-col px-12 py-12 xl:px-14">
-          {brand(38, true)}
-          <h2 className="mt-14 max-w-[470px] font-[family-name:var(--font-login-display)] text-[44px] font-extrabold leading-[1.05] tracking-tight text-white xl:text-5xl">
-            Every trip, receipt and bill, in one place.
+          {brand(96, true)}
+          <h2 className="mt-[72px] max-w-[470px] font-[family-name:var(--font-login-display)] text-[44px] font-light leading-[1.1] tracking-[-0.035em] text-white xl:text-[46px]">
+            Every trip, receipt and bill, <b className="font-semibold">in one place.</b>
           </h2>
-          <p className="mt-4 max-w-[430px] text-[17px] leading-relaxed text-white/85">
+          <p className="mt-[18px] max-w-[400px] text-base leading-relaxed text-white/80">
             From the flight to the groceries. {appName || "The app"} keeps your travel and your household in order.
           </p>
-          <ul className="mt-8 grid max-w-[520px] grid-cols-2 gap-3">
-            {FEATURES.map((f) => (
-              <li key={f.title} className="flex items-center gap-3 rounded-[18px] border border-white/20 bg-white/10 p-3 backdrop-blur-sm">
-                <IconTile kind={f.kind} size={44} />
+          <ul className="mt-12 flex max-w-[460px] flex-col gap-[22px]">
+            {QUIET_FEATURES.map((f) => (
+              <li key={f.title} className="flex items-start gap-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/15 bg-white/10"><f.icon className="h-5 w-5 text-[#bfeee6]" aria-hidden="true" /></span>
                 <span>
-                  <span className="block text-[15px] font-bold text-white">{f.title}</span>
-                  <span className="mt-px block text-[12.5px] leading-snug text-white/80">{f.text}</span>
+                  <span className="block text-base font-semibold text-white">{f.title}</span>
+                  <span className="mt-0.5 block text-sm leading-relaxed text-white/75">{f.text}</span>
                 </span>
               </li>
             ))}
@@ -160,15 +167,11 @@ export default function LoginPage() {
 
       <main className="relative flex flex-1 flex-col bg-white dark:bg-slate-950">
         {/* Sea header, phone and tablet */}
-        <div className="relative h-[330px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
+        <div className="relative h-[320px] shrink-0 overflow-hidden bg-gradient-to-b from-[#0A2540] via-[#0B4F8A] to-[#0E7FA8] lg:hidden">
           <Waves />
-          <div className="absolute left-5 top-12 -rotate-[8deg]"><IconTile kind="trip" size={54} /></div>
-          <div className="absolute right-5 top-11 rotate-[8deg]"><IconTile kind="receipt" size={50} /></div>
-          <div className="absolute left-8 top-[124px] rotate-6"><IconTile kind="basket" size={44} /></div>
-          <div className="absolute right-8 top-[120px] -rotate-6"><IconTile kind="bolt" size={44} /></div>
-          <div className="absolute inset-x-0 top-14 flex justify-center">{brand(40, true)}</div>
-          <h2 className="absolute inset-x-6 top-[184px] text-center font-[family-name:var(--font-login-display)] text-[26px] font-extrabold leading-[1.1] tracking-tight text-white">
-            Every trip, receipt and bill, in one place.
+          <div className="absolute inset-x-0 top-14 flex justify-center">{brand(72, true)}</div>
+          <h2 className="absolute inset-x-7 top-[176px] text-center font-[family-name:var(--font-login-display)] text-[26px] font-light leading-[1.18] tracking-[-0.03em] text-white">
+            Every trip, receipt and bill, <b className="font-semibold">in one place.</b>
           </h2>
         </div>
 
@@ -178,7 +181,7 @@ export default function LoginPage() {
               <RequestAccountForm primaryColor={primaryColor} inputCls={inputCls} refCode={refCode} onBack={() => setRequesting(false)} />
             ) : (
               <>
-            <h1 className="font-[family-name:var(--font-login-display)] text-[22px] font-extrabold tracking-tight lg:text-4xl">Welcome back</h1>
+            <h1 className="font-[family-name:var(--font-login-display)] text-[28px] font-semibold tracking-[-0.025em] lg:text-[34px]">Welcome back</h1>
             <p className="mt-1 hidden text-base text-slate-500 dark:text-slate-400 lg:block">Sign in to pick up where you left off.</p>
 
             <form onSubmit={handleLogin} className="mt-4 space-y-4 lg:mt-6 lg:space-y-5">
@@ -226,7 +229,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={!ready || loading || (captchaNeeded && !captchaToken)}
-                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[15px] text-base font-bold text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex h-[52px] w-full items-center justify-center gap-2 rounded-[15px] text-base font-semibold text-white transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
                 style={{ backgroundColor: primaryColor, boxShadow: `0 10px 22px ${primaryColor}52, inset 0 1px 0 rgba(255,255,255,.35)` }}
               >
                 {loading ? (
