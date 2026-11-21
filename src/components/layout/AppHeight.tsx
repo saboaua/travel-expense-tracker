@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { appHeight, standaloneHeight } from "@/lib/app-height";
+import { appHeight } from "@/lib/app-height";
 
 /**
  * Publishes the height of the part of the screen that is really visible as --app-h.
@@ -15,12 +15,7 @@ export function AppHeight() {
     const set = () => {
       const el = document.activeElement as HTMLElement | null;
       const editing = !!el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable);
-      let h = appHeight(window.visualViewport?.height, window.innerHeight, editing);
-      // Installed iPhone app: the window height leaves out the status bar strip the app now paints under
-      if ((navigator as Navigator & { standalone?: boolean }).standalone) {
-        const full = standaloneHeight(window.screen.width, window.screen.height, window.matchMedia("(orientation: landscape)").matches, editing);
-        if (full > h) h = full;
-      }
+      const h = appHeight(window.visualViewport?.height, window.innerHeight, editing);
       if (h > 0) root.style.setProperty("--app-h", `${h}px`);
     };
     const timers: ReturnType<typeof setTimeout>[] = [];
