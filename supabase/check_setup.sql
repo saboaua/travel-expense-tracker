@@ -247,6 +247,7 @@ other_checks as (
                ('unshare_my_prices','migration_shared_prices.sql'), ('unshare_prices_of','migration_shared_prices.sql'), ('_price_contributor_of','migration_shared_prices.sql'),
                ('sharing_activity_export','migration_sharing_safety.sql'),
                ('grocery_receipt_categories','migration_dashboard_rollup.sql'),
+               ('trip_expense_totals','migration_trip_totals.sql'),
                ('share_prices_for','migration_nightly_share.sql'), ('share_failed_for','migration_nightly_share.sql'), ('claim_badge_alert_for','migration_nightly_share.sql'), ('my_badge_for','migration_nightly_share.sql'),
                ('my_badge','migration_badges.sql'), ('ack_badge','migration_badges.sql'), ('claim_badge_alert','migration_badges.sql'), ('_badge_level','migration_badges.sql'),
                ('price_countries','migration_country.sql'), ('my_traveler','migration_country.sql'), ('ack_traveler','migration_country.sql'), ('_country_of_currency','migration_country.sql'), ('_note_countries','migration_country.sql'),

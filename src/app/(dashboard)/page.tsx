@@ -38,15 +38,8 @@ import { PAPER_COLS, latestPapers, type TripPaper } from "@/lib/trip-papers";
 import { cardChecklist } from "@/lib/trip-checklist";
 import { onlySpending } from "@/lib/personal/price-notes";
 import { fetchDashboardItems } from "@/lib/personal/dashboard-items";
+import { fetchTripTotals } from "@/lib/trip-totals";
 import { FLIGHT_COLS, DOCUMENT_TILE_COLS, DOCUMENT_TILE_COLS_BASE, DOCUMENT_TILE_COLS_NUMBER, PROFILE_HOME_COLS, PROFILE_HOME_PLACE_COLS, PROFILE_HOME_WELCOME_COLS, PERSONAL_PROJECT_COLS, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
-
-type Expense = { amount: number; amount_usd?: number | null; currency?: string | null; expense_date?: string | null };
-
-function usdOf(e: Expense) {
-  if (e.amount_usd != null) return Number(e.amount_usd);
-  if (!e.currency || e.currency === "USD") return Number(e.amount);
-  return 0;
-}
 
 export default async function DashboardPage({ searchParams }: { searchParams?: Promise<{ tour?: string }> }) {
   const forcedTour = (await searchParams)?.tour === "1";
@@ -66,8 +59,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     ),
     withColumnFallback(
       (cols) => supabase.from("trips").select(cols).eq("user_id", uid).order("start_date", { ascending: true }),
-      "id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency), hotel_name, hotel_address",
-      "id, name, destination, start_date, end_date, status, expenses(amount, amount_usd, currency)",
+      "id, name, destination, start_date, end_date, status, hotel_name, hotel_address",
+      "id, name, destination, start_date, end_date, status",
     ),
     // Passport renewal reminder (works before the documents migration is run: the query just returns nothing)
     withColumnFallback3(
@@ -91,7 +84,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   for (const p of (papersRes.error ? [] : (papersRes.data ?? [])) as unknown as TripPaper[]) papersByTrip.set(p.trip_id, [...(papersByTrip.get(p.trip_id) ?? []), p]);
   const lineFor = (tripId: string) => flightLine(flightsByTrip.get(tripId) ?? [], Date.now());
   const profile = profileRes.data as unknown as { first_name: string | null; last_name: string | null; full_name: string | null; avatar_url: string | null; role: string | null; home_country?: string | null; home_city?: string | null; welcome_seen_at?: string | null; welcome_tracks?: string[] | null } | null;
-  type TripRow = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string; expenses: Expense[] | null; hotel_name?: string | null; hotel_address?: string | null };
+  type TripRow = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string; hotel_name?: string | null; hotel_address?: string | null };
   const trips = tripsRes.data as unknown as TripRow[] | null;
   type DocRow = { id: string; kind: string; title: string; issuing_country: string | null; expiry_date: string | null; trip_id: string | null; file_path: string | null; created_at: string; document_number?: string | null; show_on?: string | null };
   const docRows = (docRes.data || []) as unknown as DocRow[];
@@ -120,7 +113,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const wantsDash = myPerms.has("personal.dashboard") && personalAllowed;
   const wantsSharing = myPerms.has("sharing");
   const monthStart = `${todayISO().slice(0, 7)}-01`;
-  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashGi, dashPj, dashCu, destinationInfo, sharingRes] = await Promise.all([
+  const [eventsRes, groceryRes, summaryProjectsRes, scanProjectsRes, dashEx, dashGr, dashGi, dashPj, dashCu, destinationInfo, sharingRes, tripTotals] = await Promise.all([
     // Security alerts are only for admins (the same people who can open Admin > Security)
     wantsSecurity
       ? supabase
@@ -146,6 +139,8 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
     featuredTrip ? getDestinationInfo(featuredTrip.destination) : null,
     // Partner sharing: invites waiting for an answer show on the bell (only for roles that have the option)
     wantsSharing ? supabase.rpc("sharing_overview") : null,
+    // What each trip has spent: added up in the database, not by downloading every expense
+    fetchTripTotals(supabase, (trips ?? []).map((t) => t.id)),
   ]);
 
   const securityNotifications = eventsRes ? buildSecurityNotifications(eventsRes.data || [], Date.now()) : [];
@@ -271,7 +266,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           ) : (
             <>
               {featured && (() => {
-                const fTotal = featured.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
+                const fTotal = tripTotals.get(featured.id)?.total ?? 0;
                 const fFlights = flightsByTrip.get(featured.id) ?? [];
                 const fNext = nextFlight(fFlights, Date.now());
                 return (
@@ -287,7 +282,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     checklist={checklistRes.error ? null : cardChecklist(featured, trips ?? [], (checklistRes.data ?? []) as unknown as Parameters<typeof cardChecklist>[2])}
                     papers={papersRes.error ? null : { count: (papersByTrip.get(featured.id) ?? []).length, latest: latestPapers(papersByTrip.get(featured.id) ?? []) }}
                     total={fTotal}
-                    count={featured.expenses?.length || 0}
+                    count={tripTotals.get(featured.id)?.count ?? 0}
                   />
                   <TripWeather destination={featured.destination} start={featured.start_date} end={featured.end_date} today={today} editHref={`/trips/${featured.id}/edit`} />
                   </>
@@ -298,7 +293,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                 <div className="space-y-2 pt-1">
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Also coming up</p>
                   {otherTrips.map((trip) => {
-                    const tripTotal = trip.expenses?.reduce((sum: number, e: Expense) => sum + usdOf(e), 0) || 0;
+                    const tripTotal = tripTotals.get(trip.id)?.total ?? 0;
                     const sub = trip.start_date > today ? `in ${daysBetween(today, trip.start_date)} days` : isPassed(trip) ? "Passed" : "In progress";
                     return (
                       <Link
