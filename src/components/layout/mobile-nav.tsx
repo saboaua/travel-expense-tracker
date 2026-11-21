@@ -62,7 +62,7 @@ export function MobileNav() {
       {open && (
         <div className="app-frame fixed inset-0 z-40 md:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom))] left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom)*0.3)] left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <p className="font-semibold">Menu</p>
               <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-lg text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
@@ -112,7 +112,7 @@ export function MobileNav() {
         </div>
       )}
 
-      <nav className="relative z-50 shrink-0 border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden print:hidden">
+      <nav className="relative z-50 shrink-0 border-t bg-background pb-[calc(env(safe-area-inset-bottom)*0.3)] md:hidden print:hidden">
         <div className="flex items-center justify-around h-16">
           {mainItems.map((item) => {
             const isActive = item.label === "Business" ? pathname.startsWith("/trips") || pathname.startsWith("/reports") || pathname.startsWith("/projects") : pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href)) || (item.href === "/personal" && pathname.startsWith("/documents"));
