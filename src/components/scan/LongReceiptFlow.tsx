@@ -92,7 +92,7 @@ export function LongReceiptFlow({ onDone, onCancel }: { onDone: (file: File) => 
   );
 
   return (
-    <div className="app-frame fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-background" role="dialog" aria-modal="true" aria-label="Long receipt" data-testid="long-receipt">
+    <div className="app-frame fixed inset-0 z-[60] flex flex-col overflow-y-auto bg-background pt-[env(safe-area-inset-top)]" role="dialog" aria-modal="true" aria-label="Long receipt" data-testid="long-receipt">
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col gap-4 p-4">
         <button type="button" onClick={step === "parts" ? onCancel : () => setStep("parts")} className="-ml-1.5 flex min-h-11 w-fit items-center gap-1 text-[15px] font-semibold text-primary">
           <ChevronLeft className="h-5 w-5" aria-hidden="true" />{step === "parts" ? "Cancel" : "Parts"}

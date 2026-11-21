@@ -25,7 +25,7 @@ export async function generateMetadata(): Promise<Metadata> {
     manifest: manifestHref(brand),
     appleWebApp: {
       capable: true,
-      statusBarStyle: "default",
+      statusBarStyle: "black-translucent",
       title: "Lifolio",
       startupImage: startupImages,
     },
@@ -80,6 +80,8 @@ export default async function RootLayout({
       </head>
       <body className={`${inter.className} antialiased`}>
         <AppSplash />
+        {/* Installed iPhone: the status bar is see-through, so this band paints the strip behind it (zero tall anywhere without a notch/status bar inset) */}
+        <div aria-hidden="true" data-testid="status-band" className="pointer-events-none fixed inset-x-0 top-0 z-[45] h-[env(safe-area-inset-top)] bg-primary dark:bg-page print:hidden" />
         <ConfirmProvider>{children}</ConfirmProvider>
         <ServiceWorkerRegister />
         <InstallPrompt />

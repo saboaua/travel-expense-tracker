@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     display_override: ["standalone"],
     background_color: "#ffffff",
     theme_color: theme,
-    orientation: "portrait-primary",
+    orientation: "any",
     // Long-press the app icon on Android (not for a client's own app)
     ...(clientLink ? {} : {
       shortcuts: [

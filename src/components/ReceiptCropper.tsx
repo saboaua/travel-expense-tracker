@@ -111,7 +111,7 @@ export function ReceiptCropper({
   if (!url) return null;
 
   return (
-    <div className="app-frame fixed inset-0 z-[70] flex flex-col bg-black/95" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
+    <div className="app-frame fixed inset-0 z-[70] flex flex-col bg-black/95 pt-[env(safe-area-inset-top)]" onPointerMove={onPointerMove} onPointerUp={onPointerUp}>
       <div className="flex items-center justify-between p-3 text-white">
         <p className="text-sm font-medium">{title}</p>
         <button type="button" onClick={onCancel} className="p-1" aria-label="Cancel crop">

@@ -355,6 +355,8 @@ try {
     }));
     assert(head.capable === "yes" && head.modern === "yes", "both web-app tags are present");
     assert(head.title === "Lifolio", `the home screen name is Lifolio (got ${head.title})`);
+    assert((await page.locator('meta[name="apple-mobile-web-app-status-bar-style"]').getAttribute("content")) === "black-translucent", "the iPhone status bar lets the app paint behind it");
+    assert((await page.locator('[data-testid="status-band"]').count()) === 1, "a band paints the strip behind the status bar");
     const vp = await page.evaluate(() => document.querySelector('meta[name="viewport"]')?.getAttribute("content") || "");
     assert(/viewport-fit=cover/.test(vp), `the page reaches the screen edges so the safe-area padding works (got ${vp})`);
     assert((await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)) === "light", "native controls are light in the light theme");
@@ -369,6 +371,7 @@ try {
     const m = await mres.json();
     assert(m.display === "standalone" && m.id === "/" && m.start_url === "/" && m.scope === "/", "the manifest asks for a standalone app inside this site");
     assert(m.short_name === "Lifolio", "the manifest short name is Lifolio");
+    assert(m.orientation === "any", `Android may rotate like iPhone (got ${m.orientation})`);
     assert(Array.isArray(m.shortcuts) && m.shortcuts.length >= 3 && m.shortcuts.every((x) => x.name && x.url.startsWith("/")), "long-pressing the icon offers shortcuts");
     assert(m.share_target?.action === "/share-target" && m.share_target.method === "POST" && /multipart/.test(m.share_target.enctype) && m.share_target.params.files[0].accept.includes("image/*"), "Android's share sheet can send a photo or PDF to the app");
     const clientM = await (await page.request.get(`${BASE}/api/manifest?s=${"a".repeat(32)}`)).json();
