@@ -172,7 +172,7 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
 
       {pending && (
         <ScanSheet
-          options={pending.options.length === 1 && pending.options[0].kind === "document" ? pending.options : options}
+          options={pending.options.length === 1 && pending.options[0].kind === "document" ? pending.options : options.filter((o) => o.kind === "type" || pending.options.some((p) => p.key === o.key))}
           types={personal ? allTypes : undefined}
           onTypeCreated={(t) => { setCreated((c) => [...c, t]); reloadTypes(); }}
           selected={pending.pick}
