@@ -5,12 +5,15 @@ import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CalendarPlus, ExternalLink, Plus, TrendingUp, Upload, X, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { SUBSCRIPTION_COLS, SUBSCRIPTION_COLS_PAY, isMissingColumn } from "@/lib/columns";
+import { SUBSCRIPTION_COLS, SUBSCRIPTION_COLS_LOGO, SUBSCRIPTION_COLS_PAY, isMissingColumn } from "@/lib/columns";
 import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
 import { paidLabel, type PaidWith } from "@/lib/paid-with";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
+import { SubLogo } from "@/components/logos/SubLogo";
+import { SubLogoChoice } from "@/components/logos/SubLogoChoice";
+import { cleanDomain, type LibraryLogo } from "@/lib/logo-match";
 import { RenewalBar } from "@/components/subscriptions/RenewalBar";
 import { useConfirm } from "@/components/ui/confirm";
 import { cn, formatCurrency, formatDate, todayISO } from "@/lib/utils";
@@ -41,13 +44,19 @@ export function SubscriptionsView() {
   const [editing, setEditing] = useState<{ id: string | null; form: SubInput } | null>(null);
   const [paid, setPaid] = useState<PaidWith>("credit");
   const [hasPaid, setHasPaid] = useState(true);
+  const [hasLogo, setHasLogo] = useState(true);
+  const [library, setLibrary] = useState<LibraryLogo[]>([]);
+  const [logo, setLogo] = useState<string | null>(null);
+  const [website, setWebsite] = useState("");
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
   const [note, setNote] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
-    let r = await supabase.from("subscriptions").select(SUBSCRIPTION_COLS_PAY).order("name");
+    let r = await supabase.from("subscriptions").select(SUBSCRIPTION_COLS_LOGO).order("name");
+    // Until migration_logo_library.sql has run, subscriptions load without logos
+    if (r.error && isMissingColumn(r.error)) { setHasLogo(false); r = (await supabase.from("subscriptions").select(SUBSCRIPTION_COLS_PAY).order("name")) as unknown as typeof r; }
     // Until migration_subscription_paid_with.sql has run, subscriptions load without how they are paid
     if (r.error && isMissingColumn(r.error)) { setHasPaid(false); r = (await supabase.from("subscriptions").select(SUBSCRIPTION_COLS).order("name")) as unknown as typeof r; }
     const { data, error: e } = r as unknown as { data: Record<string, unknown>[] | null; error: { message: string } | null };
@@ -56,6 +65,10 @@ export function SubscriptionsView() {
     setSubs((data ?? []).map((r) => ({ ...r, price: Number(r.price), price_history: Array.isArray(r.price_history) ? r.price_history : [] })) as Sub[]);
   }, [supabase]);
   useEffect(() => { void load(); }, [load]);
+  // The admin's logo library (empty until migration_logo_library.sql has run)
+  useEffect(() => {
+    void supabase.from("logo_library").select("id, name, keywords, logo").order("name").then(({ data }) => setLibrary((data ?? []) as LibraryLogo[]));
+  }, [supabase]);
 
   const active = useMemo(() => (subs ?? []).filter((s) => s.status === "active"), [subs]);
   const totals = useMemo(() => totalsByCurrency(subs ?? [], today), [subs, today]);
@@ -74,6 +87,8 @@ export function SubscriptionsView() {
 
   const open = (s?: Sub) => {
     setFormError("");
+    setLogo(s?.logo ?? null);
+    setWebsite(s?.website ?? "");
     setPaid(s ? subPaid(s) : "credit");
     setEditing(s ? { id: s.id, form: { name: s.name, price: String(s.price), currency: s.currency, cycle: s.cycle, next_payment: s.next_payment, category: s.category ?? "", trial_ends: s.trial_ends ?? "", split_count: String(s.split_count), remind_days: String(s.remind_days), cancel_url: s.cancel_url ?? "", notes: s.notes ?? "" } } : { id: null, form: blank(today) });
   };
@@ -88,7 +103,9 @@ export function SubscriptionsView() {
     const base = { ...v.value, price_history: history, reminded_for: null };
     const uid = editing.id ? null : (await supabase.auth.getUser()).data.user?.id;
     const write = (row: Record<string, unknown>) => (editing.id ? supabase.from("subscriptions").update(row).eq("id", editing.id) : supabase.from("subscriptions").insert({ ...row, status: "active", user_id: uid }));
-    let { error: e } = await write(hasPaid ? { ...base, paid_with: paid } : base);
+    const withPay = hasPaid ? { ...base, paid_with: paid } : base;
+    let { error: e } = await write(hasLogo ? { ...withPay, logo, website: cleanDomain(website) } : withPay);
+    if (e && hasLogo && isMissingColumn(e)) { setHasLogo(false); ({ error: e } = await write(withPay)); }
     if (e && hasPaid && isMissingColumn(e)) { setHasPaid(false); ({ error: e } = await write(base)); }
     setSaving(false);
     if (e) return setFormError("Could not save. Check your connection and try again.");
@@ -191,7 +208,7 @@ export function SubscriptionsView() {
             <Card className="divide-y">
               {soon.map((s) => (
                 <button key={s.id} type="button" onClick={() => open(s)} className="flex min-h-14 w-full items-center gap-3 p-3 text-left">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 font-bold text-primary">{s.name.slice(0, 1).toUpperCase()}</span>
+                  <SubLogo logo={s.logo} name={s.name} tone="primary" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}</span>
                     <span className="block text-sm text-muted-foreground">{whenText(daysUntil(s, today))} · {cycleLabel(s.cycle).toLowerCase()}{hasPaid ? ` · ${paidLabel(subPaid(s))}` : ""}{s.split_count > 1 ? ` · split ${s.split_count} ways` : ""}</span>
@@ -218,7 +235,7 @@ export function SubscriptionsView() {
             <Card className="divide-y">
               {shown.map((s) => (
                 <button key={s.id} type="button" onClick={() => open(s)} className="flex min-h-14 w-full items-center gap-3 p-3 text-left">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-muted font-bold">{s.name.slice(0, 1).toUpperCase()}</span>
+                  <SubLogo logo={s.logo} name={s.name} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">{s.name}{s.status !== "active" && <span className="ml-2 rounded-full bg-muted px-2 py-0.5 text-xs font-medium">{s.status}</span>}</span>
                     <span className="block text-sm text-muted-foreground">{cycleLabel(s.cycle)} · next {formatDate(nextDue(s, today))}</span>
@@ -246,6 +263,7 @@ export function SubscriptionsView() {
             </div>
             <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-5 py-3">
             <label className={field}>Name<Input value={form.name} onChange={(e) => set("name", e.target.value)} maxLength={80} /></label>
+            {hasLogo && <SubLogoChoice name={form.name} library={library} logo={logo} website={website} isNew={!editing.id} onChange={(v) => { if (v.logo !== undefined) setLogo(v.logo); if (v.website !== undefined) setWebsite(v.website); }} />}
             <div className="grid grid-cols-2 gap-3">
               <label className={field}>Price<Input inputMode="decimal" value={form.price} onChange={(e) => set("price", e.target.value)} /></label>
               <label className={field}>Currency

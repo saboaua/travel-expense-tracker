@@ -112,6 +112,8 @@ export async function withColumnFallback3<T extends { error: { code?: string; me
 export const SUBSCRIPTION_COLS = "id, name, price, currency, cycle, next_payment, category, status, trial_ends, split_count, remind_days, cancel_url, notes, price_history";
 /** With how it is paid. Falls back to SUBSCRIPTION_COLS until migration_subscription_paid_with.sql has run. */
 export const SUBSCRIPTION_COLS_PAY = `${SUBSCRIPTION_COLS}, paid_with`;
+/** With the logo and website. Falls back to SUBSCRIPTION_COLS_PAY until migration_logo_library.sql has run. */
+export const SUBSCRIPTION_COLS_LOGO = `${SUBSCRIPTION_COLS_PAY}, logo, website`;
 export const IPTV_CLIENT_COLS = "id, customer_id, plan, model, order_no, donation, portal, mac, device_id, location, date_subscribed, frequency, renewal_date, expire_date, notes";
 export const IPTV_CUSTOMER_COLS = "id, name, contact, share_enabled, client_user_id";
 export const IPTV_RENEWAL_COLS = "id, renewed_on, frequency, expires_after";

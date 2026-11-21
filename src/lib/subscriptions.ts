@@ -20,7 +20,7 @@ export const TRIAL_WARNING_DAYS = 2;
 export type Sub = {
   id: string; name: string; price: number; currency: string; cycle: Cycle; next_payment: string; category: string | null;
   status: "active" | "paused" | "cancelled"; trial_ends: string | null; split_count: number; remind_days: number;
-  cancel_url: string | null; notes: string | null; price_history: { price: number; at: string }[]; reminded_for?: string | null; paid_with?: PaidWith | null;
+  cancel_url: string | null; notes: string | null; price_history: { price: number; at: string }[]; reminded_for?: string | null; paid_with?: PaidWith | null; logo?: string | null; website?: string | null;
 };
 
 const addDays = (day: string, n: number) => new Date(Date.parse(`${day}T00:00:00Z`) + n * 86_400_000).toISOString().slice(0, 10);

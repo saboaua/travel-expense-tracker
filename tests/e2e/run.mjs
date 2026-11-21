@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed"]) fake.table(t);
+for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1104,6 +1104,49 @@ try {
     } finally {
       await ctx.close();
       recs.splice(r0, recs.length); subsT.splice(s0, subsT.length);
+    }
+  });
+
+  await test("subscription logos: the admin adds a logo to the library, a matching subscription is offered it, and the list shows it or the default icon", async () => {
+    const { ctx, page } = await newPage();
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    const subsT = fake.table("subscriptions"), libT = fake.table("logo_library");
+    const s0 = subsT.length, l0 = libT.length;
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/admin/logos`);
+      await page.getByRole("button", { name: /Add a logo/ }).first().click();
+      await page.getByLabel("Company").fill("Zorbo");
+      await page.getByLabel(/Also matches/).fill("zorbo plus, zorbo tv");
+      await page.getByLabel("Choose a logo picture").setInputFiles({ name: "z.png", mimeType: "image/png", buffer: PNG });
+      await page.getByTestId("logo-form").getByTestId("sub-logo").waitFor({ timeout: 15_000 });
+      await page.getByRole("button", { name: "Save to library" }).click();
+      await page.getByTestId("logo-row").filter({ hasText: "Zorbo" }).waitFor({ timeout: 15_000 });
+      assert(/^data:image\//.test(libT[libT.length - 1].logo) && libT[libT.length - 1].keywords.length === 2, "the library keeps the logo picture and both extra words");
+
+      await page.goto(`${BASE}/personal/subscriptions`);
+      await page.getByRole("button", { name: /Add/ }).first().click();
+      await page.getByLabel("Name").fill("Aruba Water");
+      assert((await page.getByTestId("logo-nomatch").count()) === 1, "a name that is not in the library says so and keeps the default icon");
+      await page.getByLabel("Name").fill("Zorbo Plus Family");
+      await page.getByTestId("logo-match").waitFor({ timeout: 10_000 });
+      assert((await page.getByTestId("logo-choice-library").getAttribute("aria-checked")) === "true", "the library logo is chosen to start with");
+      await page.getByLabel("Price").fill("9.99");
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await page.getByRole("dialog").waitFor({ state: "detached", timeout: 15_000 });
+      assert((await page.getByTestId("sub-logo").count()) >= 1, "the list shows the logo");
+      assert(/^data:image\//.test(subsT[subsT.length - 1].logo || ""), "the logo is saved with the subscription");
+
+      // Choosing the default icon instead removes the logo
+      await page.getByRole("button", { name: /Zorbo Plus Family/ }).first().click();
+      await page.getByTestId("logo-choice-default").click();
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await page.getByRole("dialog").waitFor({ state: "detached", timeout: 15_000 });
+      assert(subsT[subsT.length - 1].logo === null && (await page.getByTestId("sub-logo").count()) === 0, "Keep the default icon takes the logo off");
+    } finally {
+      await ctx.close();
+      subsT.splice(s0, subsT.length); libT.splice(l0, libT.length);
     }
   });
 

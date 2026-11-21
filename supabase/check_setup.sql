@@ -114,6 +114,8 @@ need_cols(tbl, col, fix) as (values
   ('grocery_receipts','trip_ref','migration_paid_with.sql'),
   ('personal_expenses','paid_with','migration_paid_with.sql'),
   ('subscriptions','paid_with','migration_subscription_paid_with.sql'),
+  ('subscriptions','logo','migration_logo_library.sql'),
+  ('subscriptions','website','migration_logo_library.sql'),
   ('grocery_receipts','area','migration_shopping_area.sql')
 ),
 col_checks as (
@@ -125,6 +127,7 @@ col_checks as (
     on c.table_schema = 'public' and c.table_name = n.tbl and c.column_name = n.col
 ),
 need_tables(tbl, fix) as (values
+  ('logo_library','migration_logo_library.sql'),
   ('house_areas','migration_house_areas.sql'),
   ('user_plans','migration_project_types_plans.sql'),
   ('payment_settings','migration_pro_payments.sql'),

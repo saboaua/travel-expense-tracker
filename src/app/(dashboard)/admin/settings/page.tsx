@@ -8,7 +8,7 @@ import { useAccess } from "@/lib/use-access";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
 import { PRO_TOOL_COUNT, SUPERMARKET_TOOLS } from "@/lib/admin-tools";
-import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, ShoppingCart, UserPlus, Crown } from "lucide-react";
+import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, ShoppingCart, UserPlus, Crown, Images } from "lucide-react";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone; tools?: number }[] = [
   {
@@ -34,6 +34,14 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "Travel receipts and trip types, and grocery items.",
     icon: Tag,
     tone: "projects",
+  },
+  {
+    href: "/admin/logos",
+    feature: "admin.only",
+    title: "Logo library",
+    description: "Company logos offered when someone adds a subscription.",
+    icon: Images,
+    tone: "subscriptions",
   },
   {
     href: "/admin/help",
