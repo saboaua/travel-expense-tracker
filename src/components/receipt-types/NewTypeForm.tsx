@@ -51,7 +51,7 @@ export function NewTypeForm({ existing, editing, onSaved, onCancel }: { existing
         </div>
       </div>
       <label className="flex min-h-12 items-center justify-between gap-3 rounded-xl border p-3">
-        <span><span className="block text-sm font-semibold">Show in my monthly budget</span><span className="block text-xs text-muted-foreground">Gets its own line. Off: it is counted in Other types.</span></span>
+        <span><span className="block text-sm font-semibold">Show on my dashboard</span><span className="block text-xs text-muted-foreground">Gets its own line. Off: it is added to Other.</span></span>
         <input type="checkbox" role="switch" data-testid="nt-budget" checked={inBudget} onChange={(e) => setInBudget(e.target.checked)} className="h-6 w-11 shrink-0 accent-primary" />
       </label>
       {inBudget && (

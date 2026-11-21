@@ -104,10 +104,10 @@ function TypeRow({ t, amount, v }: { t: ReceiptType; amount: number; v: BudgetVi
 /** Types without their own line, added up in one row that lists their names. */
 function OtherTypesRow({ amount, names, v }: { amount: number; names: string[]; v: BudgetView }) {
   return (
-    <Link href="/personal/types" className="block min-h-12 border-t py-2.5 hover:bg-accent/40" data-testid="budget-other-types" aria-label="Other types: open">
+    <Link href="/personal/types" className="block min-h-12 border-t py-2.5 hover:bg-accent/40" data-testid="budget-other-types" aria-label="Other: open">
       <div className="flex items-center gap-2.5">
         <TypeIcon icon="tag" color="#64748b" className="h-8 w-8" />
-        <span className="min-w-0 flex-1"><b className="block text-[15px]">Other types</b><span className="block truncate text-xs text-muted-foreground">{names.join(", ")}</span></span>
+        <span className="min-w-0 flex-1"><b className="block text-[15px]">Other</b><span className="block truncate text-xs text-muted-foreground">{names.join(", ")}</span></span>
         <span className="text-[15px] tabular-nums"><Money amount={amount} currency={v.currency} /></span>
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
       </div>

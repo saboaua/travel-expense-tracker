@@ -4,6 +4,7 @@ import { PageShell } from "@/components/layout/PageShell";
 import { shiftMonth } from "@/lib/personal/utilities";
 import { PageHeader } from "@/components/ui/page-header";
 import { useEffect, useState } from "react";
+import { useReceiptTypes } from "@/lib/use-receipt-types";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
@@ -29,6 +30,7 @@ type Stats = ReturnType<typeof summarizePersonal> & { shopping: ReturnType<typeo
 
 export default function PersonalHubPage() {
   const [enabled, setEnabled] = useState(true);
+  const { types: myTypes } = useReceiptTypes();
   const [stats, setStats] = useState<Stats | null>(null);
   const { perms, loaded } = useAccess();
   const [comingUp, setComingUp] = useState<ComingUpItem[] | null>(null);
@@ -149,7 +151,7 @@ export default function PersonalHubPage() {
       text: !stats ? "\u00a0" : grocery ? `${formatCurrency(grocery.total, grocery.currency)} this month \u00b7 ${plural(grocery.count, "receipt")}` : "Receipts and item prices", add: { href: "/personal/groceries/new", label: "Scan", aria: "Scan receipt" } },
     { href: "/personal/shopping", title: "Shopping", icon: ShoppingBag, tone: "projects", strong: !!stats?.shopping, testId: "shopping-tile",
       text: !stats ? "\u00a0" : stats.shopping ? `${formatCurrency(stats.shopping.total, stats.shopping.currency)} this month \u00b7 ${plural(stats.shopping.count, "receipt")}` : "Clothes, electronics, home and other stores", add: { href: "/personal/shopping/new", label: "Scan", aria: "Scan shopping receipt" } },
-    { href: "/personal/types", title: "Receipt types", icon: Tag, tone: "projects", testId: "types-tile", text: "Personal care, health, pets and your own. Choose which get a budget line" },
+    { href: "/personal/types", title: "Other", icon: Tag, tone: "projects", testId: "types-tile", text: myTypes.length ? `${myTypes.slice(0, 3).map((t) => t.name).join(", ")}${myTypes.length > 3 ? ` and ${myTypes.length - 3} more` : ""}` : "Your own kinds of receipt: food, personal care, health, pets" },
     { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
     ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/fuel" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
   ];

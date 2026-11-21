@@ -94,12 +94,12 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
 /** Your prices. The nightly community share passes `forUser` (it reads with the service key, which has no row security of its own). */
 export async function fetchPrices(supabase: SupabaseClient, forUser?: string): Result<TrackerRow[]> {
   try {
-    const data = await fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: TrackerRow["receipt"] | TrackerRow["receipt"][] }>((a, b) =>
-      (forUser ? supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)").eq("user_id", forUser) : supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency)")).order("created_at", { ascending: false }).range(a, b)
+    const data = await fetchAll<Omit<TrackerRow, "receipt"> & { grocery_receipts: (TrackerRow["receipt"] & { area?: string | null }) | (TrackerRow["receipt"] & { area?: string | null })[] }>((a, b) =>
+      (forUser ? supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency, area)").eq("user_id", forUser) : supabase.from("grocery_items").select("name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(store, purchase_date, currency, area)")).order("created_at", { ascending: false }).range(a, b)
     );
     // notebooks, clothes and other shopping lines are not grocery prices: they stay out of Best prices and what the community shares
     const shop = await fetchShoppingNames(supabase);
-    const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase())).map((d) => ({
+    const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase()) && (Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.area !== "other").map((d) => ({
       name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
       unit: d.unit ?? null, line_total: Number(d.line_total),
       receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,

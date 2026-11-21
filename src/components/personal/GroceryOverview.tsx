@@ -26,6 +26,7 @@ import { isSpending } from "@/lib/personal/price-notes";
 import { formatDate, todayISO } from "@/lib/utils";
 import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { TypeIcon } from "@/components/receipt-types/TypeIcon";
+import { TypeActions } from "@/components/receipt-types/TypeActions";
 import { PaidTag, StoreTile } from "@/components/personal/PaidIcon";
 import type { PaidWith } from "@/lib/paid-with";
 
@@ -57,7 +58,7 @@ function ReceiptRow({ id, unsent, base, children }: { id: string; unsent: boolea
 export function GroceryOverview({ area = "groceries", typeId }: { area?: "groceries" | "shopping"; typeId?: string }) {
   const typed = !!typeId;
   const shopping = area === "shopping" || typed; // a receipt type page reads like Shopping: no grocery price tools
-  const { types } = useReceiptTypes();
+  const { types, reload: reloadTypes } = useReceiptTypes();
   const rtype = typed ? types.find((t) => t.id === typeId) ?? null : null;
   const base = typed ? `/personal/types/${typeId}` : shopping ? "/personal/shopping" : "/personal/groceries";
   const today = todayISO();
@@ -133,6 +134,7 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
           </div>
           <Link href={`${base}/new`} className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> {typed ? "Scan receipt" : shopping ? "Scan shopping receipt" : "Scan receipt"}</Button></Link>
         </div>
+        {rtype && <TypeActions type={rtype} all={types} onChanged={reloadTypes} />}
         {!shopping && (
           <div className="grid grid-cols-3 gap-3 md:gap-4">
           <ActionTile href="/personal/groceries/prices" label="Price tracker" tint="bg-blue-50 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300"><TrendingUp className="h-5 w-5" aria-hidden="true" /></ActionTile>

@@ -1104,11 +1104,15 @@ try {
     await page.getByTestId("not-groceries").waitFor({ timeout: 20_000 });
     await page.getByTestId("ng-move").click();
     assert((await page.getByTestId("not-groceries").count()) === 0, "the banner closes after Move it");
+    // A typed receipt has its own plain form: no grocery categories, no category picker
+    assert((await page.getByTestId("needs-category").count()) === 0, "no needs-category block on a typed receipt");
+    assert((await page.getByText("Pantry").count()) === 0 && (await page.getByText("Remember my choices").count()) === 0, "no grocery categories or remember box");
     const before = fake.table("grocery_receipts").length;
     await page.getByRole("button", { name: "Save receipt" }).click();
     for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
     const saved = fake.table("grocery_receipts").find((r) => r.store === "Zen Body Massage");
     assert(saved && saved.area === "other" && saved.type_id === care.id, "saved as a Personal care receipt: " + JSON.stringify(saved));
+    assert(fake.table("grocery_items").filter((i) => i.receipt_id === saved.id).every((i) => i.category === "Personal care"), "every item's category is the type name");
     // It is on the type page, not in Groceries
     await page.goto(`${BASE}/personal/types/${care.id}`);
     await page.getByRole("heading", { name: "Personal care" }).waitFor({ timeout: 20_000 });
@@ -1121,13 +1125,13 @@ try {
     await page.getByTestId(`budget-type-${care.id}`).waitFor({ timeout: 20_000 });
     assert(/60/.test(await page.getByTestId(`budget-type-${care.id}`).innerText()), "the Personal care line shows 60: " + (await page.getByTestId(`budget-type-${care.id}`).innerText()));
     assert(/60/.test(await page.getByTestId("budget-line").innerText()), "the total counts it: " + (await page.getByTestId("budget-line").innerText()));
-    // Switch it off in the manager: it moves into Other types
+    // Switch it off on the Other page: it moves into the Other line
     await page.goto(`${BASE}/personal/types`);
-    await page.getByRole("switch", { name: /Personal care/ }).click();
+    await page.getByRole("switch", { name: /Show Personal care on the dashboard/ }).click();
     for (let i = 0; i < 40 && fake.table("receipt_types").find((t) => t.id === care.id)?.show_in_budget !== false; i++) await new Promise((ok) => setTimeout(ok, 250));
     await page.goto(`${BASE}/`);
     await page.getByTestId("budget-other-types").waitFor({ timeout: 20_000 });
-    assert(/Personal care/.test(await page.getByTestId("budget-other-types").innerText()), "Other types lists the name");
+    assert(/Personal care/.test(await page.getByTestId("budget-other-types").innerText()), "Other lists the name");
     fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Zen Body Massage"));
     fake.table("grocery_items").splice(0, fake.table("grocery_items").length, ...fake.table("grocery_items").filter((r) => r.receipt_id !== saved.id));
     fake.table("receipt_types").splice(0);

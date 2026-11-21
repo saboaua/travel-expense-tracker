@@ -61,6 +61,8 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   const { types } = useReceiptTypes();
   const [typeId, setTypeId] = useState<string | null>(typeProp ?? null);
   const rtype = types.find((t) => t.id === typeId) ?? null;
+  // A receipt of your own type has plain lines: the type is the category, so no grocery categories, sorting or remembered choices
+  const typed = !!typeId;
   // After a scan read as Groceries: a receipt that looks like something else (a massage, a clinic) is offered a better home. Nothing moves without a tap.
   const [nudge, setNudge] = useState<{ pick: string; why: string } | null>(null);
   const BACK = typeId ? `/personal/types/${typeId}` : asShopping ? "/personal/shopping" : "/personal/groceries";
@@ -362,7 +364,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
           user_id: owner,
           name: r.name.trim(),
           normalized_name: normalizeItemName(r.name),
-          category: r.category,
+          category: typed ? rtype?.name ?? "Other" : r.category,
           quantity: money(r.quantity),
           unit_price: money(r.unit_price),
           line_total: money(r.line_total),
@@ -378,7 +380,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
         label: head.store, summary: `Grocery receipt · ${receiptId ? "changed" : "new"}`,
       });
       // Lines the person sorted by hand are remembered for next time
-      if (remember) await saveItemRules(supabase, owner, clean.filter((r) => r.sorted && r.category !== "Other").map((r) => ({ normalized_name: normalizeItemName(r.name), category: r.category })));
+      if (remember && !typed) await saveItemRules(supabase, owner, clean.filter((r) => r.sorted && r.category !== "Other").map((r) => ({ normalized_name: normalizeItemName(r.name), category: r.category })));
       // A receipt that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
       router.push(saved.queued && !receiptId ? BACK : `${BACK}/${saved.id}`);
       router.refresh();
@@ -529,7 +531,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
                 </div>
               )}
 
-              {rows.length > 0 && (() => {
+              {rows.length > 0 && !typed && (() => {
                 const sp = splitReceipt(rows.map((r) => ({ category: r.category, line_total: money(r.line_total) })), shop);
                 // lines still in Other that the person has confirmed are groceries, not "needs a category"
                 const confirmedOther = rows.filter((r) => r.category === "Other" && r.sorted).reduce((t, r) => t + money(r.line_total), 0);
@@ -551,7 +553,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
               })()}
 
               {rows.filter((r) => !onlyCheck || r.flag).map((r) => (
-                <div key={r.key} className={`space-y-2 rounded-xl border p-3 ${r.flag ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/40" : needsCategory(r.category, r.sorted) && r.name.trim() ? "border-amber-300 bg-amber-50/40" : ""}`} data-flagged={r.flag ? "true" : undefined} data-needs-category={needsCategory(r.category, r.sorted) && r.name.trim() ? "true" : undefined}>
+                <div key={r.key} className={`space-y-2 rounded-xl border p-3 ${r.flag ? "border-amber-300 border-l-4 border-l-amber-400 bg-amber-50/40" : !typed && needsCategory(r.category, r.sorted) && r.name.trim() ? "border-amber-300 bg-amber-50/40" : ""}`} data-flagged={r.flag ? "true" : undefined} data-needs-category={!typed && needsCategory(r.category, r.sorted) && r.name.trim() ? "true" : undefined}>
                   {r.flag && (
                     <div className="space-y-2" data-testid="row-check">
                       <div className="flex items-center gap-2"><span className="inline-flex min-h-[26px] items-center gap-1 rounded-full bg-amber-100 px-2.5 text-xs font-semibold text-amber-800"><AlertTriangle className="h-3.5 w-3.5" />Check</span></div>
@@ -591,10 +593,10 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
                     <div><label htmlFor={`gr-${r.key}-price`} className="text-xs text-muted-foreground">{r.unit ? `Price per ${r.unit}` : "Price each"}</label><Input id={`gr-${r.key}-price`} type="number" step="0.01" min="0" value={r.unit_price} onChange={(e) => setUnit(r, e.target.value)} /></div>
                     <div><label htmlFor={`gr-${r.key}-line`} className="text-xs text-muted-foreground">Line total</label><Input id={`gr-${r.key}-line`} type="number" step="0.01" min="0" value={r.line_total} onChange={(e) => setLine(r, e.target.value)} /></div>
                   </div>
-                  <Select aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} category`} className="h-11 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value, sorted: true })}>
+                  {!typed && <Select aria-label={`Item ${rows.findIndex((x) => x.key === r.key) + 1} category`} className="h-11 px-2 py-1" value={r.category} onChange={(e) => update(r.key, { category: e.target.value, sorted: true })}>
                     {(categoryNames.includes(r.category) ? categoryNames : [r.category, ...categoryNames]).map((c) => <option key={c} value={c}>{c}</option>)}
-                  </Select>
-                  {needsCategory(r.category, r.sorted) && r.name.trim() && (
+                  </Select>}
+                  {!typed && needsCategory(r.category, r.sorted) && r.name.trim() && (
                     <div className="space-y-1.5" data-testid="needs-category">
                       <p className="text-[13px] font-semibold text-amber-800 dark:text-amber-200">Needs a category</p>
                       <div className="flex flex-wrap gap-1.5">
