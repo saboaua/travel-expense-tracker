@@ -29,7 +29,7 @@ export default async function AboutPage() {
           ) : (
             <span className="flex h-[68px] w-[68px] items-center justify-center rounded-[18px] border-2 border-dashed bg-muted/40 text-muted-foreground" data-testid="about-logo-placeholder"><ImageIcon className="h-9 w-9" aria-hidden="true" /></span>
           )}
-          <h2 className="mt-1.5 text-xl font-bold">{name}</h2>
+          <h2 className="-mt-3 text-xl font-bold">{name}</h2>
           <p className="text-sm text-muted-foreground">Receipts, trips and money in one place</p>
           {!brand.logoUrl && <p className="mt-2 text-xs text-muted-foreground">Placeholder until an app logo is set in Admin &gt; Branding</p>}
         </div>
