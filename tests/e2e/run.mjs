@@ -1150,6 +1150,30 @@ try {
     }
   });
 
+  await test("about: a menu item below Help opens the page with the logo or its placeholder, the version, the update check and the privacy links", async () => {
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.setViewportSize({ width: 390, height: 800 });
+      await page.getByRole("button", { name: /Menu/ }).last().click();
+      const help = page.getByRole("link", { name: "Help", exact: true }), about = page.getByRole("link", { name: "About", exact: true });
+      await about.waitFor({ timeout: 15_000 });
+      const [hb, ab] = [await help.boundingBox(), await about.boundingBox()];
+      assert(hb && ab && ab.y > hb.y && ab.y - hb.y < 80, "About sits right below Help in the menu");
+      await about.click();
+      await page.waitForURL((u) => u.pathname === "/about");
+      assert((await page.getByTestId("about-logo").count()) + (await page.getByTestId("about-logo-placeholder").count()) === 1, "the app logo or its placeholder is shown");
+      assert(/^\d+\.\d+\.\d+/.test(await page.getByTestId("about-version").innerText()), "the version number is shown");
+      assert((await page.getByTestId("about-build").innerText()).length > 0, "the build is shown");
+      assert((await page.getByTestId("about-privacy").getAttribute("href")) === "/privacy", "the privacy policy is linked");
+      await page.getByTestId("check-updates").click();
+      await page.waitForFunction(() => (document.querySelector('[data-testid="update-result"]')?.textContent || "").length > 0, null, { timeout: 15_000 });
+    } finally {
+      await ctx.close();
+    }
+  });
+
   await test("scan: rows the second look disagrees with get a Check mark and a Use button, and the total bar turns green once the items add up", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

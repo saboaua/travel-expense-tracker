@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  Home, Briefcase, FolderOpen, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet, CircleHelp, Tv,
+  Home, Briefcase, FolderOpen, LogOut, User, Shield, Users, Activity, Settings as SettingsIcon, Wallet, CircleHelp, Info, Tv,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -113,6 +113,17 @@ export function Sidebar() {
           >
             <IconTile tone="help" className="h-8 w-8 rounded-lg"><CircleHelp className="h-[18px] w-[18px]" /></IconTile>
             <span className="truncate">Help</span>
+          </Link>
+          <Link
+            href="/about"
+            style={toneStyle("admin")}
+            className={cn(
+              "flex h-10 w-full items-center justify-start gap-3 rounded-lg px-3 text-sm font-medium transition-colors",
+              pathname.startsWith("/about") ? "tone-tile font-semibold" : "hover:bg-accent hover:text-accent-foreground"
+            )}
+          >
+            <IconTile tone="admin" className="h-8 w-8 rounded-lg"><Info className="h-[18px] w-[18px]" /></IconTile>
+            <span className="truncate">About</span>
           </Link>
           <ThemeToggle className="w-full justify-start gap-3 px-3" />
           <Button variant="ghost" className="w-full justify-start gap-3 px-3" onClick={handleLogout}>

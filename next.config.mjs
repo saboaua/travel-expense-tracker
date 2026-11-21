@@ -2,6 +2,8 @@
 // and that step failed on Vercel ("Cannot read properties of undefined (reading 'fileExists')").
 // The Content-Security-Policy is set per request (with a nonce) in src/middleware.ts.
 
+import { readFileSync } from "node:fs";
+
 // Headers sent on every response
 const securityHeaders = [
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
@@ -16,9 +18,13 @@ const securityHeaders = [
 // Identifies this deployment. The browser compares it with /api/version to notice that a newer version went live.
 const buildId = process.env.VERCEL_GIT_COMMIT_SHA || process.env.VERCEL_DEPLOYMENT_ID || "local";
 
+// Shown on the About page: the app version from package.json and when this release was built
+const appVersion = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8")).version;
+const buildTime = new Date().toISOString();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  env: { NEXT_PUBLIC_BUILD_ID: buildId },
+  env: { NEXT_PUBLIC_BUILD_ID: buildId, NEXT_PUBLIC_APP_VERSION: appVersion, NEXT_PUBLIC_BUILD_TIME: buildTime },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

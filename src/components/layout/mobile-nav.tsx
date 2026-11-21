@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet, CircleHelp, Tv } from "lucide-react";
+import { Home, Briefcase, FolderOpen, User, Menu, X, Settings, Users, Activity, Shield, LogOut, Wallet, CircleHelp, Info, Tv } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
 import { clearOfflineData } from "@/lib/offline-store";
@@ -86,6 +86,15 @@ export function MobileNav() {
               )}
             >
               <IconTile tone="help" className="h-8 w-8 rounded-lg"><CircleHelp className="h-[18px] w-[18px]" /></IconTile> Help
+            </Link>
+            <Link
+              href="/about"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                pathname.startsWith("/about") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
+              )}
+            >
+              <IconTile tone="admin" className="h-8 w-8 rounded-lg"><Info className="h-[18px] w-[18px]" /></IconTile> About
             </Link>
 
             {adminItems.length > 0 && (
