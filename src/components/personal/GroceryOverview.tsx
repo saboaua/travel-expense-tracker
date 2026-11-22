@@ -1,6 +1,6 @@
 "use client";
 
-import { PaidFilter } from "@/components/personal/PaidFilter";
+import { PaidFilter, NO_FILTER, applyPaidFilter } from "@/components/personal/PaidFilter";
 import { CardsThisMonth } from "@/components/personal/CardsThisMonth";
 import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
@@ -28,7 +28,7 @@ import { useReceiptTypes } from "@/lib/use-receipt-types";
 import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 import { TypeActions } from "@/components/receipt-types/TypeActions";
 import { PaidTag, StoreTile } from "@/components/personal/PaidIcon";
-import type { PaidWith } from "@/lib/paid-with";
+import type { Filter, PaidWith } from "@/lib/paid-with";
 
 type Receipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null };
 
@@ -120,6 +120,8 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
   const catRows = [...cats.map((c) => ({ label: c.category, value: c.total })), ...(itemsReady && unitemised > 0.01 ? [{ label: "Tax / not itemised", value: unitemised }] : [])];
   const top = useMemo(() => topItems(receipts, items, month, cur), [receipts, items, month, cur]);
   const monthReceipts = allReceipts.filter((r) => r.currency === cur && monthOf(r.purchase_date) === month);
+  const [paidFilter, setPaidFilter] = useState<Filter>(NO_FILTER);
+  const shownReceipts = applyPaidFilter(monthReceipts, paidFilter);
   const trend = totals.slice(-6).map((t) => ({ label: monthLabel(t.month).split(" ")[0], value: t.total }));
 
   return (
@@ -204,7 +206,8 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
           <Card>
             <CardHeader><CardTitle className="text-base">Receipts in {monthLabel(month)}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
-              {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : monthReceipts.map((r) => (
+              <PaidFilter all={monthReceipts} shown={shownReceipts} filter={paidFilter} onChange={setPaidFilter} />
+              {monthReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts this month.</p> : shownReceipts.length === 0 ? <p className="text-sm text-muted-foreground">No receipts for this choice.</p> : shownReceipts.map((r) => (
                 <ReceiptRow key={r.id} id={r.id} base={base} unsent={unsent.has(r.id)}>
                   <StoreTile />
                   <div className="min-w-0 flex-1"><p className="font-medium">{r.store}</p><p className="text-xs text-muted-foreground">{formatDate(r.purchase_date)}{itemsReady && isTotalOnly(r, withItems) && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="total-only-tag">Total only</span>}{r.prices_only && <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground" data-testid="prices-only-tag">Prices only</span>}{waitingReceipts.has(r.id) && <span className="ml-1 inline-flex items-center gap-0.5 text-amber-600"><CloudOff className="inline h-3 w-3" aria-hidden="true" /> Waiting to sync</span>}</p></div>
@@ -214,7 +217,6 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
             </CardContent>
           </Card>
 
-          <PaidFilter receipts={allReceipts} base={base} />
         </>
       )}
     </div>
