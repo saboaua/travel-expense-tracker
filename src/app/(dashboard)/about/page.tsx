@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ChevronRight, ImageIcon, Mail, Shield } from "lucide-react";
-import { BackLink, PageHeader } from "@/components/ui/page-header";
+import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { CheckForUpdates } from "@/components/about/CheckForUpdates";
 import { getBrand } from "@/lib/brand-icon";
@@ -18,7 +18,6 @@ export default async function AboutPage() {
 
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-24 md:p-8">
-      <BackLink href="/">Home</BackLink>
       <PageHeader title="About" />
 
       <Card className="p-5">
