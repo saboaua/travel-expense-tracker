@@ -263,6 +263,11 @@ other_checks as (
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and p.pronargs = 3) then 'OK' else 'MISSING' end,
          'migration_country.sql'
   union all
+  select 'storage', 'avatars cannot be listed by everyone',
+         case when not exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects' and cmd = 'SELECT'
+                               and (roles && array['public'::name, 'anon'::name]) and qual ilike '%avatars%') then 'OK' else 'MISSING' end,
+         'migration_avatar_listing.sql'
+  union all
   select 'function', 'product_match_cache keeps the AI verdicts on doubtful matches',
          case when to_regclass('public.product_match_cache') is not null then 'OK' else 'MISSING' end,
          'migration_match_cache.sql'
