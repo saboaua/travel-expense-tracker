@@ -53,7 +53,7 @@ export function AddShelfPrice() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
   const [scanFail, setScanFail] = useState<Extract<ShelfScanOutcome, { ok: false }> | null>(null);
-  const [scanned, setScanned] = useState<{ cur: string | null } | null>(null); // filled from a photo: ask the shopper to check
+  const [scanned, setScanned] = useState<{ cur: string | null; basic: boolean } | null>(null); // filled from a photo: ask the shopper to check
   const [photo, setPhoto] = useState<string | null>(null);
 
   const currency = currencyOfCountry(country) ?? "AWG";
@@ -156,7 +156,7 @@ export function AddShelfPrice() {
     if (sc.price != null) setPrice(sc.price.toFixed(2));
     setSize(sc.size ?? "");
     setSale(sc.sale);
-    setScanned({ cur: sc.usedCurrency });
+    setScanned({ cur: sc.usedCurrency, basic: !!out.basic });
   };
   const dropPhoto = () => { setPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); setScanFail(null); setScanned(null); };
 
@@ -287,7 +287,7 @@ export function AddShelfPrice() {
             </div>
           )}
           {scanned && (
-            <div className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13.5px] leading-snug text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="shelf-scan-check"><b className="shrink-0">Check</b><span>Filled from your photo. Make sure each box matches the label.{scanned.cur === currency ? ` The ${currency} price was used.` : ""}</span></div>
+            <div className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13.5px] leading-snug text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="shelf-scan-check"><b className="shrink-0">Check</b><span>{scanned.basic ? "The AI reader was not available, so your phone read the label. It can make mistakes: check every box." : "Filled from your photo. Make sure each box matches the label."}{!scanned.basic && scanned.cur === currency ? ` The ${currency} price was used.` : ""}</span></div>
           )}
         </div>
       )}

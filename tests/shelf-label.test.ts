@@ -1,4 +1,4 @@
-import { buildShelfPrompt, cleanSize, sanitizeShelfLabel, unreadable } from "../src/lib/shelf-label";
+import { buildShelfPrompt, cleanSize, parseShelfText, sanitizeShelfLabel, unreadable } from "../src/lib/shelf-label";
 
 let failed = 0;
 const eq = (got: unknown, want: unknown, msg: string) => { const ok = JSON.stringify(got) === JSON.stringify(want); if (!ok) { failed++; console.log(`FAIL ${msg}: got ${JSON.stringify(got)} want ${JSON.stringify(want)}`); } else console.log(`PASS ${msg}`); };
@@ -23,6 +23,13 @@ eq(/Aruban florin/.test(buildShelfPrompt("AWG")) && /digits under a barcode/.tes
 // the Kraft label: "FL. 15.05" has no ISO code, and it still counts as the local price
 eq(sanitizeShelfLabel({ brand: "Kraft", name: "Classic Ceasar Dressing", size: "16OZ", prices: [{ amount: 15.05, currency: "AWG" }] }, "AWG"), { product: "Kraft Classic Ceasar Dressing", size: "16 oz", price: 15.05, sale: false, usedCurrency: "AWG" }, "the Kraft label");
 eq(sanitizeShelfLabel({ name: "GOYA HOT SAUCE", size: "6OZ", prices: [{ amount: 3.95, currency: null }] }, "AWG").price, 3.95, "a label price with no code is the local price");
+
+// the phone's own reading of the two shelf labels (plain text, no AI)
+eq(parseShelfText("KRAFT CLASSIC CEASAR\nDRESSING 160Z\nII 021000323074\nFL. 15.05", "AWG"), { product: "Kraft Classic Ceasar Dressing", size: "16 oz", price: 15.05, sale: false, usedCurrency: "AWG" }, "Kraft label read by the phone: price from the FL. line, barcode ignored");
+eq(parseShelfText("GOYA HOT SAUCE 6OZ\n041331038577\nFL. 3.95", "AWG"), { product: "Goya Hot Sauce", size: "6 oz", price: 3.95, sale: false, usedCurrency: "AWG" }, "Goya label read by the phone");
+eq(parseShelfText("Duyvis\nTijgernootjes bbq paprika\n275gr\nAWG 10.29\n$ 5.88", "AWG").price, 5.88, "the last price line wins when two are printed (the caller shows the Check note)");
+eq(parseShelfText("041331038577", "AWG").price, null, "barcode digits are never a price");
+eq(unreadable(parseShelfText("", "AWG")), true, "no text is unreadable");
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
 console.log("shelf-label: all checks passed");

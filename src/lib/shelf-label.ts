@@ -78,3 +78,35 @@ export function sanitizeShelfLabel(raw: Record<string, unknown>, currency: strin
 
 /** True when there is nothing worth filling in. */
 export const unreadable = (s: ShelfLabelScan) => !s.product && s.price == null;
+
+const TITLE = (w: string) => (/\d|&/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase());
+const SIZE_IN_TEXT = /(\d{1,4}(?:[.,]\d{1,3})?)\s*(oz|gr|gm|g|kg|ml|cl|ltr|lt|l|lb|lbs|ct|pk)\b/i;
+
+/**
+ * Last resort when both AI readers fail: reads the plain text the phone found on the label. Much less sure than the AI, so the screen
+ * asks the shopper to check everything. The price is the number with two decimals on the line that starts with FL / Afl / AWG / $,
+ * otherwise the only such number; barcode digits are never a price.
+ */
+export function parseShelfText(text: string, currency: string | null): ShelfLabelScan {
+  // Plain OCR often reads the letter O in "16OZ" as a zero: "160Z" is 16 oz
+  const lines = text.split(/\r?\n/).map((l) => l.replace(/\b(\d{1,2})0Z\b/gi, "$1 oz").replace(/\s+/g, " ").trim()).filter(Boolean);
+  const dec = (l: string) => [...l.replace(/\d{7,}/g, " ").matchAll(/(?<![\d.,])(\d{1,5})[.,](\d{2})(?![\d])/g)].map((m) => Number(`${m[1]}.${m[2]}`));
+  const priced = lines.filter((l) => /^\s*(?:afl|awg|fl|f1|us\$|\$|ƒ)(?![a-z])/i.test(l) && dec(l).length > 0);
+  const all = lines.flatMap(dec).filter((n) => n > 0 && n < 100000);
+  const price = priced.length ? dec(priced[priced.length - 1]).pop() ?? null : all.length === 1 ? all[0] : null;
+
+  // The name: the first lines made of words, up to the barcode digits or the price
+  const words: string[] = [];
+  let size: string | null = null;
+  for (const l of lines) {
+    if (/\d{7,}/.test(l) || priced.includes(l)) break;
+    if (!/[A-Za-z]{3}/.test(l)) continue;
+    const m = l.match(SIZE_IN_TEXT);
+    if (m && !size) size = cleanSize(`${m[1]}${m[2]}`);
+    words.push(l.replace(SIZE_IN_TEXT, " ").replace(/[^A-Za-z0-9&'%. -]/g, " ").replace(/\s+/g, " ").trim());
+    if (words.length >= 2) break;
+  }
+  const name = words.join(" ").split(" ").filter(Boolean).map(TITLE).join(" ").slice(0, 120);
+  const dollar = priced.length > 0 && /^\s*(?:us\$|\$)/i.test(priced[priced.length - 1]);
+  return { product: name || null, size, price: price != null && price > 0 ? price : null, sale: false, usedCurrency: dollar ? "USD" : currency };
+}
