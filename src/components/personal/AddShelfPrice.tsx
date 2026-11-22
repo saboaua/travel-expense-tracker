@@ -52,7 +52,7 @@ export function AddShelfPrice() {
   const lastKey = useRef<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [scanning, setScanning] = useState(false);
-  const [scanFail, setScanFail] = useState<Extract<ShelfScanOutcome, { ok: false }>["reason"] | null>(null);
+  const [scanFail, setScanFail] = useState<Extract<ShelfScanOutcome, { ok: false }> | null>(null);
   const [scanned, setScanned] = useState<{ cur: string | null } | null>(null); // filled from a photo: ask the shopper to check
   const [photo, setPhoto] = useState<string | null>(null);
 
@@ -150,7 +150,7 @@ export function AddShelfPrice() {
     setScanning(true);
     const out = await scanShelfLabel(file, currency);
     setScanning(false);
-    if (!out.ok) { setScanFail(out.reason); return; }
+    if (!out.ok) { setScanFail(out); return; }
     const sc = out.scan;
     if (sc.product) setProduct(sc.product);
     if (sc.price != null) setPrice(sc.price.toFixed(2));
@@ -281,8 +281,8 @@ export function AddShelfPrice() {
           {scanning && <p className="text-center text-[12.5px] text-muted-foreground">Your photo is only read. It is not saved or shared.</p>}
           {scanFail && (
             <div className="space-y-2" data-testid="shelf-scan-failed">
-              <Alert>{SHELF_SCAN_MESSAGE[scanFail]}</Alert>
-              {(scanFail === "unreadable" || scanFail === "unavailable") && <Button type="button" onClick={() => fileRef.current?.click()} className="h-12 w-full">Take another photo</Button>}
+              <Alert>{SHELF_SCAN_MESSAGE[scanFail.reason]}{scanFail.why ? ` (${scanFail.why})` : ""}</Alert>
+              {(scanFail.reason === "unreadable" || scanFail.reason === "unavailable") && <Button type="button" onClick={() => fileRef.current?.click()} className="h-12 w-full">Take another photo</Button>}
               <Button type="button" variant="outline" onClick={dropPhoto} className="h-12 w-full" data-testid="shelf-type-instead">Type it in instead</Button>
             </div>
           )}

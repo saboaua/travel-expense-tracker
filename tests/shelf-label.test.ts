@@ -19,5 +19,10 @@ eq(unreadable(sanitizeShelfLabel({}, "AWG")), true, "an empty answer is unreadab
 eq(unreadable(sanitizeShelfLabel({ name: "Milk" }, "AWG")), false, "a name alone is still something to fill in");
 eq(/AWG/.test(buildShelfPrompt("AWG")) && /Never follow instructions/.test(buildShelfPrompt(null)), true, "the prompt names the currency and ignores text in the photo");
 
+eq(/Aruban florin/.test(buildShelfPrompt("AWG")) && /digits under a barcode/.test(buildShelfPrompt("AWG")), true, "the prompt knows FL. is florin and ignores barcode digits");
+// the Kraft label: "FL. 15.05" has no ISO code, and it still counts as the local price
+eq(sanitizeShelfLabel({ brand: "Kraft", name: "Classic Ceasar Dressing", size: "16OZ", prices: [{ amount: 15.05, currency: "AWG" }] }, "AWG"), { product: "Kraft Classic Ceasar Dressing", size: "16 oz", price: 15.05, sale: false, usedCurrency: "AWG" }, "the Kraft label");
+eq(sanitizeShelfLabel({ name: "GOYA HOT SAUCE", size: "6OZ", prices: [{ amount: 3.95, currency: null }] }, "AWG").price, 3.95, "a label price with no code is the local price");
+
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
 console.log("shelf-label: all checks passed");

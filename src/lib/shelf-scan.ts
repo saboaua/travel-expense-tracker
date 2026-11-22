@@ -1,8 +1,9 @@
 /** Sends a shelf label photo to the AI reader and says plainly what happened. The photo is not kept. */
 import { compressReceiptImage } from "@/lib/compress-image";
+import { aiFallbackText } from "@/lib/receipt-extract";
 import { unreadable, type ShelfLabelScan } from "@/lib/shelf-label";
 
-export type ShelfScanOutcome = { ok: true; scan: ShelfLabelScan } | { ok: false; reason: "offline" | "quota" | "limit" | "unavailable" | "unreadable" };
+export type ShelfScanOutcome = { ok: true; scan: ShelfLabelScan } | { ok: false; reason: "offline" | "quota" | "limit" | "unavailable" | "unreadable"; why?: string };
 
 export const SHELF_SCAN_MESSAGE: Record<Exclude<Extract<ShelfScanOutcome, { ok: false }>["reason"], never>, string> = {
   offline: "You are offline. Connect to scan, or type the price in.",
@@ -15,7 +16,7 @@ export const SHELF_SCAN_MESSAGE: Record<Exclude<Extract<ShelfScanOutcome, { ok: 
 export async function scanShelfLabel(file: File, currency: string): Promise<ShelfScanOutcome> {
   if (typeof navigator !== "undefined" && navigator.onLine === false) return { ok: false, reason: "offline" };
   let img = file;
-  try { img = await compressReceiptImage(file, { maxSide: 1600, quality: 0.8 }); } catch { /* the server explains if it cannot use it */ }
+  try { img = await compressReceiptImage(file, { maxSide: 2000, quality: 0.85 }); } catch { /* the server explains if it cannot use it */ }
   const form = new FormData();
   form.append("file", img);
   form.append("mode", "shelf");
@@ -27,11 +28,12 @@ export async function scanShelfLabel(file: File, currency: string): Promise<Shel
       const { result } = (await res.json()) as { result?: ShelfLabelScan };
       return result && !unreadable(result) ? { ok: true, scan: result } : { ok: false, reason: "unreadable" };
     }
-    const body = (await res.json().catch(() => ({}))) as { reason?: string };
+    const body = (await res.json().catch(() => ({}))) as { reason?: string; upstream?: string | null };
     if (body.reason === "quota") return { ok: false, reason: "quota" };
     if (body.reason === "limit") return { ok: false, reason: "limit" };
-    return { ok: false, reason: "unavailable" };
-  } catch {
-    return { ok: false, reason: "unavailable" };
+    const code = body.reason === "ai_failed" ? `ai_failed${body.upstream ? `_${body.upstream}` : ""}` : body.reason || `http_${res.status}`;
+    return { ok: false, reason: "unavailable", why: aiFallbackText(code) };
+  } catch (e) {
+    return { ok: false, reason: "unavailable", why: e instanceof Error && e.name === "TimeoutError" ? "the AI reader took too long" : "no connection to the AI reader" };
   }
 }

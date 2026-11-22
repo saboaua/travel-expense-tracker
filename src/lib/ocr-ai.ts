@@ -592,6 +592,6 @@ export async function extractFlightWithAi(image: { data: Uint8Array | ArrayBuffe
 }
 
 export async function extractShelfLabelWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }, currency: string | null): Promise<ShelfLabelScan> {
-  const raw = await askAi(image, buildShelfPrompt(currency), 400, { single: true, ms: 15000 });
+  const raw = await askAi(image, buildShelfPrompt(currency), 500, { backup: true });
   return sanitizeShelfLabel(raw, currency);
 }

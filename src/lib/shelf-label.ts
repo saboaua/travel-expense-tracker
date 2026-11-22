@@ -24,7 +24,9 @@ export function buildShelfPrompt(currency: string | null) {
     "Rules:",
     "- Take the price to pay for one item. Not a price per kg or per litre, not a multi-buy total, not a deposit.",
     currency ? `- The shopper is in a country that uses ${currency}. Put that price first when the label shows it.` : "- Put the main, largest price first.",
-    "- Never return a barcode, vendor code, date or stock number as a price.",
+    "- Never return a barcode, the digits under a barcode, a vendor code, a date or a stock number as a price.",
+    '- On Aruban labels "FL", "FL.", "Afl", "Afl." and "AWG" all mean the Aruban florin, so use currency "AWG". "$" and "US$" mean "USD".',
+    "- Labels often put the brand inside the product name in capitals, like KRAFT CLASSIC CEASAR DRESSING 16OZ. Return brand \"Kraft\", name \"Classic Ceasar Dressing\" and size \"16 oz\". Fix capitals to normal words but keep the spelling as printed.",
     "- If a field is unreadable or absent use null or an empty list. Do not guess.",
   ].join("\n");
 }
