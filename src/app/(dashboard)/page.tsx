@@ -259,10 +259,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
         </CardHeader>
         <CardContent className="space-y-4 max-md:px-0 max-md:pb-0">
           {activeTripsList.length === 0 ? (
-            <div className="text-center py-8">
-              <Plane className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
-              <p className="text-muted-foreground">No active trips</p>
-            </div>
+            <Card data-testid="no-active-trips">
+              <CardContent className="py-12 text-center">
+                <Plane className="mx-auto mb-3 h-10 w-10 text-muted-foreground" aria-hidden="true" />
+                <p className="text-muted-foreground">No active trips.</p>
+              </CardContent>
+            </Card>
           ) : (
             <>
               {featured && (() => {
