@@ -9,6 +9,7 @@ import { GROCERY_CATEGORIES } from "@/lib/personal/constants";
 import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 import { checkGrocery, type ScanCheck } from "@/lib/receipt-check";
+import { buildShelfPrompt, sanitizeShelfLabel, type ShelfLabelScan } from "@/lib/shelf-label";
 import { askGroq, groqConfigured, groqModels } from "@/lib/ocr-groq";
 
 const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
@@ -588,4 +589,9 @@ function buildFlightPrompt() {
 export async function extractFlightWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }): Promise<FlightScan> {
   const raw = await askAi(image, buildFlightPrompt(), 300);
   return sanitizeFlightScan(raw, todayISO());
+}
+
+export async function extractShelfLabelWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }, currency: string | null): Promise<ShelfLabelScan> {
+  const raw = await askAi(image, buildShelfPrompt(currency), 400, { single: true, ms: 15000 });
+  return sanitizeShelfLabel(raw, currency);
 }

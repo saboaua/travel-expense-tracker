@@ -3,7 +3,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { serviceDb } from "@/lib/service-db";
 import { countAiScan, scanStatusFor } from "@/lib/limits-server";
 import { createClient } from "@/lib/supabase/server";
-import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, recheckGroceryWithAi, type GroceryScan, extractReceiptWithAi } from "@/lib/ocr-ai";
+import { AI_IMAGE_TYPES, aiOcrConfigured, extractDocumentWithAi, extractFlightWithAi, extractGroceryChecked, recheckGroceryWithAi, type GroceryScan, extractReceiptWithAi, extractShelfLabelWithAi } from "@/lib/ocr-ai";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -65,6 +65,10 @@ export async function POST(request: Request) {
   try {
     if (form.get("mode") === "document") {
       const result = await extractDocumentWithAi(image);
+      { await count(); return NextResponse.json({ result }); }
+    }
+    if (form.get("mode") === "shelf") {
+      const result = await extractShelfLabelWithAi(image, hints.currency);
       { await count(); return NextResponse.json({ result }); }
     }
     if (form.get("mode") === "flight") {

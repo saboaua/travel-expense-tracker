@@ -4218,6 +4218,25 @@ try {
       await page.getByTestId("shelf-undo").click();
       await page.waitForFunction(() => document.querySelectorAll("[data-testid=shelf-added-row]").length === 2);
       assert(shelf.rows.length === 2, "Undo takes the last price back");
+      // scanning the shelf label fills the boxes, which still have to be checked and saved
+      const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+      let sentMode = "";
+      await page.route("**/api/ocr", async (route) => { sentMode = String(route.request().postData() || "").includes('name="mode"\r\n\r\nshelf') ? "shelf" : "other"; await route.fulfill({ json: { result: { product: "Duyvis Tijgernootjes bbq paprika", size: "275 g", price: 10.29, sale: false, usedCurrency: "AWG" } } }); });
+      await page.getByTestId("shelf-scan").waitFor();
+      await page.getByTestId("shelf-file").setInputFiles({ name: "label.png", mimeType: "image/png", buffer: png });
+      await page.getByTestId("shelf-scan-check").waitFor();
+      assert(sentMode === "shelf", "the photo is sent to the label reader");
+      assert((await page.getByTestId("shelf-product").inputValue()) === "Duyvis Tijgernootjes bbq paprika" && (await page.getByTestId("shelf-price").inputValue()) === "10.29" && (await page.getByTestId("shelf-size").inputValue()) === "275 g", "the boxes are filled from the label");
+      assert(/Make sure each box matches/.test(await page.getByTestId("shelf-scan-check").innerText()) && shelf.rows.length === 2, "the person is asked to check, and nothing is saved by scanning");
+      // a label that cannot be read says so and offers to type it in
+      await page.unroute("**/api/ocr");
+      await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { product: null, size: null, price: null, sale: false, usedCurrency: null } } }));
+      await page.getByTestId("shelf-retake").click().catch(() => {});
+      await page.getByTestId("shelf-file").setInputFiles({ name: "blur.png", mimeType: "image/png", buffer: png });
+      await page.getByTestId("shelf-scan-failed").waitFor();
+      assert(/Could not read this label/.test(await page.getByTestId("shelf-scan-failed").innerText()), "an unreadable label is explained");
+      await page.getByTestId("shelf-type-instead").click();
+      await page.getByTestId("shelf-scan").waitFor();
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll");
     } finally {
       await ctx.close();

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Check, Crosshair, MapPin, Search, Users } from "lucide-react";
+import { ArrowLeft, Camera, Check, Crosshair, Loader2, MapPin, Search, Users } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ import { useOnline } from "@/lib/use-online";
 import { currencyOfCountry } from "@/lib/country";
 import { type LatLng } from "@/lib/personal/basket";
 import { distanceLabel, nearestShops, readShelfStatus, seenBy, SHELF_MESSAGE, shelfArgs, suggestedShop, type NearShop, type Shop } from "@/lib/personal/shelf-price";
+import { scanShelfLabel, SHELF_SCAN_MESSAGE, type ShelfScanOutcome } from "@/lib/shelf-scan";
 import { parseAmount } from "@/lib/personal/quick-spend";
 import { storeKey as shopKey } from "@/lib/personal/community";
 
@@ -49,6 +50,11 @@ export function AddShelfPrice() {
   const [added, setAdded] = useState<Added[]>([]);
   const [saved, setSaved] = useState(false);
   const lastKey = useRef<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanFail, setScanFail] = useState<Extract<ShelfScanOutcome, { ok: false }>["reason"] | null>(null);
+  const [scanned, setScanned] = useState<{ cur: string | null } | null>(null); // filled from a photo: ask the shopper to check
+  const [photo, setPhoto] = useState<string | null>(null);
 
   const currency = currencyOfCountry(country) ?? "AWG";
 
@@ -133,9 +139,26 @@ export function AddShelfPrice() {
     if (status !== "ok") return setErr(SHELF_MESSAGE[status]);
     lastKey.current = args.p_product_key + (sale ? "|sale" : "");
     setCheck(false); setSaved(true);
-    setProduct(""); setSize(""); setPrice(""); setSale(false);
+    setProduct(""); setSize(""); setPrice(""); setSale(false); dropPhoto();
     await refreshAdded(shop);
   };
+
+  const onPhoto = async (file: File | undefined) => {
+    if (!file) return;
+    setErr(null); setScanFail(null); setScanned(null); setSaved(false); setCheck(false);
+    setPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setScanning(true);
+    const out = await scanShelfLabel(file, currency);
+    setScanning(false);
+    if (!out.ok) { setScanFail(out.reason); return; }
+    const sc = out.scan;
+    if (sc.product) setProduct(sc.product);
+    if (sc.price != null) setPrice(sc.price.toFixed(2));
+    setSize(sc.size ?? "");
+    setSale(sc.sale);
+    setScanned({ cur: sc.usedCurrency });
+  };
+  const dropPhoto = () => { setPhoto((old) => { if (old) URL.revokeObjectURL(old); return null; }); setScanFail(null); setScanned(null); };
 
   const undo = async () => {
     if (!shop || !lastKey.current) return;
@@ -238,6 +261,35 @@ export function AddShelfPrice() {
 
       {saved && (
         <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 p-3 text-sm font-semibold text-emerald-900 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200" data-testid="shelf-saved"><Check className="h-5 w-5 shrink-0" aria-hidden="true" />Price saved. Thank you, other shoppers will see it.</div>
+      )}
+
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden="true" data-testid="shelf-file" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; void onPhoto(f); }} />
+      {!photo && (
+        <>
+          <button type="button" onClick={() => fileRef.current?.click()} className="mt-4 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-slate-400 bg-card text-[15px] font-bold text-primary" data-testid="shelf-scan"><Camera className="h-5 w-5" aria-hidden="true" />Scan the shelf label</button>
+          <p className="mt-1.5 text-center text-[12.5px] text-muted-foreground">or fill in the boxes below by hand</p>
+        </>
+      )}
+      {photo && (
+        <div className="mt-4 space-y-3" data-testid="shelf-photo">
+          <div className="relative h-28 overflow-hidden rounded-2xl bg-muted">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={photo} alt="Your photo of the shelf label" className="h-full w-full object-cover" />
+            {!scanning && <button type="button" onClick={() => fileRef.current?.click()} className="absolute right-2.5 top-2.5 min-h-9 rounded-full bg-slate-900/80 px-3 text-xs font-semibold text-white" data-testid="shelf-retake">Retake</button>}
+          </div>
+          {scanning && <div className="flex items-center gap-2.5 rounded-2xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm font-semibold text-blue-900 dark:border-blue-500/30 dark:bg-blue-500/10 dark:text-blue-200" role="status" data-testid="shelf-reading"><Loader2 className="h-[18px] w-[18px] animate-spin" aria-hidden="true" />Reading the label…</div>}
+          {scanning && <p className="text-center text-[12.5px] text-muted-foreground">Your photo is only read. It is not saved or shared.</p>}
+          {scanFail && (
+            <div className="space-y-2" data-testid="shelf-scan-failed">
+              <Alert>{SHELF_SCAN_MESSAGE[scanFail]}</Alert>
+              {(scanFail === "unreadable" || scanFail === "unavailable") && <Button type="button" onClick={() => fileRef.current?.click()} className="h-12 w-full">Take another photo</Button>}
+              <Button type="button" variant="outline" onClick={dropPhoto} className="h-12 w-full" data-testid="shelf-type-instead">Type it in instead</Button>
+            </div>
+          )}
+          {scanned && (
+            <div className="flex gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3 text-[13.5px] leading-snug text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100" data-testid="shelf-scan-check"><b className="shrink-0">Check</b><span>Filled from your photo. Make sure each box matches the label.{scanned.cur === currency ? ` The ${currency} price was used.` : ""}</span></div>
+          )}
+        </div>
       )}
 
       <form onSubmit={(e) => { e.preventDefault(); save(false); }} className="mt-4 space-y-4 rounded-2xl border bg-card p-4">
