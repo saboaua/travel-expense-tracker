@@ -1150,6 +1150,25 @@ try {
     await ctx.close();
   });
 
+  await test("other row colour: starts rose, a picked colour is saved on your profile and shows on the Personal row", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/types`);
+    await page.getByTestId("other-color").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("other-color-db2777").getAttribute("aria-checked")) === "true", "rose is picked to begin with");
+    await page.getByTestId("other-color-2563eb").click();
+    for (let i = 0; i < 40 && fake.table("profiles").find((p) => p.id === PAT)?.other_color !== "#2563eb"; i++) await new Promise((ok) => setTimeout(ok, 250));
+    assert(fake.table("profiles").find((p) => p.id === PAT)?.other_color === "#2563eb", "the colour is saved on the profile");
+    await page.goto(`${BASE}/personal`);
+    const tile = page.getByTestId("types-tile").locator("span[aria-hidden=true]").first();
+    await tile.waitFor({ timeout: 20_000 });
+    await page.waitForFunction(() => (document.querySelector('[data-testid="types-tile"] span[aria-hidden=true]')?.getAttribute("style") ?? "").includes("#2563eb"), null, { timeout: 10_000 }).catch(() => {});
+    assert(((await tile.getAttribute("style")) ?? "").includes("#2563eb"), "the Other row uses the picked colour: " + (await tile.getAttribute("style")));
+    fake.table("profiles").find((p) => p.id === PAT).other_color = null;
+    await ctx.close();
+  });
+
   await test("receipt types: Scan on the dashboard, Other, a type, Save: the photo arrives on that type's form and starts reading", async () => {
     const { ctx, page } = await newPage();
     await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Corner Deli", date: null, total: 12, currency: "USD", source: "ai", items: [{ name: "Lunch", quantity: 1, unit_price: 12, line_total: 12, category: "Other", unit: null }] } } }));

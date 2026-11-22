@@ -70,6 +70,7 @@ need_cols(tbl, col, fix) as (values
   ('savings_events','month','migration_savings.sql'),
   ('profiles','home_lat','migration_home_gps.sql'),
   ('profiles','home_lng','migration_home_gps.sql'),
+  ('profiles','other_color','migration_other_color.sql'),
   ('profiles','share_prices','migration_shared_prices.sql'),
   ('shared_prices','price','migration_shared_prices.sql'),
   ('shared_prices','contributor','migration_shared_prices.sql'),

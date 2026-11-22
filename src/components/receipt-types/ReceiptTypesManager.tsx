@@ -2,7 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Plus, Tag } from "lucide-react";
+import { IconTile } from "@/components/ui/icon-tile";
+import { OTHER_COLORS, useOtherColor } from "@/lib/use-other-color";
 import { createClient } from "@/lib/supabase/client";
 import { BackLink } from "@/components/ui/page-header";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +24,7 @@ import type { ReceiptType } from "@/lib/receipt-types";
 /** Personal > Receipt types: your own kinds of receipt, a switch for each to get its own line in the monthly budget, and what each added this month. */
 export function ReceiptTypesManager() {
   const { types, missing, loading, reload } = useReceiptTypes();
+  const other = useOtherColor();
   const [form, setForm] = useState<"new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [spent, setSpent] = useState<Record<string, number>>({});
@@ -51,9 +54,20 @@ export function ReceiptTypesManager() {
     <div className="mx-auto max-w-2xl space-y-4 p-4 pb-28 md:p-8" data-testid="receipt-types">
       <BackLink href="/personal">Personal</BackLink>
       <div>
-        <h1 className="text-2xl font-bold md:text-3xl">Other</h1>
+        <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl"><IconTile tone="projects" color={other.color} className="h-11 w-11"><Tag className="h-[22px] w-[22px]" /></IconTile>Other</h1>
         <p className="mt-1 text-sm text-muted-foreground">Your own kinds of receipt. Every one counts in your budget. Switch on the ones that should show as their own line on the dashboard; the rest are added up in one line called Other.</p>
       </div>
+      <Card data-testid="other-color"><CardContent className="p-4">
+        <p className="mb-2 text-[13px] font-bold">Colour of this row</p>
+        <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Colour of the Other row">
+          {OTHER_COLORS.map((c) => (
+            <button key={c} type="button" role="radio" aria-checked={other.color === c} aria-label={c} onClick={() => other.save(c)} data-testid={`other-color-${c.slice(1)}`}
+              className="h-[30px] w-[30px] rounded-full" style={{ background: c, boxShadow: other.color === c ? `0 0 0 3px var(--card, #fff), 0 0 0 5px ${c}` : undefined }} />
+          ))}
+        </div>
+        <p className="mt-2 text-xs leading-snug text-muted-foreground">Shown on the Other row in Personal. Only you see your choice. Each type below keeps its own colour, set when you edit the type.</p>
+        {other.error && <Alert className="mt-2">{other.error}</Alert>}
+      </CardContent></Card>
       {missing && <Alert>Receipt types are not set up yet. Run supabase/migration_receipt_types.sql in Supabase.</Alert>}
       {error && <Alert>{error}</Alert>}
       {form ? (
