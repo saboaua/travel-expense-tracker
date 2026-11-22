@@ -41,8 +41,8 @@ export function PriceSearch({ products, currency, country = null }: { products: 
       const [c, o] = await Promise.all([
         searchCommunity(createClient(), { q: text }, countryForShared(currency, country)),
         currency === ONLINE_CURRENCY
-          ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: [{ key: "search", names: [text] }] }) })
-              .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches?.search ?? []) : []))
+          ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ search: text }) })
+              .then(async (r) => (r.ok ? (((await r.json()) as { results?: OnlineMatch[] }).results ?? []) : []))
               .catch(() => [] as OnlineMatch[])
           : Promise.resolve([] as OnlineMatch[]),
       ]);

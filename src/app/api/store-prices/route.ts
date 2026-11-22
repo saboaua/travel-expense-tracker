@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { rateLimit } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { productWords } from "@/lib/personal/price-compare";
-import { matchProducts, staleDays, STORE_IDS, STORES, type Answer, type CatalogItem, type StoreId } from "@/lib/store-prices";
+import { matchProducts, searchCatalog, staleDays, STORE_IDS, STORES, type Answer, type CatalogItem, type StoreId } from "@/lib/store-prices";
 
 export const dynamic = "force-dynamic";
 
@@ -18,14 +18,15 @@ export async function POST(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!(await rateLimit(`storeprices:${user.id}`, 240, 3600))) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
 
-  let body: { products?: { key?: unknown; names?: unknown }[] };
+  let body: { products?: { key?: unknown; names?: unknown }[]; search?: unknown };
   try { body = await request.json(); } catch { return NextResponse.json({ error: "Bad request" }, { status: 400 }); }
   const wanted = (Array.isArray(body.products) ? body.products : []).slice(0, MAX_PRODUCTS).flatMap((p) => {
     const key = typeof p.key === "string" ? p.key.slice(0, 300) : "";
     const names = (Array.isArray(p.names) ? p.names : []).filter((n): n is string => typeof n === "string").map((n) => n.slice(0, 160)).slice(0, 6);
     return key && names.length ? [{ key, names }] : [];
   });
-  if (wanted.length === 0) return NextResponse.json({ matches: {}, stores: [] });
+  const search = typeof body.search === "string" ? body.search.trim().slice(0, 120) : "";
+  if (wanted.length === 0 && !search) return NextResponse.json({ matches: {}, stores: [] });
 
   const [prefsRes, answersRes] = await Promise.all([
     supabase.from("grocery_online_prefs").select("stores").eq("user_id", user.id).maybeSingle(),
@@ -35,8 +36,9 @@ export async function POST(request: Request) {
   const enabled = STORE_IDS.filter((s) => saved.includes(s));
 
   // The shops' lists are small enough to read the rows that share a word with something you bought
-  const keyWords = [...new Set(wanted.flatMap((w) => w.names.map((n) => [...productWords(n)].sort((a, b) => b.length - a.length)[0]).filter((x): x is string => !!x && x.length >= 3)))].slice(0, 150);
-  if (keyWords.length === 0 || enabled.length === 0) return NextResponse.json({ matches: {}, stores: enabled.map((s) => ({ id: s, name: STORES[s].name })), enabled });
+  const searchWords = [...new Set(productWords(search).concat(search.toLowerCase().split(/[^a-z0-9]+/)).filter((x) => x.length >= 3).map((x) => (x.length > 5 ? x.slice(0, 4) : x)))].slice(0, 6); // a 4-letter start also finds a shop that writes "SMART FOOD" for "smartfood"; searchCatalog does the exact check
+  const keyWords = search ? searchWords : [...new Set(wanted.flatMap((w) => w.names.map((n) => [...productWords(n)].sort((a, b) => b.length - a.length)[0]).filter((x): x is string => !!x && x.length >= 3)))].slice(0, 150);
+  if (keyWords.length === 0 || enabled.length === 0) return NextResponse.json({ matches: {}, results: [], stores: enabled.map((s) => ({ id: s, name: STORES[s].name })), enabled });
   const orFilter = keyWords.map((w) => `name_norm.ilike.%${w.replace(/[^a-z0-9]/g, "")}%`).join(",");
   const { data, error } = await supabase.from("store_catalog").select("store, item_id, name, size_text, price, url, fetched_at").in("store", enabled).or(orFilter).limit(6000);
   if (error) {
@@ -52,6 +54,7 @@ export async function POST(request: Request) {
   const lastBy: Partial<Record<StoreId, string>> = {};
   for (const r of fresh ?? []) if (!lastBy[r.store as StoreId]) lastBy[r.store as StoreId] = r.fetched_at as string;
 
+  if (search) return NextResponse.json({ results: searchCatalog(search, catalog, enabled), enabled }, { headers: { "Cache-Control": "private, no-store" } });
   const matches = matchProducts(wanted, catalog, (answersRes.data ?? []) as Answer[], enabled);
   return NextResponse.json({
     matches,

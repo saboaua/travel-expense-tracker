@@ -297,3 +297,29 @@ export function mapDoit(rows: Record<string, unknown>[], keep: { closeout?: bool
   }
   return { rows: [...out.values()], total: rows.length, skipped };
 }
+
+/**
+ * Free-text search in the shops' lists (Best Prices): every word you typed must be in the product name, whether the shop writes it as one
+ * word or two ("smartfood" finds "SMART FOOD"). Several products per shop, the closest names first, then the cheapest.
+ */
+export function searchCatalog(q: string, catalog: CatalogItem[], enabled: StoreId[] = STORE_IDS, perStore = 5): OnlineMatch[] {
+  const words = searchText(q, null).split(" ").filter(Boolean);
+  if (!words.length) return [];
+  const out: OnlineMatch[] = [];
+  for (const store of enabled) {
+    const hits: OnlineMatch[] = [];
+    for (const c of catalog) {
+      if (c.store !== store) continue;
+      const text = searchText(c.name, c.size_text);
+      const tokens = text.split(" ");
+      const compact = text.replace(/ /g, "");
+      if (!words.every((w) => (w.length >= 3 ? compact.includes(w) : tokens.includes(w)))) continue;
+      const extra = Math.max(0, tokens.length - words.length);
+      const status: "same" | "ask" = extra <= 2 ? "same" : "ask";
+      hits.push({ store, storeName: STORES[store].name, itemId: c.item_id, name: c.name, size: c.size_text, price: c.price, url: c.url, fetchedAt: c.fetched_at, status, confirmed: false, score: 1 - extra * 0.05 });
+    }
+    hits.sort((a, b) => b.score - a.score || a.price - b.price);
+    out.push(...hits.slice(0, perStore));
+  }
+  return out.sort((a, b) => a.price - b.price);
+}

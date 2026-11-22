@@ -1,4 +1,4 @@
-import { doitSize, mapDoit, staleDays, compareOnline, fetchLing, fetchSuperFood, mapFreshop, mapShopify, matchProducts, scoreCandidate, tidySize, type CatalogItem } from "../src/lib/store-prices";
+import { doitSize, mapDoit, staleDays, compareOnline, fetchLing, fetchSuperFood, mapFreshop, mapShopify, matchProducts, scoreCandidate, searchCatalog, tidySize, type CatalogItem } from "../src/lib/store-prices";
 import { parseSize, productWords } from "../src/lib/personal/price-compare";
 
 let failed = 0;
@@ -138,6 +138,18 @@ eq(staleDays("doit") > staleDays("superfood"), true, "file prices stay usable lo
 const dcat = mapDoit([{ ...dbase, No: "9", Description: "COCA COLA ZERO 40OZ", LSC_Unit_Price_Incl_VAT: 3.1 }]).rows.map((x) => ({ ...x, fetched_at: new Date().toISOString() }));
 const dm = matchProducts([{ key: "k", names: ["Coca Cola Zero 40 oz"] }], dcat as never, [], ["doit"]);
 eq(dm.k?.[0]?.status, "same", "a bought 40 oz matches the file's 40OZ");
+
+{
+  const at = new Date().toISOString();
+  const cat = [
+    { store: "doit" as const, item_id: "1", name: "SMART FOOD POPCORN WHITE CHEDDAR 6.75OZ", size_text: "6.75 oz", price: 5.5, url: null, fetched_at: at },
+    { store: "doit" as const, item_id: "2", name: "SMARTFOOD POPCORN 2OZ", size_text: "2 oz", price: 2.1, url: null, fetched_at: at },
+    { store: "doit" as const, item_id: "3", name: "ORVILLE POPCORN 8OZ", size_text: "8 oz", price: 3, url: null, fetched_at: at },
+  ];
+  const r = searchCatalog("smartfood popcorn", cat);
+  eq(r.map((x) => x.itemId).sort().join(), "1,2", "search: Do it name in two words and the one-word name are both found, other brands not");
+  eq(r[0].storeName, "Do it Aruba", "search: results carry the shop name");
+}
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
   console.log("store-prices: all checks passed");
