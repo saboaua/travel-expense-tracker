@@ -1581,6 +1581,61 @@ try {
     } finally { if (before === undefined) delete me.home_country; else me.home_country = before; }
   });
 
+  await test("add to home screen tip: not on the login page, once after each sign-in, not again on a page visit, never once installed, and one listener serves it", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", hasTouch: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const tip = page.getByTestId("install-tip");
+    await page.goto(`${BASE}/login`);
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2500);
+    assert((await tip.count()) === 0, "nothing is offered to a visitor on the login page");
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await tip.waitFor({ timeout: 15_000 });
+    assert((await page.getByText("Add to Home Screen").count()) === 1, "one tip, not two");
+    await page.getByRole("button", { name: "Dismiss" }).click();
+    await page.goto(`${BASE}/personal`);
+    await page.waitForLoadState("networkidle");
+    await page.waitForTimeout(2500);
+    assert((await tip.count()) === 0, "visiting a page after dismissing does not bring it back");
+    await page.reload();
+    await page.waitForTimeout(2500);
+    assert((await tip.count()) === 0, "a reload in the same sign-in does not bring it back");
+    // A new sign-in offers it again
+    await page.evaluate(() => { for (const k of Object.keys(localStorage)) if (k.startsWith("sb-")) localStorage.removeItem(k); });
+    await page.context().clearCookies();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await tip.waitFor({ timeout: 15_000 });
+    // Once the app has been installed on this phone, it is not offered again
+    await page.evaluate(() => { localStorage.setItem("pwa-installed", "1"); for (const k of Object.keys(localStorage)) if (k.startsWith("sb-")) localStorage.removeItem(k); });
+    await page.context().clearCookies();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.waitForTimeout(2800);
+    assert((await tip.count()) === 0, "an installed app is not offered again after signing in");
+    await ctx.close();
+  });
+
+  await test("add to home screen tip: a new person on a phone gets the welcome tour (with its install step) and no second popup, before or after it", async () => {
+    const NEW = fake.addUser({ email: "tourphone@example.com", password: "Correct-Horse-1", role: "user", full_name: "Tour Phone" });
+    fake.table("profiles").find((p) => p.id === NEW).welcome_seen_at = null;
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 800 }, userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1", hasTouch: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await signIn(page, "tourphone@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.getByTestId("welcome-tour").waitFor({ timeout: 20_000 });
+    await page.waitForTimeout(2500);
+    assert((await page.getByTestId("install-tip").count()) === 0, "no tip on top of the tour");
+    await page.getByTestId("tour-skip").click();
+    await page.getByTestId("welcome-tour").waitFor({ state: "detached", timeout: 15_000 });
+    await page.waitForTimeout(2500);
+    assert((await page.getByTestId("install-tip").count()) === 0, "no tip right after the tour either");
+    await ctx.close();
+  });
+
   await test("welcome tour: a new person gets the popup once, picks are saved, a person from before never sees it, Help replays it", async () => {
     const TOUR = fake.addUser({ email: "tour@example.com", password: "Correct-Horse-1", role: "user", full_name: "Tour Tester" });
     const mine = () => fake.table("profiles").find((p) => p.id === TOUR);

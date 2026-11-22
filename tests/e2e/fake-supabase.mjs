@@ -54,7 +54,7 @@ export function createFakeSupabase() {
     return id;
   }
 
-  const userJson = (u) => ({ id: u.id, aud: "authenticated", role: "authenticated", email: u.email, app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", ...(u.new_email ? { new_email: u.new_email } : {}), ...(u.banned_until ? { banned_until: u.banned_until } : {}) });
+  const userJson = (u) => ({ id: u.id, aud: "authenticated", role: "authenticated", email: u.email, app_metadata: {}, user_metadata: {}, created_at: "2026-01-01T00:00:00Z", ...(u.last_sign_in_at ? { last_sign_in_at: u.last_sign_in_at } : {}), ...(u.new_email ? { new_email: u.new_email } : {}), ...(u.banned_until ? { banned_until: u.banned_until } : {}) });
 
   function session(u) {
     const exp = now() + 3600;
@@ -182,6 +182,7 @@ export function createFakeSupabase() {
         const u = [...users.values()].find((x) => x.email === String(body.email).toLowerCase() && x.password === body.password);
         if (!u) return send(res, 400, { code: "invalid_credentials", error_code: "invalid_credentials", msg: "Invalid login credentials" });
         if (u.banned_until && Date.parse(u.banned_until) > Date.now()) return send(res, 400, { code: "user_banned", error_code: "user_banned", msg: "User is banned" });
+        u.last_sign_in_at = new Date().toISOString();
         return send(res, 200, session(u));
       }
       if (grant === "refresh_token") {

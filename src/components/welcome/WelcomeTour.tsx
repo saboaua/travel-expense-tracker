@@ -11,6 +11,7 @@ import { isMissingColumn } from "@/lib/columns";
 import { currentPlace } from "@/lib/scan-place";
 import { countryName } from "@/lib/scan-destination";
 import { homeCurrency } from "@/lib/personal/currency-guess";
+import { clearInstallOffer, getInstallOffer, wireInstallOffer } from "@/lib/install-offer";
 import { HIGHLIGHTS, TOUR_STEPS, TRACKS, installPlatform, type HighlightId, type Platform, type TrackId } from "@/lib/welcome";
 import { cn } from "@/lib/utils";
 
@@ -197,12 +198,12 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
     const p = installPlatform(navigator.userAgent, navigator.maxTouchPoints);
     setPlatform(p);
     setTab(p === "android" ? "android" : "ios");
-    const onPrompt = (e: Event) => { e.preventDefault(); deferred.current = e as InstallEvent; setCanInstall(true); };
-    // The offer may have arrived while this code was still loading
-    const early = (window as Window & { __earlyInstall?: Event }).__earlyInstall;
-    if (early) onPrompt(early);
-    window.addEventListener("beforeinstallprompt", onPrompt);
-    return () => window.removeEventListener("beforeinstallprompt", onPrompt);
+    // The one shared install offer; it may have arrived while this code was still loading
+    wireInstallOffer();
+    const sync = () => { const o = getInstallOffer(); deferred.current = o as InstallEvent | null; setCanInstall(!!o); };
+    sync();
+    window.addEventListener("install-offer", sync);
+    return () => window.removeEventListener("install-offer", sync);
   }, []);
 
   // Keep the page behind from scrolling, and start at the top of each step
@@ -266,6 +267,7 @@ export function WelcomeTour({ userId, forced, home, tracks }: { userId: string; 
     const ev = deferred.current;
     if (!ev) return;
     await ev.prompt().catch(() => {});
+    clearInstallOffer();
     deferred.current = null;
     setCanInstall(false);
   };

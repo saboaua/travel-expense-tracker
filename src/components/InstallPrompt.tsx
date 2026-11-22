@@ -3,111 +3,91 @@
 import { useEffect, useState } from "react";
 import { Download, X, Share } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { createClient } from "@/lib/supabase/client";
+import { clearInstallOffer, getInstallOffer, isIosDevice, isMobileDevice, markOfferedThisSignIn, offeredThisSignIn, rememberInstalled, wasInstalled, wireInstallOffer, type InstallOffer } from "@/lib/install-offer";
 
-interface BeforeInstallPromptEvent extends Event {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-}
+const MANUAL = "Open the browser menu (⋮ or ⋯) and choose “Install app” or “Add to Home screen”.";
 
-const DISMISS_KEY = "pwa-install-dismissed";
-
-function isStandalone(): boolean {
-  if (typeof window === "undefined") return false;
-  if (window.matchMedia("(display-mode: standalone)").matches) return true;
-  if ((navigator as Navigator & { standalone?: boolean }).standalone === true) return true;
-  return false;
-}
-
-function isMobile(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-}
-
-function isIos(): boolean {
-  if (typeof navigator === "undefined") return false;
-  return /iPhone|iPad|iPod/i.test(navigator.userAgent);
-}
-
+/**
+ * The "Add to Home Screen" tip. It shows once after you sign in, and only when the app is not on your home screen yet.
+ * Visiting a page, signing out, or opening the app from the home screen never shows it. The welcome tour has its own install step,
+ * so when the tour is on screen this tip is skipped for that sign-in.
+ */
 export function InstallPrompt() {
   const [show, setShow] = useState(false);
-  const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
+  const [offer, setOffer] = useState<InstallOffer | null>(null);
   const [ios, setIos] = useState(false);
   const [hint, setHint] = useState<string | null>(null);
+  const [signInAt, setSignInAt] = useState<string | null>(null);
+  const [blocked, setBlocked] = useState(false);
 
+  // Keep the browser's install offer (one shared listener) and learn when the app gets installed
   useEffect(() => {
-    if (isStandalone()) return;
-    if (!isMobile()) return;
-    if (localStorage.getItem(DISMISS_KEY) === "1") return;
-
-    const iosDevice = isIos();
-    setIos(iosDevice);
-
-    const onBeforeInstall = (e: Event) => {
-      e.preventDefault();
-      setDeferred(e as BeforeInstallPromptEvent);
-      setShow(true);
-    };
-
-    window.addEventListener("beforeinstallprompt", onBeforeInstall);
-
-    // Show banner even if the browser never fires beforeinstallprompt
-    setShow(true);
-
-    const onInstalled = () => {
-      setShow(false);
-      setDeferred(null);
-    };
-    window.addEventListener("appinstalled", onInstalled);
-
-    return () => {
-      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
-      window.removeEventListener("appinstalled", onInstalled);
-    };
+    wireInstallOffer();
+    if (isMobileDevice() && wasInstalled()) rememberInstalled();
+    const sync = () => { setOffer(getInstallOffer()); if (wasInstalled()) setShow(false); };
+    sync();
+    window.addEventListener("install-offer", sync);
+    return () => window.removeEventListener("install-offer", sync);
   }, []);
 
-  const dismiss = () => {
-    localStorage.setItem(DISMISS_KEY, "1");
-    setShow(false);
-  };
-
-  const install = async () => {
-    setHint(null);
-
-    if (ios) {
-      setHint("Tap the Share button (square with arrow) at the bottom of Safari, then tap \u201cAdd to Home Screen\u201d.");
-      return;
-    }
-
-    if (deferred) {
-      try {
-        await deferred.prompt();
-        const { outcome } = await deferred.userChoice;
-        setDeferred(null);
-        if (outcome === "accepted") setShow(false);
-      } catch {
-        setHint("Open the browser menu (\u22ee or \u22ef) and choose \u201cInstall app\u201d or \u201cAdd to Home screen\u201d.");
-      }
-      return;
-    }
-
-    // No native prompt available (common until SW is ready, or on some browsers)
-    setHint("Open the browser menu (\u22ee or \u22ef) and choose \u201cInstall app\u201d or \u201cAdd to Home screen\u201d.");
-  };
-
-  // The tip sits low on the screen, right where a bottom sheet puts its options and Save button: stay out of the way while one is open
-  const [modalOpen, setModalOpen] = useState(false);
+  // Which sign-in is this? Only a signed-in person can be offered the tip
   useEffect(() => {
-    const check = () => setModalOpen(!!document.querySelector('[role="dialog"][aria-modal="true"]'));
+    if (!isMobileDevice() || wasInstalled()) return;
+    setIos(isIosDevice());
+    const sb = createClient();
+    let alive = true;
+    const read = () => sb.auth.getUser().then(({ data }) => { if (alive) setSignInAt(data.user?.last_sign_in_at ?? null); }, () => {});
+    void read();
+    const { data: sub } = sb.auth.onAuthStateChange((ev) => { if (ev === "SIGNED_IN" || ev === "SIGNED_OUT") void read(); });
+    return () => { alive = false; sub.subscription.unsubscribe(); };
+  }, []);
+
+  // Stay out of the way of a bottom sheet, and of the welcome tour (it has its own install step)
+  useEffect(() => {
+    const check = () => {
+      const tour = !!document.querySelector('[data-testid="welcome-tour"]');
+      if (tour && signInAt) markOfferedThisSignIn(signInAt);
+      setBlocked(!!document.querySelector('[role="dialog"][aria-modal="true"]'));
+      if (tour) setShow(false);
+    };
     check();
     const obs = new MutationObserver(check);
     obs.observe(document.body, { childList: true, subtree: true });
     return () => obs.disconnect();
-  }, []);
+  }, [signInAt]);
 
-  if (!show || modalOpen) return null;
+  // Decide once per sign-in
+  useEffect(() => {
+    if (!signInAt || blocked || show) return;
+    if (wasInstalled() || offeredThisSignIn(signInAt)) return;
+    // A moment's wait so the welcome tour, which loads a little later, can claim this sign-in first
+    const t = window.setTimeout(() => {
+      if (document.querySelector('[data-testid="welcome-tour"]') || offeredThisSignIn(signInAt)) return;
+      markOfferedThisSignIn(signInAt);
+      setShow(true);
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [signInAt, blocked, show]);
+
+  const install = async () => {
+    setHint(null);
+    if (ios) { setHint("Tap the Share button (square with arrow) at the bottom of Safari, then tap “Add to Home Screen”."); return; }
+    const ev = offer ?? getInstallOffer();
+    if (!ev) { setHint(MANUAL); return; }
+    try {
+      await ev.prompt();
+      const { outcome } = await ev.userChoice;
+      clearInstallOffer();
+      setOffer(null);
+      if (outcome === "accepted") { rememberInstalled(); setShow(false); }
+    } catch { setHint(MANUAL); }
+  };
+
+  if (!show || blocked) return null;
 
   return (
-    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-md md:bottom-4 rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-4 right-4 z-50 mx-auto max-w-md md:bottom-4 rounded-xl border bg-card shadow-lg p-4 flex flex-col gap-3" data-testid="install-tip">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-3">
           <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
@@ -116,24 +96,16 @@ export function InstallPrompt() {
           <div>
             <p className="font-medium text-sm">Add to Home Screen</p>
             <p className="text-xs text-muted-foreground mt-0.5">
-              {hint ||
-                (ios
-                  ? "Tap below for steps, or use the Share button."
-                  : "Install the app for quick access and a full-screen experience.")}
+              {hint || (ios ? "Tap below for steps, or use the Share button." : "Install the app for quick access and a full-screen experience.")}
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={dismiss}
-          className="p-1 rounded-lg text-muted-foreground hover:bg-accent"
-          aria-label="Dismiss"
-        >
+        <button type="button" onClick={() => setShow(false)} className="p-1 rounded-lg text-muted-foreground hover:bg-accent" aria-label="Dismiss">
           <X className="h-4 w-4" />
         </button>
       </div>
       <Button size="sm" onClick={install} className="w-full">
-        {ios ? "How to add" : deferred ? "Add to Home Screen" : "Add to Home Screen"}
+        {ios ? "How to add" : "Add to Home Screen"}
       </Button>
     </div>
   );
