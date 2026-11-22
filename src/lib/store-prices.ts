@@ -188,12 +188,25 @@ export type OnlineMatch = {
 const sizeSig = (s: Size | null) => (s ? `${s.kind}${s.amount}` : "");
 
 /** How well a shop product fits what you bought, or null when it is certainly not it (a different size, or too few shared words). */
+/** "smart food" in one name and "smartfood" in the other: two words that together spell a word of the other name become that word. */
+function joinSplit(words: string[], other: string[]): string[] {
+  const used = new Set<string>();
+  const joined: string[] = [];
+  for (const a of words) for (const b of words) {
+    if (a === b || used.has(a) || used.has(b)) continue;
+    if (other.includes(a + b) && !other.includes(a) && !other.includes(b)) { joined.push(a + b); used.add(a); used.add(b); }
+  }
+  return [...words.filter((w) => !used.has(w)), ...joined];
+}
+
 export function scoreCandidate(want: { words: string[]; size: Size | null }, cand: { name: string; size_text: string | null }): { score: number; status: "same" | "ask" } | null {
   const text = `${cand.name} ${cand.size_text ?? ""}`;
   const cSize = parseSize(text);
   if (want.size && cSize && sizeSig(want.size) !== sizeSig(cSize)) return null;
-  const cWords = [...new Set(productWords(cand.name))];
-  const wWords = [...new Set(want.words)];
+  const cRaw = [...new Set(productWords(cand.name))];
+  const wRaw = [...new Set(want.words)];
+  const cWords = joinSplit(cRaw, wRaw);
+  const wWords = joinSplit(wRaw, cRaw);
   if (!wWords.length || !cWords.length) return null;
   const taken = new Set<number>();
   let shared = 0;

@@ -37,7 +37,9 @@ export async function POST(request: Request) {
 
   // The shops' lists are small enough to read the rows that share a word with something you bought
   const searchWords = [...new Set(productWords(search).concat(search.toLowerCase().split(/[^a-z0-9]+/)).filter((x) => x.length >= 3).map((x) => (x.length > 5 ? x.slice(0, 4) : x)))].slice(0, 6); // a 4-letter start also finds a shop that writes "SMART FOOD" for "smartfood"; searchCatalog does the exact check
-  const keyWords = search ? searchWords : [...new Set(wanted.flatMap((w) => w.names.map((n) => [...productWords(n)].sort((a, b) => b.length - a.length)[0]).filter((x): x is string => !!x && x.length >= 3)))].slice(0, 150);
+  // the longest words of each name, and the first four letters of long ones, so "smartfood" also finds a shop's "SMART FOOD"
+  const wordsOf = (n: string) => [...productWords(n)].filter((x) => x.length >= 3).sort((a, b) => b.length - a.length).slice(0, 3).flatMap((x) => (x.length > 5 ? [x, x.slice(0, 4)] : [x]));
+  const keyWords = search ? searchWords : [...new Set(wanted.flatMap((w) => w.names.flatMap(wordsOf)))].slice(0, 150);
   if (keyWords.length === 0 || enabled.length === 0) return NextResponse.json({ matches: {}, results: [], stores: enabled.map((s) => ({ id: s, name: STORES[s].name })), enabled });
   const orFilter = keyWords.map((w) => `name_norm.ilike.%${w.replace(/[^a-z0-9]/g, "")}%`).join(",");
   const { data, error } = await supabase.from("store_catalog").select("store, item_id, name, size_text, price, url, fetched_at").in("store", enabled).or(orFilter).limit(6000);

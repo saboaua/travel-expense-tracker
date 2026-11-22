@@ -151,6 +151,13 @@ eq(dm.k?.[0]?.status, "same", "a bought 40 oz matches the file's 40OZ");
   eq(r[0].storeName, "Do it Aruba", "search: results carry the shop name");
 }
 
+{
+  const at = new Date().toISOString();
+  const cat = [{ store: "doit" as const, item_id: "1", name: "SMART FOOD POPCORN WHITE CHEDDAR 6.75OZ", size_text: "6.75 oz", price: 5.5, url: null, fetched_at: at }];
+  const m = matchProducts([{ key: "k", names: ["Smartfood popcorn"] }], cat, [], ["doit"]);
+  eq(m.k?.[0]?.name, "SMART FOOD POPCORN WHITE CHEDDAR 6.75OZ", "a bought 'Smartfood popcorn' meets the shop's 'SMART FOOD POPCORN' (offered, not sure)");
+}
+
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
   console.log("store-prices: all checks passed");
 });

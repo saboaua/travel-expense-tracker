@@ -75,11 +75,11 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
 
 /**
  * Community and online prices for the products on a list, as real prices to fill the gaps in the basket totals. Community rows are only
- * ones the database returns (the last 3 months, from one shopper up); online matches only when the shop item is the same product.
+ * ones the database returns (the last 3 months, from one shopper up); online matches too, those that are only a similar item flagged so the list says so.
  */
 export function externalPrices(community: CommunityRow[], online: Record<string, OnlineMatch[]>, currency: string): ExternalPrice[] {
   const out: ExternalPrice[] = [];
   for (const r of community) if (r.currency === currency && Number(r.price) > 0) out.push({ store: r.store_name, key: r.product_key, price: Number(r.price), source: "community" });
-  for (const [key, list] of Object.entries(online)) for (const m of list) if (m.status === "same" && m.price > 0) out.push({ store: m.storeName, key, price: m.price, source: "online" });
+  for (const [key, list] of Object.entries(online)) for (const m of list) if (m.price > 0) out.push({ store: m.storeName, key, price: m.price, source: "online", similar: m.status !== "same" });
   return out;
 }

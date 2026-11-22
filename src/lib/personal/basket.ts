@@ -124,7 +124,7 @@ export const LEVEL_LABEL: Record<Level, string> = { cheapest: "Cheapest", below:
 
 export type ListItem = { key: string; qty: number };
 export type PriceSource = "own" | "community" | "online";
-export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null };
+export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean };
 export type StoreBasket = {
   store: string;
   /** The total of the items that have a real price here (items with no price are left out, never guessed) */
@@ -141,7 +141,7 @@ export type StoreBasket = {
 };
 
 /** Real prices from outside your receipts: community and online price lists, by store and product key. */
-export type ExternalPrice = { store: string; key: string; price: number; source: "community" | "online" };
+export type ExternalPrice = { store: string; key: string; price: number; source: "community" | "online"; similar?: boolean };
 
 /**
  * The list at each store, from real prices only: the latest price you paid there (flagged when older than 60 days), otherwise a
@@ -161,8 +161,8 @@ export function basketTotals(list: ListItem[], products: Product[], stores: stri
         return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: "own" } as BasketLine];
       }
       // community first (people paid it), then the online list; the cheapest of the two sources is not assumed, the community one wins
-      const ext = external.filter((e) => e.key === it.key && sameStore(e.store, store) && e.price > 0).sort((a, b) => (a.source === b.source ? a.price - b.price : a.source === "community" ? -1 : 1))[0];
-      if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: null, source: ext.source } as BasketLine];
+      const ext = external.filter((e) => e.key === it.key && sameStore(e.store, store) && e.price > 0).sort((a, b) => (a.similar ? 1 : 0) - (b.similar ? 1 : 0) || (a.source === b.source ? a.price - b.price : a.source === "community" ? -1 : 1))[0];
+      if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: null, source: ext.source, similar: ext.similar } as BasketLine];
       return [{ key: p.key, name: p.name, qty: it.qty, price: null, total: null, status: "unknown", date: null, source: null } as BasketLine];
     });
     const total = round2(lines.reduce((s, l) => s + (l.total ?? 0), 0));
