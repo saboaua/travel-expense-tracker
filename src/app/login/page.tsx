@@ -118,10 +118,10 @@ export default function LoginPage() {
     "w-full h-[52px] pl-11 rounded-[14px] border border-[#D5E2EE] dark:border-slate-700 bg-white dark:bg-slate-800/60 text-slate-900 dark:text-slate-100 text-base placeholder:text-slate-400 focus:outline-none focus:ring-2 transition-all";
   const brand = (size: number, light: boolean) =>
     logoUrl ? (
-      <span className="flex flex-col items-center gap-0 lg:items-start">
+      <span className="flex flex-col items-center gap-0 lg:flex-row lg:gap-4">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={logoUrl} alt="" style={{ height: Math.min(Math.max(logoSize, size), size * 1.2), width: "auto", maxWidth: "100%" }} className="object-contain" />
-        <span className={`-mt-3 font-[family-name:var(--font-login-display)] font-semibold tracking-[-0.035em] ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.46 }}>
+        <span className={`-mt-3 lg:mt-0 font-[family-name:var(--font-login-display)] font-semibold tracking-[-0.035em] ${light ? "text-white" : "text-slate-900"}`} style={{ fontSize: size * 0.46 }}>
           {appName}
         </span>
       </span>
