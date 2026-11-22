@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { MapPin } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, MapPin } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import { cityOf, distanceText, mapsUrl, placesTrips, type Place, type PlacesTrip } from "@/lib/trip-places";
@@ -10,10 +10,10 @@ import { formatDateRange } from "@/lib/utils";
 type Data = { things: Place[]; eat: Place[]; attribution?: string };
 type State = { status: "loading" } | { status: "ready"; data: Data } | { status: "none" };
 
-const TONES = ["bg-blue-100 dark:bg-blue-950", "bg-amber-100 dark:bg-amber-950", "bg-emerald-100 dark:bg-emerald-950", "bg-rose-100 dark:bg-rose-950", "bg-violet-100 dark:bg-violet-950", "bg-sky-100 dark:bg-sky-950"];
+const FIRST = 5; // rows shown before "Show all"
 
 /**
- * Top 10 things to do and places to eat for the trip that is on now (otherwise the next one), as two tabs of swipe tiles.
+ * Top 10 things to do and places to eat for the trip that is on now (otherwise the next one), as two tabs. 5 rows show first, "Show all 10" opens the rest.
  * Shown on both the Personal and the Business home. Hidden when there is no trip with a destination or nothing was found.
  */
 export function TripPlaces({ trips, today }: { trips: PlacesTrip[]; today: string }) {
@@ -21,6 +21,7 @@ export function TripPlaces({ trips, today }: { trips: PlacesTrip[]; today: strin
   const [pick, setPick] = useState<string | null>(null);
   const trip = list.find((t) => t.id === pick) ?? list[0] ?? null;
   const [tab, setTab] = useState<"things" | "eat">("things");
+  const [all, setAll] = useState(false);
   const [state, setState] = useState<State>({ status: "loading" });
   const dest = trip?.destination?.trim() ?? "";
 
@@ -37,7 +38,8 @@ export function TripPlaces({ trips, today }: { trips: PlacesTrip[]; today: strin
 
   if (!trip || state.status === "none") return null;
   const range = formatDateRange(trip.start as string, trip.end);
-  const shown = state.status === "ready" ? (tab === "things" ? state.data.things : state.data.eat) : [];
+  const full = state.status === "ready" ? (tab === "things" ? state.data.things : state.data.eat) : [];
+  const shown = all ? full : full.slice(0, FIRST);
   const sub = `${cityOf(dest)}, ${range}`;
 
   return (
@@ -51,26 +53,30 @@ export function TripPlaces({ trips, today }: { trips: PlacesTrip[]; today: strin
           </select>
         </label>
       ) : <p className="-mt-1.5 text-[12.5px] text-muted-foreground" data-testid="trip-places-sub">{sub}</p>}
-      <Tabs label="Places" size="md" fullWidth value={tab} onChange={(v) => setTab(v as "things" | "eat")} idPrefix="places-tab" options={[{ id: "things", label: "Things to do" }, { id: "eat", label: "Where to eat" }]} />
+      <Tabs label="Places" size="md" fullWidth value={tab} onChange={(v) => { setTab(v as "things" | "eat"); setAll(false); }} idPrefix="places-tab" options={[{ id: "things", label: "Things to do" }, { id: "eat", label: "Where to eat" }]} />
       {state.status === "loading" ? (
-        <div className="flex gap-2.5 overflow-hidden" aria-hidden="true">{[0, 1, 2].map((i) => <div key={i} className="h-[170px] w-[150px] shrink-0 animate-pulse rounded-2xl bg-muted" />)}</div>
+        <div className="space-y-3" aria-hidden="true">{[0, 1, 2, 3].map((i) => <div key={i} className="flex items-center gap-3"><div className="h-6 w-6 shrink-0 animate-pulse rounded-full bg-muted" /><div className="flex-1 space-y-2"><div className="h-3 w-3/5 animate-pulse rounded bg-muted" /><div className="h-3 w-2/5 animate-pulse rounded bg-muted" /></div></div>)}</div>
       ) : shown.length === 0 ? (
         <p className="py-6 text-center text-sm text-muted-foreground" data-testid="trip-places-empty">Nothing found here yet.</p>
       ) : (
-        <ul className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1" data-testid="trip-places-list" aria-label={tab === "things" ? "Things to do" : "Where to eat"}>
-          {shown.map((p, i) => (
-            <li key={p.id} className="w-[150px] shrink-0 snap-start">
-              <a href={mapsUrl({ name: `${p.name} ${cityOf(dest)}`, lat: p.lat, lng: p.lng })} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-2xl border bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="trip-place">
-                <div className={`flex h-[72px] items-start p-2 ${TONES[i % TONES.length]}`}><span className="rounded-full bg-white/90 px-2 py-0.5 text-xs font-extrabold text-slate-900">{i + 1}</span></div>
-                <div className="p-2.5">
-                  <p className="line-clamp-2 min-h-[35px] text-sm font-bold leading-tight">{p.name}</p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{p.type}</p>
-                  <p className="mt-1 text-xs font-semibold text-foreground/70">{distanceText(p.km)} from the centre</p>
-                </div>
-              </a>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="divide-y" data-testid="trip-places-list" aria-label={tab === "things" ? "Things to do" : "Where to eat"}>
+            {shown.map((p, i) => (
+              <li key={p.id}>
+                <a href={mapsUrl({ name: `${p.name} ${cityOf(dest)}`, lat: p.lat, lng: p.lng })} target="_blank" rel="noopener noreferrer" className="flex min-h-14 items-center gap-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="trip-place">
+                  <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full bg-blue-50 text-[12.5px] font-extrabold text-blue-700 dark:bg-blue-950 dark:text-blue-300">{i + 1}</span>
+                  <span className="min-w-0 flex-1"><b className="block truncate text-[15px] font-bold">{p.name}</b><span className="text-[12.5px] text-muted-foreground">{p.type} · {distanceText(p.km)}</span></span>
+                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </a>
+              </li>
+            ))}
+          </ul>
+          {full.length > FIRST && (
+            <button type="button" onClick={() => setAll(!all)} aria-expanded={all} className="flex min-h-11 w-full items-center justify-center gap-1 border-t text-sm font-bold text-primary" data-testid="trip-places-more">
+              {all ? "Show fewer" : `Show all ${full.length}`}{all ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />}
+            </button>
+          )}
+        </>
       )}
       {state.status === "ready" && <p className="text-[11.5px] text-muted-foreground">Tap a place to open it in Maps. {state.data.attribution ?? "© OpenStreetMap contributors"}</p>}
     </Card>
