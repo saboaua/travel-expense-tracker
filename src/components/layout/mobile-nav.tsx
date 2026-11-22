@@ -64,17 +64,19 @@ export function MobileNav() {
       {open && (
         <div className="app-frame fixed inset-0 z-40 md:hidden">
           <button type="button" className="absolute inset-0 bg-black/40" aria-label="Close menu" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom)*0.3)] left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 space-y-4 max-h-[70vh] overflow-y-auto">
+          <div className="absolute bottom-[calc(4rem+env(safe-area-inset-bottom)*0.3)] left-0 right-0 rounded-t-2xl border bg-card shadow-lg p-4 max-h-[70vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <p className="font-semibold">Menu</p>
               <button type="button" onClick={() => setOpen(false)} className="p-1 rounded-lg text-muted-foreground" aria-label="Close"><X className="h-5 w-5" /></button>
             </div>
 
+            {/* One list: every row has the same height and the same gap */}
+            <div className="mt-2 space-y-1">
             {/* Profile above admin / management */}
             <Link
               href="/profile"
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                "flex min-h-11 items-center gap-3 px-3 rounded-lg text-sm font-medium",
                 pathname.startsWith("/profile") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
               )}
             >
@@ -83,7 +85,7 @@ export function MobileNav() {
             <Link
               href="/help"
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                "flex min-h-11 items-center gap-3 px-3 rounded-lg text-sm font-medium",
                 pathname.startsWith("/help") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
               )}
             >
@@ -92,7 +94,7 @@ export function MobileNav() {
             <Link
               href="/about"
               className={cn(
-                "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium",
+                "flex min-h-11 items-center gap-3 px-3 rounded-lg text-sm font-medium",
                 pathname.startsWith("/about") ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent"
               )}
             >
@@ -100,22 +102,23 @@ export function MobileNav() {
             </Link>
 
             {adminItems.length > 0 && (
-              <div className="space-y-1">
-                <p className="px-3 pt-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>
+              <div className="space-y-1 pt-2">
+                <p className="px-3 pb-1 text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"><Shield className="h-3 w-3" /> {role === "admin" ? "Admin" : "Management"}</p>
                 {adminItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname.startsWith(item.href);
                   return (
-                    <Link key={item.href} href={item.href} className={cn("flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
+                    <Link key={item.href} href={item.href} className={cn("flex min-h-11 items-center gap-3 px-3 rounded-lg text-sm font-medium", isActive ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent")}>
                       <IconTile tone={item.tone} className="h-8 w-8 rounded-lg"><Icon className="h-[18px] w-[18px]" /></IconTile> {item.label}
                     </Link>
                   );
                 })}
               </div>
             )}
-            <div className="border-t pt-3 space-y-1">
-              <ThemeToggle className="w-full justify-start gap-3 px-3" />
-              <Button type="button" variant="ghost" className="w-full justify-start gap-3 px-3 text-red-600 hover:text-red-600" onClick={logout}>
+            </div>
+            <div className="mt-2 space-y-1 border-t pt-2">
+              <ThemeToggle className="h-auto min-h-11 w-full justify-start gap-3 px-3 text-sm font-medium" />
+              <Button type="button" variant="ghost" className="h-auto min-h-11 w-full justify-start gap-3 px-3 text-sm font-medium text-red-600 hover:text-red-600" onClick={logout}>
                 <IconTile tone="security" className="h-8 w-8 rounded-lg"><LogOut className="h-[18px] w-[18px]" /></IconTile> Sign out
               </Button>
             </div>
