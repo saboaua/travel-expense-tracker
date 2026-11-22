@@ -1275,6 +1275,7 @@ try {
       assert(hb && ab && ab.y > hb.y && ab.y - hb.y < 80, "About sits right below Help in the menu");
       await about.click();
       await page.waitForURL((u) => u.pathname === "/about");
+      await page.getByTestId("about-version").waitFor({ timeout: 15_000 });
       assert((await page.getByTestId("about-logo").count()) + (await page.getByTestId("about-logo-placeholder").count()) === 1, "the app logo or its placeholder is shown");
       assert(/^\d+\.\d+\.\d+/.test(await page.getByTestId("about-version").innerText()), "the version number is shown");
       assert((await page.getByTestId("about-build").innerText()).length > 0, "the build is shown");
