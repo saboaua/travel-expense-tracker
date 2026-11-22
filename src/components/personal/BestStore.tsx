@@ -25,7 +25,7 @@ import { RADII, basketTotals, type ExternalPrice, bestStoreFor, distanceKm, LEVE
 import { useOnline } from "@/lib/use-online";
 import { useCountry, useCountryStats } from "@/components/personal/use-country";
 import { CountrySwitch } from "@/components/personal/CountrySwitch";
-import { currencyOfCountry, hasPriceData } from "@/lib/country";
+import { countryForShared, currencyOfCountry, hasPriceData } from "@/lib/country";
 import { formatCurrency } from "@/lib/utils";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-80 w-full animate-pulse sm:h-96 md:h-[30rem] rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -111,8 +111,8 @@ export function BestStore() {
     (async () => {
       const keys = listKey.split("|");
       const [c, o] = await Promise.all([
-        searchCommunity(createClient(), { keys }, country),
-        currency === ONLINE_CURRENCY && (!country || country === "AW")
+        searchCommunity(createClient(), { keys }, countryForShared(currency, country)),
+        currency === ONLINE_CURRENCY
           ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: inCur.filter((p) => keys.includes(p.key)).map((p) => ({ key: p.key, names: p.names.map((n) => n.name) })) }) })
               .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches ?? {}) : {}))
               .catch(() => ({}) as Record<string, OnlineMatch[]>)

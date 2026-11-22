@@ -109,6 +109,13 @@ export async function shareNow(supabase: SupabaseClient, uid: string, products: 
  * then the same search is made without it (every country), so nothing stops working before the migration.
  */
 export async function searchCommunity(supabase: SupabaseClient, args: { q?: string; keys?: string[] }, country: string | null): Promise<CommunityRow[]> {
+  // The database returns a limited number of rows per call, so a long list of products is asked in small batches: none is cut off.
+  if (args.keys && args.keys.length > KEY_BATCH) {
+    const batches: string[][] = [];
+    for (let i = 0; i < args.keys.length; i += KEY_BATCH) batches.push(args.keys.slice(i, i + KEY_BATCH));
+    const parts = await Promise.all(batches.map((keys) => searchCommunity(supabase, { ...args, keys }, country)));
+    return parts.flat();
+  }
   try {
     if (country) {
       const r = await supabase.rpc("community_search", { ...args, ctry: country });
@@ -118,3 +125,6 @@ export async function searchCommunity(supabase: SupabaseClient, args: { q?: stri
     return r.error ? [] : ((r.data ?? []) as CommunityRow[]);
   } catch { return []; }
 }
+
+/** How many products are asked about in one call. */
+export const KEY_BATCH = 40;

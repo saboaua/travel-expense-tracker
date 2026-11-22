@@ -1,8 +1,9 @@
 /**
  * Best Prices: one search over three sources, so the cheapest place is easy to see.
  *  - your own receipts (latest price at each store)
- *  - community prices (the middle price shoppers paid, from the first shopper; Confirmed from 3; works whether or not you share)
- *  - online shop prices Lifolio keeps (store websites and the admin's imported price lists)
+ *  - community prices (the middle price shoppers paid, from the first shopper; Confirmed from 3; works whether or not you share).
+ *    The admin's imported Excel price lists are in here too: each upload counts as one more shopper.
+ *  - online shop prices Lifolio keeps (the daily copy of the online supermarkets' own lists)
  * Pure, so it is unit-tested.
  */
 import { groupCommunity, productKey, shopperLabel, type CommunityRow } from "@/lib/personal/community";

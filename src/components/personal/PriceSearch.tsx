@@ -1,5 +1,6 @@
 "use client";
 
+import { countryForShared } from "@/lib/country";
 import { useState } from "react";
 import { Money } from "@/components/ui/money";
 import { Search } from "lucide-react";
@@ -38,7 +39,7 @@ export function PriceSearch({ products, currency, country = null }: { products: 
     let shops: OnlineMatch[] = [];
     if (online) {
       const [c, o] = await Promise.all([
-        searchCommunity(createClient(), { q: text }, country),
+        searchCommunity(createClient(), { q: text }, countryForShared(currency, country)),
         currency === ONLINE_CURRENCY
           ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ products: [{ key: "search", names: [text] }] }) })
               .then(async (r) => (r.ok ? (((await r.json()) as { matches?: Record<string, OnlineMatch[]> }).matches?.search ?? []) : []))

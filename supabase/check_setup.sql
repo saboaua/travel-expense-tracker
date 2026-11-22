@@ -263,6 +263,10 @@ other_checks as (
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and p.pronargs = 3) then 'OK' else 'MISSING' end,
          'migration_country.sql'
   union all
+  select 'function', 'community_search returns up to 1500 prices',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and p.pronargs = 3 and p.prosrc like '%limit 1500%') then 'OK' else 'MISSING' end,
+         'migration_community_limit.sql'
+  union all
   select 'function', 'community_search shows Confirmed',
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and pg_get_function_result(p.oid) like '%confirmed%') then 'OK' else 'MISSING' end,
          'migration_community_confirm.sql'
