@@ -192,7 +192,7 @@ export function AddShelfPrice() {
           <div className="space-y-1.5 text-sm">
             <p className="text-[13px] font-bold text-muted-foreground">What is shared</p>
             <p><span className="font-bold text-emerald-600">✓</span> Shop, product, size and price</p>
-            <p><span className="font-bold text-emerald-600">✓</span> The month, never the day or time</p>
+            <p><span className="font-bold text-emerald-600">✓</span> The month. The exact time is wiped after 2 days</p>
             <p><span className="font-bold text-red-600">✕</span> Your name, email or account</p>
             <p><span className="font-bold text-red-600">✕</span> Your position or any photo</p>
           </div>

@@ -8,7 +8,7 @@
 -- A sale price is saved as its own product (the key ends with |sale), so specials never mix with the normal price.
 
 alter table public.shared_prices add column if not exists source text not null default 'receipt' check (source in ('receipt', 'shelf'));
-alter table public.shared_prices add column if not exists created_at timestamptz not null default now();
+alter table public.shared_prices add column if not exists created_at timestamptz; -- kept 2 days only, see migration_shelf_prices_wipe_time.sql
 create index if not exists shared_prices_shelf_idx on public.shared_prices (contributor, created_at) where source = 'shelf';
 
 create or replace function public.share_prices_for(uid uuid, rows jsonb, replace_month boolean default true) returns integer

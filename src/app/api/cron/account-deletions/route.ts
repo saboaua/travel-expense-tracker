@@ -40,6 +40,8 @@ export async function GET(req: Request) {
     }
     // Saved trip places are deleted the day after the trip ends (harmless when the table is not there yet)
     await db.rpc("purge_trip_places").then(() => null, () => null);
+    // Shared prices keep the exact time for 2 days only (for the daily limit and Undo), then only the month remains
+    await db.rpc("wipe_share_times").then(() => null, () => null);
     if (failed > 0) await notifyJobFailure(db, "Account deletions (some could not be removed)");
     return NextResponse.json({ ok: true, removed, failed });
   } catch (e) {

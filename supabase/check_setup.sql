@@ -328,9 +328,18 @@ other_checks as (
   union all
   select 'privacy', 'shared_prices: holds no receipt date column',
          case when to_regclass('public.shared_prices') is null then 'MISSING'
-              when exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_prices' and column_name in ('date','purchase_date','created_at','user_id','email')) then 'REVIEW: unexpected column'
+              when exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_prices' and column_name in ('date','purchase_date','user_id','email')) then 'REVIEW: unexpected column'
               else 'OK' end,
          'migration_shared_prices.sql'
+  union all
+  select 'privacy', 'shared_prices: a time is kept 2 days at most',
+         case when to_regclass('public.shared_prices') is null then 'MISSING'
+              when not exists (select 1 from information_schema.columns where table_schema='public' and table_name='shared_prices' and column_name='created_at') then 'OK'
+              when not exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'wipe_share_times') then 'MISSING: run the file'
+              when (select is_nullable from information_schema.columns where table_schema='public' and table_name='shared_prices' and column_name='created_at') = 'NO' then 'REVIEW: time cannot be wiped'
+              when (select count(*) from public.shared_prices where created_at is not null and created_at < now() - interval '3 days') > 0 then 'REVIEW: old times are still kept'
+              else 'OK' end,
+         'migration_shelf_prices_wipe_time.sql'
   union all
   select 'data', 'price_share_secret has its one row',
          case when to_regclass('public.price_share_secret') is not null
