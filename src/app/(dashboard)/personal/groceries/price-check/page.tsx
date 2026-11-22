@@ -1,5 +1,5 @@
-import { PriceCheckForm } from "@/components/personal/PriceCheckForm";
+import { AddShelfPrice } from "@/components/personal/AddShelfPrice";
 
 export default function Page() {
-  return <PriceCheckForm />;
+  return <AddShelfPrice />;
 }

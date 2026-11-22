@@ -268,6 +268,10 @@ other_checks as (
                                and (roles && array['public'::name, 'anon'::name]) and qual ilike '%avatars%') then 'OK' else 'MISSING' end,
          'migration_avatar_listing.sql'
   union all
+  select 'function', 'share_shelf_price saves a price seen in a shop',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'share_shelf_price') then 'OK' else 'MISSING' end,
+         'migration_shelf_prices.sql'
+  union all
   select 'function', 'product_match_cache keeps the AI verdicts on doubtful matches',
          case when to_regclass('public.product_match_cache') is not null then 'OK' else 'MISSING' end,
          'migration_match_cache.sql'

@@ -86,7 +86,18 @@ let badgeBest = 0;
 const communityCalls = [];
 const travelerCountries = new Set();
 let travelerSeen = false;
+const shelf = { rows: [], check: false, calls: [] };
 fake.setRpcHook(async (name, body, uid, bearer) => {
+  if (name === "share_shelf_price") {
+    shelf.calls.push(body);
+    if (shelf.check && !body.p_force) return { status: 200, body: "check" };
+    const key = body.p_sale ? `${body.p_product_key}|sale` : body.p_product_key;
+    shelf.rows = shelf.rows.filter((r) => !(r.store === body.p_store_key && r.key === key));
+    shelf.rows.push({ store: body.p_store_key, key, name: body.p_sale ? `${body.p_product_name} (sale)` : body.p_product_name, size: body.p_size, currency: body.p_currency, price: body.p_price, reporters: 3 });
+    return { status: 200, body: "ok" };
+  }
+  if (name === "my_shelf_prices") return { status: 200, body: shelf.rows.filter((r) => r.store === body.p_store_key).map((r) => ({ product_key: r.key, product_name: r.name, size_label: r.size, currency: r.currency, price: r.price, reporters: r.reporters })) };
+  if (name === "undo_shelf_price") { const n = shelf.rows.length; shelf.rows = shelf.rows.filter((r) => !(r.store === body.p_store_key && r.key === body.p_product_key)); return { status: 200, body: n - shelf.rows.length }; }
   if (name === "share_prices") { for (const r of body.rows || []) if (r.country) travelerCountries.add(r.country); sharedCalls.push(body); sharedCount += Array.isArray(body.rows) ? body.rows.length : 0; return { status: 200, body: Array.isArray(body.rows) ? body.rows.length : 0 }; }
   if (name === "my_invite" || name === "reset_my_invite" || name === "set_invite_show_name") {
     const links = fake.table("invite_links");
@@ -4116,6 +4127,7 @@ try {
       assert(fake.table("grocery_items").some((i) => i.receipt_id === kept.id && i.name === "Item 1"), "the nameless line is saved as Item 1");
       // a price seen in a shop, two stores
       await page.goto(`${BASE}/personal/groceries/price-check`);
+      await page.getByTestId("shelf-not-now").click(); // sharing is off: "Not now" saves a price just for you
       await page.locator("#pc-product").fill("C4 Energy");
       await page.locator("#pc-store").fill("Fit Stop");
       await page.locator("#pc-price").fill("39.95");
@@ -4145,6 +4157,73 @@ try {
     } finally {
       await ctx.close();
       for (const t of ["price_checks", "grocery_receipts", "grocery_items"]) fake.table(t).splice(0);
+    }
+  });
+
+  await test("add a price in the shop: sharing off asks first, the nearest shop is offered, a price is shared (a sale kept apart), a far price asks twice, and it can be undone", async () => {
+    const places = fake.table("supermarket_places");
+    const mkp = (id, name, lat, lng) => ({ id, name, name_key: name.toLowerCase().replace(/[^a-z]/g, ""), lat, lng, country: "AW" });
+    places.push(mkp("9a0001", "Super Food Plaza", 12.52, -70.03), mkp("9a0002", "Do it Aruba", 12.5215, -70.03), mkp("9a0003", "Ling & Sons", 12.53, -70.03));
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    me().share_prices = false;
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, geolocation: { latitude: 12.52, longitude: -70.03 }, permissions: ["geolocation"] });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/price-check`);
+      await page.getByTestId("shelf-gate").waitFor();
+      assert(/Turn on community sharing to add prices/.test(await page.getByTestId("shelf-gate").innerText()), "with sharing off, the page asks to turn it on first");
+      assert(me().share_prices === false, "nothing is switched on by looking");
+      await page.getByTestId("shelf-turn-on").click();
+      await page.getByTestId("shelf-here").waitFor();
+      assert(me().share_prices === true, "Turn on and continue switches sharing on");
+      const here = await page.getByTestId("shelf-here").innerText();
+      assert(/Super Food Plaza/.test(here) && !/Do it|Ling/.test(here), "only the nearest shop is offered: " + here);
+      await page.getByTestId("shelf-not-here").click();
+      const near = await page.getByTestId("shelf-near").innerText();
+      assert(/Super Food Plaza/.test(near) && /Do it Aruba/.test(near) && /Ling/.test(near), "Choose another lists the closest shops: " + near);
+      await page.getByTestId("shelf-find").fill("ling");
+      await page.getByTestId("shelf-found").waitFor();
+      await page.getByTestId("shelf-near").getByText("Super Food Plaza").click();
+      await page.getByTestId("shelf-form").waitFor();
+      await page.getByTestId("shelf-product").fill("Smartfood popcorn white cheddar 6.75oz");
+      await page.getByTestId("shelf-price").fill("5.79");
+      await page.getByTestId("shelf-save").click();
+      await page.getByTestId("shelf-saved").waitFor();
+      const sent = shelf.calls[0];
+      assert(sent.p_store_key === "superfoodplaza" && sent.p_price === 5.79 && sent.p_currency === "AWG" && sent.p_sale === false && sent.p_size === "191 g", "the price is sent: " + JSON.stringify(sent));
+      assert(!JSON.stringify(sent).includes("12.52") && !JSON.stringify(sent).includes("pat@example.com") && Object.keys(sent).length === 10, "no position or name is sent");
+      await page.getByTestId("shelf-added-row").first().waitFor();
+      assert(/Seen by 2 other shoppers/.test(await page.getByTestId("shelf-added").innerText()), "it says how many others saw about that price");
+      // a sale price is its own line
+      await page.getByTestId("shelf-product").fill("Smartfood popcorn white cheddar 6.75oz");
+      await page.getByTestId("shelf-price").fill("4.50");
+      await page.getByTestId("shelf-sale").click();
+      await page.getByTestId("shelf-save").click();
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=shelf-added-row]").length === 2);
+      assert(shelf.calls[1].p_sale === true && /\(sale\)/.test(await page.getByTestId("shelf-added").innerText()), "a sale price is kept apart");
+      // a price far from the others asks for a second look
+      shelf.check = true;
+      await page.getByTestId("shelf-product").fill("Pringles original 158g");
+      await page.getByTestId("shelf-price").fill("45");
+      await page.getByTestId("shelf-save").click();
+      await page.getByTestId("shelf-check").waitFor();
+      assert(shelf.rows.length === 2, "nothing is saved until the person confirms");
+      await page.getByTestId("shelf-save-anyway").click();
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=shelf-added-row]").length === 3);
+      assert(shelf.calls[shelf.calls.length - 1].p_force === true, "Save anyway confirms it");
+      shelf.check = false;
+      await page.getByTestId("shelf-undo").click();
+      await page.waitForFunction(() => document.querySelectorAll("[data-testid=shelf-added-row]").length === 2);
+      assert(shelf.rows.length === 2, "Undo takes the last price back");
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll");
+    } finally {
+      await ctx.close();
+      me().share_prices = false;
+      shelf.rows = []; shelf.calls = []; shelf.check = false;
+      for (const id of ["9a0001", "9a0002", "9a0003"]) { const i = places.findIndex((r) => r.id === id); if (i >= 0) places.splice(i, 1); }
     }
   });
 
