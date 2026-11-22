@@ -182,6 +182,8 @@ export type OnlineMatch = {
   /** same = same words and size (or you said so); ask = close, needs your answer */
   status: "same" | "ask";
   confirmed: boolean;
+  /** judged the same by the AI, not by the word matcher alone */
+  ai?: boolean;
   score: number;
 };
 

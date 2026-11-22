@@ -54,7 +54,7 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
     if (!(m.price > 0)) continue;
     const host = [...groups.values()].find((g) => sameWords(g.name, m.name));
     const g = host ?? put(`online|${m.name}|${m.size ?? ""}`, m.name, m.size);
-    g.offers.push({ store: m.storeName, price: m.price, source: "online", note: m.status === "same" ? "Online price list" : "Online price list, similar item" });
+    g.offers.push({ store: m.storeName, price: m.price, source: "online", note: m.ai ? "Online price list, checked automatically" : m.status === "same" ? "Online price list" : "Online price list, similar item" });
   }
 
   const out: PriceGroup[] = [];
