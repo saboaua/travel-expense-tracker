@@ -1,5 +1,6 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
 import { PaidFilter, NO_FILTER, applyPaidFilter } from "@/components/personal/PaidFilter";
 import { CardsThisMonth } from "@/components/personal/CardsThisMonth";
 import { BackLink } from "@/components/ui/page-header";
@@ -131,7 +132,7 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
       <div className="space-y-4 border-b pb-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
-            <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl">{rtype && <TypeIcon icon={rtype.icon} color={rtype.color} className="h-10 w-10" />}{typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"}</h1>
+            <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl">{rtype && <TypeIcon icon={rtype.icon} color={rtype.color} className="h-10 w-10" />}{!typed && (shopping ? <TileButton id="shopping" icon={ShoppingBag} tone="projects" /> : <TileButton id="groceries" icon={ShoppingCart} tone="groceries" />)}{typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"}</h1>
             <p className="mt-1 text-sm text-muted-foreground">{typed ? "Your receipts of this type, month by month" : shopping ? "Clothes, electronics, home and other stores" : "Monthly spending, categories and item price changes"}</p>
           </div>
           <Link href={`${base}/new`} className="block md:shrink-0"><Button className="h-12 w-full gap-2 rounded-2xl text-base shadow-md shadow-primary/30 md:h-11 md:w-auto md:px-8"><Plus className="h-5 w-5" /> {typed ? "Scan receipt" : shopping ? "Scan shopping receipt" : "Scan receipt"}</Button></Link>

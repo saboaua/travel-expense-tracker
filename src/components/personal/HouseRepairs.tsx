@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { Home } from "lucide-react";
 import { setupNeeded } from "@/lib/setup-message";
 import { Money } from "@/components/ui/money";
 import { useEffect, useMemo, useState } from "react";
@@ -60,7 +62,7 @@ export function HouseRepairs() {
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-x-8">
       <div className="lg:col-span-2">
       <Link href="/personal/spend" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Quick spend</Link>
-      <h1 className="text-[26px] font-bold leading-tight">House &amp; repairs</h1>
+      <h1 className="flex items-center gap-3 text-[26px] font-bold leading-tight"><TileButton id="house" icon={Home} tone="house" />House &amp; repairs</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">{year} · {rows ? `${rows.length} item${rows.length === 1 ? "" : "s"}` : " "}</p>
       {error && <Alert className="mt-3">{error}</Alert>}
       </div>

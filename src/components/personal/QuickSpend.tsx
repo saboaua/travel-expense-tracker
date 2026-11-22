@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { Coins } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Money } from "@/components/ui/money";
 import Link from "next/link";
@@ -191,7 +193,7 @@ export function QuickSpend() {
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8">
       <div className="lg:col-span-2">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
-      <h1 className="text-xl font-bold">{editing ? "Change spend" : "Quick spend"}</h1>
+      <h1 className="flex items-center gap-3 text-xl font-bold">{!editing && <TileButton id="spend" icon={Coins} tone="spend" />}{editing ? "Change spend" : "Quick spend"}</h1>
       <p className="mt-1 text-sm text-muted-foreground">For purchases with no receipt. It counts toward your personal spending and never goes to a business trip, which still needs a receipt or invoice.</p>
 
       {!editing && <div className="mt-4"><DestinationTiles value={dest} onChange={pickDest} /></div>}

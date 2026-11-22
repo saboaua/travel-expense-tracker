@@ -1150,22 +1150,30 @@ try {
     await ctx.close();
   });
 
-  await test("other row colour: starts rose, a picked colour is saved on your profile and shows on the Personal row", async () => {
+  await test("icon colours: Other starts rose; tap a page icon, pick a colour, it is saved on your profile and shows on the page and in the Personal list; Use default puts it back", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
-    await page.goto(`${BASE}/personal/types`);
-    await page.getByTestId("other-color").waitFor({ timeout: 20_000 });
-    assert((await page.getByTestId("other-color-db2777").getAttribute("aria-checked")) === "true", "rose is picked to begin with");
-    await page.getByTestId("other-color-2563eb").click();
-    for (let i = 0; i < 40 && fake.table("profiles").find((p) => p.id === PAT)?.other_color !== "#2563eb"; i++) await new Promise((ok) => setTimeout(ok, 250));
-    assert(fake.table("profiles").find((p) => p.id === PAT)?.other_color === "#2563eb", "the colour is saved on the profile");
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    const style = (sel) => page.evaluate((q) => document.querySelector(q)?.getAttribute("style") ?? "", sel);
     await page.goto(`${BASE}/personal`);
-    const tile = page.getByTestId("types-tile").locator("span[aria-hidden=true]").first();
-    await tile.waitFor({ timeout: 20_000 });
-    await page.waitForFunction(() => (document.querySelector('[data-testid="types-tile"] span[aria-hidden=true]')?.getAttribute("style") ?? "").includes("#2563eb"), null, { timeout: 10_000 }).catch(() => {});
-    assert(((await tile.getAttribute("style")) ?? "").includes("#2563eb"), "the Other row uses the picked colour: " + (await tile.getAttribute("style")));
-    fake.table("profiles").find((p) => p.id === PAT).other_color = null;
+    await page.getByTestId("types-tile").waitFor({ timeout: 20_000 });
+    await page.waitForFunction(() => (document.querySelector('[data-testid="types-tile"] span[aria-hidden=true]')?.getAttribute("style") ?? "").includes("#db2777"), null, { timeout: 10_000 });
+    await page.goto(`${BASE}/personal/fixed`);
+    await page.getByTestId("tile-button-fixed").waitFor({ timeout: 20_000 });
+    await page.getByTestId("tile-button-fixed").getByRole("button", { name: "Change the colour of this icon" }).click();
+    await page.getByTestId("tile-color-7c3aed").click();
+    for (let i = 0; i < 40 && me()?.tile_colors?.fixed !== "#7c3aed"; i++) await new Promise((ok) => setTimeout(ok, 250));
+    assert(me()?.tile_colors?.fixed === "#7c3aed", "the colour is saved on the profile: " + JSON.stringify(me()?.tile_colors));
+    assert((await style('[data-testid="tile-button-fixed"] span[aria-hidden=true]')).includes("#7c3aed"), "the page icon uses it");
+    await page.goto(`${BASE}/personal`);
+    await page.waitForFunction(() => [...document.querySelectorAll("a")].some((a) => a.textContent?.startsWith("Fixed costs") && (a.querySelector("span[aria-hidden=true]")?.getAttribute("style") ?? "").includes("#7c3aed")), null, { timeout: 10_000 });
+    await page.goto(`${BASE}/personal/fixed`);
+    await page.getByTestId("tile-button-fixed").getByRole("button", { name: "Change the colour of this icon" }).click();
+    await page.getByTestId("tile-default").click();
+    for (let i = 0; i < 40 && me()?.tile_colors?.fixed; i++) await new Promise((ok) => setTimeout(ok, 250));
+    assert(!me()?.tile_colors?.fixed, "Use default removes it");
+    me().tile_colors = {};
     await ctx.close();
   });
 

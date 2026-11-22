@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { Repeat } from "lucide-react";
 import { createPortal } from "react-dom";
 import { Money } from "@/components/ui/money";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -152,7 +154,7 @@ export function SubscriptionsView() {
     <>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Subscriptions</h1>
+          <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl"><TileButton id="subscriptions" icon={Repeat} tone="subscriptions" />Subscriptions</h1>
           <p className="mt-1 text-sm text-muted-foreground">Only you see these. No bank login needed.</p>
         </div>
         <Button onClick={() => open()} className="shrink-0"><Plus className="h-4 w-4" /> Add</Button>

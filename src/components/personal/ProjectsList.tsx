@@ -1,5 +1,6 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
 import { BackLink } from "@/components/ui/page-header";
 import { Money } from "@/components/ui/money";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
@@ -91,7 +92,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
       <BackLink href="/personal">Personal</BackLink>
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold md:text-3xl">{meta.plural}</h1>
+          <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl">{kind === "home_project" ? <TileButton id="projects" icon={Hammer} tone="projects" /> : <TileButton id="travel" icon={Plane} tone="travel" />}{meta.plural}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {kind === "home_project" ? "Home, car, boat or anything else: scan tickets and see what each project costs you" : "Scan receipts and see what a trip cost you"}
           </p>

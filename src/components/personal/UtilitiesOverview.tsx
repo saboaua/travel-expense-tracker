@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { Zap } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, BellRing, Check, ChevronLeft, ChevronRight, Mail, Plus } from "lucide-react";
@@ -58,7 +60,7 @@ export function UtilitiesOverview() {
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-6xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
-      <h1 className="text-[26px] font-bold leading-tight">Utilities</h1>
+      <h1 className="flex items-center gap-3 text-[26px] font-bold leading-tight"><TileButton id="utilities" icon={Zap} tone="utilities" />Utilities</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">Add each bill yourself or send it from email. Money counts in the month you paid it; each bill says which month it is for.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 

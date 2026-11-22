@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { Landmark } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Switch } from "@/components/ui/switch";
 import { Money as AmountText } from "@/components/ui/money";
@@ -68,8 +70,8 @@ const removeCost = (uid: string, kind: FixedKind) => createClient().from("fixed_
 function Back({ href, text }: { href: string; text: string }) {
   return <Link href={href} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> {text}</Link>;
 }
-function Title({ title, sub }: { title: string; sub: string }) {
-  return <><h1 className="text-[26px] font-bold leading-tight">{title}</h1><p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{sub}</p></>;
+function Title({ title, sub, tile }: { title: string; sub: string; tile?: boolean }) {
+  return <><h1 className={`text-[26px] font-bold leading-tight${tile ? " flex items-center gap-3" : ""}`}>{tile && <TileButton id="fixed" icon={Landmark} tone="fixed" />}{title}</h1><p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{sub}</p></>;
 }
 function Money({ id, value, onChange, currency, onCurrency, placeholder = "0.00" }: { id: string; value: string; onChange: (v: string) => void; currency: BudgetCurrency; onCurrency: (c: BudgetCurrency) => void; placeholder?: string }) {
   return (
@@ -128,7 +130,7 @@ export function FixedCostsHub() {
   return (
     <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8 lg:max-w-4xl" data-testid="fixed-hub">
       <Back href="/personal" text="Personal" />
-      <Title title="Fixed costs" sub="Set a payment once. It is added to your spending for you." />
+      <Title tile title="Fixed costs" sub="Set a payment once. It is added to your spending for you." />
       {missing && <Alert>{SETUP}</Alert>}
       {ready && !missing && (
         <>

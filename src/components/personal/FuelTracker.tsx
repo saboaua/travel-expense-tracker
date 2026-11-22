@@ -1,5 +1,6 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Fuel, Plus } from "lucide-react";
@@ -47,7 +48,7 @@ export function FuelTracker() {
   return (
     <div className="mx-auto max-w-lg space-y-4 p-4 pb-28 md:p-8">
       <BackLink href="/personal">Personal</BackLink>
-      <PageHeader title="Fuel" description={monthLabel(month.slice(0, 7))} />
+      <PageHeader title={<span className="flex items-center gap-3"><TileButton id="fuel" icon={Fuel} tone="projects" />Fuel</span>} description={monthLabel(month.slice(0, 7))} />
       {setup && <Alert>Run supabase/migration_fuel.sql in Supabase first.</Alert>}
       {rows == null && !setup && <Alert>Could not load your fill-ups. Check your connection.</Alert>}
 

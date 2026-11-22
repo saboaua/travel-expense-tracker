@@ -1,5 +1,7 @@
 "use client";
 
+import { TileButton } from "@/components/ui/TileButton";
+import { TrendingUp } from "lucide-react";
 import { setupNeeded } from "@/lib/setup-message";
 import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
@@ -195,7 +197,7 @@ export function GroceryPrices() {
       </div>
       <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold md:text-3xl">Price tracker</h1>
+          <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl"><TileButton id="prices" icon={TrendingUp} tone="groceries" />Price tracker</h1>
           <p className="mt-1 text-sm text-muted-foreground">{inCur.length} item{inCur.length === 1 ? "" : "s"} · {summary.stores} store{summary.stores === 1 ? "" : "s"}{onlineData && onlineData.enabled.length > 0 && cur === ONLINE_CURRENCY ? ` · ${onlineData.enabled.length} online` : ""} · {cur}</p>
         </div>
         <div className="flex gap-2">
