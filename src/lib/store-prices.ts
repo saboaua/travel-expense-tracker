@@ -185,7 +185,20 @@ export type OnlineMatch = {
   score: number;
 };
 
-const sizeSig = (s: Size | null) => (s ? `${s.kind}${s.amount}` : "");
+/** The same pack within 6%: 6.75 oz (191 g) and 190 g are one size. */
+export const sizesClose = (a: Size, b: Size) => a.kind === b.kind && Math.abs(a.amount - b.amount) <= Math.max(a.amount, b.amount) * 0.06;
+
+/** Words that carry no product meaning, and plural endings, so "chips" meets "chip" and "the" is ignored. Applied to both sides. */
+const STOP = new Set(["the", "and", "with", "of", "for", "flavor", "flavour", "flavored", "flavoured", "new", "brand"]);
+export const stem = (w: string): string => {
+  if (w.length <= 3 || /\d/.test(w)) return w;
+  if (w.endsWith("ies") && w.length > 4) return `${w.slice(0, -3)}y`;
+  if (w.endsWith("ie") && w.length > 4) return `${w.slice(0, -2)}y`;
+  if (/(ss|us|is)$/.test(w)) return w;
+  if (/(ches|shes|xes|ses)$/.test(w)) return w.slice(0, -2);
+  return w.endsWith("s") ? w.slice(0, -1) : w;
+};
+export const nameWords = (words: string[]): string[] => words.filter((w) => !STOP.has(w)).map(stem);
 
 /** How well a shop product fits what you bought, or null when it is certainly not it (a different size, or too few shared words). */
 /** "smart food" in one name and "smartfood" in the other: two words that together spell a word of the other name become that word. */
@@ -202,9 +215,9 @@ function joinSplit(words: string[], other: string[]): string[] {
 export function scoreCandidate(want: { words: string[]; size: Size | null }, cand: { name: string; size_text: string | null }): { score: number; status: "same" | "ask" } | null {
   const text = `${cand.name} ${cand.size_text ?? ""}`;
   const cSize = parseSize(text);
-  if (want.size && cSize && sizeSig(want.size) !== sizeSig(cSize)) return null;
-  const cRaw = [...new Set(productWords(cand.name))];
-  const wRaw = [...new Set(want.words)];
+  if (want.size && cSize && !sizesClose(want.size, cSize)) return null;
+  const cRaw = [...new Set(nameWords(productWords(cand.name)))];
+  const wRaw = [...new Set(nameWords(want.words))];
   const cWords = joinSplit(cRaw, wRaw);
   const wWords = joinSplit(wRaw, cRaw);
   if (!wWords.length || !cWords.length) return null;
@@ -312,24 +325,35 @@ export function mapDoit(rows: Record<string, unknown>[], keep: { closeout?: bool
 }
 
 /**
- * Free-text search in the shops' lists (Best Prices): every word you typed must be in the product name, whether the shop writes it as one
- * word or two ("smartfood" finds "SMART FOOD"). Several products per shop, the closest names first, then the cheapest.
+ * Free-text search in the shops' lists (Best Prices). Every word you typed must be found in the product name: as that word or its plural,
+ * inside a longer word, a word the shop writes in two ("smartfood" / "SMART FOOD"), or one letter off. A size you typed ("6.75oz", "190 g")
+ * ranks the same pack first but never hides the others. Several products per shop: closest names first, then the cheapest.
  */
 export function searchCatalog(q: string, catalog: CatalogItem[], enabled: StoreId[] = STORE_IDS, perStore = 5): OnlineMatch[] {
-  const words = searchText(q, null).split(" ").filter(Boolean);
+  const qSize = parseSize(q);
+  let words = [...new Set(nameWords(productWords(q)))];
+  if (!words.length) words = [...new Set(nameWords(searchText(q, null).split(" ").filter(Boolean)))];
   if (!words.length) return [];
   const out: OnlineMatch[] = [];
   for (const store of enabled) {
     const hits: OnlineMatch[] = [];
     for (const c of catalog) {
       if (c.store !== store) continue;
-      const text = searchText(c.name, c.size_text);
-      const tokens = text.split(" ");
-      const compact = text.replace(/ /g, "");
-      if (!words.every((w) => (w.length >= 3 ? compact.includes(w) : tokens.includes(w)))) continue;
-      const extra = Math.max(0, tokens.length - words.length);
-      const status: "same" | "ask" = extra <= 2 ? "same" : "ask";
-      hits.push({ store, storeName: STORES[store].name, itemId: c.item_id, name: c.name, size: c.size_text, price: c.price, url: c.url, fetchedAt: c.fetched_at, status, confirmed: false, score: 1 - extra * 0.05 });
+      const tokens = [...new Set(nameWords(productWords(c.name)))];
+      const all = tokens.length ? tokens : nameWords(searchText(c.name, null).split(" ").filter(Boolean));
+      const compact = searchText(c.name, null).replace(/ /g, "");
+      let exact = 0, fuzzy = 0;
+      for (const w of words) {
+        if (all.includes(w)) exact++;
+        else if ((w.length >= 3 && compact.includes(w)) || all.some((t) => wordsClose(w, t))) fuzzy++;
+      }
+      if (exact + fuzzy < words.length) continue;
+      const cSize = parseSize(`${c.name} ${c.size_text ?? ""}`);
+      const sizeOk = !qSize || (!!cSize && sizesClose(qSize, cSize));
+      const extra = Math.max(0, all.length - words.length);
+      const score = (exact + fuzzy * 0.8) / words.length - extra * 0.03 + (qSize && sizeOk ? 0.15 : 0) - (qSize && !sizeOk ? 0.2 : 0);
+      const status: "same" | "ask" = fuzzy === 0 && extra <= 2 && sizeOk ? "same" : "ask";
+      hits.push({ store, storeName: STORES[store].name, itemId: c.item_id, name: c.name, size: c.size_text, price: c.price, url: c.url, fetchedAt: c.fetched_at, status, confirmed: false, score });
     }
     hits.sort((a, b) => b.score - a.score || a.price - b.price);
     out.push(...hits.slice(0, perStore));

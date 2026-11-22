@@ -7,6 +7,35 @@ import { matchProducts, searchCatalog, staleDays, STORE_IDS, STORES, type Answer
 export const dynamic = "force-dynamic";
 
 const MAX_PRODUCTS = 120;
+const PAGE = 1000; // the database returns at most 1000 rows per request
+const CACHE_MS = 10 * 60 * 1000;
+const cache = new Map<string, { at: number; rows: (Omit<CatalogItem, "store"> & { store: string })[] }>();
+
+/** Every row of the shops' lists (they are public and the same for everyone signed in), read in pages and kept for ten minutes. */
+async function loadCatalog(supabase: Awaited<ReturnType<typeof createClient>>, enabled: StoreId[]): Promise<CatalogItem[]> {
+  const now = Date.now();
+  const rows: (Omit<CatalogItem, "store"> & { store: string })[] = [];
+  for (const store of enabled) {
+    const hit = cache.get(store);
+    if (hit && now - hit.at < CACHE_MS) { rows.push(...hit.rows); continue; }
+    const got: (Omit<CatalogItem, "store"> & { store: string })[] = [];
+    for (let from = 0; from < 30000; from += PAGE) {
+      const { data, error } = await supabase.from("store_catalog").select("store, item_id, name, size_text, price, url, fetched_at").eq("store", store).order("item_id").range(from, from + PAGE - 1);
+      if (error) throw new Error(error.message);
+      got.push(...((data ?? []) as typeof got));
+      if (!data || data.length < PAGE) break;
+    }
+    cache.set(store, { at: now, rows: got });
+    rows.push(...got);
+  }
+  return rows
+    .filter((r) => (STORE_IDS as string[]).includes(r.store) && Date.parse(r.fetched_at) >= now - staleDays(r.store as StoreId) * 86400000) as CatalogItem[];
+}
+
+/** A search or list item that found nothing in any shop is counted, so the admin can see what the matching misses. */
+async function logMiss(supabase: Awaited<ReturnType<typeof createClient>>, text: string, kind: "search" | "list") {
+  try { await supabase.rpc("log_search_miss", { p_q: text.slice(0, 120), p_kind: kind }); } catch { /* the log is best effort */ }
+}
 
 /**
  * For the things you bought: the matching product in each online shop, from the daily copy of their lists.
@@ -35,29 +64,27 @@ export async function POST(request: Request) {
   const saved = (prefsRes.data?.stores as string[] | undefined) ?? STORE_IDS;
   const enabled = STORE_IDS.filter((s) => saved.includes(s));
 
-  // The shops' lists are small enough to read the rows that share a word with something you bought
-  const searchWords = [...new Set(productWords(search).concat(search.toLowerCase().split(/[^a-z0-9]+/)).filter((x) => x.length >= 3).map((x) => (x.length > 5 ? x.slice(0, 4) : x)))].slice(0, 6); // a 4-letter start also finds a shop that writes "SMART FOOD" for "smartfood"; searchCatalog does the exact check
-  // the longest words of each name, and the first four letters of long ones, so "smartfood" also finds a shop's "SMART FOOD"
-  const wordsOf = (n: string) => [...productWords(n)].filter((x) => x.length >= 3).sort((a, b) => b.length - a.length).slice(0, 3).flatMap((x) => (x.length > 5 ? [x, x.slice(0, 4)] : [x]));
-  const keyWords = search ? searchWords : [...new Set(wanted.flatMap((w) => w.names.flatMap(wordsOf)))].slice(0, 150);
-  if (keyWords.length === 0 || enabled.length === 0) return NextResponse.json({ matches: {}, results: [], stores: enabled.map((s) => ({ id: s, name: STORES[s].name })), enabled });
-  const orFilter = keyWords.map((w) => `name_norm.ilike.%${w.replace(/[^a-z0-9]/g, "")}%`).join(",");
-  const { data, error } = await supabase.from("store_catalog").select("store, item_id, name, size_text, price, url, fetched_at").in("store", enabled).or(orFilter).limit(6000);
-  if (error) {
-    const missing = /relation|schema cache|does not exist/i.test(error.message);
+  // The shops' lists are small (a few thousand products), so the whole list of each enabled shop is scored: nothing is missed by a pre-filter
+  if (!search && wanted.every((w) => w.names.every((n) => productWords(n).length === 0))) return NextResponse.json({ matches: {}, results: [], stores: enabled.map((s) => ({ id: s, name: STORES[s].name })), enabled });
+  if (enabled.length === 0) return NextResponse.json({ matches: {}, results: [], stores: [], enabled });
+  let catalog: CatalogItem[];
+  try { catalog = await loadCatalog(supabase, enabled); } catch (e) {
+    const missing = /relation|schema cache|does not exist/i.test(e instanceof Error ? e.message : String(e));
     return NextResponse.json({ matches: {}, stores: [], enabled, setup: missing ? "migration" : "error" });
   }
-  const now = Date.now();
-  const catalog = ((data ?? []) as (Omit<CatalogItem, "store"> & { store: string })[])
-    .filter((r) => (STORE_IDS as string[]).includes(r.store) && Date.parse(r.fetched_at) >= now - staleDays(r.store as StoreId) * 86400000) as CatalogItem[];
 
   // When did each shop last answer? (an empty catalog means the daily job has not run yet)
   const { data: fresh } = await supabase.from("store_catalog").select("store, fetched_at").in("store", enabled).order("fetched_at", { ascending: false }).limit(50);
   const lastBy: Partial<Record<StoreId, string>> = {};
   for (const r of fresh ?? []) if (!lastBy[r.store as StoreId]) lastBy[r.store as StoreId] = r.fetched_at as string;
 
-  if (search) return NextResponse.json({ results: searchCatalog(search, catalog, enabled), enabled }, { headers: { "Cache-Control": "private, no-store" } });
+  if (search) {
+    const results = searchCatalog(search, catalog, enabled);
+    if (results.length === 0 && catalog.length > 0) await logMiss(supabase, search, "search");
+    return NextResponse.json({ results, enabled }, { headers: { "Cache-Control": "private, no-store" } });
+  }
   const matches = matchProducts(wanted, catalog, (answersRes.data ?? []) as Answer[], enabled);
+  if (catalog.length > 0) await Promise.all(wanted.slice(0, 5).filter((w) => !matches[w.key] && w.names[0]).map((w) => logMiss(supabase, w.names[0], "list")));
   return NextResponse.json({
     matches,
     enabled,
