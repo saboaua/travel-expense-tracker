@@ -38,6 +38,8 @@ export async function GET(req: Request) {
         console.error("[cron] account-deletions", id, e instanceof Error ? e.message : e);
       }
     }
+    // Saved trip places are deleted the day after the trip ends (harmless when the table is not there yet)
+    await db.rpc("purge_trip_places").then(() => null, () => null);
     if (failed > 0) await notifyJobFailure(db, "Account deletions (some could not be removed)");
     return NextResponse.json({ ok: true, removed, failed });
   } catch (e) {

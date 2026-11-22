@@ -25,6 +25,7 @@ import { buildSharingNotifications, type SharingOverview } from "@/lib/sharing";
 import { permissionsFromRoles, type RoleRecord } from "@/lib/access";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/supabase/session";
+import { TripPlaces } from "@/components/TripPlaces";
 import { PersonalTiles } from "@/components/PersonalTiles";
 import { summarizePersonal } from "@/lib/personal/summary";
 import { fetchLinkedSpends, withLinkedTotals } from "@/lib/offline-personal";
@@ -330,6 +331,9 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
 
       {/* Dutch travel advice for the trip the hero shows (needs a destination) */}
       {featured?.destination && <AdvisoryTile tripId={featured.id} destination={featured.destination} />}
+
+      {/* Top 10 things to do and places to eat for the trip that is on now or next; hidden with no trip or destination */}
+      {myPerms.has("trips") && <TripPlaces today={today} trips={activeTripsList.map((t) => ({ id: t.id, name: t.name, destination: t.destination, start: t.start_date, end: t.end_date }))} />}
 
       {/* Documents: one tile per saved document, soonest to expire first */}
       {myPerms.has("documents") && <DocumentTiles tiles={docTiles} total={accountDocs.length} />}

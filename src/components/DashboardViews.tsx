@@ -5,6 +5,7 @@ import PersonalHome from "@/components/personal/PersonalHome";
 import { useEffect, useState, type ReactNode } from "react";
 import { Briefcase, Wallet } from "lucide-react";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
+import { TripPlaces } from "@/components/TripPlaces";
 import type { DocTile } from "@/components/documents/DocumentTiles";
 
 type View = "business" | "personal";
@@ -54,6 +55,7 @@ export function DashboardViews({ rows, projects, today, docs, docTotal, canDocum
       {view === "personal" && (
         <div id="dash-panel-personal" role="tabpanel" aria-labelledby="dash-tab-personal" className="space-y-6">
           <PersonalHome rows={rows} projects={projects} today={today} docs={docs} docTotal={docTotal} canDocuments={canDocuments} />
+          <TripPlaces today={today} trips={projects.filter((p) => p.kind === "personal_trip" && (p.status || "active") === "active").map((p) => ({ id: p.id, name: p.name, destination: p.destination ?? null, start: p.start_date, end: p.end_date }))} />
         </div>
       )}
     </>

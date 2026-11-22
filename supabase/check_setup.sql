@@ -272,6 +272,10 @@ other_checks as (
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'share_shelf_price') then 'OK' else 'MISSING' end,
          'migration_shelf_prices.sql'
   union all
+  select 'function', 'trip_places keeps the top places for each trip until it ends',
+         case when to_regclass('public.trip_places') is not null and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'purge_trip_places') then 'OK' else 'MISSING' end,
+         'migration_trip_places.sql'
+  union all
   select 'function', 'product_match_cache keeps the AI verdicts on doubtful matches',
          case when to_regclass('public.product_match_cache') is not null then 'OK' else 'MISSING' end,
          'migration_match_cache.sql'

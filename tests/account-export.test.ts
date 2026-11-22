@@ -30,6 +30,7 @@ const NOT_EXPORTED = new Set([
   "ai_scan_usage", // monthly AI scan counter, resets by itself
   "bill_email_held", // bills waiting for Pro, added when Pro comes on
   "user_plans", // the plan an admin switched on for you, not data you entered
+  "trip_places", // map suggestions saved for a trip, deleted the day after it ends
 ]);
 const sql = readdirSync("supabase").filter((f) => f.endsWith(".sql")).map((f) => readFileSync(`supabase/${f}`, "utf8")).join("\n");
 const owned: string[] = [];

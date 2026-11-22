@@ -4246,6 +4246,33 @@ try {
     }
   });
 
+  await test("Around your trip: the top things to do and places to eat show as two tabs of swipe tiles, and the card is hidden when nothing is found", async () => {
+    const mk = (n, t, km) => ({ id: `node/${n}`, name: `${t} ${n}`, type: t, km, lat: 25.76, lng: -80.19 });
+    const ten = (t) => Array.from({ length: 10 }, (_, i) => mk(i + 1, t, 0.4 + i));
+    let found = true, asked = "";
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    await page.route("**/api/trip-places**", (route) => { asked = route.request().url(); return route.fulfill({ json: found ? { things: ten("Museum"), eat: ten("Seafood"), attribution: "© OpenStreetMap contributors" } : { things: [], eat: [] } }); });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      const biz = page.getByRole("tab", { name: "Business" });
+      if (await biz.count()) await biz.click();
+      await page.getByTestId("trip-places").waitFor();
+      assert(/dest=Miami/.test(asked) && /trip=/.test(asked) && /end=\d{4}-\d{2}-\d{2}/.test(asked), "the trip, its destination and its end date are sent: " + asked);
+      assert((await page.getByTestId("trip-place").count()) === 10, "10 things to do are shown");
+      assert(/Museum 1/.test(await page.getByTestId("trip-place").first().innerText()) && /Miami, /.test(await page.getByTestId("trip-places").innerText()), "the first place and the destination are shown");
+      await page.getByRole("tab", { name: "Where to eat" }).click();
+      assert(/Seafood 1/.test(await page.getByTestId("trip-place").first().innerText()), "the second tab lists places to eat");
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "the swipe row does not scroll the page sideways");
+      found = false;
+      await page.reload();
+      await page.waitForTimeout(1500);
+      assert((await page.getByTestId("trip-places").count()) === 0, "nothing found: the card is hidden");
+    } finally { await ctx.close(); }
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
