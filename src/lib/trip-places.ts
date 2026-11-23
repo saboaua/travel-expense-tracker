@@ -81,10 +81,10 @@ export const mapsUrl = (p: { name: string; lat: number; lng: number }) => `https
 
 export type PlacesTrip = { id: string; name: string; destination: string | null; start: string | null; end: string | null };
 
-/** Trips that can show places: they need a destination and must not be over. Ongoing first, then the soonest upcoming. */
+/** Trips that can show places: they need a destination and must not be over. Ongoing first (the one that started most recently opens first, so a short trip inside a long one takes over while it lasts), then the soonest upcoming. */
 export function placesTrips(trips: PlacesTrip[], today: string): PlacesTrip[] {
   const ok = trips.filter((t) => t.destination?.trim() && t.start && (t.end || t.start) >= today);
-  const ongoing = ok.filter((t) => (t.start as string) <= today).sort((a, b) => (a.start as string).localeCompare(b.start as string));
+  const ongoing = ok.filter((t) => (t.start as string) <= today).sort((a, b) => (b.start as string).localeCompare(a.start as string));
   const upcoming = ok.filter((t) => (t.start as string) > today).sort((a, b) => (a.start as string).localeCompare(b.start as string));
   return [...ongoing, ...upcoming];
 }

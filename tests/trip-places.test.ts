@@ -47,6 +47,9 @@ eq(/around:7000,38\.7223,-9\.1393/.test(overpassQuery("eat", c)) && /restaurant/
 // which trips can show places
 const T = (id: string, destination: string | null, start: string, end: string | null) => ({ id, name: id, destination, start, end });
 eq(placesTrips([T("later", "Rome", "2026-12-20", "2026-12-25"), T("now", "Lisbon", "2026-11-20", "2026-11-25"), T("nodest", null, "2026-11-21", "2026-11-23"), T("over", "Paris", "2026-11-01", "2026-11-10"), T("soon", "Oslo", "2026-12-01", null)], "2026-11-22").map((t) => t.id), ["now", "soon", "later"], "ongoing first, then the soonest; no destination or ended trips are left out");
+eq(placesTrips([T("nl", "Amsterdam", "2026-12-01", "2026-12-31"), T("es", "Madrid", "2026-12-14", "2026-12-18")], "2026-12-15").map((t) => t.id), ["es", "nl"], "two trips in progress: the one that started most recently opens first");
+eq(placesTrips([T("nl", "Amsterdam", "2026-12-01", "2026-12-31"), T("es", "Madrid", "2026-12-14", "2026-12-18")], "2026-12-19").map((t) => t.id), ["nl"], "back to the long trip once the short one ends");
+eq(placesTrips([T("nl", "Amsterdam", "2026-12-01", "2026-12-31"), T("es", "Madrid", "2026-12-14", "2026-12-18")], "2026-12-10").map((t) => t.id), ["nl", "es"], "before the short trip starts the long one shows first");
 eq(placesTrips([T("blank", "  ", "2026-11-22", null)], "2026-11-22"), [], "a blank destination is not a destination");
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }
