@@ -28,7 +28,7 @@ export const EXPORT_TABLES: { table: string; owner: string; bucket?: string; col
   { table: "grocery_items", owner: "user_id", cols: `${GROCERY_ITEM_COLS}, receipt_id` },
   { table: "grocery_item_rules", owner: "user_id", cols: "user_id, normalized_name, category, updated_at", order: "normalized_name" },
   { table: "loyalty_cards", owner: "user_id", bucket: "loyalty-cards", cols: LOYALTY_CARD_COLS, base: LOYALTY_CARD_COLS_BASE },
-  { table: "reminders", owner: "user_id", cols: "id, title, notes, due_at, repeat, alert, color, icon, done_at, snoozed_until, created_at" },
+  { table: "reminders", owner: "user_id", cols: "id, title, notes, due_at, repeat, repeat_days, alert, color, icon, done_at, snoozed_until, created_at" },
   { table: "reminder_photos", owner: "user_id", bucket: "reminder-photos", cols: "id, reminder_id, file_path, created_at" },
   { table: "travel_documents", owner: "user_id", bucket: "documents", cols: DOCUMENT_COLS, base: DOCUMENT_COLS_BASE },
   { table: "trip_papers", owner: "user_id", bucket: "documents", cols: "id, trip_id, title, note, file_path, created_at" },

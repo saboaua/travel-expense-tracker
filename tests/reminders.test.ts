@@ -6,10 +6,10 @@ const assert = {
   deepEqual: (a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${JSON.stringify(a)} != ${JSON.stringify(b)}`); },
   match: (a: string, re: RegExp) => { if (!re.test(a)) throw new Error(`${a} !~ ${re}`); },
 };
-import { addStep, nextDue, alertTime, needsAlert, statusOf, filterReminders, snoozeTime, parseQuickAdd, dueText, type Reminder } from "../src/lib/reminders";
+import { alignToDays, cleanDays, daysText, repeatLabel, addStep, nextDue, alertTime, needsAlert, statusOf, filterReminders, snoozeTime, parseQuickAdd, dueText, type Reminder } from "../src/lib/reminders";
 
 const now = new Date(2026, 10, 22, 10, 0); // Sun 22 Nov 2026 10:00 local
-const mk = (o: Partial<Reminder>): Reminder => ({ id: "1", user_id: "u", title: "t", notes: null, due_at: now.toISOString(), repeat: "none", alert: "at", color: "blue", icon: "bell", done_at: null, snoozed_until: null, last_alerted_for: null, created_at: now.toISOString(), ...o });
+const mk = (o: Partial<Reminder>): Reminder => ({ id: "1", user_id: "u", title: "t", notes: null, due_at: now.toISOString(), repeat: "none", repeat_days: null, tz: null, alert: "at", color: "blue", icon: "bell", done_at: null, snoozed_until: null, last_alerted_for: null, created_at: now.toISOString(), ...o });
 
 test("monthly steps keep month ends", () => {
   assert.equal(addStep(new Date(2026, 0, 31), "monthly").getDate(), 28);
@@ -65,6 +65,20 @@ test("quick add sentences", () => {
 test("due text", () => {
   assert.match(dueText(new Date(2026, 10, 22, 18).toISOString(), now), /^Today 6:00 PM$/);
   assert.match(dueText(new Date(2026, 10, 23, 9).toISOString(), now), /^Tomorrow 9:00 AM$/);
+});
+
+test("chosen weekdays", () => {
+  assert.deepEqual(cleanDays([0, 3, 3, 9, "x"]), [3, 0]);
+  assert.equal(daysText([0]), "Every Sun"); assert.equal(daysText([5, 1, 3]), "Every Mon, Wed, Fri");
+  assert.equal(daysText([0, 1, 2, 3, 4, 5, 6]), "Every day"); assert.equal(daysText([1, 2, 3, 4, 5]), "Every weekday"); assert.equal(daysText([6, 0]), "Every weekend");
+  assert.equal(repeatLabel({ repeat: "weekly", repeat_days: [0] }), "Every Sun"); assert.equal(repeatLabel({ repeat: "weekly", repeat_days: null }), "Weekly"); assert.equal(repeatLabel({ repeat: "none", repeat_days: null }), "");
+  const sun7 = new Date(2026, 10, 22, 19); // Sun 22 Nov 7 PM
+  assert.equal(nextDue(sun7, "weekly", now, [0])!.getDate(), 22); // 7 PM is still ahead today
+  assert.equal(nextDue(new Date(2026, 10, 22, 9), "weekly", now, [0])!.getDate(), 29);
+  const mwf = nextDue(new Date(2026, 10, 24, 8), "weekly", new Date(2026, 10, 24, 9), [1, 3, 5])!; // Tue after 8 -> Wed
+  assert.equal(mwf.getDay(), 3); assert.equal(mwf.getHours(), 8);
+  assert.equal(alignToDays(new Date(2026, 10, 24, 8), [0]).getDay(), 0);
+  assert.equal(alignToDays(new Date(2026, 10, 24, 8), null).getDate(), 24);
 });
 
 if (failed) { console.log(`${failed} failed`); process.exit(1); }

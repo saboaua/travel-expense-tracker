@@ -7,7 +7,7 @@ import { Camera, Crown, Loader2, Lock, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useLimits } from "@/lib/use-limits";
-import { normalizeReminder, ALERTS, PHOTO_LIMIT, REMINDER_COLORS, REMINDER_ICONS, REPEATS, quickWhen, toInput, type AlertWhen, type Reminder, type Repeat } from "@/lib/reminders";
+import { DAY_LETTERS, DAY_ORDER, alignToDays, cleanDays, daysText, normalizeReminder, ALERTS, PHOTO_LIMIT, REMINDER_COLORS, REMINDER_ICONS, REPEATS, quickWhen, toInput, type AlertWhen, type Reminder, type Repeat } from "@/lib/reminders";
 import { ReminderBadge, iconFor } from "./reminder-icons";
 import { REMINDER_COLS, setupMessage } from "./RemindersList";
 import { ShareSheet } from "./ShareSheet";
@@ -28,6 +28,7 @@ export function ReminderForm({ id }: { id?: string }) {
   const [notes, setNotes] = useState("");
   const [due, setDue] = useState(() => toInput(quickWhen(new Date()).tomorrow));
   const [repeat, setRepeat] = useState<Repeat>("none");
+  const [days, setDays] = useState<number[]>([]);
   const [alert, setAlert] = useState<AlertWhen>("at");
   const [color, setColor] = useState("blue");
   const [icon, setIcon] = useState<string>("bell");
@@ -45,7 +46,7 @@ export function ReminderForm({ id }: { id?: string }) {
       const row = data ? normalizeReminder(data as Reminder) : null;
       if (row) {
         setR(row); setTitle(row.title); setNotes(row.notes ?? ""); setDue(toInput(new Date(row.snoozed_until ?? row.due_at)));
-        setRepeat(row.repeat); setAlert(row.alert); setColor(row.color); setIcon(row.icon);
+        setRepeat(row.repeat); setDays(row.repeat_days ?? []); setAlert(row.alert); setColor(row.color); setIcon(row.icon);
       }
       setLoaded(true);
     })();
@@ -67,7 +68,9 @@ export function ReminderForm({ id }: { id?: string }) {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Please sign in again.");
-      const body = { title: t.slice(0, 120), notes: notes.trim() || null, due_at: when.toISOString(), repeat, alert, color, icon, snoozed_until: null, last_alerted_for: null };
+      const chosen = repeat === "weekly" ? (cleanDays(days) ?? [when.getDay()]) : null;
+      const first = chosen ? alignToDays(when, chosen) : when;
+      const body = { title: t.slice(0, 120), notes: notes.trim() || null, due_at: first.toISOString(), repeat, repeat_days: chosen, tz: Intl.DateTimeFormat().resolvedOptions().timeZone || null, alert, color, icon, snoozed_until: null, last_alerted_for: null };
       let rid = id;
       if (rid) {
         const res = await supabase.from("reminders").update(body).eq("id", rid);
@@ -114,7 +117,25 @@ export function ReminderForm({ id }: { id?: string }) {
 
       <div>
         <span className={label}>Repeat</span>
-        <div className="flex flex-wrap gap-2">{REPEATS.map((o) => <button key={o.id} type="button" className={chip(repeat === o.id)} onClick={() => setRepeat(o.id)}>{o.label}</button>)}</div>
+        <div className="flex flex-wrap gap-2">{REPEATS.map((o) => <button key={o.id} type="button" className={chip(repeat === o.id)} onClick={() => { setRepeat(o.id); if (o.id === "weekly" && !days.length) setDays([new Date(due).getDay()]); }} data-testid={`repeat-${o.id}`}>{o.label}</button>)}</div>
+        {repeat === "weekly" && (
+          <div className="mt-3" data-testid="repeat-days">
+            <span className="mb-1.5 block text-sm font-semibold">Repeat on</span>
+            <div className="flex justify-between" role="group" aria-label="Repeat on">
+              {DAY_ORDER.map((n) => { const on = days.includes(n); return (
+                <button key={n} type="button" aria-pressed={on} aria-label={["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][n]} data-testid={`day-${n}`}
+                  onClick={() => setDays((d) => (d.includes(n) ? (d.length > 1 ? d.filter((x) => x !== n) : d) : [...d, n]))}
+                  className={`flex h-10 w-10 items-center justify-center rounded-full border text-sm font-bold ${on ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-muted"}`}>{DAY_LETTERS[n]}</button>
+              ); })}
+            </div>
+            <div className="mt-1 flex gap-4 text-[13px] font-bold text-primary">
+              <button type="button" className="min-h-8" onClick={() => setDays([1, 2, 3, 4, 5])}>Weekdays</button>
+              <button type="button" className="min-h-8" onClick={() => setDays([6, 0])}>Weekends</button>
+              <button type="button" className="min-h-8" onClick={() => setDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button>
+            </div>
+            <p className="mt-1 rounded-lg bg-primary/10 px-3 py-2 text-[13.5px] font-semibold" data-testid="repeat-days-text">{daysText(days.length ? days : [new Date(due).getDay()])} at {new Date(due).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</p>
+          </div>
+        )}
       </div>
       <div>
         <span className={label}>Remind me</span>

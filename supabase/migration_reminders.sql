@@ -8,6 +8,8 @@ create table if not exists public.reminders (
   notes text check (notes is null or char_length(notes) <= 2000),
   due_at timestamptz not null,
   repeat text not null default 'none' check (repeat in ('none','daily','weekly','monthly','yearly')),
+  repeat_days smallint[],
+  tz text,
   alert text not null default 'at' check (alert in ('at','hour','day')),
   color text not null default 'blue' check (char_length(color) <= 20),
   icon text not null default 'bell' check (char_length(icon) <= 30),
@@ -17,6 +19,9 @@ create table if not exists public.reminders (
   created_at timestamptz not null default now()
 );
 create index if not exists reminders_user_due on public.reminders (user_id, due_at);
+-- Weekly on chosen days (0 = Sunday ... 6 = Saturday) and the time zone those days count in. Added after the first release.
+alter table public.reminders add column if not exists repeat_days smallint[];
+alter table public.reminders add column if not exists tz text;
 alter table public.reminders enable row level security;
 
 create table if not exists public.reminder_photos (
@@ -73,7 +78,7 @@ create policy "Reminder shares delete" on public.reminder_shares for delete to a
 -- Mark done. The owner or a person with "can mark done". A repeating reminder moves to its next time instead of closing.
 create or replace function public.complete_reminder(rid uuid) returns timestamptz
 language plpgsql security definer set search_path = public as $$
-declare r public.reminders; nxt timestamptz;
+declare r public.reminders; nxt timestamptz; loc timestamp;
 begin
   select * into r from public.reminders where id = rid;
   if not found then raise exception 'not_found'; end if;
@@ -84,11 +89,21 @@ begin
     update public.reminders set done_at = now(), snoozed_until = null where id = rid;
     return null;
   end if;
-  nxt := r.due_at;
-  while nxt <= now() loop
-    nxt := case r.repeat when 'daily' then nxt + interval '1 day' when 'weekly' then nxt + interval '7 days'
-                         when 'monthly' then nxt + interval '1 month' else nxt + interval '1 year' end;
-  end loop;
+  if r.repeat = 'weekly' and r.repeat_days is not null and cardinality(r.repeat_days) > 0 then
+    -- chosen weekdays: step one day at a time, in the person's own time zone, to the next chosen day that is still ahead
+    loc := r.due_at at time zone coalesce(r.tz, 'UTC');
+    loop
+      loc := loc + interval '1 day';
+      exit when extract(dow from loc)::smallint = any (r.repeat_days) and (loc at time zone coalesce(r.tz, 'UTC')) > now();
+    end loop;
+    nxt := loc at time zone coalesce(r.tz, 'UTC');
+  else
+    nxt := r.due_at;
+    while nxt <= now() loop
+      nxt := case r.repeat when 'daily' then nxt + interval '1 day' when 'weekly' then nxt + interval '7 days'
+                           when 'monthly' then nxt + interval '1 month' else nxt + interval '1 year' end;
+    end loop;
+  end if;
   update public.reminders set due_at = nxt, snoozed_until = null, done_at = null, last_alerted_for = null where id = rid;
   return nxt;
 end $$;

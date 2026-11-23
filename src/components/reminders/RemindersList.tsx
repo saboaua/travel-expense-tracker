@@ -7,10 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { normalizeReminder, dueText, filterReminders, overdueOf, parseQuickAdd, quickWhen, repeatText, statusOf, type Filter, type Reminder } from "@/lib/reminders";
+import { normalizeReminder, dueText, filterReminders, overdueOf, parseQuickAdd, quickWhen, repeatLabel, statusOf, type Filter, type Reminder } from "@/lib/reminders";
 import { ReminderBadge } from "./reminder-icons";
 
-export const REMINDER_COLS = "id, user_id, title, notes, due_at, repeat, alert, color, icon, done_at, snoozed_until, last_alerted_for, created_at";
+export const REMINDER_COLS = "id, user_id, title, notes, due_at, repeat, repeat_days, tz, alert, color, icon, done_at, snoozed_until, last_alerted_for, created_at";
 
 export function setupMessage(m: string) {
   return /relation|does not exist|schema cache/i.test(m) ? "Reminders are not set up yet. Run supabase/migration_reminders.sql in the Supabase SQL Editor." : m;
@@ -105,7 +105,7 @@ export function RemindersList() {
           <span className="min-w-0 flex-1">
             <span className={`block truncate font-semibold ${isDone ? "text-muted-foreground line-through" : ""}`}>{r.title}</span>
             <span className={`block truncate text-xs ${over ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-              {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatText(r.repeat)}` : ""}{shared ? " · Shared with you" : ""}
+              {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatLabel(r)}` : ""}{shared ? " · Shared with you" : ""}
             </span>
           </span>
           {shared && <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}

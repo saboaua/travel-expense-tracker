@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { useConfirm } from "@/components/ui/confirm";
 import { useLimits } from "@/lib/use-limits";
-import { normalizeReminder, ALERTS, SNOOZES, dueText, repeatText, snoozeTime, statusOf, toInput, type Reminder, type SnoozeChoice } from "@/lib/reminders";
+import { normalizeReminder, ALERTS, SNOOZES, dueText, repeatLabel, snoozeTime, statusOf, toInput, type Reminder, type SnoozeChoice } from "@/lib/reminders";
 import { ReminderBadge } from "./reminder-icons";
 import { REMINDER_COLS, setupMessage } from "./RemindersList";
 import { ShareSheet } from "./ShareSheet";
@@ -95,7 +95,7 @@ export function ReminderDetail({ id }: { id: string }) {
       </div>
 
       <dl className="divide-y rounded-2xl border text-sm">
-        <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted-foreground">Repeat</dt><dd className="font-medium">{r.repeat === "none" ? "Never" : repeatText(r.repeat).replace(/^./, (c) => c.toUpperCase())}</dd></div>
+        <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted-foreground">Repeat</dt><dd className="font-medium">{r.repeat === "none" ? "Never" : repeatLabel(r)}</dd></div>
         <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted-foreground">Remind me</dt><dd className="font-medium">{alertLabel}</dd></div>
         {r.snoozed_until && <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted-foreground">Snoozed until</dt><dd className="font-medium">{dueText(r.snoozed_until, now)}</dd></div>}
         {!mine && <div className="flex justify-between gap-3 px-4 py-3"><dt className="text-muted-foreground">Shared with you</dt><dd className="font-medium">{canDone ? "Can mark done" : "View only"}</dd></div>}

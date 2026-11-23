@@ -4302,6 +4302,32 @@ try {
     } finally { await ctx.close(); }
   });
 
+  await test("Reminders: repeat weekly on a chosen day (every Sunday) and see it in the list", async () => {
+    fake.table("reminders"); fake.table("reminder_photos"); fake.table("reminder_shares");
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/reminders/new`);
+      await page.getByTestId("reminder-title").fill("Take the trash out");
+      await page.getByTestId("reminder-pick-date").click();
+      await page.getByTestId("reminder-due").fill("2026-12-07T19:00");
+      assert((await page.getByTestId("repeat-days").count()) === 0, "no day row until Weekly is chosen");
+      await page.getByTestId("repeat-weekly").click();
+      assert((await page.getByTestId("day-1").getAttribute("aria-pressed")) === "true", "the day of the start date (Monday) is chosen first");
+      await page.getByTestId("day-0").click();
+      await page.getByTestId("day-1").click();
+      assert((await page.getByTestId("day-1").getAttribute("aria-pressed")) === "false" && /Every Sun at 7:00 PM/.test(await page.getByTestId("repeat-days-text").innerText()), "only Sunday is chosen and it says Every Sun at 7:00 PM");
+      await page.getByTestId("reminder-save").click();
+      await page.getByTestId("reminder-detail-title").waitFor();
+      const row = fake.table("reminders").find((r) => r.title === "Take the trash out");
+      assert(row && JSON.stringify(row.repeat_days) === "[0]" && row.repeat === "weekly" && new Date(row.due_at).getDay() === 0, "saved as weekly on Sunday, and the first time moved to a Sunday");
+      assert(/Every Sun/.test(await page.getByTestId("reminder-detail").innerText()), "the detail says Every Sun");
+    } finally { await ctx.close(); }
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

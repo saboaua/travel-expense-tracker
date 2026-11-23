@@ -3,7 +3,7 @@
 export type Repeat = "none" | "daily" | "weekly" | "monthly" | "yearly";
 export type AlertWhen = "at" | "hour" | "day";
 export type Reminder = {
-  id: string; user_id: string; title: string; notes: string | null; due_at: string; repeat: Repeat; alert: AlertWhen;
+  id: string; user_id: string; title: string; notes: string | null; due_at: string; repeat: Repeat; repeat_days: number[] | null; tz: string | null; alert: AlertWhen;
   color: string; icon: string; done_at: string | null; snoozed_until: string | null; last_alerted_for: string | null; created_at: string;
 };
 
@@ -39,10 +39,46 @@ export function addStep(d: Date, repeat: Repeat): Date {
   return o;
 }
 
+/** Weekday numbers as `Date.getDay()` gives them (0 = Sunday), sorted Monday first, no repeats. */
+export const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0] as const;
+const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
+export function cleanDays(v: unknown): number[] | null {
+  if (!Array.isArray(v)) return null;
+  const d = [...new Set(v.filter((n): n is number => Number.isInteger(n) && n >= 0 && n <= 6))];
+  return d.length ? DAY_ORDER.filter((n) => d.includes(n)) : null;
+}
+/** "Every Sun", "Every Mon, Wed, Fri", "Every day", "Every weekday", "Every weekend". */
+export function daysText(days: number[]): string {
+  const d = cleanDays(days) ?? [];
+  if (d.length === 7) return "Every day";
+  if (d.length === 5 && ![0, 6].some((n) => d.includes(n))) return "Every weekday";
+  if (d.length === 2 && d.includes(0) && d.includes(6)) return "Every weekend";
+  return `Every ${d.map((n) => DAY_NAMES[n]).join(", ")}`;
+}
+/** What a repeating reminder says in the list: the chosen days, or the plain repeat. */
+export function repeatLabel(r: Pick<Reminder, "repeat" | "repeat_days">): string {
+  if (r.repeat === "weekly" && cleanDays(r.repeat_days)) return daysText(r.repeat_days!);
+  return r.repeat === "none" ? "" : REPEATS.find((x) => x.id === r.repeat)!.label;
+}
+/** The first time on or after `d` that falls on one of the chosen days (same clock time). */
+export function alignToDays(d: Date, days: number[] | null): Date {
+  const set = cleanDays(days);
+  const o = new Date(d);
+  if (!set) return o;
+  for (let i = 0; i < 7 && !set.includes(o.getDay()); i++) o.setDate(o.getDate() + 1);
+  return o;
+}
+
 /** The next time after `after` (a repeating reminder moves forward until it is in the future). */
-export function nextDue(due: Date, repeat: Repeat, after: Date): Date | null {
+export function nextDue(due: Date, repeat: Repeat, after: Date, days: number[] | null = null): Date | null {
   if (repeat === "none") return null;
+  const set = repeat === "weekly" ? cleanDays(days) : null;
   let n = new Date(due);
+  if (set) {
+    for (let i = 0; i < 4000 && (n <= after || !set.includes(n.getDay())); i++) n.setDate(n.getDate() + 1);
+    return n;
+  }
   for (let i = 0; i < 2000 && n <= after; i++) n = addStep(n, repeat);
   return n;
 }
@@ -180,6 +216,6 @@ export function normalizeReminder(r: Partial<Reminder> & { id: string }): Remind
   return {
     user_id: "", title: "", notes: null, due_at: new Date().toISOString(), done_at: null, snoozed_until: null, last_alerted_for: null, created_at: new Date().toISOString(),
     ...r,
-    repeat: isRepeat(r.repeat) ? r.repeat : "none", alert: isAlert(r.alert) ? r.alert : "at", color: r.color || "blue", icon: r.icon || "bell",
+    repeat: isRepeat(r.repeat) ? r.repeat : "none", repeat_days: cleanDays(r.repeat_days), tz: r.tz ?? null, alert: isAlert(r.alert) ? r.alert : "at", color: r.color || "blue", icon: r.icon || "bell",
   } as Reminder;
 }
