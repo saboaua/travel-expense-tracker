@@ -17,7 +17,10 @@ export const REMINDER_COLORS = [
   { id: "blue", hex: "#2563eb" }, { id: "green", hex: "#16a34a" }, { id: "amber", hex: "#d97706" }, { id: "red", hex: "#dc2626" },
   { id: "purple", hex: "#7c3aed" }, { id: "pink", hex: "#db2777" }, { id: "teal", hex: "#0d9488" }, { id: "slate", hex: "#475569" },
 ] as const;
-export const REMINDER_ICONS = ["bell", "cart", "home", "car", "heart", "briefcase", "plane", "gift", "pill", "phone", "card", "star"] as const;
+export const EVERYDAY_ICONS = ["bell", "cart", "home", "car", "heart", "briefcase", "plane", "gift", "pill", "phone", "card", "star"] as const;
+/** Around the house: trash bin, plant, laundry, dishes, cleaning, tools, light bulb, water, pet, bed, recycling, keys. */
+export const HOUSE_ICONS = ["trash", "plant", "laundry", "dishes", "clean", "tools", "bulb", "water", "paw", "bed", "recycle", "key"] as const;
+export const REMINDER_ICONS = [...EVERYDAY_ICONS, ...HOUSE_ICONS] as const;
 export const PHOTO_LIMIT = { free: 3, pro: 10 } as const;
 
 export const colorHex = (id: string) => REMINDER_COLORS.find((c) => c.id === id)?.hex ?? REMINDER_COLORS[0].hex;

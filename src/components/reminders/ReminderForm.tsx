@@ -7,7 +7,7 @@ import { Camera, Crown, Loader2, Lock, Users, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { useLimits } from "@/lib/use-limits";
-import { DAY_LETTERS, DAY_ORDER, alignToDays, cleanDays, daysText, normalizeReminder, ALERTS, PHOTO_LIMIT, REMINDER_COLORS, REMINDER_ICONS, REPEATS, quickWhen, toInput, type AlertWhen, type Reminder, type Repeat } from "@/lib/reminders";
+import { DAY_LETTERS, DAY_ORDER, alignToDays, cleanDays, daysText, normalizeReminder, ALERTS, EVERYDAY_ICONS, HOUSE_ICONS, PHOTO_LIMIT, REMINDER_COLORS, REPEATS, quickWhen, toInput, type AlertWhen, type Reminder, type Repeat } from "@/lib/reminders";
 import { ReminderBadge, iconFor } from "./reminder-icons";
 import { REMINDER_COLS, setupMessage } from "./RemindersList";
 import { ShareSheet } from "./ShareSheet";
@@ -153,11 +153,16 @@ export function ReminderForm({ id }: { id?: string }) {
       </div>
       <div>
         <span className={label}>Icon</span>
-        <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="Icon">
-          {REMINDER_ICONS.map((n) => { const I = iconFor(n); return (
-            <button key={n} type="button" role="radio" aria-checked={icon === n} aria-label={n} onClick={() => setIcon(n)} className={`flex h-11 items-center justify-center rounded-xl border ${icon === n ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}><I className="h-5 w-5" /></button>
-          ); })}
-        </div>
+        {([["Everyday", EVERYDAY_ICONS], ["Around the house", HOUSE_ICONS]] as const).map(([cap, set]) => (
+          <div key={cap} className="mb-2.5">
+            <p className="mb-1.5 text-xs font-semibold text-muted-foreground">{cap}</p>
+            <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label={`${cap} icons`}>
+              {set.map((n) => { const I = iconFor(n); return (
+                <button key={n} type="button" role="radio" aria-checked={icon === n} aria-label={n} data-testid={`icon-${n}`} onClick={() => setIcon(n)} className={`flex h-11 items-center justify-center rounded-xl border ${icon === n ? "border-primary bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"}`}><I className="h-5 w-5" /></button>
+              ); })}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div>

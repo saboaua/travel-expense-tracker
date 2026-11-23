@@ -1,8 +1,9 @@
-import { Bell, Briefcase, Car, CreditCard, Gift, Heart, Home, Phone, Pill, Plane, ShoppingCart, Star, type LucideIcon } from "lucide-react";
+import { BedDouble, Bell, Briefcase, Car, CreditCard, Droplets, Gift, Heart, Home, KeyRound, Lightbulb, PawPrint, Phone, Pill, Plane, Recycle, Shirt, ShoppingCart, Sparkles, Sprout, Star, Trash2, UtensilsCrossed, Wrench, type LucideIcon } from "lucide-react";
 import { colorHex, type REMINDER_ICONS } from "@/lib/reminders";
 
 export const ICON_MAP: Record<(typeof REMINDER_ICONS)[number], LucideIcon> = {
   bell: Bell, cart: ShoppingCart, home: Home, car: Car, heart: Heart, briefcase: Briefcase, plane: Plane, gift: Gift, pill: Pill, phone: Phone, card: CreditCard, star: Star,
+  trash: Trash2, plant: Sprout, laundry: Shirt, dishes: UtensilsCrossed, clean: Sparkles, tools: Wrench, bulb: Lightbulb, water: Droplets, paw: PawPrint, bed: BedDouble, recycle: Recycle, key: KeyRound,
 };
 export const iconFor = (id: string): LucideIcon => (ICON_MAP as Record<string, LucideIcon>)[id] ?? Bell;
 

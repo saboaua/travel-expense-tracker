@@ -4320,10 +4320,11 @@ try {
       await page.getByTestId("day-0").click();
       await page.getByTestId("day-1").click();
       assert((await page.getByTestId("day-1").getAttribute("aria-pressed")) === "false" && /Every Sun at 7:00 PM/.test(await page.getByTestId("repeat-days-text").innerText()), "only Sunday is chosen and it says Every Sun at 7:00 PM");
+      await page.getByTestId("icon-trash").click();
       await page.getByTestId("reminder-save").click();
       await page.getByTestId("reminder-detail-title").waitFor();
       const row = fake.table("reminders").find((r) => r.title === "Take the trash out");
-      assert(row && JSON.stringify(row.repeat_days) === "[0]" && row.repeat === "weekly" && new Date(row.due_at).getDay() === 0, "saved as weekly on Sunday, and the first time moved to a Sunday");
+      assert(row && row.icon === "trash" && JSON.stringify(row.repeat_days) === "[0]" && row.repeat === "weekly" && new Date(row.due_at).getDay() === 0, "saved as weekly on Sunday, and the first time moved to a Sunday");
       assert(/Every Sun/.test(await page.getByTestId("reminder-detail").innerText()), "the detail says Every Sun");
     } finally { await ctx.close(); }
   });
