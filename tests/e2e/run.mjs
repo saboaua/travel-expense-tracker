@@ -2251,7 +2251,7 @@ try {
       assert(fake.table("btc_addresses").filter((r) => r.payment_id).length === 1, "reloading does not use another address");
       // the admin does not see it until the person says they paid
       await ap.goto(`${BASE}/admin/pro/payments`);
-      await ap.getByTestId("pro-chip-payments").waitFor();
+      await ap.getByRole("heading", { name: "Prices and payments" }).waitFor();
       assert((await ap.getByTestId("pay-request").count()) === 0, "an unclaimed Bitcoin quote is not in Payments to check");
       // a bad transaction id is refused, a good one is kept
       await page.getByTestId("btc-txid").fill("not a txid");
@@ -3940,7 +3940,7 @@ try {
     } finally { await actx.close(); }
   });
 
-  await test("admin Pro plan: one tile with payments waiting, an overview with live numbers, chips between the four parts, and the old addresses still work", async () => {
+  await test("admin Pro plan: one tile with payments waiting, an overview with live numbers, each part opened from the menu with no second menu on top, and the old addresses still work", async () => {
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     actx.setDefaultTimeout(60_000);
     const ap = await actx.newPage();
@@ -3969,14 +3969,15 @@ try {
       await ap.getByTestId("pro-review").click();
       await ap.waitForURL((u) => u.pathname === "/admin/pro/payments");
       await ap.getByTestId("pay-request").waitFor();
-      await ap.getByTestId("pro-chip-waiting").waitFor();
-      assert((await ap.getByTestId("pro-chip-payments").getAttribute("aria-current")) === "page", "Payments is the current chip");
-      // chips jump between the parts
+      assert((await ap.getByRole("navigation", { name: "Pro plan sections" }).count()) === 0 && (await ap.locator('[data-testid^="pro-chip-"]').count()) === 0, "a part page has no second menu on top");
+      // every part is reached from the Pro plan menu
       for (const [id, path, title] of [["limits", "/admin/pro/limits", "Free plan limits"], ["trial", "/admin/pro/trial", "Free Pro month"], ["people", "/admin/pro/people", "People and access"]]) {
-        await ap.getByTestId(`pro-chip-${id}`).click();
+        await ap.getByRole("link", { name: "Pro plan" }).first().click();
+        await ap.waitForURL((u) => u.pathname === "/admin/pro");
+        await ap.getByTestId(`pro-row-${id}`).click();
         await ap.waitForURL((u) => u.pathname === path);
         await ap.getByRole("heading", { name: title }).waitFor();
-        assert((await ap.getByTestId(`pro-chip-${id}`).boundingBox()).height >= 44, `the ${id} chip is at least 44px tall`);
+        assert((await ap.locator('[data-testid^="pro-chip-"]').count()) === 0, `${id} has no menu on top`);
       }
       assert((await ap.getByTestId("pay-pending").count()) === 0, "payments to check are on the Payments page, not on People");
       await ap.getByRole("link", { name: "Pro plan" }).first().click();
