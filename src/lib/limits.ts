@@ -174,6 +174,8 @@ export function proComparison(l: Limits): { label: string; free: string; pro: st
   if (has("trip_papers")) rows.push({ label: "Papers per trip", free: String(l.free_trip_papers), pro: String(l.pro_trip_papers) });
   if (has("projects")) rows.push({ label: "Active business projects", free: String(l.free_projects), pro: String(l.pro_projects) });
   if (has("trip_reports")) rows.push({ label: "Trip and project reports (Excel, PDF)", free: "Receipt photos only", pro: "Yes" });
+  rows.push({ label: "Share a reminder with someone", free: "No", pro: "Yes" });
+  rows.push({ label: "Photos on a reminder", free: "3", pro: "10" });
   rows.push({ label: "Excel and PDF reports", free: "No", pro: "Yes" });
   return rows;
 }
