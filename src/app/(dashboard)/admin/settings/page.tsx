@@ -18,6 +18,7 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "App name, logo and size, primary color, privacy policy, and support email.",
     icon: Palette,
     tone: "brand",
+    tools: 4,
   },
   {
     href: "/admin/currencies",
@@ -26,14 +27,16 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "Enable, disable, and order available currencies.",
     icon: Coins,
     tone: "money",
+    tools: 2,
   },
   {
     href: "/admin/categories",
     feature: "categories.manage",
     title: "Categories",
-    description: "Travel receipts and trip types, and grocery items.",
+    description: "Travel receipts and trip types, grocery items, and house areas.",
     icon: Tag,
     tone: "projects",
+    tools: 3,
   },
   {
     href: "/admin/logos",
@@ -66,6 +69,7 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "Bot token and notification settings.",
     icon: Send,
     tone: "telegram",
+    tools: 2,
   },
   {
     href: "/admin/iptv",
@@ -108,6 +112,7 @@ const sections: { href: string; feature: string; title: string; description: str
     description: "Create users, create roles and choose what each role can use.",
     icon: Users,
     tone: "people",
+    tools: 2,
   },
 ];
 

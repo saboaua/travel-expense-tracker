@@ -2961,6 +2961,10 @@ try {
       }
       assert((await ap.getByTestId("tools-count-supermarkets").innerText()).trim() === "3 tools", "Supermarkets says it holds 3 tools");
       assert((await ap.getByTestId("tools-count-pro").innerText()).trim() === "5 tools", "Pro plan says it holds 5 tools");
+      for (const [id, n] of [["branding", 4], ["currencies", 2], ["categories", 3], ["telegram", 2], ["users", 2]]) assert((await ap.getByTestId(`tools-count-${id}`).innerText()).trim() === `${n} tools`, `${id} says it holds ${n} tools`);
+      for (const id of ["logos", "help", "support", "iptv", "account-requests"]) assert((await ap.getByTestId(`tools-count-${id}`).count()) === 0, `${id} holds one tool, so no count`);
+      const badge = async (id) => ap.getByTestId(`tools-count-${id}`).evaluate((el) => el.className);
+      assert((await badge("pro")) === (await badge("branding")) && (await badge("supermarkets")) === (await badge("telegram")), "every count badge has the same style");
       await ap.getByRole("link", { name: /Supermarkets/ }).click();
       await ap.waitForURL((u) => u.pathname === "/admin/supermarkets");
       await ap.getByTestId("supermarkets-row-doit").waitFor();
