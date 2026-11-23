@@ -119,7 +119,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <PageShell size="wide" className="pb-28 md:pb-8">
-      <BusinessHeader />
+      <BusinessHeader title="Business reports" description="See what your business trips cost and export your reports." />
       <BusinessTabs
         title="Reports"
         description="Business travel spending in USD, using the rate saved with each expense"

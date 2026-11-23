@@ -152,12 +152,12 @@ export function SubscriptionsView() {
 
   return (
     <>
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl"><TileButton id="subscriptions" icon={Repeat} tone="subscriptions" />Subscriptions</h1>
           <p className="mt-1 text-sm text-muted-foreground">Only you see these. No bank login needed.</p>
         </div>
-        <Button onClick={() => open()} className="shrink-0"><Plus className="h-4 w-4" /> Add</Button>
+        <Button onClick={() => open()} className="w-full shrink-0 sm:w-auto"><Plus className="h-4 w-4" /> Add subscription</Button>
       </div>
 
       {error && <p role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm">{error}</p>}

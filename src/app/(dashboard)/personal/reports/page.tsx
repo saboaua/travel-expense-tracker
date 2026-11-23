@@ -57,7 +57,7 @@ export default function ReportsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-4 md:p-8">
-      <PageHeader title="Personal" description="Your spending and your exports." />
+      <PageHeader title="Personal reports" description="Your spending and your exports." />
       <PersonalTabs />
       <h2 className="sr-only">Reports</h2>
 

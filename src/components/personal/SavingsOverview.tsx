@@ -70,7 +70,7 @@ export function SavingsOverview() {
   return (
     <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
-      <h1 className="flex items-center gap-3 text-[26px] font-bold leading-tight"><TileButton id="savings" icon={PiggyBank} tone="savings" />Savings</h1>
+      <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl"><TileButton id="savings" icon={PiggyBank} tone="savings" />Savings</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">What you set aside each month, and what you have saved so far.</p>
       {error && <Alert className="mt-3">{error}</Alert>}
 

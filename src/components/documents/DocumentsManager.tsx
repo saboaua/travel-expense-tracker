@@ -5,7 +5,9 @@ import { Select } from "@/components/ui/select";
 import { useConfirm } from "@/components/ui/confirm";
 import { Alert } from "@/components/ui/alert";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CloudOff, Crop, Loader2, Lock, Plus, Sparkles, X } from "lucide-react";
+import { Camera, CloudOff, Crop, FileText, Loader2, Lock, Plus, Sparkles, X } from "lucide-react";
+import { IconTile } from "@/components/ui/icon-tile";
+import { EmptyState } from "@/components/ui/empty-state";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -338,6 +340,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
     <div className={tripId ? "space-y-3" : "space-y-6"}>
       {!tripId && (
         <PageHeader
+          icon={<IconTile tone="documents" className="h-11 w-11"><FileText className="h-[22px] w-[22px]" /></IconTile>}
           title="Documents"
           description={docLimit && docLimit.limit != null ? `${docLimit.count} of ${docLimit.limit} on the ${lim?.who.pro ? "Pro" : "Free"} plan` : "Your passport, ID, driver's license and travel papers, close at hand. We keep track of what is still valid."}
           actions={<Button type="button" className="w-full gap-2 sm:w-auto" onClick={openAdd} disabled={!!docLimit?.full} data-testid="doc-add">{docLimit?.full ? <Lock className="h-4 w-4" /> : <Plus className="h-4 w-4" />} Add document</Button>}
@@ -353,7 +356,13 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
       {loading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : visibleDocs.length === 0 && !adding ? (
-        <p className="text-sm text-muted-foreground">{tripId ? "No documents for this trip yet. Add your ticket, booking, visa or insurance so it is close at hand." : "No documents yet. Start with your passport."}</p>
+        tripId ? (
+          <p className="text-sm text-muted-foreground">No documents for this trip yet. Add your ticket, booking, visa or insurance so it is close at hand.</p>
+        ) : (
+          <EmptyState icon={FileText} tone="documents" title="No documents yet" action={<Button type="button" className="h-11 px-5" onClick={openAdd} disabled={!!docLimit?.full}><Plus className="h-4 w-4" /> Add your first document</Button>}>
+            Start with your passport. We keep track of what is still valid.
+          </EmptyState>
+        )
       ) : (
         <DocumentList
           docs={visibleDocs} urls={{ ...urls, ...localUrls }} revealed={revealed} toggleReveal={toggleReveal} today={today} compact={!!tripId}

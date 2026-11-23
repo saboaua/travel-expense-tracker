@@ -71,7 +71,7 @@ function Back({ href, text }: { href: string; text: string }) {
   return <Link href={href} className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> {text}</Link>;
 }
 function Title({ title, sub, tile }: { title: string; sub: string; tile?: boolean }) {
-  return <><h1 className={`text-[26px] font-bold leading-tight${tile ? " flex items-center gap-3" : ""}`}>{tile && <TileButton id="fixed" icon={Landmark} tone="fixed" />}{title}</h1><p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{sub}</p></>;
+  return <><h1 className={`text-2xl font-bold tracking-tight md:text-3xl${tile ? " flex items-center gap-3" : ""}`}>{tile && <TileButton id="fixed" icon={Landmark} tone="fixed" />}{title}</h1><p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{sub}</p></>;
 }
 function Money({ id, value, onChange, currency, onCurrency, placeholder = "0.00" }: { id: string; value: string; onChange: (v: string) => void; currency: BudgetCurrency; onCurrency: (c: BudgetCurrency) => void; placeholder?: string }) {
   return (

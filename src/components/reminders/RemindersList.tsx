@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { BellRing, Check, Mic, Plus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Card } from "@/components/ui/card";
 import { Tabs } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -128,11 +130,10 @@ export function RemindersList() {
       <Tabs options={counts} value={filter} onChange={(v) => setFilter(v as Filter)} label="Show reminders" fullWidth size="sm" />
 
       {list === null ? <Skeleton className="h-40 w-full rounded-2xl" /> : shown.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 rounded-2xl p-8 text-center" data-testid="reminders-empty">
-          <BellRing className="h-8 w-8 text-muted-foreground" aria-hidden="true" />
-          <p className="font-semibold">{filter === "done" ? "Nothing done yet" : filter === "today" ? "Nothing for today" : "No reminders"}</p>
-          <p className="text-sm text-muted-foreground">Type what you need to remember above. Add a day or time, like “Fri 9am”.</p>
-        </Card>
+        <EmptyState icon={BellRing} tone="notifications" testId="reminders-empty" title={filter === "done" ? "Nothing done yet" : filter === "today" ? "Nothing for today" : "No reminders"}
+          action={<Button type="button" className="h-11 px-5" onClick={() => document.querySelector<HTMLInputElement>('[data-testid="reminder-quick"]')?.focus()}><Plus className="h-4 w-4" /> Add a reminder</Button>}>
+          Type what you need to remember above. Add a day or time, like “Fri 9am”.
+        </EmptyState>
       ) : (
         <>
           {overdue.length > 0 && <div><h2 className="mb-1 px-1 text-xs font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Overdue</h2><Card className="rounded-2xl"><ul className="divide-y">{overdue.map(row)}</ul></Card></div>}

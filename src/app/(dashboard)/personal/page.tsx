@@ -185,7 +185,7 @@ export default function PersonalHubPage() {
   ];
   const auto: Row[] = [
     { href: "/personal/utilities/emails", title: "Bills by email", icon: Mail, tone: "utilities", text: "Add your bills from your inbox (Pro)" },
-    { href: "/settings", title: "Telegram", icon: Send, tone: "notifications", text: "Reminders, and saving by chat (Pro)" },
+    { href: "/profile#telegram", title: "Telegram", icon: Send, tone: "notifications", text: "Reminders, and saving by chat (Pro)" },
   ];
 
   const group = (name: string, rows: Row[], id: string) => rows.length === 0 ? null : (

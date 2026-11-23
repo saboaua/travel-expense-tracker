@@ -6,13 +6,17 @@ import { cn } from "@/lib/utils";
  * The one page header: title, a line of help, and the page's main action on the right (below on a phone).
  * `as="h2"` is the smaller header of a section that sits under a page title (Trips and Reports under Business).
  */
-export function PageHeader({ title, description, actions, className, as = "h1" }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; className?: string; as?: "h1" | "h2" }) {
+export function PageHeader({ title, description, actions, className, as = "h1", icon }: { title: React.ReactNode; description?: React.ReactNode; actions?: React.ReactNode; className?: string; as?: "h1" | "h2"; /** The page icon tile shown before the title */ icon?: React.ReactNode }) {
   const Heading = as;
   const section = as === "h2";
   return (
     <div className={cn("flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between", section ? "pb-0" : "border-b pb-6", className)}>
       <div className="min-w-0">
-        <Heading className={section ? "text-xl font-bold tracking-tight md:text-2xl" : "text-2xl font-bold tracking-tight md:text-3xl"}>{title}</Heading>
+        {icon ? (
+          <div className="flex items-center gap-3">{icon}<Heading className={section ? "text-xl font-bold tracking-tight md:text-2xl" : "text-2xl font-bold tracking-tight md:text-3xl"}>{title}</Heading></div>
+        ) : (
+          <Heading className={section ? "text-xl font-bold tracking-tight md:text-2xl" : "text-2xl font-bold tracking-tight md:text-3xl"}>{title}</Heading>
+        )}
         {description && <p className="mt-1 text-sm text-muted-foreground">{description}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-3 [&>*]:max-sm:w-full">{actions}</div>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { TileButton } from "@/components/ui/TileButton";
+import { EmptyState } from "@/components/ui/empty-state";
 import { PaidFilter, NO_FILTER, applyPaidFilter } from "@/components/personal/PaidFilter";
 import { CardsThisMonth } from "@/components/personal/CardsThisMonth";
 import { BackLink } from "@/components/ui/page-header";
@@ -158,11 +159,10 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
       {error && <Alert>{error}</Alert>}
 
       {!loading && !error && allReceipts.length === 0 && (
-        <Card><CardContent className="py-16 text-center">
-          <ShoppingCart className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-          <p className="mb-4 text-muted-foreground">{typed ? "No receipts of this type yet" : shopping ? "No shopping receipts yet" : "No grocery receipts yet"}</p>
-          <Link href={`${base}/new`}><Button><Plus className="mr-2 h-4 w-4" /> {typed ? "Scan your first receipt" : shopping ? "Scan your first shopping receipt" : "Scan your first receipt"}</Button></Link>
-        </CardContent></Card>
+        <EmptyState icon={shopping ? ShoppingBag : ShoppingCart} tone={shopping ? "shopping" : "groceries"} title={typed ? "No receipts of this type yet" : shopping ? "No shopping receipts yet" : "No grocery receipts yet"}
+          action={<Link href={`${base}/new`}><Button className="h-11 px-5"><Plus className="mr-2 h-4 w-4" /> {typed ? "Scan your first receipt" : shopping ? "Scan your first shopping receipt" : "Scan your first receipt"}</Button></Link>}>
+          Scan a receipt and it shows up here.
+        </EmptyState>
       )}
 
       {allReceipts.length > 0 && (

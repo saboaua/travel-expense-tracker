@@ -7,13 +7,13 @@ import { PageHeader } from "@/components/ui/page-header";
 import { useAccess } from "@/lib/use-access";
 
 /** The title of the Business area, like the Personal page has: shown above the Trips / Projects / Reports switch. */
-export function BusinessHeader() {
-  return <PageHeader title="Business" description="Plan business trips, track their expenses and export your travel reports." />;
+export function BusinessHeader({ title = "Trips", description = "Plan business trips, track their expenses and export your travel reports." }: { title?: string; description?: string }) {
+  return <PageHeader title={title} description={description} />;
 }
 
 /**
  * Switch between the business sections (Trips, Projects, Reports), with the page's main action beside it (below it on a phone).
- * `title` and `description` name the section for screen readers: the visible heading stays "Business".
+ * `title` and `description` name the section for screen readers: the visible heading is the name of the section (Trips, Projects or Business reports).
  */
 export function BusinessTabs({ title, description, actions }: { title: string; description?: string; actions?: React.ReactNode }) {
   const pathname = usePathname();

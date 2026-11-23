@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Pencil, type LucideIcon } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
 import { TILE_COLORS, type TileId } from "@/lib/tile-colors";
@@ -27,7 +27,6 @@ export function TileButton({ id, icon: Icon, tone, className = "h-11 w-11" }: { 
     <span ref={box} className="relative inline-flex shrink-0 text-base font-normal" data-testid={`tile-button-${id}`}>
       <button type="button" aria-label="Change the colour of this icon" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="relative rounded-xl">
         <IconTile tone={tone} color={color ?? undefined} className={className}><Icon className="h-[22px] w-[22px]" /></IconTile>
-        <span aria-hidden="true" className="absolute -bottom-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full border bg-card text-muted-foreground"><Pencil className="h-[11px] w-[11px]" /></span>
       </button>
       {open && (
         <span className="absolute left-0 top-full z-30 mt-2 block w-[min(21rem,calc(100vw-2rem))] rounded-2xl border bg-card p-4 text-foreground shadow-xl" data-testid="tile-picker">

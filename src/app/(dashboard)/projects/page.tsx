@@ -62,7 +62,7 @@ export default async function ProjectsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4 pb-28 md:p-8">
-      <BusinessHeader />
+      <BusinessHeader title="Projects" description="Keep business projects and their expenses together." />
       <BusinessTabs
         title="Projects"
         description="Keep each client's receipts together and report on them"

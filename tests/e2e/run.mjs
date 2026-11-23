@@ -4113,7 +4113,8 @@ try {
       // Telegram: Pro-only notice in settings
       await page.route("**/api/telegram/link", (route) => route.fulfill({ json: { linked: false, botUsername: "lifolio_test_bot", link: "https://t.me/lifolio_test_bot?start=x", prefs: {} } }));
       await page.goto(`${BASE}/settings`);
-      await page.getByTestId("telegram-pro-only").waitFor();
+      await page.waitForURL((u) => u.pathname === "/profile");
+      await page.getByTestId("telegram-pro-only").waitFor(); // the #telegram link opens the section
       await page.unroute("**/api/telegram/link");
       // the Get Pro page compares the plans (once prices and a bank are set)
       await ap.goto(`${BASE}/admin/payment-settings`);
@@ -5404,14 +5405,14 @@ try {
     }
   });
 
-  await test("business: Trips and Reports open under a Business title with a line of help, like the Personal page", async () => {
-    for (const [path, section] of [["/trips", "Trips"], ["/reports", "Reports"]]) {
+  await test("business: Trips and Reports each open under their own title with a line of help, above the Business switch", async () => {
+    for (const [path, section, heading, line] of [["/trips", "Trips", "Trips", "Plan business trips, track their expenses and export your travel reports."], ["/reports", "Reports", "Business reports", "See what your business trips cost and export your reports."]]) {
       await admin.page.goto(`${BASE}${path}`);
-      await admin.page.getByRole("heading", { name: "Business", level: 1 }).waitFor();
-      await admin.page.getByText("Plan business trips, track their expenses and export your travel reports.").waitFor();
+      await admin.page.getByRole("heading", { name: heading, level: 1 }).waitFor();
+      await admin.page.getByText(line).waitFor();
       await admin.page.getByRole("heading", { name: new RegExp(`^${section}:`), level: 2 }).waitFor({ state: "attached" });
       assert((await admin.page.getByRole("heading", { level: 1 }).count()) === 1, `${path} has one main title`);
-      const title = await admin.page.getByRole("heading", { name: "Business", level: 1 }).boundingBox();
+      const title = await admin.page.getByRole("heading", { name: heading, level: 1 }).boundingBox();
       const tabs = await admin.page.getByRole("navigation", { name: "Business sections" }).boundingBox();
       assert(title && tabs && title.y < tabs.y, "the title sits above the Trips / Reports switch");
     }
@@ -5572,7 +5573,7 @@ try {
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
     await page.goto(`${BASE}/personal/subscriptions`);
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: "Add subscription", exact: true }).click();
     const dlg = page.getByRole("dialog", { name: "Add a subscription" });
     await dlg.waitFor();
     const save = await dlg.getByRole("button", { name: "Save", exact: true }).boundingBox();
@@ -5589,7 +5590,7 @@ try {
     await page.goto(`${BASE}/personal`);
     await page.getByRole("link", { name: /Subscriptions/ }).click();
     await page.getByRole("heading", { name: "Subscriptions", level: 1 }).waitFor();
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: "Add subscription", exact: true }).click();
     await page.getByLabel("Name", { exact: true }).fill("Netflix");
     await page.getByLabel("Price", { exact: true }).fill("120");
     await page.getByRole("group", { name: "Billed" }).getByRole("button", { name: "Yearly" }).click();

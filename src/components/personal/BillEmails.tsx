@@ -120,7 +120,7 @@ export function BillEmails() {
     <div className="mx-auto max-w-lg space-y-4 p-4 pb-28 md:p-8 lg:max-w-4xl">
       <Link href="/personal/utilities" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
       <div>
-        <h1 className="text-[26px] font-bold leading-tight">Bill emails</h1>
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Bill emails</h1>
         <p className="mt-0.5 text-[13px] text-muted-foreground">Your Gmail sends new bills to the app.</p>
       </div>
       {setup && <Alert>{setup}</Alert>}
