@@ -14,6 +14,8 @@ import { projectsStatus } from "@/lib/limits";
 import { PROJECT_COLS, activeCount, projectTotals, type BizProject } from "@/lib/business-projects";
 import { todayISO } from "@/lib/utils";
 
+export const metadata = { title: "Projects" };
+
 type Rec = { project_id: string; amount: number | string; currency: string | null; amount_usd: number | string | null; category: string | null };
 
 function Row({ p, rec, first }: { p: BizProject; rec: Rec[]; first: boolean }) {

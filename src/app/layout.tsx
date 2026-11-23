@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const brand = await getBrand();
   const { logoUrl, appName } = brand;
   return {
-    title: appName || "Travel Expense Tracker",
+    title: { default: appName || "Travel Expense Tracker", template: `%s \u00b7 ${appName || "Travel Expense Tracker"}` },
     description: "Scan receipts, track business travel expenses, and generate reports",
     manifest: manifestHref(brand),
     appleWebApp: {

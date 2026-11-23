@@ -40,7 +40,7 @@ export function TripReportList({ trips, year, locked = false }: { trips: TripRep
       type="button"
       onClick={() => setFilter(value)}
       aria-pressed={filter === value}
-      className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${filter === value ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}
+      className={`inline-flex min-h-11 items-center rounded-full border px-3.5 text-xs font-medium transition-colors md:min-h-8 md:px-3 ${filter === value ? "border-primary bg-primary text-primary-foreground" : "bg-background hover:bg-accent"}`}
     >
       {label}
     </button>
@@ -50,12 +50,12 @@ export function TripReportList({ trips, year, locked = false }: { trips: TripRep
     <div className="space-y-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <div className="relative flex-1">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="pointer-events-none absolute left-3 top-3.5 h-4 w-4 md:top-2.5 text-muted-foreground" />
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search trips"
-            className="h-9 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm"
+            className="h-11 w-full rounded-lg border border-input bg-background pl-9 pr-3 text-sm md:h-9"
             aria-label="Search trips"
           />
         </div>
@@ -63,7 +63,7 @@ export function TripReportList({ trips, year, locked = false }: { trips: TripRep
           {chip("all", "All")}
           {chip("active", "Active")}
           {chip("completed", "Completed")}
-          <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="w-auto min-w-fit h-9 px-2 text-xs py-0" aria-label="Sort trips">
+          <Select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="w-auto min-w-fit h-11 px-2 text-xs py-0 md:h-9" aria-label="Sort trips">
             <option value="recent">Newest</option>
             <option value="spend">Highest spend</option>
           </Select>

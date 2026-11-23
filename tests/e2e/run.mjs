@@ -643,6 +643,21 @@ try {
     await browser2.close();
   });
 
+  await test("page titles and touch sizes: each page names its tab, and the small controls are 44 px on a phone", async () => {
+    const browser2 = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    const page = await browser2.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    for (const [path, title] of [["/personal/groceries", "Groceries"], ["/personal/loyalty", "Loyalty cards"], ["/personal/reminders", "Reminders"], ["/reports", "Business reports"], ["/profile", "Profile"]]) {
+      await page.goto(`${BASE}${path}`);
+      await page.waitForFunction((t) => document.title.startsWith(t + " \u00b7 "), title, { timeout: 30000 }).catch(async () => { throw new Error(`${path}: tab title is "${await page.title()}" / ${(await page.content()).match(/<title[^>]*>[^<]*<\/title>/g)}`); });
+    }
+    await page.goto(`${BASE}/personal/reminders/new`);
+    const dot = await page.getByRole("radio", { name: "blue" }).boundingBox();
+    assert(dot && dot.width >= 44 && dot.height >= 44, "colour dots are at least 44 px: " + JSON.stringify(dot));
+    await browser2.close();
+  });
+
   await test("loyalty card reader: Take photo, read details fills only empty fields, failure offers retry", async () => {
     const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
     const browser2 = await browser.newContext({ viewport: { width: 390, height: 844 } });

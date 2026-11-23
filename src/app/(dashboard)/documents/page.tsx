@@ -9,6 +9,8 @@ import { DocumentsManager } from "@/components/documents/DocumentsManager";
 import { kindLabel, type TravelDocument } from "@/lib/documents";
 import { DOCUMENT_COLS, DOCUMENT_COLS_BASE, DOCUMENT_COLS_NUMBER, withColumnFallback3 } from "@/lib/columns";
 
+export const metadata = { title: "Documents" };
+
 export default async function DocumentsPage() {
   const supabase = await createClient();
   const user = await getCurrentUser();

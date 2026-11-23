@@ -122,7 +122,7 @@ export function RemindersList() {
         {canSpeak.current && <button type="button" onClick={listen} aria-label="Speak a reminder" className={`flex h-11 w-11 items-center justify-center rounded-xl ${listening ? "bg-red-100 text-red-600" : "text-muted-foreground hover:bg-muted"}`}><Mic className="h-5 w-5" /></button>}
         <button type="submit" disabled={!text.trim() || busy} aria-label="Add reminder" data-testid="reminder-quick-add" className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground disabled:opacity-40"><Plus className="h-5 w-5" /></button>
       </form>
-      <div className="flex justify-end -mt-1"><Link href="/personal/reminders/new" className="text-sm font-semibold text-primary" data-testid="reminder-new">More options</Link></div>
+      <div className="flex justify-end -mt-1"><Link href="/personal/reminders/new" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary" data-testid="reminder-new">More options</Link></div>
 
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" data-testid="reminders-error">{error}</p>}
       <Tabs options={counts} value={filter} onChange={(v) => setFilter(v as Filter)} label="Show reminders" fullWidth size="sm" />

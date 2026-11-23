@@ -7,6 +7,8 @@ import { HubCountryChips } from "@/components/admin/HubCountryChips";
 import { SUPERMARKET_TOOLS } from "@/lib/admin-tools";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
+export const metadata = { title: "Supermarkets" };
+
 const ICONS = { doit: FileSpreadsheet, places: MapPin, community: FileSpreadsheet } as const;
 
 export default function AdminSupermarketsPage() {

@@ -147,7 +147,7 @@ export function ReminderForm({ id }: { id?: string }) {
         <div className="flex flex-wrap gap-2.5" role="radiogroup" aria-label="Colour">
           {REMINDER_COLORS.map((c) => (
             <button key={c.id} type="button" role="radio" aria-checked={color === c.id} aria-label={c.id} onClick={() => setColor(c.id)} style={{ backgroundColor: c.hex }}
-              className={`h-9 w-9 rounded-full ring-offset-2 ring-offset-background ${color === c.id ? "ring-2 ring-foreground" : ""}`} />
+              className={`h-11 w-11 rounded-full ring-offset-2 ring-offset-background ${color === c.id ? "ring-2 ring-foreground" : ""}`} />
           ))}
         </div>
       </div>

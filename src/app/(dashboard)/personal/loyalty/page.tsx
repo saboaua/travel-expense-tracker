@@ -2,6 +2,8 @@ import { PageShell } from "@/components/layout/PageShell";
 import { BackLink } from "@/components/ui/page-header";
 import { LoyaltyWallet } from "@/components/loyalty/LoyaltyWallet";
 
+export const metadata = { title: "Loyalty cards" };
+
 export default function LoyaltyPage() {
   return (
     <PageShell size="wide" className="pb-28 md:pb-8">

@@ -285,7 +285,7 @@ export default function AddExpensePage() {
       </div>
       <Card>
         <CardHeader>
-          <CardTitle>Add Expense</CardTitle>
+          <CardTitle as="h1">Add Expense</CardTitle>
           <CardDescription>Take a photo — we&apos;ll try to read merchant, amount, and date automatically</CardDescription>
         </CardHeader>
         <CardContent>

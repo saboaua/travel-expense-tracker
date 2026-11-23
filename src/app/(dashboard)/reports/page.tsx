@@ -20,6 +20,8 @@ import { featureLocked } from "@/lib/limits";
 import { AccountingExport } from "@/components/accounting/AccountingExport";
 import { AlertTriangle, ArrowDownRight, Crown, ArrowUpRight, CalendarRange, Download, FileSpreadsheet, Plane, Receipt, TrendingUp, Wallet } from "lucide-react";
 
+export const metadata = { title: "Business reports" };
+
 type Trip = { id: string; name: string; destination: string | null; start_date: string; end_date: string | null; status: string };
 
 /** The change against an earlier period; with nothing to compare against it says so instead of "vs last month" with no number */

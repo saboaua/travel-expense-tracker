@@ -15,6 +15,8 @@ import { hotelOf } from "@/lib/hotel";
 import { flightLine, type TripFlight } from "@/lib/flights";
 import { SharedTrips } from "@/components/sharing/SharedTrips";
 
+export const metadata = { title: "Business" };
+
 type Expense = { amount: number; amount_usd?: number | null; currency?: string | null };
 type Trip = {
   id: string;

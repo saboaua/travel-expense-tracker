@@ -1,6 +1,8 @@
 import { BackLink } from "@/components/ui/page-header";
 import { SubscriptionsView } from "@/components/subscriptions/SubscriptionsView";
 
+export const metadata = { title: "Subscriptions" };
+
 export default function SubscriptionsPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 pb-28 md:p-8">

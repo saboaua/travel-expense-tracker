@@ -1,6 +1,8 @@
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { ProjectForm } from "@/components/projects/ProjectForm";
 
+export const metadata = { title: "New project" };
+
 export default function NewProjectPage() {
   return (
     <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 md:p-8">

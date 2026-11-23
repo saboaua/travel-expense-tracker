@@ -85,7 +85,7 @@ export function TripStatusToggle({
         aria-label="Trip complete"
         disabled={saving}
         onClick={() => onChange(!completed)}
-        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-60 ${completed ? "bg-emerald-600" : "bg-muted-foreground/30"}`}
+        className={`relative h-7 w-12 shrink-0 rounded-full transition-colors before:absolute before:-inset-x-1 before:-inset-y-2.5 before:content-[''] disabled:opacity-60 ${completed ? "bg-emerald-600" : "bg-muted-foreground/30"}`}
       >
         <span className={`absolute left-0.5 top-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform ${completed ? "translate-x-5" : "translate-x-0"}`} />
       </button>
