@@ -9,6 +9,7 @@ import { CountryField } from "@/components/admin/CountryField";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Preview = {
   total: number; kept: number; seenBefore: number; fresh: number;
@@ -63,7 +64,7 @@ export default function AdminCommunityPricesPage() {
   if (loaded && role !== "admin") return <div className="p-4 md:p-8"><Alert>Only an admin can import community prices.</Alert></div>;
   const sk = preview?.skipped;
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
       <PageHeader title="Community prices import" description="Add prices from receipts you typed into Excel. People see them next to the prices from the app." />
       {error && <Alert>{error}</Alert>}

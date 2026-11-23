@@ -4334,6 +4334,46 @@ try {
     } finally { await ctx.close(); }
   });
 
+  await test("Global Settings on a desktop: three columns, the Pro parts listed on the left, a live Branding preview; a phone is unchanged", async () => {
+    const dctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const pctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    dctx.setDefaultTimeout(60_000); pctx.setDefaultTimeout(60_000);
+    const d = await dctx.newPage(); const m = await pctx.newPage();
+    try {
+      await signIn(d, "admin@example.com", "Admin-Pass-123");
+      await d.waitForURL((u) => u.pathname === "/");
+      await d.goto(`${BASE}/admin/settings`);
+      await d.getByTestId("tools-count-pro").waitFor();
+      const ys = await d.locator('a[href^="/admin/"] .text-lg').evaluateAll((els) => els.slice(0, 3).map((e) => Math.round(e.getBoundingClientRect().top)));
+      assert(ys.length === 3 && ys[0] === ys[1] && ys[1] === ys[2], "the first three cards sit on one row: " + ys);
+      assert(await d.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on the hub");
+      await d.goto(`${BASE}/admin/pro/payments`);
+      await d.getByTestId("pro-rail").waitFor();
+      assert((await d.getByTestId("pro-rail").locator("a").count()) === 5, "the Pro rail lists the five parts");
+      assert((await d.getByTestId("pro-rail-payments").getAttribute("aria-current")) === "page", "Prices and payments is the open part");
+      await d.getByTestId("pro-rail-limits").click();
+      await d.waitForURL((u) => u.pathname === "/admin/pro/limits");
+      await d.getByTestId("pro-rail").waitFor();
+      await d.goto(`${BASE}/admin/pro`);
+      await d.getByTestId("pro-row-people").waitFor();
+      assert((await d.getByTestId("pro-rail").count()) === 0, "the Pro menu itself has no rail");
+      await d.goto(`${BASE}/admin/branding`);
+      await d.getByTestId("brand-preview").waitFor();
+      await d.screenshot({ path: "/tmp/desk-branding.png" });
+      await d.goto(`${BASE}/admin/settings`); await d.getByTestId("tools-count-pro").waitFor(); await d.screenshot({ path: "/tmp/desk-hub.png" });
+      await d.goto(`${BASE}/admin/pro/payments`); await d.getByTestId("pro-rail").waitFor(); await d.screenshot({ path: "/tmp/desk-pro.png" });
+      await signIn(m, "admin@example.com", "Admin-Pass-123");
+      await m.waitForURL((u) => u.pathname === "/");
+      await m.goto(`${BASE}/admin/pro/payments`);
+      await m.getByRole("heading", { name: "Prices and payments" }).waitFor();
+      assert((await m.getByTestId("pro-rail").isVisible()) === false, "no rail on a phone");
+      await m.goto(`${BASE}/admin/branding`);
+      await m.getByRole("heading", { name: "Branding" }).waitFor();
+      assert((await m.getByTestId("brand-preview").isVisible()) === false, "no preview column on a phone");
+      assert(await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scroll on a phone");
+    } finally { await dctx.close(); await pctx.close(); }
+  });
+
   await test("on a phone the document row menu is not cut off by its card", async () => {
     fake.table("travel_documents").push({ id: "d0c00000-0000-4000-8000-0000000003aa", user_id: PAT, kind: "visa", title: "Menu Visa", issuing_country: "USA", document_number: null, expiry_date: addDays(today, 400), trip_id: null, file_path: null, created_at: new Date().toISOString() });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

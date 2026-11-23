@@ -10,6 +10,7 @@ import { CountryField } from "@/components/admin/CountryField";
 import { PlacesFix } from "@/components/admin/PlacesFix";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Preview = { total: number; kept: number; skipped: { noName: number; badGps: number; duplicate: number; example: number }; sample: { name: string; lat: number; lng: number }[] };
 type Status = { rows: number; importedAt: string | null };
@@ -60,7 +61,7 @@ export default function AdminSupermarketsPage() {
   if (loaded && role !== "admin") return <div className="p-4 md:p-8"><Alert>Only an admin can import supermarket places.</Alert></div>;
   const sk = preview?.skipped;
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
       <PageHeader title="Supermarket places" description={<>Shops with their GPS point, shown on the Best store map for everyone. A receipt shows at the shop with the same name.</>} />
       {error && <Alert>{error}</Alert>}

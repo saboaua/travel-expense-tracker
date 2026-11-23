@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Preview = { total: number; kept: number; skipped: { soldOut: number; closeout: number; hidden: number; noPrice: number; noName: number }; sample: { name: string; size: string | null; price: number }[] };
 type Status = { rows: number; importedAt: string | null };
@@ -60,7 +61,7 @@ export default function AdminDoitPage() {
   const age = status?.importedAt ? Math.floor((Date.now() - Date.parse(status.importedAt)) / 86400000) : null;
   const sk = preview?.skipped;
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
       <PageHeader title="Do it Aruba prices" description={<>Imported from the exported Excel file, not read live. Shown in the Price tracker as an online store.</>} />
       {error && <Alert>{error}</Alert>}

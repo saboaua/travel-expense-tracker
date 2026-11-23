@@ -98,7 +98,7 @@ export default function PaymentSettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className="space-y-5 p-4 md:p-8">
       <ProSubHeader active="payments" title="Prices and payments" description="What people see when they pick Pro, and the payments to check" />
       <PaymentsToCheck />
       {error && <Alert>{error}</Alert>}

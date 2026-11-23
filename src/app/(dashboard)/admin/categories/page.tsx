@@ -6,6 +6,7 @@ import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Tabs } from "@/components/ui/tabs";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 import { CategoryManager } from "@/components/admin/category-manager";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const TRAVEL_TABS = [
   { id: "receipts", label: "Receipts" },
@@ -21,11 +22,11 @@ export default function AdminCategoriesPage() {
   const travelSummary = [n(counts.receipts, "receipt category", "receipt categories"), n(counts.trips, "trip type", "trip types")].filter(Boolean).join(" · ") || "Receipt categories and trip types";
 
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Categories" description={<>Edit, reorder or create the categories offered on receipts, trips and the house.</>} />
 
-      <AccordionGroup>
+      <AccordionGroup className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
         <AccordionSection id="travel" title="Travel" icon={<Briefcase />} tone="travel" summary={travelSummary}>
           <Tabs
             semantics="group"

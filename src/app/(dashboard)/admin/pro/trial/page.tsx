@@ -45,7 +45,7 @@ export default function ProTrialPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className="space-y-5 p-4 md:p-8">
       <ProSubHeader active="trial" title="Free Pro month" description="Let new accounts try Pro before they buy it" />
       {error && <Alert>{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}

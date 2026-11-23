@@ -14,6 +14,7 @@ import { HelpBody } from "@/components/help/HelpBody";
 import { HELP_TOPIC_COLS } from "@/lib/columns";
 import { DEFAULT_HELP_CATEGORY, HELP_LIMITS, groupByCategory, slugifyTopic, validateHelpDraft, type HelpTopic } from "@/lib/help";
 import { cn } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Form = { id: string | null; title: string; category: string; summary: string; body: string; sort_order: string; published: boolean };
 const EMPTY: Form = { id: null, title: "", category: DEFAULT_HELP_CATEGORY, summary: "", body: "", sort_order: "100", published: true };
@@ -103,7 +104,7 @@ export default function AdminHelpPage() {
   const set = <K extends keyof Form>(k: K, v: Form[K]) => setForm((f) => (f ? { ...f, [k]: v } : f));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 pb-24 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-6 p-4 pb-24 md:p-8`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader
         title="Help topics"

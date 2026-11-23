@@ -135,7 +135,7 @@ export default function ProLimitsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className="space-y-5 p-4 md:p-8">
       <ProSubHeader active="limits" title="Free plan limits" description="Pick what starts, and when" />
       {error && <Alert>{error}</Alert>}
       {notice && <Alert variant="success">{notice}</Alert>}

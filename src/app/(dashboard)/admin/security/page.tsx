@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, Activity, Globe, RefreshCw, Filter, X } from "lucide-react";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 interface SecurityEvent {
   id: string;
@@ -151,7 +152,7 @@ export default function AdminSecurityPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-6xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-6`}>
       <PageHeader
         title="Security & Audit"
         description="Filter logins, threats, and user actions"

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 import { Palette, Upload, ImageIcon, Plane, FileText, User } from "lucide-react";
 import { BRANDING_COLS, BRANDING_COLS_BASE, withColumnFallback } from "@/lib/columns";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 function getErrorMessage(err: unknown): string {
   if (err instanceof Error) return err.message;
@@ -146,10 +147,11 @@ export default function AdminBrandingPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Branding" description={<>Logo and colors shown on login and in the app header</>} />
 
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start lg:gap-6">
       <form onSubmit={handleSave} className="space-y-6">
       <AccordionGroup>
       <AccordionSection id="logo" title="Logo" icon={<ImageIcon />} tone="brand" summary={logoUrl ? `Custom logo · ${logoSize}px on the login screen` : "Default logo"} description="Appears on the login screen and next to the app name in the sidebar">
@@ -348,6 +350,20 @@ export default function AdminBrandingPage() {
         {loading ? "Saving..." : "Save branding"}
       </Button>
       </form>
+      <aside className="sticky top-8 mt-6 hidden rounded-2xl border bg-card p-4 lg:mt-0 lg:block" aria-label="Preview" data-testid="brand-preview">
+        <p className="mb-3 text-sm font-bold">Preview</p>
+        <div className="rounded-xl border p-5 text-center">
+          {logoUrl ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={logoUrl} alt="" style={{ height: Math.min(logoSize, 72) }} className="mx-auto mb-2 object-contain" /> : <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center rounded-2xl text-lg font-extrabold text-white" style={{ backgroundColor: primaryColor }}>{(appName || "A").slice(0, 2)}</div>}
+          <p className="text-lg font-extrabold">{appName || "App name"}</p>
+          <p className="mb-3 text-xs text-muted-foreground">Sign in</p>
+          <div className="h-9 rounded-lg" style={{ backgroundColor: primaryColor }} />
+        </div>
+        <div className="mt-3 flex h-11 items-center gap-2 rounded-xl border px-3">
+          <span className="h-6 w-6 rounded-md" style={{ backgroundColor: primaryColor }} /><b className="truncate text-sm">{appName || "App name"}</b>
+        </div>
+        <p className="mt-2 text-xs text-muted-foreground">How the login screen and the app header look.</p>
+      </aside>
+      </div>
     </div>
   );
 }

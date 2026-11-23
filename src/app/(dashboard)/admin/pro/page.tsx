@@ -10,6 +10,7 @@ import { IconTile } from "@/components/ui/icon-tile";
 import { trialSummary, type TrialSettings } from "@/lib/pro-trial";
 import { LIMIT_KEYS, limitOn, limitsSet, type Limits } from "@/lib/limits";
 import { cn } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Overview = { today: string; proNow: number; ending: number; onTrial: number; waiting: number; limits: Limits; trial: TrialSettings };
 
@@ -34,7 +35,7 @@ export default function AdminProPage() {
   ] : [];
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className={`${PAGE_WIDTH.form} space-y-5 p-4 md:p-8`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Pro plan" description="Who has Pro, how they pay, and what Free gets" />
       {error && <Alert>{error}</Alert>}

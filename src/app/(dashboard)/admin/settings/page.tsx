@@ -9,6 +9,7 @@ import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
 import { PRO_TOOL_COUNT, SUPERMARKET_TOOLS } from "@/lib/admin-tools";
 import { Palette, Coins, Send, Tag, Users, LifeBuoy, CircleHelp, Tv, ShoppingCart, UserPlus, Crown, Images } from "lucide-react";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const sections: { href: string; feature: string; title: string; description: string; icon: typeof Palette; tone: IconTone; tools?: number }[] = [
   {
@@ -127,12 +128,12 @@ export default function AdminSettingsPage() {
   }, [role]);
   const visible = sections.filter((s) => role === "admin" || (s.feature !== "admin.only" && perms.has(s.feature)));
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-4xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-6`}>
       <PageHeader title="Global Settings" description={<>Configure branding, currencies, categories, Telegram, and users.</>} />
 
       {loaded && visible.length === 0 && <p className="text-sm text-muted-foreground">Nothing here is available for your role.</p>}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((s) => {
           const Icon = s.icon;
           return (

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
 import { Coins, Plus } from "lucide-react";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type CurrencyRow = {
   code: string;
@@ -75,13 +76,13 @@ export default function AdminCurrenciesPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Currencies" description={<>Turn currencies on or off. Only enabled ones appear when adding a trip or expense.</>} />
 
       {error && <Alert>{error}</Alert>}
 
-      <AccordionGroup>
+      <AccordionGroup className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
       <AccordionSection id="available" title="Available currencies" icon={<Coins />} tone="money" summary={loading ? "Loading…" : `${rows.filter((r) => r.enabled).length} of ${rows.length} turned on`} description="Rate is USD per 1 unit. Leave it empty to use the live market rate.">
         <div className="space-y-3">
           {loading ? (

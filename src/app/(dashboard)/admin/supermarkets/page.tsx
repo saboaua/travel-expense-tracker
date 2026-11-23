@@ -5,12 +5,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import { HubCountryChips } from "@/components/admin/HubCountryChips";
 import { SUPERMARKET_TOOLS } from "@/lib/admin-tools";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const ICONS = { doit: FileSpreadsheet, places: MapPin, community: FileSpreadsheet } as const;
 
 export default function AdminSupermarketsPage() {
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-5 p-4 md:p-8`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Supermarkets" description="Prices and places for the Price tracker and the Best store map" />
       <Card><CardContent className="divide-y p-0">

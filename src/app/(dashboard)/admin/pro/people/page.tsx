@@ -67,7 +67,7 @@ export default function AdminPlansPage() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6 p-4 md:p-8">
+    <div className="space-y-6 p-4 md:p-8">
       <ProSubHeader active="people" title="People and access" description="Who has Pro, and until when. Pro switches off by itself after its end date." />
       <Card><CardContent className="space-y-1 py-4 text-sm">
         <p className="font-semibold">Pro includes</p>
@@ -84,6 +84,7 @@ export default function AdminPlansPage() {
         ))}
       </div>
 
+      <div className="space-y-5 lg:grid lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start lg:gap-5 lg:space-y-0">
       <Card><CardContent className="divide-y p-0">
         {loading && <p className="p-4 text-sm text-muted-foreground">Loading…</p>}
         {!loading && rows.length === 0 && <p className="p-4 text-sm text-muted-foreground">Nobody here yet.</p>}
@@ -97,7 +98,7 @@ export default function AdminPlansPage() {
       </CardContent></Card>
 
       {chosen && (
-        <Card data-testid="plan-editor"><CardContent className="space-y-4 py-4">
+        <Card data-testid="plan-editor" className="lg:sticky lg:top-8"><CardContent className="space-y-4 py-4">
           <p className="font-semibold">Plan for {chosen.name}</p>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="Plan">
             {([["monthly", "Monthly"], ["yearly", "Yearly"], ["gift", "Free gift"], ["free", "Free (no Pro)"]] as [Choice, string][]).map(([c, l]) => (
@@ -132,6 +133,7 @@ export default function AdminPlansPage() {
           <div className="flex gap-2"><Button onClick={() => save()} disabled={saving} data-testid="plan-save"><Check className="h-4 w-4" aria-hidden="true" />{period === "free" ? "Remove Pro" : "Turn on Pro"}</Button><Button variant="outline" onClick={() => setPick(null)}>Cancel</Button></div>
         </CardContent></Card>
       )}
+      </div>
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Mail, Check, Trash2, RotateCcw, RefreshCw, Sparkles } from "lucide-react";
 import { SUPPORT_REQUEST_AI_COLS, SUPPORT_REQUEST_COLS, withColumnFallback } from "@/lib/columns";
 import { CATEGORY_LABEL, PRIORITY_LABEL, type SupportCategory, type SupportPriority } from "@/lib/support-ai";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type SupportRequest = {
   id: string;
@@ -88,7 +89,7 @@ export default function AdminSupportPage() {
   const shown = rows.filter((r) => filter === "all" || r.status === filter);
 
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-3xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Support Requests" description={<>Messages sent from the Contact Support form on the login screen.</>} />
 
@@ -111,7 +112,7 @@ export default function AdminSupportPage() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-3 xl:space-y-0">
           {loading && rows.length === 0 ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
           ) : shown.length === 0 ? (

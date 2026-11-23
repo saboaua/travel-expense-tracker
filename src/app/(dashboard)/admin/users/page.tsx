@@ -19,6 +19,7 @@ import { RolesManager, type RoleSummary } from "@/components/admin/RolesManager"
 import { Switch } from "@/components/ui/switch";
 import { CredentialsPanel } from "@/components/admin/CredentialsPanel";
 import { statusOf, timeAgo, type Credentials, type ManagedUser } from "@/components/admin/user-status";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 const fmt = formatDateTime;
@@ -260,7 +261,7 @@ export default function AdminUsersPage() {
   const canReset = (u: ManagedUser) => u.id !== meId && (canAssignRole(myRole) || u.role === "user");
 
   return (
-    <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="User Roles & Users" description="Create accounts, choose each person's role, and decide what each role can use. Public signup is disabled." />
 
@@ -391,7 +392,7 @@ export default function AdminUsersPage() {
           ) : users.length === 0 ? (
             <p className="text-muted-foreground text-sm">No users yet</p>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2 xl:grid xl:grid-cols-2 xl:items-start xl:gap-3 xl:space-y-0">
               {users.map((u) => {
                 const name = [u.first_name, u.last_name].filter(Boolean).join(" ") || u.full_name || "—";
                 const status = statusOf(u);

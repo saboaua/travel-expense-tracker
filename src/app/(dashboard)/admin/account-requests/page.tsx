@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAccess } from "@/lib/use-access";
 import { formatDateTime } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Req = { id: string; name: string; email: string | null; phone: string | null; status: "new" | "done" | "dismissed"; created_at: string; recommended_by?: string | null };
 
@@ -37,7 +38,7 @@ export default function AccountRequestsPage() {
   if (loaded && role !== "admin") return <div className="p-4 md:p-8"><Alert>Only an admin can see account requests.</Alert></div>;
   const waiting = rows?.filter((r) => r.status === "new").length ?? 0;
   return (
-    <div className="p-4 md:p-8 pb-24 max-w-2xl mx-auto space-y-4">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 pb-24 space-y-4`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Account requests" description={rows ? `${waiting} waiting` : "People who asked for an account on the sign-in screen"} />
       {error && <Alert variant="error">{error}</Alert>}

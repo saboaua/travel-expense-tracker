@@ -8,7 +8,7 @@ import { PROGRAMS } from "@/lib/accounting";
 /** Accounting export is a Pro tool: it follows the Pro switch of each person, so there is nothing to set here except to see the formats. */
 export default function ProAccountingPage() {
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className="space-y-5 p-4 md:p-8">
       <ProSubHeader active="accounting" title="Accounting export" description="Journal entries for the accountant, part of Pro" />
       <Card><CardContent className="space-y-1 p-4 text-sm">
         <p className="flex items-center gap-2 font-bold"><Crown className="h-4 w-4 text-amber-600" aria-hidden="true" />Pro only</p>

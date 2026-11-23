@@ -7,6 +7,7 @@ import { Send, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export default function AdminTelegramPage() {
   const [enabled, setEnabled] = useState(false);
@@ -67,11 +68,11 @@ export default function AdminTelegramPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 max-w-2xl mx-auto space-y-6">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 space-y-6`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
       <PageHeader title="Telegram" description={<>Connect the bot here. Nothing needs to be set in Vercel.</>} />
 
-      <AccordionGroup>
+      <AccordionGroup className="lg:grid lg:grid-cols-2 lg:items-start lg:gap-3 lg:space-y-0">
       <AccordionSection
         id="bot"
         title="Bot setup"
