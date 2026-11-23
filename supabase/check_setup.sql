@@ -278,6 +278,7 @@ other_checks as (
   union all
   select 'function', 'reminders keep each person''s reminders, photos and shares',
          case when to_regclass('public.reminders') is not null and to_regclass('public.reminder_photos') is not null and to_regclass('public.reminder_shares') is not null
+                and exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'reminders' and column_name = 'repeat_days')
                 and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'complete_reminder') then 'OK' else 'MISSING' end,
          'migration_reminders.sql'
   union all
