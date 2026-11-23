@@ -2998,7 +2998,6 @@ try {
       await page.getByTestId("country-notice").waitFor();
       assert(/Now showing Aruba prices/.test(await page.getByTestId("country-notice").innerText()), "the message says Aruba prices");
       assert((await page.getByTestId("country-label").innerText()).trim() === "Aruba · AWG", "the row says Aruba and AWG");
-      await page.waitForFunction(() => true);
       assert(seen.some((u) => /country=eq\.AW/.test(u)), "only Aruba's places were asked for: " + seen.join(" | "));
       // Undo goes back to the country before
       await page.getByTestId("country-undo").click();
@@ -4272,6 +4271,34 @@ try {
       await page.reload();
       await page.waitForTimeout(1500);
       assert((await page.getByTestId("trip-places").count()) === 0, "nothing found: the card is hidden");
+    } finally { await ctx.close(); }
+  });
+
+  await test("Reminders: type a sentence to add one, see it in the list, open it, and delete it", async () => {
+    fake.table("reminders"); fake.table("reminder_photos"); fake.table("reminder_shares");
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/reminders`);
+      await page.getByTestId("reminders-empty").waitFor();
+      await page.getByTestId("reminder-quick").fill("Pay rent tomorrow 9am");
+      await page.getByTestId("reminder-quick-add").click();
+      const saved = () => fake.table("reminders").find((r) => r.title === "Pay rent");
+      for (let i = 0; i < 40 && !saved(); i++) await page.waitForTimeout(250);
+      assert(saved() && saved().user_id === PAT, "the sentence became a reminder for this person");
+      await page.getByRole("tab", { name: /Upcoming/ }).click();
+      await page.getByTestId("reminder-row").first().waitFor();
+      assert(/Pay rent/.test(await page.getByTestId("reminder-row").first().innerText()) && /Tomorrow 9:00 AM/.test(await page.getByTestId("reminder-row").first().innerText()), "the row shows the title and when");
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), "the list does not scroll sideways");
+      await page.getByTestId("reminder-row").first().getByRole("link").click();
+      await page.getByTestId("reminder-detail-title").waitFor();
+      await page.getByTestId("reminder-delete").click();
+      await page.getByRole("button", { name: "Delete", exact: true }).last().click();
+      await page.getByTestId("reminders-empty").waitFor();
+      assert(fake.table("reminders").length === 0, "deleted from the database");
     } finally { await ctx.close(); }
   });
 

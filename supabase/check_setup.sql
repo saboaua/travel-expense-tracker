@@ -276,6 +276,11 @@ other_checks as (
          case when to_regclass('public.trip_places') is not null and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'purge_trip_places') then 'OK' else 'MISSING' end,
          'migration_trip_places.sql'
   union all
+  select 'function', 'reminders keep each person''s reminders, photos and shares',
+         case when to_regclass('public.reminders') is not null and to_regclass('public.reminder_photos') is not null and to_regclass('public.reminder_shares') is not null
+                and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'complete_reminder') then 'OK' else 'MISSING' end,
+         'migration_reminders.sql'
+  union all
   select 'function', 'product_match_cache keeps the AI verdicts on doubtful matches',
          case when to_regclass('public.product_match_cache') is not null then 'OK' else 'MISSING' end,
          'migration_match_cache.sql'

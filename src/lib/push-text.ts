@@ -19,6 +19,7 @@ export const PUSH_TEXT = {
   checklist: { title: "Lifolio", body: "Your trip checklist still has things to tick. Open the app to finish it." },
   entryCard: { title: "Lifolio", body: "Your Aruba re-entry card is not done yet. Open the app to fill it in." },
   afterTrip: { title: "Lifolio", body: "A trip has ended. Open the app to add your last receipts." },
+  reminder: { title: "Lifolio", body: "You have a reminder. Open the app to see it." },
   document: { title: "Lifolio", body: "A document is about to expire. Open the app to check it." },
   utility: { title: "Lifolio", body: "Time to add your utility bills for this month." },
   billEmail: { title: "Lifolio", body: "A new utility bill arrived by email." },
@@ -74,6 +75,7 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
   const by = clean(d.by, 40);
   const item = clean(d.item, 60);
   switch (kind) {
+    case "reminder": return item ? `Reminder: ${item}` : null;
     case "invite": return by ? `${by} invited you to share.` : null;
     case "accepted": return by ? `${by} accepted your invite.` : null;
     case "shared": return by && item ? `${by} shared ${itemPhrase(d.itemKind, item)} with you.` : by ? `${by} shared something with you.` : null;

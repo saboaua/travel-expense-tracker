@@ -7,6 +7,7 @@ import { budgetAlerts, gamblingAlerts, paymentDayAlerts, yearlyBillAlerts, utili
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { dueForReminder as dueSubs, nextDue, type Sub } from "@/lib/subscriptions";
 import { dueForReminder as dueClients } from "@/lib/iptv";
+import { sendReminderAlerts } from "@/lib/reminder-alerts";
 import { daysBetween, todayISO } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -29,6 +30,7 @@ export async function GET(req: Request) {
     const gambling = await gamblingAlerts(db, today).catch((e) => { console.error("[cron] gambling alerts", e instanceof Error ? e.message : e); return -1; });
     const yearly = await yearlyBillAlerts(db, today).catch((e) => { console.error("[cron] yearly bill alerts", e instanceof Error ? e.message : e); return -1; });
     const payments = await paymentDayAlerts(db, today).catch((e) => { console.error("[cron] payment day alerts", e instanceof Error ? e.message : e); return -1; });
+    await sendReminderAlerts(db, new Date()).catch((e) => { console.error("[cron] reminder alerts", e instanceof Error ? e.message : e); });
     let people = 0;
     const subs = await db.from("subscriptions").select(`user_id, reminded_for, ${SUBSCRIPTION_COLS}`).eq("status", "active").limit(5000);
     if (subs.error && !/does not exist|schema cache/i.test(subs.error.message)) throw new Error(subs.error.message);

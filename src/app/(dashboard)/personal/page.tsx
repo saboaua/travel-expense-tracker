@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Card } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import type { IconTone } from "@/lib/icon-tones";
-import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet, ShoppingBag, Tag } from "lucide-react";
+import { Fuel, PiggyBank, ShoppingCart, Hammer, Home, Plane, ChevronRight, FolderOpen, CreditCard, TrendingUp, Repeat, Coins, Zap, Landmark, Mail, Plus, Send, Tv, Wallet, ShoppingBag, Tag, BellRing } from "lucide-react";
 import { PersonalTabs } from "@/components/layout/PersonalTabs";
 import { useAccess } from "@/lib/use-access";
 import { useSharing } from "@/lib/use-sharing";
@@ -37,6 +37,18 @@ export default function PersonalHubPage() {
   const { types: myTypes } = useReceiptTypes();
   const { colorOf } = useTileColors();
   const [stats, setStats] = useState<Stats | null>(null);
+  const [reminderCount, setReminderCount] = useState<number | null>(null);
+  // Open reminders: its own small lookup, so a missing reminders table never breaks the rest of this page
+  useEffect(() => {
+    let live = true;
+    (async () => {
+      try {
+        const r = await createClient().from("reminders").select("id", { count: "exact", head: true }).is("done_at", null);
+        if (live && !r.error) setReminderCount(r.count ?? 0);
+      } catch { /* offline or not set up: the row just has no count */ }
+    })();
+    return () => { live = false; };
+  }, []);
   const { perms, loaded } = useAccess();
   const [comingUp, setComingUp] = useState<ComingUpItem[] | null>(null);
   // This month's fuel fill-ups (null when the table is not there yet)
@@ -160,6 +172,9 @@ export default function PersonalHubPage() {
     { href: "/personal/groceries/prices", title: "Price tracker", icon: TrendingUp, tone: "groceries", text: "Compare what the same item costs in different stores" },
     ...rowTiles.filter((t) => t.href === "/personal/spend" || t.href === "/personal/fuel" || t.href === "/personal/savings" || t.href === "/personal/utilities" || t.href === "/personal/house"),
   ];
+  const reminderRows: Row[] = [
+    { href: "/personal/reminders", title: "Reminders", icon: BellRing, tone: "notifications", testId: "reminders-tile", text: reminderCount == null ? "Things to remember, with an alert" : reminderCount > 0 ? `${plural(reminderCount, "open reminder")}` : "Things to remember, with an alert", strong: !!reminderCount, add: { href: "/personal/reminders/new", label: "Add", aria: "Add reminder" } },
+  ];
   const track: Row[] = [
     ...(perms.has("subscriptions") ? [{ href: "/personal/subscriptions", title: "Subscriptions", icon: Repeat, tone: "subscriptions" as const, text: "Track what you pay and what is due", add: { href: "/personal/subscriptions", label: "Add" } }] : []),
     ...rowTiles.filter((t) => t.href === "/personal/projects").map((t) => ({ ...t, add: { href: "/personal/projects/new", label: "Add" } })),
@@ -217,6 +232,7 @@ export default function PersonalHubPage() {
       )}
       {group("Money", money, "org-money")}
       {group("Things you track", track, "org-track")}
+      {group("Reminders", reminderRows, "org-reminders")}
       {group("Automatic", auto, "org-auto")}
       </div>
 
