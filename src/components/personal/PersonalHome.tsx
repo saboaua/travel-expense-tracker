@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
 import { useEffect, useState } from "react";
-import { Camera, Coins, CreditCard, Plus, Repeat, Tv, ChevronRight } from "lucide-react";
+import { Coins, Tag, CreditCard, Plus, Repeat, Tv, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
@@ -17,6 +17,7 @@ import { BudgetCard } from "@/components/personal/BudgetCard";
 import { PricesGlance } from "@/components/personal/PricesGlance";
 import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
 import { IconTile } from "@/components/ui/icon-tile";
+import { RemindersCard } from "@/components/reminders/RemindersCard";
 import { TrialBanner } from "@/components/personal/TrialBanner";
 
 const CARD = "rounded-2xl border bg-card p-4 shadow-sm";
@@ -36,9 +37,9 @@ function KeepHandy({ testId }: { testId: string }) {
   const { perms } = useAccess();
   const tile = "flex min-h-[56px] items-center justify-start gap-2.5 rounded-xl border text-left bg-card px-3.5 text-sm font-semibold transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
   const items = [
-    // Scan and Upload already sit at the top of the home page, so the first door here is Quick spend
+    // Scan and Upload already sit at the top of the home page, so the first door here is Quick spend and the receipt door is Add a price
     { href: "/personal/spend", label: "Quick spend", icon: Coins, primary: true, show: perms.has("personal") },
-    { href: "/personal/groceries/new", label: "Scan receipt", icon: Camera, primary: false, show: perms.has("personal") },
+    { href: "/personal/groceries/price-check", label: "Add a price", icon: Tag, primary: false, show: perms.has("personal") },
     { href: "/personal/subscriptions", label: "Add subscription", icon: Repeat, primary: false, show: perms.has("subscriptions") },
     { href: "/personal/loyalty", label: "Loyalty cards", icon: CreditCard, primary: false, show: perms.has("loyalty") },
   ].filter((i) => i.show);
@@ -133,7 +134,7 @@ function MyIptv() {
 }
 
 /**
- * The Personal dashboard: what is worth a daily look, in this order: Keep handy, the month budget, the price cards, Active trips and their
+ * The Personal dashboard: what is worth a daily look, in this order: Keep handy, the month budget, Reminders (only once there is one), the price cards, Active trips and their
  * travel advice, Projects, Documents, Subscriptions, and the IPTV service when an admin assigned one. A section with nothing
  * in it hides itself. Everything is set up in Personal > Organizer; the numbers and exports are in Personal > Reports.
  */
@@ -165,6 +166,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
         <div className="min-w-0 space-y-4">
           <BudgetCard />
+          <RemindersCard />
           <PricesGlance />
           <ActiveTrips rows={rows} projects={projects} today={today} />
           <HomeProjects rows={rows} projects={projects} />

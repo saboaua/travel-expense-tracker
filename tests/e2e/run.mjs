@@ -5257,6 +5257,39 @@ try {
     }
   });
 
+  await test("Personal dashboard: Add a price replaces Scan receipt, and the Reminders card shows only once there is one (5 rows, + Add, See more)", async () => {
+    const rem = fake.table("reminders"); rem.splice(0);
+    fake.table("reminder_photos"); fake.table("reminder_shares");
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.evaluate(() => { try { localStorage.removeItem("dashboard-view"); } catch { /* ignore */ } });
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("keep-handy").waitFor();
+      const handy = page.getByTestId("keep-handy");
+      assert((await handy.getByRole("link", { name: "Add a price" }).getAttribute("href")) === "/personal/groceries/price-check", "Keep handy has Add a price");
+      assert((await handy.getByRole("link", { name: "Scan receipt" }).count()) === 0, "Scan receipt is gone from Keep handy");
+      await page.getByTestId("budget-card").or(page.getByTestId("budget-empty")).first().waitFor();
+      await page.waitForTimeout(600);
+      assert((await page.getByTestId("reminders-card").count()) === 0, "no Reminders card while there is no reminder");
+      const base = Date.now();
+      for (let i = 0; i < 7; i++) rem.push({ id: `a0000000-0000-4000-8000-00000000090${i}`, user_id: ADMIN, title: `Reminder ${i + 1}`, notes: null, due_at: new Date(base + (i + 1) * 86400000).toISOString(), repeat: "none", alert: "at", color: "blue", icon: "bell", done_at: null, snoozed_until: null, last_alerted_for: null, created_at: new Date().toISOString() });
+      rem.push({ id: "a0000000-0000-4000-8000-0000000009ff", user_id: ADMIN, title: "Already done", notes: null, due_at: new Date(base).toISOString(), repeat: "none", alert: "at", color: "blue", icon: "bell", done_at: new Date().toISOString(), snoozed_until: null, last_alerted_for: null, created_at: new Date().toISOString() });
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("reminders-card").waitFor();
+      assert((await page.getByTestId("reminders-card-row").count()) === 5, "the card shows 5 reminders");
+      assert(/Reminder 1/.test(await page.getByTestId("reminders-card-row").first().innerText()) && (await page.getByTestId("reminders-card").getByText("Already done").count()) === 0, "soonest first, done ones left out");
+      assert(/See more \(2\)/.test(await page.getByTestId("reminders-card-more").innerText()), "See more says how many are left");
+      assert((await page.getByTestId("reminders-card-add").getAttribute("href")) === "/personal/reminders/new" && (await page.getByTestId("reminders-card-more").getAttribute("href")) === "/personal/reminders", "Add and See more go to the right pages");
+      const y = async (sel) => (await page.locator(sel).first().boundingBox())?.y ?? -1;
+      assert((await y("[data-testid=budget-card],[data-testid=budget-empty]")) < (await y("[data-testid=reminders-card]")), "the card sits under the budget");
+      assert(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), "no sideways scrolling");
+    } finally { await ctx.close(); rem.splice(0); }
+  });
+
   await test("home on a phone: Keep handy comes first, then the budget, documents and subscriptions in one column", async () => {
     const now = new Date().toISOString();
     const docs = fake.table("travel_documents");
