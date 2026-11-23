@@ -615,7 +615,7 @@ try {
     await page.getByLabel("Upload front photo").setInputFiles({ name: "front.png", mimeType: "image/png", buffer: PNG });
     await page.getByRole("button", { name: "Use full image" }).click();
     await page.getByTestId("slot-front").getByRole("button", { name: "Crop" }).waitFor();
-    await page.getByLabel("Scan back photo").setInputFiles({ name: "back.png", mimeType: "image/png", buffer: PNG });
+    await page.getByLabel("Take back photo").setInputFiles({ name: "back.png", mimeType: "image/png", buffer: PNG });
     await page.getByRole("button", { name: "Use full image" }).click();
     await page.getByTestId("slot-back").getByRole("button", { name: "Remove" }).waitFor();
     await page.getByRole("button", { name: "Save changes" }).click();
@@ -640,6 +640,40 @@ try {
     await page.getByRole("button", { name: "Delete", exact: true }).last().click();
     await page.getByText("No loyalty cards yet").waitFor();
     assert(fake.table("loyalty_cards").length === 0, "card removed from the database");
+    await browser2.close();
+  });
+
+  await test("loyalty card reader: Take photo, read details fills only empty fields, failure offers retry", async () => {
+    const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+    const browser2 = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const page = await browser2.newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    let mode = "ok", calls = 0;
+    await page.route("**/api/ocr", (route) => { calls++; route.fulfill({ json: { result: mode === "ok" ? { store: "Sunrise Pharmacy", category: "Care card", holder: "Pat Example", number: "7700 1234 5566", format: null, is_payment_card: false } : {} } }); });
+    await page.goto(`${BASE}/personal/loyalty`);
+    await page.getByRole("button", { name: /Add (your first )?card|Add a card/i }).first().click();
+    assert((await page.getByText("Take photo").count()) === 2, "both sides say Take photo");
+    assert((await page.getByText("Scan", { exact: true }).count()) === 0, "no button says Scan any more");
+    assert((await page.getByTestId("card-reader").count()) === 0, "no reader button before a photo");
+    await page.getByLabel("Store name").fill("My Own Name");
+    await page.getByLabel("Take front photo").setInputFiles({ name: "front.png", mimeType: "image/png", buffer: PNG });
+    await page.getByRole("button", { name: "Use full image" }).click();
+    await page.getByRole("button", { name: "Read details from photos" }).click();
+    await page.getByTestId("card-read-ok").waitFor();
+    assert((await page.getByLabel("Store name").inputValue()) === "My Own Name", "a typed store name is kept");
+    assert((await page.getByLabel("Card holder").inputValue()) === "Pat Example", "the holder is filled");
+    assert((await page.getByLabel("Barcode or card number").inputValue()) === "770012345566", "the number is filled and cleaned");
+    assert((await page.getByLabel(/Card type/).inputValue()) === "Care card", "the card type is filled");
+    assert(fake.table("loyalty_cards").length === 0, "reading saves nothing");
+    await page.getByLabel("Card holder").fill("");
+    await page.getByLabel("Barcode or card number").fill("");
+    mode = "empty";
+    await page.getByRole("button", { name: "Read details from photos" }).click();
+    await page.getByTestId("card-read-fail").waitFor();
+    assert((await page.getByTestId("card-read-fail").innerText()).includes("Could not read this card"), "failure message shown");
+    await page.getByRole("button", { name: "Try again" }).waitFor();
+    assert(calls >= 2, "the reader was asked each time");
     await browser2.close();
   });
 

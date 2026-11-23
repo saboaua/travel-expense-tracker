@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Camera, Crop, ImageUp, Loader2, Trash2, X } from "lucide-react";
+import { Camera, Crop, ImageUp, Loader2, Sparkles, Trash2, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +14,7 @@ import { browserOutbox, type OutboxItem } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
 import { Barcode } from "./Barcode";
 import { useCardPhoto } from "./CardFace";
+import { readCard, CARD_SCAN_MESSAGE } from "@/lib/loyalty-scan";
 
 const label = "text-sm font-medium";
 
@@ -32,7 +33,7 @@ function useObjectUrl(file: File | null): string | null {
   return url;
 }
 
-/** One side of the card: a card-shaped preview with Upload, Scan, Crop and Remove. */
+/** One side of the card: a card-shaped preview with Upload, Take photo, Crop and Remove. */
 function PhotoSlot({ side, savedPath, slot, busy, onFile, onCrop, onRemove }: { side: Side; savedPath: string | null | undefined; slot: Slot; busy: boolean; onFile: (f: File | undefined) => void; onCrop: () => void; onRemove: () => void }) {
   const savedUrl = useCardPhoto(slot.removed ? null : savedPath);
   const newUrl = useObjectUrl(slot.photo?.file ?? null);
@@ -59,8 +60,8 @@ function PhotoSlot({ side, savedPath, slot, busy, onFile, onCrop, onRemove }: { 
           <input type="file" accept={LOYALTY_ACCEPT} className="sr-only" aria-label={`Upload ${side} photo`} disabled={busy} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
         <label className={cn(btn, "cursor-pointer", busy && "pointer-events-none opacity-50")}>
-          <Camera className="h-4 w-4" aria-hidden="true" /> Scan
-          <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Scan ${side} photo`} disabled={busy} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
+          <Camera className="h-4 w-4" aria-hidden="true" /> Take photo
+          <input type="file" accept="image/*" capture="environment" className="sr-only" aria-label={`Take ${side} photo`} disabled={busy} onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
         </label>
         {has && (
           <>
@@ -85,6 +86,10 @@ export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: 
   const [cropping, setCropping] = useState<{ side: Side; file: File } | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reading, setReading] = useState(false);
+  const [readFail, setReadFail] = useState<string | null>(null);
+  const [filled, setFilled] = useState<Set<string>>(new Set());
+  const [fromBarcode, setFromBarcode] = useState(false);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && !busy && !cropping && onClose();
@@ -140,11 +145,44 @@ export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: 
       const blob = await (await fetch(savedUrl)).blob();
       setCropping({ side, file: new File([blob], `${side}.${blob.type === "image/webp" ? "webp" : "jpg"}`, { type: blob.type || "image/jpeg" }) });
     } catch {
-      setError("Could not open the saved photo to crop it. Upload or scan it again instead.");
+      setError("Could not open the saved photo to crop it. Upload or take it again instead.");
     } finally {
       setBusy(false);
     }
   }
+
+  const hasPhoto = !!(slots.front.photo || slots.back.photo || (card?.image_path && !slots.front.removed) || (card?.back_image_path && !slots.back.removed));
+
+  /** Reads the photos and fills only the empty fields. Nothing is saved here and the photos are not kept by the reader. */
+  async function readDetails() {
+    setReadFail(null);
+    setError(null);
+    setReading(true);
+    try {
+      const files: File[] = [];
+      for (const [side, saved] of [["front", frontUrl], ["back", backUrl]] as const) {
+        const fresh = slots[side].photo?.file;
+        if (fresh) files.push(fresh);
+        else if (saved) {
+          try { const b = await (await fetch(saved)).blob(); files.push(new File([b], `${side}.jpg`, { type: b.type || "image/jpeg" })); } catch { /* skip an unreachable saved photo */ }
+        }
+      }
+      const out = await readCard(files);
+      if (!out.ok) return setReadFail(CARD_SCAN_MESSAGE[out.reason] + (out.why ? ` (${out.why})` : ""));
+      const r = out.read;
+      const got = new Set<string>();
+      if (r.store && !store.trim()) { setStore(r.store); got.add("store"); }
+      if (r.category && !category.trim()) { setCategory(r.category); got.add("category"); }
+      if (r.holder && !holder.trim()) { setHolder(r.holder); got.add("holder"); }
+      if (r.number && !number.trim()) { setNumber(r.number); got.add("number"); if (r.format) { setFormat(r.format); got.add("format"); } }
+      setFromBarcode(!!r.fromBarcode && got.has("format"));
+      setFilled(got);
+      if (!got.size) setReadFail("Everything this card shows is already filled in. Nothing was changed.");
+    } finally {
+      setReading(false);
+    }
+  }
+  const hi = (k: string) => (filled.has(k) ? "border-emerald-500 bg-emerald-50/60 dark:bg-emerald-950/20" : "");
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -183,26 +221,45 @@ export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: 
           <PhotoSlot side="front" savedPath={card?.image_path} slot={slots.front} busy={busy} onFile={(f) => choose("front", f)} onCrop={() => recrop("front", frontUrl)} onRemove={() => set("front", { photo: null, removed: true })} />
           <PhotoSlot side="back" savedPath={card?.back_image_path} slot={slots.back} busy={busy} onFile={(f) => choose("back", f)} onCrop={() => recrop("back", backUrl)} onRemove={() => set("back", { photo: null, removed: true })} />
         </div>
-        <p className="-mt-2 text-xs text-muted-foreground">Optional. Upload or scan each side, then crop so only the card is kept. Photos are shrunk to 800 px before they are saved.</p>
+        <p className="-mt-2 text-xs text-muted-foreground">Optional. Upload or take a photo of each side, then crop so only the card is kept. Photos are shrunk to 800 px before they are saved.</p>
 
+        {hasPhoto && (
+          <div className="-mt-1 space-y-2" data-testid="card-reader">
+            <button type="button" onClick={readDetails} disabled={busy || reading} className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-primary/40 bg-primary/5 text-sm font-semibold text-primary hover:bg-primary/10 disabled:opacity-60">
+              {reading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Sparkles className="h-4 w-4" aria-hidden="true" />}
+              {reading ? "Reading the card…" : "Read details from photos"}
+            </button>
+            {!reading && !filled.size && !readFail && <p className="text-xs text-muted-foreground">Reads the store name, card number and name from the photos. The photos are only read, not kept by the reader.</p>}
+            {filled.size > 0 && <p role="status" data-testid="card-read-ok" className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">Filled from the card. Check the details, then save.</p>}
+            {readFail && (
+              <div role="alert" data-testid="card-read-fail" className="space-y-2 rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-800 dark:bg-orange-950/30 dark:text-orange-300">
+                <p>{readFail}</p>
+                <div className="flex gap-2">
+                  <button type="button" onClick={readDetails} className="h-9 rounded-lg border border-orange-300 bg-background px-3 font-medium">Try again</button>
+                  <button type="button" onClick={() => { setReadFail(null); document.getElementById("lc-store")?.focus(); }} className="h-9 rounded-lg px-3 font-medium underline">Type it in</button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="space-y-1.5">
           <label htmlFor="lc-store" className={label}>Store name</label>
-          <Input id="lc-store" value={store} onChange={(e) => setStore(e.target.value)} maxLength={80} className="h-11 text-base" placeholder="Greenfield Market" autoComplete="off" />
+          <Input id="lc-store" value={store} onChange={(e) => setStore(e.target.value)} maxLength={80} className={cn("h-11 text-base", hi("store"))} placeholder="Greenfield Market" autoComplete="off" />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label htmlFor="lc-cat" className={label}>Card type <span className="font-normal text-muted-foreground">(optional)</span></label>
-            <Input id="lc-cat" list="lc-cats" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={40} className="h-11 text-base" placeholder="Rewards" autoComplete="off" />
+            <Input id="lc-cat" list="lc-cats" value={category} onChange={(e) => setCategory(e.target.value)} maxLength={40} className={cn("h-11 text-base", hi("category"))} placeholder="Rewards" autoComplete="off" />
             <datalist id="lc-cats">{CARD_CATEGORIES.map((c) => <option key={c} value={c} />)}</datalist>
           </div>
           <div className="space-y-1.5">
             <label htmlFor="lc-holder" className={label}>Card holder <span className="font-normal text-muted-foreground">(optional)</span></label>
-            <Input id="lc-holder" value={holder} onChange={(e) => setHolder(e.target.value)} maxLength={80} className="h-11 text-base" autoComplete="off" />
+            <Input id="lc-holder" value={holder} onChange={(e) => setHolder(e.target.value)} maxLength={80} className={cn("h-11 text-base", hi("holder"))} autoComplete="off" />
           </div>
         </div>
         <div className="space-y-1.5">
           <label htmlFor="lc-number" className={label}>Barcode or card number</label>
-          <Input id="lc-number" value={number} onChange={(e) => setNumber(e.target.value)} className="h-11 text-base tracking-wider" inputMode="text" autoComplete="off" placeholder="4021 8830 1177" />
+          <Input id="lc-number" value={number} onChange={(e) => setNumber(e.target.value)} className={cn("h-11 text-base tracking-wider", hi("number"))} inputMode="text" autoComplete="off" placeholder="4021 8830 1177" />
         </div>
         <div className="space-y-1.5">
           <label htmlFor="lc-format" className={label}>Barcode format</label>
@@ -210,7 +267,7 @@ export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: 
             <option value="auto">Auto-detect{number.trim() ? ` (${formatLabel(detectFormat(number))})` : ""}</option>
             {BARCODE_FORMATS.map((f) => <option key={f.value} value={f.value}>{f.label}</option>)}
           </select>
-          <p className="text-xs text-muted-foreground">Auto-detect picks the format from the number. Change it if the till does not scan.</p>
+          <p className="text-xs text-muted-foreground">{fromBarcode && filled.has("format") ? `${formatLabel(chosen)} (found in the barcode). ` : ""}Auto-detect picks the format from the number. Change it if the till does not scan.</p>
         </div>
 
         <fieldset className="min-w-0 space-y-1.5">

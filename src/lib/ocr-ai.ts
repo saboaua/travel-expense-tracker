@@ -10,6 +10,7 @@ import { sanitizeDocumentFields, type DocumentFields } from "@/lib/mrz";
 import { attachWeightLines, guessGroceryCategory, type GroceryLine } from "@/lib/personal/grocery";
 import { checkGrocery, type ScanCheck } from "@/lib/receipt-check";
 import { buildShelfPrompt, sanitizeShelfLabel, type ShelfLabelScan } from "@/lib/shelf-label";
+import { buildCardPrompt, sanitizeCardRead, type CardRead } from "@/lib/loyalty-read";
 import { askGroq, groqConfigured, groqModels } from "@/lib/ocr-groq";
 
 const DEFAULT_MODEL = "gemini-3.8-flash"; // override with OCR_MODEL (a Gemini model name)
@@ -594,4 +595,9 @@ export async function extractFlightWithAi(image: { data: Uint8Array | ArrayBuffe
 export async function extractShelfLabelWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }, currency: string | null): Promise<ShelfLabelScan> {
   const raw = await askAi(image, buildShelfPrompt(currency), 500, { backup: true });
   return sanitizeShelfLabel(raw, currency);
+}
+
+export async function extractCardWithAi(image: { data: Uint8Array | ArrayBuffer; mime: string }): Promise<CardRead> {
+  const raw = await askAi(image, buildCardPrompt(), 400, { backup: true });
+  return sanitizeCardRead(raw);
 }
