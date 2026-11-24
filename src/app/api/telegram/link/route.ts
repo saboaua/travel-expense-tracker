@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { randomCode } from "@/lib/telegram";
 
-async function context() {
+async function context(soft = false) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -17,7 +17,8 @@ async function context() {
     .single();
 
   if (!settings?.telegram_enabled) {
-    return { error: NextResponse.json({ error: "Telegram is disabled" }, { status: 403 }) };
+    // Reading the state while the feature is off is a normal answer (200), so the browser console stays clean; changing it is refused
+    return { error: soft ? NextResponse.json({ enabled: false }) : NextResponse.json({ error: "Telegram is disabled" }, { status: 403 }) };
   }
 
   const username = settings.telegram_bot_username || "travelexpenseassistant_bot";
@@ -25,7 +26,7 @@ async function context() {
 }
 
 export async function GET() {
-  const ctx = await context();
+  const ctx = await context(true);
   if (ctx.error) return ctx.error;
 
   const { data } = await ctx.supabase

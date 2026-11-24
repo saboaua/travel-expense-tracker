@@ -4349,6 +4349,28 @@ try {
     } finally { await ctx.close(); }
   });
 
+  await test("admin: every field on Users and Security has a name, and a switched-off Telegram does not log a 403", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "admin@example.com", "Admin-Pass-123");
+    await page.waitForURL((u) => u.pathname === "/");
+    for (const path of ["/admin/users", "/admin/security"]) {
+      await page.goto(`${BASE}${path}`);
+      await page.locator("main input, main select").first().waitFor();
+      const unnamed = await page.evaluate(() => [...document.querySelectorAll("main input, main select, main textarea")]
+        .filter((el) => el.type !== "hidden" && el.offsetParent !== null && !el.labels?.length && !el.getAttribute("aria-label") && !el.getAttribute("aria-labelledby"))
+        .map((el) => `${el.tagName}#${el.id || ""}[${el.placeholder || el.type || ""}]`));
+      assert(unnamed.length === 0, `${path}: fields without a name: ${unnamed.join(", ")}`);
+    }
+    const denied = [];
+    page.on("response", (r) => { if (r.url().includes("/api/telegram/link") && r.status() === 403) denied.push(r.url()); });
+    fake.table("app_settings")[0].telegram_enabled = false;
+    await page.goto(`${BASE}/profile`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor();
+    await page.waitForTimeout(1500);
+    assert(denied.length === 0, "reading the Telegram state while it is off must not be a 403");
+    await ctx.close();
+  });
+
   await test("reminders: share with a partner by a switch, see who it is shared with, and the partner sees who sent it", async () => {
     const RID = "a2a2a2a2-0000-4000-8000-000000000001";
     fake.table("user_plans").push({ user_id: ALICE, plan: "pro", period: "monthly", ends_on: null });

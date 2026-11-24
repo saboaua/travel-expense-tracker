@@ -300,18 +300,18 @@ export default function AdminUsersPage() {
           <form onSubmit={handleCreate} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">First name</label>
-                <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" />
+                <label htmlFor="user-new-first-name" className="text-sm font-medium">First name</label>
+                <Input id="user-new-first-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="John" />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">Last name</label>
-                <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
+                <label htmlFor="user-new-last-name" className="text-sm font-medium">Last name</label>
+                <Input id="user-new-last-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Doe" />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email *</label>
-              <Input
+              <label htmlFor="user-new-email" className="text-sm font-medium">Email *</label>
+              <Input id="user-new-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -322,8 +322,8 @@ export default function AdminUsersPage() {
 
             {canAssignRole(myRole) ? (
               <div className="space-y-2">
-                <label className="text-sm font-medium">Role</label>
-                <Select
+                <label htmlFor="user-new-role" className="text-sm font-medium">Role</label>
+                <Select id="user-new-role"
  value={role}
  onChange={(e) => setRole(e.target.value as UserRole)}
 

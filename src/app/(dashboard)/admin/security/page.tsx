@@ -205,28 +205,28 @@ export default function AdminSecurityPage() {
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div>
-              <label className="text-xs text-muted-foreground">From</label>
-              <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 h-9" />
+              <label htmlFor="log-filter-from" className="text-xs text-muted-foreground">From</label>
+              <Input id="log-filter-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="mt-1 h-9" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">To</label>
-              <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 h-9" />
+              <label htmlFor="log-filter-to" className="text-xs text-muted-foreground">To</label>
+              <Input id="log-filter-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="mt-1 h-9" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">Email</label>
-              <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@..." className="mt-1 h-9" />
+              <label htmlFor="log-filter-email" className="text-xs text-muted-foreground">Email</label>
+              <Input id="log-filter-email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@..." className="mt-1 h-9" />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground">IP address</label>
-              <Input value={ip} onChange={(e) => setIp(e.target.value)} placeholder="1.2.3" className="mt-1 h-9" />
+              <label htmlFor="log-filter-ip-address" className="text-xs text-muted-foreground">IP address</label>
+              <Input id="log-filter-ip-address" value={ip} onChange={(e) => setIp(e.target.value)} placeholder="1.2.3" className="mt-1 h-9" />
             </div>
           </div>
 
           {tab === "security" ? (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Event</label>
-                <Select value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-1 h-9 px-2 py-0">
+                <label htmlFor="log-filter-event" className="text-xs text-muted-foreground">Event</label>
+                <Select id="log-filter-event" value={eventType} onChange={(e) => setEventType(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All events</option>
                   <option value="login_success">Login success</option>
                   <option value="login_failed">Login failed</option>
@@ -244,8 +244,8 @@ export default function AdminSecurityPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Severity</label>
-                <Select value={severity} onChange={(e) => setSeverity(e.target.value)} className="mt-1 h-9 px-2 py-0">
+                <label htmlFor="log-filter-severity" className="text-xs text-muted-foreground">Severity</label>
+                <Select id="log-filter-severity" value={severity} onChange={(e) => setSeverity(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All severities</option>
                   <option value="info">Info</option>
                   <option value="warning">Warning</option>
@@ -256,8 +256,8 @@ export default function AdminSecurityPage() {
           ) : (
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-muted-foreground">Action</label>
-                <Select value={action} onChange={(e) => setAction(e.target.value)} className="mt-1 h-9 px-2 py-0">
+                <label htmlFor="log-filter-action" className="text-xs text-muted-foreground">Action</label>
+                <Select id="log-filter-action" value={action} onChange={(e) => setAction(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All actions</option>
                   <option value="created">Created</option>
                   <option value="updated">Updated</option>
@@ -265,8 +265,8 @@ export default function AdminSecurityPage() {
                 </Select>
               </div>
               <div>
-                <label className="text-xs text-muted-foreground">Record</label>
-                <Select value={entityType} onChange={(e) => setEntityType(e.target.value)} className="mt-1 h-9 px-2 py-0">
+                <label htmlFor="log-filter-record" className="text-xs text-muted-foreground">Record</label>
+                <Select id="log-filter-record" value={entityType} onChange={(e) => setEntityType(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All records</option>
                   <option value="expenses">Expenses</option>
                   <option value="trips">Trips</option>

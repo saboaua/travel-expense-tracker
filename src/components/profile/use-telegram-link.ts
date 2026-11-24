@@ -21,12 +21,13 @@ export function useTelegramLink() {
 
   const load = useCallback(async () => {
     const res = await fetch("/api/telegram/link");
-    if (!res.ok) {
+    const data = res.ok ? await res.json() : null;
+    if (!data || data.enabled === false) {
       setFeatureOn(false);
       return;
     }
     setFeatureOn(true);
-    setStatus(await res.json());
+    setStatus(data);
   }, []);
 
   useEffect(() => {

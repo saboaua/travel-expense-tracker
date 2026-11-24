@@ -3,6 +3,7 @@
 // The Content-Security-Policy is set per request (with a nonce) in src/middleware.ts.
 
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 
 // Headers sent on every response
 const securityHeaders = [
@@ -27,6 +28,11 @@ const nextConfig = {
   env: { NEXT_PUBLIC_BUILD_ID: buildId, NEXT_PUBLIC_APP_VERSION: appVersion, NEXT_PUBLIC_BUILD_TIME: buildTime },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
+  },
+  // Leave out the live-updates part of the Supabase client in the browser: the app never uses it
+  webpack(config, { isServer }) {
+    if (!isServer) config.resolve.alias["@supabase/realtime-js"] = fileURLToPath(new URL("./src/lib/realtime-stub.js", import.meta.url));
+    return config;
   },
   images: {
     remotePatterns: [
