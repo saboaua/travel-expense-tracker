@@ -1,5 +1,6 @@
 "use client";
 
+import { SectionCard } from "@/components/ui/section-card";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, Plus } from "lucide-react";
@@ -45,8 +46,7 @@ export function RemindersCard() {
   const shown = open.slice(0, SHOW);
   const more = open.length - shown.length;
   return (
-    <section aria-label="Reminders" className="rounded-2xl border bg-card p-4 shadow-sm" data-testid="reminders-card">
-      <h2 className="text-lg font-bold">Reminders</h2>
+    <SectionCard id="reminders-card-h" testId="reminders-card" title="Reminders" href="/personal/reminders" seeAll={more > 0 ? `See all (${open.length})` : "See all"} seeAllTestId="reminders-card-more">
       <ul className="mt-1 divide-y">
         {shown.map((r) => {
           const over = statusOf(r, now) === "overdue";
@@ -74,10 +74,9 @@ export function RemindersCard() {
           );
         })}
       </ul>
-      <div className="mt-1 flex items-center justify-between text-sm font-semibold text-primary">
+      <div className="mt-1 flex items-center text-sm font-semibold text-primary">
         <Link href="/personal/reminders/new" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg pr-2" data-testid="reminders-card-add"><Plus className="h-4 w-4" aria-hidden="true" />Add</Link>
-        {more > 0 && <Link href="/personal/reminders" className="inline-flex min-h-11 items-center rounded-lg pl-2" data-testid="reminders-card-more">See more ({more})</Link>}
       </div>
-    </section>
+    </SectionCard>
   );
 }

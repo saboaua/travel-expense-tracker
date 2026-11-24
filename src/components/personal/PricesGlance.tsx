@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, Store, TrendingUp } from "lucide-react";
 import { Money } from "@/components/ui/money";
@@ -60,7 +60,7 @@ function BestCard({ b }: { b: BestGlance }) {
 }
 
 /**
- * The Personal dashboard's price cards: Price tracker and Best store, side by side in a row you swipe on a phone.
+ * The Personal dashboard's price cards: Price tracker and Best store, full width, side by side on a wide screen.
  * Each is a headline and a few chips; tapping opens the full page. A card with nothing to show is left out.
  */
 export function PricesGlance() {
@@ -72,25 +72,12 @@ export function PricesGlance() {
   }, []);
   const now = useMemo(() => new Date(), []);
   const glance = useMemo(() => priceGlance(prices.data ?? [], matches.data ?? [], listQ.data ?? [], now), [prices.data, matches.data, listQ.data, now]);
-  const scroller = useRef<HTMLDivElement>(null);
-  const [page, setPage] = useState(0);
 
   const cards = [glance.tracker && <TrackerCard key="t" t={glance.tracker} />, glance.best && <BestCard key="b" b={glance.best} />].filter(Boolean);
   if (cards.length === 0) return null;
   return (
-    <section aria-label="Prices" data-testid="prices-glance" className="space-y-2">
-      <div
-        ref={scroller}
-        onScroll={(e) => { const el = e.currentTarget; setPage(el.scrollLeft + el.clientWidth / 2 > el.scrollWidth / 2 ? 1 : 0); }}
-        className="-mx-4 flex snap-x snap-mandatory gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
-      >
-        {cards.map((c, i) => <div key={i} className="flex w-[86%] max-w-[330px] shrink-0 snap-start sm:w-auto sm:max-w-none sm:min-w-0 sm:flex-1 sm:basis-0">{c}</div>)}
-      </div>
-      {cards.length > 1 && (
-        <div className="flex justify-center gap-1.5 sm:hidden" aria-hidden="true">
-          {cards.map((_, i) => <span key={i} className={`h-1.5 rounded-full transition-all ${page === i ? "w-[18px] bg-primary" : "w-1.5 bg-border"}`} />)}
-        </div>
-      )}
+    <section aria-label="Prices" data-testid="prices-glance" className="space-y-4 sm:grid sm:grid-cols-2 sm:gap-4 sm:space-y-0">
+      {cards.map((c, i) => <div key={i} className="flex min-w-0">{c}</div>)}
     </section>
   );
 }

@@ -528,7 +528,7 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
     await page.getByRole("heading", { name: "Documents", exact: true }).waitFor();
-    const titles = await page.getByTestId("doc-tiles").locator("p.truncate.font-bold").allInnerTexts();
+    const titles = await page.getByTestId("doc-tiles").locator(".truncate.font-bold").allInnerTexts();
     assert(titles.join("|") === "Visa / e-visa|Travel insurance", `tile order/content was: ${titles.join("|")}`);
     await page.getByText("Expires soon").first().waitFor();
     const text = await page.getByTestId("doc-tiles").innerText();
@@ -5434,7 +5434,7 @@ try {
       await page.getByTestId("reminders-card").waitFor();
       assert((await page.getByTestId("reminders-card-row").count()) === 5, "the card shows 5 reminders");
       assert(/Reminder 1/.test(await page.getByTestId("reminders-card-row").first().innerText()) && (await page.getByTestId("reminders-card").getByText("Already done").count()) === 0, "soonest first, done ones left out");
-      assert(/See more \(2\)/.test(await page.getByTestId("reminders-card-more").innerText()), "See more says how many are left");
+      assert(/See all \(7\)/.test(await page.getByTestId("reminders-card-more").innerText()), "See all says how many are left");
       assert((await page.getByTestId("reminders-card-add").getAttribute("href")) === "/personal/reminders/new" && (await page.getByTestId("reminders-card-more").getAttribute("href")) === "/personal/reminders", "Add and See more go to the right pages");
       const y = async (sel) => (await page.locator(sel).first().boundingBox())?.y ?? -1;
       assert((await y("[data-testid=budget-card],[data-testid=budget-empty]")) < (await y("[data-testid=reminders-card]")), "the card sits under the budget");

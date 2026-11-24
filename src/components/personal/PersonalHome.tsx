@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { Money } from "@/components/ui/money";
 import { useEffect, useState } from "react";
-import { Coins, Tag, CreditCard, Plus, Repeat, Tv, ChevronRight } from "lucide-react";
+import { Coins, Tag, CreditCard, Repeat, Tv, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { useAccess } from "@/lib/use-access";
 import { SUBSCRIPTION_COLS } from "@/lib/columns";
@@ -16,7 +16,7 @@ import type { DocTile } from "@/components/documents/DocumentTiles";
 /** Below the first screen: loads after the top of Home and holds its space meanwhile. */
 const DocumentTiles = dynamic(() => import("@/components/documents/DocumentTiles").then((m) => m.DocumentTiles), {
   ssr: false,
-  loading: () => <div className="h-32 animate-pulse rounded-2xl bg-muted/60" aria-hidden="true" data-testid="docs-loading" />,
+  loading: () => <div className="h-40 animate-pulse rounded-2xl bg-muted/60" aria-hidden="true" data-testid="docs-loading" />,
 });
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
@@ -24,12 +24,10 @@ import { BudgetCard } from "@/components/personal/BudgetCard";
 import { PricesGlance } from "@/components/personal/PricesGlance";
 import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
 import { IconTile } from "@/components/ui/icon-tile";
+import { EmptyTile, SectionCard } from "@/components/ui/section-card";
 import { RemindersCard } from "@/components/reminders/RemindersCard";
 import { TrialBanner } from "@/components/personal/TrialBanner";
 
-const CARD = "rounded-2xl border bg-card p-4 shadow-sm";
-const heading = "text-lg font-bold";
-const seeAll = "inline-flex min-h-11 shrink-0 items-center rounded-lg px-2 text-sm font-semibold text-primary hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
 /** How soon, as the short pill on a row. */
 function duePill(days: number): { text: string; cls: string } {
@@ -73,17 +71,9 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
   const usd = approxUsd(totals);
   const next = upcoming(subs, today, 365).slice(0, 3);
   return (
-    <section aria-labelledby={`${testId}-h`} data-testid={testId} className={cn(CARD, "space-y-3")}>
-      <div className="flex items-center justify-between gap-2">
-        <h2 id={`${testId}-h`} className={heading}>Subscriptions</h2>
-        <Link href="/personal/subscriptions" className={seeAll}>See all</Link>
-      </div>
+    <SectionCard id={`${testId}-h`} testId={testId} title="Subscriptions" href="/personal/subscriptions" className="space-y-3">
       {subs.length === 0 ? (
-        <Link href="/personal/subscriptions" className="flex min-h-[5rem] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-3 text-center text-muted-foreground hover:border-primary hover:text-foreground">
-          <Plus className="h-5 w-5 text-primary" aria-hidden="true" />
-          <span className="text-sm font-semibold text-foreground">Add a subscription</span>
-          <span className="text-xs">Track what you pay and when it is due</span>
-        </Link>
+        <EmptyTile href="/personal/subscriptions" title="Add a subscription" text="Track what you pay and when it is due" />
       ) : (
         <>
           <div>
@@ -112,7 +102,7 @@ function SubscriptionsCard({ subs, today, testId }: { subs: Sub[] | null; today:
           </ul>
         </>
       )}
-    </section>
+    </SectionCard>
   );
 }
 
@@ -180,7 +170,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
         <div className="min-w-0 space-y-4">
           <RemindersCard />
           <SubscriptionsCard subs={subs} today={today} testId="subs-card" />
-          {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="grid-cols-2" />}
+          {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" />}
           <MyIptv />
         </div>
       </div>

@@ -255,7 +255,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
             <CardDescription>Your ongoing and upcoming travels. Completed trips are in Trips.</CardDescription>
           </div>
           <Link href="/trips">
-            <Button variant="outline" size="sm">View all</Button>
+            <Button variant="outline" size="sm">See all</Button>
           </Link>
         </CardHeader>
         <CardContent className="space-y-4 max-md:px-0 max-md:pb-0">

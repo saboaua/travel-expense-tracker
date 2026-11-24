@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { IconTile } from "@/components/ui/icon-tile";
-import Link from "next/link";
-import { BadgeCheck, Car, Download, Eye, FileText, IdCard, Plane, Plus, ShieldCheck, Stamp, Syringe, Hotel, Loader2 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import { BadgeCheck, Car, FileText, IdCard, Plane, ShieldCheck, Stamp, Syringe, Hotel, Loader2 } from "lucide-react";
+import { EmptyTile, SectionCard } from "@/components/ui/section-card";
 import { DocumentViewer } from "@/components/documents/DocumentViewer";
 import { createClient } from "@/lib/supabase/client";
 import { DOC_BUCKET } from "@/lib/document-upload";
@@ -50,8 +49,8 @@ const CHIP: Record<DocLevel, string> = {
   none: "",
 };
 
-/** Documents on the business page: one tile per saved document, soonest to expire first. */
-export function DocumentTiles({ tiles, total, idPrefix = "doc-tiles", gridClass = "sm:grid-cols-2 xl:grid-cols-3" }: { tiles: DocTile[]; total: number; /** Two lists on one page (Personal and Business) need their own heading ids */ idPrefix?: string; gridClass?: string }) {
+/** Documents on Home: one card of rows, soonest to expire first. Tapping a row opens the file when there is one. */
+export function DocumentTiles({ tiles, total, idPrefix = "doc-tiles" }: { tiles: DocTile[]; total: number; /** Two lists on one page (Personal and Business) need their own heading ids */ idPrefix?: string; gridClass?: string }) {
   const [viewing, setViewing] = useState<{ title: string; url: string; path: string } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -66,88 +65,49 @@ export function DocumentTiles({ tiles, total, idPrefix = "doc-tiles", gridClass 
     setViewing({ title: t.kindLabel, url: data.signedUrl, path: t.filePath });
   };
 
-  const download = async (t: DocTile) => {
-    if (!t.filePath) return;
-    setBusy(t.id);
-    setError(null);
-    const name = t.filePath.split("/").pop() || "document";
-    const { data, error: err } = await createClient().storage.from(DOC_BUCKET).createSignedUrl(t.filePath, 3600, { download: name });
-    setBusy(null);
-    if (err || !data?.signedUrl) return setError("Could not download that file. Check your connection and try again.");
-    window.location.assign(data.signedUrl);
-  };
-
   return (
-    <section aria-labelledby={`${idPrefix}-heading`} data-testid={idPrefix} className="space-y-3">
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <h2 id={`${idPrefix}-heading`} className="text-lg font-bold">Documents</h2>
-          <p className="text-sm text-muted-foreground">Soonest to expire first</p>
-        </div>
-        <Link href="/documents" className="inline-flex h-10 shrink-0 items-center rounded-lg border bg-card px-4 text-sm font-semibold text-primary hover:bg-muted">
-          {total > tiles.length ? `View all (${total})` : "View all"}
-        </Link>
-      </div>
-
-      {error && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">{error}</p>}
+    <SectionCard id={`${idPrefix}-heading`} testId={idPrefix} title="Documents" href="/documents" seeAll={total > tiles.length ? `See all (${total})` : "See all"}>
+      {error && <p role="alert" className="mb-2 rounded-lg bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-950/50 dark:text-amber-300">{error}</p>}
 
       {tiles.length === 0 ? (
-        <Link href="/documents" className="flex min-h-[8rem] flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed p-4 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground sm:max-w-xs">
-          <Plus className="h-6 w-6 text-primary" aria-hidden="true" />
-          <span className="text-sm font-semibold text-foreground">Add a document</span>
-          <span className="text-xs">Passport, ID, driver&apos;s license…</span>
-        </Link>
+        <EmptyTile href="/documents" title="Add a document" text="Passport, ID, driver's license..." />
       ) : (
-        <div className={`grid grid-cols-1 gap-3 md:gap-4 ${gridClass}`}>
+        <ul className="divide-y">
           {tiles.map((t) => {
             const Icon = ICONS[t.kind] ?? FileText;
-            const iconBtn = "inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-60";
+            const body = (
+              <>
+                <IconTile tone="documents" className="h-10 w-10 rounded-xl">
+                  {busy === t.id ? <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" /> : <Icon className="h-5 w-5" />}
+                </IconTile>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-bold" title={t.kindLabel}>{t.kindLabel}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {[t.country, t.number ? `${t.numberLabel} ${t.number}` : null].filter(Boolean).join(" · ") || "\u00a0"}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    {t.level === "expired" ? "Expired" : "Expires"} {t.expiry ? formatDate(t.expiry) : "(no expiry date)"}
+                    {t.countdown && <span className={t.level === "ok" ? "" : " font-medium text-amber-700 dark:text-amber-300"}> ({t.countdown})</span>}
+                  </span>
+                </span>
+                {t.level !== "none" && <span className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold ${CHIP[t.level]}`}>{t.statusLabel}</span>}
+              </>
+            );
+            const row = "flex min-h-[60px] w-full items-center gap-3 py-2 text-left";
             return (
-              <Card key={t.id} className="p-3.5">
-                <div className="flex items-start gap-3">
-                  <IconTile tone="documents" className="h-9 w-9 rounded-lg">
-                    <Icon className="h-5 w-5" />
-                  </IconTile>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-                      <p className="truncate text-sm font-bold" title={t.kindLabel}>{t.kindLabel}</p>
-                      {t.level !== "none" && <span className={`shrink-0 whitespace-nowrap rounded-full px-2 py-0.5 text-[11px] font-bold ${CHIP[t.level]}`}>{t.statusLabel}</span>}
-                    </div>
-                    <p className="truncate text-xs text-muted-foreground">{t.country ?? "\u00a0"}</p>
-                  </div>
-                  {t.filePath && (
-                    <div className="-mr-1 -mt-1 flex shrink-0 gap-0.5">
-                      <button type="button" onClick={() => open(t)} disabled={busy === t.id} className={iconBtn} aria-label={`View ${t.kindLabel}`}>
-                        {busy === t.id ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
-                      </button>
-                      <button type="button" onClick={() => download(t)} disabled={busy === t.id} className={iconBtn} aria-label={`Download ${t.kindLabel}`}>
-                        <Download className="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-                <dl className="mt-3 flex gap-6 border-t pt-2.5 text-sm">
-                  {t.number && (
-                    <div className="min-w-0">
-                      <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t.numberLabel}</dt>
-                      <dd className="font-semibold">{t.number}</dd>
-                    </div>
-                  )}
-                  <div className="min-w-0">
-                    <dt className="text-[11px] uppercase tracking-wide text-muted-foreground">{t.level === "expired" ? "Expired" : "Expires"}</dt>
-                    <dd className="font-semibold">
-                      {t.expiry ? formatDate(t.expiry) : "No expiry date"}
-                      {t.countdown && <span className={`ml-1 font-medium ${t.level === "ok" ? "text-muted-foreground" : "text-amber-700 dark:text-amber-300"}`}>({t.countdown})</span>}
-                    </dd>
-                  </div>
-                </dl>
-              </Card>
+              <li key={t.id}>
+                {t.filePath ? (
+                  <button type="button" onClick={() => open(t)} disabled={busy === t.id} aria-label={`View ${t.kindLabel}`} className={`${row} transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-70`}>{body}</button>
+                ) : (
+                  <div className={row}>{body}</div>
+                )}
+              </li>
             );
           })}
-        </div>
+        </ul>
       )}
 
       {viewing && <DocumentViewer {...viewing} onClose={() => setViewing(null)} />}
-    </section>
+    </SectionCard>
   );
 }

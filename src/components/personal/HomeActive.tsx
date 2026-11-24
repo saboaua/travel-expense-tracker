@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Fragment } from "react";
 import { Camera, ChevronRight, Hammer, MapPin, Plane } from "lucide-react";
 import { IconTile } from "@/components/ui/icon-tile";
+import { SectionCard } from "@/components/ui/section-card";
 import { TripWeather } from "@/components/TripWeather";
 import { AdvisoryTile } from "@/components/AdvisoryTile";
 import { BASE_CURRENCY, type DashboardProject, type DashboardRow } from "@/lib/personal/dashboard";
@@ -89,25 +90,25 @@ export function HomeProjects({ rows, projects }: { rows: DashboardRow[]; project
   const list = projects.filter((p) => (p.status || "active") === "active" && p.kind === "home_project");
   if (list.length === 0) return null;
   return (
-    <section aria-labelledby="home-projects-h" data-testid="home-projects" className="space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <h2 id="home-projects-h" className={heading}>Projects</h2>
-        <Link href="/personal/projects" className={seeAll}>See all</Link>
-      </div>
-      {list.map((p) => {
-        const spent = spentOn(rows, p.id);
-        return (
-          <Link key={p.id} href={`/personal/projects/${p.id}`} data-testid="personal-project-row" className="flex min-h-[72px] items-center gap-3 rounded-2xl border bg-card px-4 py-3 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
-            <IconTile tone="projects" className="h-11 w-11"><Hammer className="h-5 w-5" /></IconTile>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold">{p.name}</span>
-              <span className="block text-[13px] text-muted-foreground">{spent.count ? plural(spent.count, "expense") : "No expenses yet"}</span>
-            </span>
-            <span className="text-[15px] font-semibold tabular-nums">{money(spent.total)}</span>
-            <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden="true" />
-          </Link>
-        );
-      })}
-    </section>
+    <SectionCard id="home-projects-h" testId="home-projects" title="Projects" href="/personal/projects">
+      <ul className="divide-y">
+        {list.map((p) => {
+          const spent = spentOn(rows, p.id);
+          return (
+            <li key={p.id}>
+              <Link href={`/personal/projects/${p.id}`} data-testid="personal-project-row" className="flex min-h-[60px] items-center gap-3 py-2 transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <IconTile tone="projects" className="h-10 w-10"><Hammer className="h-5 w-5" /></IconTile>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-semibold">{p.name}</span>
+                  <span className="block text-xs text-muted-foreground">{spent.count ? plural(spent.count, "expense") : "No expenses yet"}</span>
+                </span>
+                <span className="text-[15px] font-semibold tabular-nums">{money(spent.total)}</span>
+                <ChevronRight className="h-[18px] w-[18px] text-muted-foreground" aria-hidden="true" />
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+    </SectionCard>
   );
 }
