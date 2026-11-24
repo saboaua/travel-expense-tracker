@@ -147,6 +147,13 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
           <ActionTile href="/personal/groceries/price-check" label="Add a price" testid="price-check-link" tint="bg-slate-100 text-slate-600 dark:bg-slate-500/20 dark:text-slate-300"><Tag className="h-5 w-5" aria-hidden="true" /></ActionTile>
         </div>
         )}
+        {!shopping && (
+          <Link href="/personal/groceries/smart-cart" data-testid="smart-cart-link" className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-100 to-emerald-50 p-3 shadow-sm transition-colors hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-emerald-500/30 dark:from-emerald-500/20 dark:to-emerald-500/5">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-600/15 text-emerald-700 dark:text-emerald-300"><ShoppingCart className="h-6 w-6" aria-hidden="true" /></span>
+            <span className="min-w-0 flex-1"><span className="flex items-center gap-2 text-[15px] font-extrabold">Smart Cart<span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-extrabold text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">PRO</span></span><span className="block text-xs text-emerald-900 dark:text-emerald-200">Your usual cart, and where it costs least</span></span>
+            <ChevronRight className="h-5 w-5 shrink-0 text-emerald-800 dark:text-emerald-200" aria-hidden="true" />
+          </Link>
+        )}
       </div>
 
       {!shopping && (

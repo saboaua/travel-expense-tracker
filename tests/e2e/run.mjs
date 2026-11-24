@@ -6393,6 +6393,87 @@ try {
     }
   });
 
+  await test("smart cart: Free sees it locked, Pro gets the usual cart, trips after driving cost, and every supermarket when driving is switched off", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const names = ["Milk", "Bread", "Rice", "Eggs", "Butter", "Juice"];
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    // Ling & Sons is where you shop (3 visits, 10 each); New Ten Sing is cheaper on the first three things and dearer on the rest
+    [["Ling & Sons", [-30, -20, -10], () => 10], ["New Ten Sing", [-6, -3], (ni) => (ni < 3 ? 8 : 13)]].forEach(([st, days, price], si) => {
+      days.forEach((d, di) => {
+        const rid = `9c000000-0000-4000-8000-0000000e5${si}${di}`;
+        fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: st, purchase_date: addDays(today, d), total: 60, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+        names.forEach((n, ni) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000e5${si}${di}${ni}`, receipt_id: rid, user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: price(ni), line_total: price(ni), unit: null, created_at: new Date().toISOString() }));
+      });
+    });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5001", user_id: PAT, name: "Ling & Sons", lat: 12.525, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5002", user_id: PAT, name: "New Ten Sing", lat: 12.56, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    me().home_lat = 12.52; me().home_lng = -70.03;
+    await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      // The entry is on Groceries
+      await page.goto(`${BASE}/personal/groceries`);
+      await page.getByTestId("smart-cart-link").waitFor();
+      // Free: a locked preview and Get Pro
+      await page.goto(`${BASE}/personal/groceries/smart-cart`);
+      await page.getByTestId("sc-free").waitFor();
+      assert(/Pro feature/.test(await page.getByTestId("sc-free").innerText()), "Free is told Smart Cart is a Pro feature");
+      assert((await page.getByTestId("sc-get-pro").getAttribute("href")) === "/personal/pro", "Get Pro goes to the Pro page");
+      assert((await page.getByTestId("smart-cart").count()) === 0, "Free gets no cart");
+      // Pro
+      fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+      await page.reload();
+      await page.getByTestId("smart-cart").waitFor();
+      assert((await page.getByTestId("sc-cart-row").count()) === 6, "the usual cart has the six things bought again");
+      const hero = await page.getByTestId("sc-hero").innerText();
+      assert(/6 items/.test(hero) && /could save/.test(hero), `the hero says what could be saved (got: ${hero})`);
+      await page.getByTestId("sc-plan").first().waitFor();
+      assert((await page.getByTestId("sc-plan").count()) >= 2, "one stop and two stops are offered");
+      assert(/Best/.test(await page.getByTestId("sc-plans").innerText()), "the best plan is marked");
+      const route = await page.getByTestId("sc-route").getAttribute("href");
+      assert(/google\.com\/maps\/dir\/\?api=1&destination=12\.\d+,-70\.03/.test(route) && /origin=12\.52/.test(route), `directions go from home to the store (got: ${route})`);
+      assert((await page.getByTestId("sc-stop").count()) >= 1 && (await page.getByTestId("sc-line").count()) >= 1, "each stop lists what to buy there");
+      // A store name opens its map
+      await page.getByTestId("sc-stop-open").first().click();
+      await page.getByTestId("sc-store-sheet").waitFor();
+      assert(/maps\/dir/.test(await page.getByTestId("sc-directions").getAttribute("href")), "the map sheet has Directions in Google Maps");
+      await page.keyboard.press("Escape");
+      // Leave one thing out: it stays out after a reload
+      await page.getByRole("checkbox", { name: "Leave out Milk" }).click();
+      assert((await page.getByRole("checkbox", { name: "Add Milk" }).getAttribute("aria-checked")) === "false", "Milk is left out");
+      await page.reload();
+      await page.getByTestId("smart-cart").waitFor();
+      assert((await page.getByRole("checkbox", { name: "Add Milk" }).count()) === 1, "and it is still out after a reload");
+      // Driving cost off: every supermarket, and the person decides
+      await page.getByRole("switch", { name: "Include driving cost", exact: true }).click();
+      await page.getByTestId("sc-stores").waitFor();
+      assert((await page.getByTestId("sc-store-row").count()) === 2, "both supermarkets are listed");
+      const first = await page.getByTestId("sc-store-row").first().innerText();
+      assert(/Ling & Sons/.test(first) && /Usual store/.test(first), `the usual store is marked (got: ${first})`);
+      assert(/more/.test(await page.getByTestId("sc-store-row").nth(1).innerText()), "the other store says how much more");
+      assert((await page.getByTestId("sc-plans").count()) === 0, "no trips are planned while driving is not counted");
+      await page.getByTestId("sc-store-row").nth(1).click();
+      assert(/destination=12\.56/.test(await page.getByTestId("sc-directions").getAttribute("href")), "a store row opens directions to that store");
+      await page.keyboard.press("Escape");
+      // Settings
+      await page.getByTestId("sc-settings-open").click();
+      await page.getByTestId("sc-settings").waitFor();
+      await page.getByLabel("Driving cost per km").fill("0.5");
+      await page.getByLabel("Driving cost per km").blur();
+      await page.reload();
+      await page.getByTestId("smart-cart").waitFor();
+      assert((await page.getByRole("switch", { name: "Include driving cost", exact: true }).getAttribute("aria-checked")) === "false", "the switch stays off after a reload");
+    } finally {
+      await ctx.close();
+      me().home_lat = null; me().home_lng = null;
+      fake.table("user_plans").splice(0);
+      for (const t of ["grocery_receipts", "grocery_items", "store_locations"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e5")) a.splice(i, 1); }
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {
