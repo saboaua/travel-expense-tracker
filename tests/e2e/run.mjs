@@ -692,6 +692,30 @@ try {
     await browser2.close();
   });
 
+  await test("admin: Supermarket places shows how many different products the community shared, in total and per store, and the hub shows the total", async () => {
+    const SP = fake.table("shared_prices");
+    const before = SP.length;
+    const mk = (id, store, key, name, who, month = "2026-11-01") => ({ id, country: "AW", store_key: store, store_name: name, product_key: key, product_name: key, size_label: null, currency: "AWG", price: 2, month, contributor: who });
+    SP.push(mk(9001, "ling", "milk", "Ling & Sons", "a"), mk(9002, "ling", "eggs", "Ling & Sons", "a"), mk(9003, "sf", "milk", "Super Food Plaza", "b"), mk(9004, "sf", "rice", "Super Food Plaza", "c"), mk(9005, "sf", "eggs", "Super Food Plaza", "c"));
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/admin/supermarkets`);
+      await page.getByTestId("hub-community-products").first().waitFor();
+      assert(/community products?/.test(await page.getByTestId("hub-community-products").first().innerText()), "the hub shows the community product total");
+      await page.goto(`${BASE}/admin/supermarkets/places`);
+      await page.getByTestId("community-totals").waitFor();
+      const tot = await page.getByTestId("community-totals").innerText();
+      assert(/Unique products\s*3\b/.test(tot.replace(/\n+/g, " ")) || /3\s*Stores|Unique products\n3/.test(tot), `totals were: ${tot.replace(/\s+/g, " ")}`);
+      const rows = await page.getByTestId("community-store-row").allInnerTexts();
+      assert(rows.length === 2 && /Super Food Plaza/.test(rows[0]) && /3\s*products/.test(rows[0].replace(/\s+/g, " ")), `store rows were: ${rows.join(" | ").replace(/\s+/g, " ")}`);
+      assert(!/ a$| b$| c$/.test((await page.getByTestId("community-by-store").innerText()).trim()), "no shopper is named");
+      const status = await page.evaluate(async () => (await fetch("/api/admin/community-products")).status);
+      assert(status === 200, "admin can read the overview");
+    } finally { SP.length = before; await ctx.close(); }
+  });
+
   await test("offline: loyalty cards and documents open with no connection, from the copy saved on the phone", async () => {
     const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
     fake.storage.set(`sign/loyalty-cards/${PAT}/front.png`, PNG);

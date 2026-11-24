@@ -10,6 +10,7 @@ import { CountryField } from "@/components/admin/CountryField";
 import { PlacesFix } from "@/components/admin/PlacesFix";
 import { useAccess } from "@/lib/use-access";
 import { formatDate } from "@/lib/utils";
+import { CommunityByStore } from "@/components/admin/CommunityByStore";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Preview = { total: number; kept: number; skipped: { noName: number; badGps: number; duplicate: number; example: number }; sample: { name: string; lat: number; lng: number }[] };
@@ -68,6 +69,8 @@ export default function AdminSupermarketsPage() {
       {done && <Alert variant="success">{done}</Alert>}
 
       <Card><CardContent className="p-4"><CountryField value={country} onChange={(c) => { setCountry(c); reset(); }} disabled={busy} /></CardContent></Card>
+
+      <CommunityByStore country={country} />
 
       <Card>
         <CardHeader className="pb-2"><CardTitle className="text-lg">Saved list</CardTitle></CardHeader>
