@@ -13,6 +13,7 @@ import { currentPassport } from "@/lib/documents";
 import { FLIGHT_COLS } from "@/lib/columns";
 import type { TripFlight } from "@/lib/flights";
 import { DETAILS_COLS, ENTRY_CARD_TITLE, ENTRY_CARD_URL, EMPTY_DETAILS, buildAnswers, cleanDetails, homeFlight, missingDetails, type AnswerRow, type EntryDetails } from "@/lib/entry-card";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const masked = (v: string) => (v.length > 4 ? `•••••• ${v.slice(-4)}` : "••••••");
 
@@ -97,7 +98,7 @@ export default function EntryCardPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-xl space-y-4 px-4 pb-28 pt-4">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 px-4 pb-28 pt-4`}>
       <BackLink href={`/trips/${id}`}>Trip</BackLink>
       <PageHeader title={ENTRY_CARD_TITLE} description="Copy each answer into the card site, in the same order." />
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}

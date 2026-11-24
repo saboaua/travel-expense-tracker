@@ -18,6 +18,7 @@ import { useOutbox } from "@/lib/use-outbox";
 import { applyRows, deleteRow, makeRowApi, saveRow, waitingParents } from "@/lib/row-outbox";
 import { CATEGORIES, CHECKLIST_TABLE, MAX_ITEMS, cleanCategory, copyItems, groupItems, parseItem, pastLists, progress, type ChecklistCategory, type ChecklistItem, type PastList } from "@/lib/trip-checklist";
 import { cn } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const TONE: Record<ChecklistCategory, string> = { documents: "#4f46e5", clothes: "#c026d3", tech: "#0284c7", health: "#dc2626", other: "#475569" };
 
@@ -170,7 +171,7 @@ function Checklist() {
       </button>
     );
     return (
-      <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 md:p-8">
+      <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 pb-28 md:p-8`}>
         <button type="button" onClick={() => setSheet(false)} className="inline-flex min-h-9 items-center gap-2 text-sm text-muted-foreground hover:text-foreground">‹ Checklist</button>
         <PageHeader title="Copy from an earlier trip" description="Same place, so you do not start from zero" />
         {error && <Alert>{error}</Alert>}
@@ -193,7 +194,7 @@ function Checklist() {
   }
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 pb-28 md:p-8`}>
       <BackLink href={`/trips/${id}`}>{trip?.name ?? "Trip"}</BackLink>
       <div className="relative">
         <PageHeader title="Checklist" description={trip ? [trip.name, place].filter(Boolean).join(" · ") : undefined} actions={state === "ready" ? (

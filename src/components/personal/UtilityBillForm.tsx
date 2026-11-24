@@ -22,6 +22,7 @@ import { browserOutbox } from "@/lib/outbox";
 import { browserBlobs } from "@/lib/offline-store";
 import { deleteRow, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { useConfirm } from "@/components/ui/confirm";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const chip = (on: boolean) =>
   `inline-flex min-h-10 items-center rounded-full border px-3.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
@@ -153,7 +154,7 @@ export function UtilityBillForm() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-4xl">
+    <div className={`${PAGE_WIDTH.form} p-4 pb-28 md:p-8`}>
       <Link href="/personal/utilities" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
       <h1 className="text-xl font-bold">{editId ? (fromEmail ? "Bill from email" : "Change bill") : "Add bill"}</h1>
       {fromEmail && (

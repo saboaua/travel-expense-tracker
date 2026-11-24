@@ -23,6 +23,7 @@ import { normPaid, paidLabel } from "@/lib/paid-with";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export function GroceryReceiptDetail({ id }: { id: string }) {
   const tripChoices = useTripChoices();
@@ -77,7 +78,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
   const itemsSum = items.reduce((s, i) => s + i.line_total, 0);
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-6 p-4 pb-28 md:p-8`}>
       <BackLink href={base}>{base.endsWith("shopping") ? "Shopping" : "Groceries"}</BackLink>
       <OfflineNotice savedAt={savedAt} writable />
       {waiting && <p className="flex items-center gap-1 text-xs font-medium text-amber-600"><CloudOff className="h-3.5 w-3.5" aria-hidden="true" /> Waiting to sync</p>}

@@ -13,6 +13,7 @@ import { todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { deleteRow, isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { useConfirm } from "@/components/ui/confirm";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Field = "t" | "p" | "q";
 const UNIT_KEY = "fuel-unit";
@@ -125,7 +126,7 @@ export function FuelForm({ id }: { id?: string }) {
   );
   const u = unitShort(unit);
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 pb-28 md:p-8`}>
       <BackLink href="/personal/fuel">Fuel</BackLink>
       <PageHeader title={id ? "Change fill-up" : "Add fill-up"} />
       {setup && <Alert>Run supabase/migration_fuel.sql in Supabase first.</Alert>}

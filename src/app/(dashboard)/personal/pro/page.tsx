@@ -15,6 +15,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PAYMENT_BASE_COLS, PAYMENT_BASE_SETTINGS_COLS, PAYMENT_COLS, PAYMENT_SETTINGS_COLS, monthsFree, offeredPeriods, priceFor, userReference, type PayPeriod, type PaymentSettings, type PlanPayment } from "@/lib/payments";
 import { PLAN_COLS, isProActive, type PlanRow } from "@/lib/plans";
 import { cn, formatDate, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const pick = "flex-1 rounded-2xl border-2 p-3 text-left";
 
@@ -86,7 +87,7 @@ export default function GetProPage() {
   };
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 md:p-8`}>
       <BackLink href="/personal">Personal</BackLink>
       <PageHeader title="Get Pro" description={btc.available ? "Pay by bank transfer or Bitcoin" : "Pay by bank transfer from your bank app"} />
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}

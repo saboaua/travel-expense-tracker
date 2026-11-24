@@ -14,6 +14,7 @@ import { fetchSavings } from "@/lib/personal/savings-data";
 import { isMissingColumn } from "@/lib/columns";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
 import { monthLabel } from "@/lib/personal/utilities";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const TEAL = "#0d9488";
 const BADGE = {
@@ -77,7 +78,7 @@ export function SavingsPlanDetail() {
   const action = "flex min-h-14 flex-1 flex-col items-center justify-center gap-1 rounded-2xl border bg-card px-1 text-[13px] font-semibold hover:bg-accent disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary";
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8">
+    <div className={`${PAGE_WIDTH.wide} p-4 pb-28 md:p-8 lg:grid lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8`}>
       <div className="lg:col-span-2">
       <Link href="/personal/savings" className="mb-3 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Savings</Link>
       <div className="flex items-center gap-3">

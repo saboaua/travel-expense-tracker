@@ -31,6 +31,7 @@ import { TypeIcon } from "@/components/receipt-types/TypeIcon";
 import { TypeActions } from "@/components/receipt-types/TypeActions";
 import { PaidTag, StoreTile } from "@/components/personal/PaidIcon";
 import type { Filter, PaidWith } from "@/lib/paid-with";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Receipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null };
 
@@ -127,7 +128,7 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
   const trend = totals.slice(-6).map((t) => ({ label: monthLabel(t.month).split(" ")[0], value: t.total }));
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-6 p-4 pb-28 md:p-8`}>
       <BackLink href="/personal">Personal</BackLink>
 
       <div className="space-y-4 border-b pb-6">
@@ -166,7 +167,8 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
       )}
 
       {allReceipts.length > 0 && (
-        <>
+        <div className="space-y-6 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+          <div className="min-w-0 space-y-6">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-1">
               <Button variant="outline" size="icon" onClick={() => setMonth(shift(month, -1))} aria-label="Previous month"><ChevronLeft className="h-4 w-4" /></Button>
@@ -193,9 +195,7 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
             </CardContent>
           </Card>
 
-          <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
-
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-1">
             <Card><CardHeader><CardTitle className="text-base">{shopping ? "By category" : "Spending by category"}</CardTitle></CardHeader><CardContent>{itemsReady ? <Bars rows={catRows} currency={cur} /> : <p className="text-sm text-muted-foreground" data-testid="items-loading" role="status">{olderFailed === month ? "This month's lines are not saved on this phone. Connect to see them." : "Loading this month's lines…"}</p>}</CardContent></Card>
             <Card><CardHeader><CardTitle className="text-base">Last months</CardTitle></CardHeader><CardContent><Bars rows={trend} currency={cur} /></CardContent></Card>
           </div>
@@ -204,6 +204,9 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
             <Card><CardHeader><CardTitle className="text-base">Where the money went (top items)</CardTitle></CardHeader><CardContent><Bars rows={top.map((t) => ({ label: `${t.name} (${t.count}x)`, value: t.total }))} currency={cur} /></CardContent></Card>
           )}
 
+          </div>
+          <div className="min-w-0 space-y-6">
+          <CardsThisMonth receipts={monthReceipts} month={month} currency={cur} label={typed ? rtype?.name ?? "Receipts" : shopping ? "Shopping" : "Groceries"} withSubs={shopping} />
           <Card>
             <CardHeader><CardTitle className="text-base">Receipts in {monthLabel(month)}</CardTitle></CardHeader>
             <CardContent className="space-y-2">
@@ -217,8 +220,8 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
               ))}
             </CardContent>
           </Card>
-
-        </>
+          </div>
+        </div>
       )}
     </div>
   );

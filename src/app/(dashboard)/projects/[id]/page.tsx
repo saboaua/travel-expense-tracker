@@ -15,6 +15,7 @@ import { PROJECT_COLS, RECEIPT_COLS, clientLines, projectTotals, receiptUsd, typ
 import { featureLocked, projectsStatus } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
 import { formatDate, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export default function ProjectPage() {
   const { id } = useParams<{ id: string }>();
@@ -87,7 +88,7 @@ export default function ProjectPage() {
     : <Link key={format} href="/personal/pro" className="inline-flex min-h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-bold hover:bg-accent" data-testid={`project-${format}`}><Crown className="h-4 w-4 text-amber-600" aria-hidden="true" />{label}</Link>;
 
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 pb-28 md:p-8`}>
       <BackLink href="/projects">Projects</BackLink>
       <PageHeader title={p.name} description={info[0] ? info[0].replace("Client: ", "") + (p.contact_name ? ` · ${p.contact_name}` : "") : undefined} actions={<Link href={`/projects/${id}/edit`} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border bg-card px-4 text-sm font-bold hover:bg-accent"><Pencil className="h-4 w-4" aria-hidden="true" />Edit</Link>} />
       {error && <Alert>{error}</Alert>}

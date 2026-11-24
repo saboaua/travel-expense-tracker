@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Ban, Check, ChevronLeft, Eye, Loader2, Mail, Share2, Unlink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Item = { id: string; kind: string; partner: string | null; partner_id: string | null; item: string | null; item_kind: string | null; at: string };
 type Page = { items: Item[]; more: boolean; partners: { id: string; name: string }[] };
@@ -79,7 +80,7 @@ export default function SharingActivityPage() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4 md:p-8" data-testid="sharing-activity">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 md:p-8`} data-testid="sharing-activity">
       <div>
         <Link href="/profile#sharing" className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-primary"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Profile</Link>
         <h1 className="text-2xl font-bold tracking-tight">Sharing activity</h1>

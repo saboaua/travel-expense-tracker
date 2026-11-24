@@ -13,6 +13,7 @@ import { loadLimits, whoIs } from "@/lib/limits-server";
 import { projectsStatus } from "@/lib/limits";
 import { PROJECT_COLS, activeCount, projectTotals, type BizProject } from "@/lib/business-projects";
 import { todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export const metadata = { title: "Projects" };
 
@@ -61,7 +62,7 @@ export default async function ProjectsPage() {
   const active = projects.filter((p) => p.status === "active"), done = projects.filter((p) => p.status === "done");
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-28 md:p-8`}>
       <BusinessHeader title="Projects" description="Keep business projects and their expenses together." />
       <BusinessTabs
         title="Projects"

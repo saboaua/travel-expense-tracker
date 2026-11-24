@@ -7,9 +7,11 @@ import { cn } from "@/lib/utils";
 export const PAGE_WIDTH = {
   wide: "mx-auto w-full max-w-6xl",
   form: "mx-auto w-full max-w-4xl",
+  /** A form that is one column: the same form width, with the content kept to a readable 672 px at the left edge. */
+  formColumn: "mx-auto w-full max-w-4xl [&>*]:max-w-2xl",
 } as const;
 
-export type PageSize = keyof typeof PAGE_WIDTH;
+export type PageSize = "wide" | "form";
 
 export function PageShell({ size, className, children }: { size: PageSize; className?: string; children: React.ReactNode }) {
   return <div className={cn(PAGE_WIDTH[size], "space-y-6 p-4 md:p-8", className)}>{children}</div>;

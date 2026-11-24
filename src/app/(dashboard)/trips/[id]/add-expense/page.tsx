@@ -29,6 +29,7 @@ import { imageDhash } from "@/lib/image-hash";
 import { DuplicateList } from "@/components/DuplicateList";
 import { makeSyncApi } from "@/lib/offline-api";
 import { SYNC_NOW_EVENT } from "@/lib/sync-event";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 export default function AddExpensePage() {
@@ -278,7 +279,7 @@ export default function AddExpensePage() {
   };
 
   return (
-    <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
+    <div className={`${PAGE_WIDTH.formColumn} p-4 md:p-8 pb-28`}>
       <BackLink href={`/trips/${tripId}`} className="mb-6">Trip</BackLink>
       <div className="mb-4 empty:hidden">
         <ScanChip currentKey={`trip:${tripId}`} label={`${tripName || "This trip"} \u00b7 Business`} />

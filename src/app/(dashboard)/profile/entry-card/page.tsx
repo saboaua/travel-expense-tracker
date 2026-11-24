@@ -11,6 +11,7 @@ import { createClient } from "@/lib/supabase/client";
 import { currentPassport } from "@/lib/documents";
 import { formatDate } from "@/lib/utils";
 import { DETAILS_COLS, EMPTY_DETAILS, GENDERS, cleanDetails, shortDate, validEmail, type EntryDetails } from "@/lib/entry-card";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const L = "text-sm font-medium";
 
@@ -60,7 +61,7 @@ export default function EntryCardDetailsPage() {
   };
 
   return (
-    <div className="mx-auto w-full max-w-xl space-y-4 px-4 pb-28 pt-4">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 px-4 pb-28 pt-4`}>
       <BackLink href="/profile">Profile</BackLink>
       <PageHeader title="Details for entry cards" description="Saved once, used for every entry card. Private to you." />
       {state === "loading" && <p className="text-sm text-muted-foreground">Loading…</p>}

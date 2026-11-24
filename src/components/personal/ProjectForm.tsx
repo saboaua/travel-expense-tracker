@@ -19,6 +19,7 @@ import { isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { TypePicker } from "@/components/personal/ProjectType";
 import { customTypesFrom, resolveType, typeColumns, typeId, type ProjectTypeInfo } from "@/lib/personal/project-types";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId?: string }) {
@@ -113,7 +114,7 @@ export function ProjectForm({ kind, projectId }: { kind: PersonalKind; projectId
   };
 
   return (
-    <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
+    <div className={`${PAGE_WIDTH.formColumn} p-4 md:p-8 pb-28`}>
       <Link href={projectId ? `${meta.path}/${projectId}` : meta.path} className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>

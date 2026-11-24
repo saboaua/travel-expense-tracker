@@ -6,6 +6,7 @@ import { Card } from "@/components/ui/card";
 import { CheckForUpdates } from "@/components/about/CheckForUpdates";
 import { getBrand } from "@/lib/brand-icon";
 import { aboutInfo } from "@/lib/about";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "About" };
@@ -17,7 +18,7 @@ export default async function AboutPage() {
   const line = "flex items-center justify-between border-t py-3 text-[15px] first:border-t-0";
 
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-24 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 pb-24 md:p-8`}>
       <PageHeader title="About" />
 
       <Card className="p-5">

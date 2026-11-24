@@ -21,6 +21,7 @@ import {
 } from "@/lib/personal/fixed-costs";
 import { convert, round2, type BudgetCurrency } from "@/lib/personal/money";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const label = "mb-1.5 block text-[13px] font-bold";
 const field = "h-12 w-full rounded-xl border bg-background px-3 text-base outline-none focus-visible:ring-2 focus-visible:ring-primary";
@@ -128,7 +129,7 @@ export function FixedCostsHub() {
   const coming = costs.map((c) => ({ c, n: nextYearly(c, today) })).filter((x) => x.n && !lines.some((l) => l.kind === x.c.kind)).sort((a, b) => a.n!.date.localeCompare(b.n!.date));
 
   return (
-    <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8 lg:max-w-4xl" data-testid="fixed-hub">
+    <div className={`${PAGE_WIDTH.wide} space-y-3 p-4 pb-28 md:p-8`} data-testid="fixed-hub">
       <Back href="/personal" text="Personal" />
       <Title tile title="Fixed costs" sub="Set a payment once. It is added to your spending for you." />
       {missing && <Alert>{SETUP}</Alert>}
@@ -209,7 +210,7 @@ export function MonthlyCostForm({ kind }: { kind: "mortgage" | "home_insurance" 
   const stop = async () => { if (!uid) return; setBusy(true); const { error } = await removeCost(uid, kind); setBusy(false); if (error) return setErr("Could not stop it. Check your connection."); router.push("/personal/fixed"); };
 
   return (
-    <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-3 p-4 pb-28 md:p-8`}>
       <Back href="/personal/fixed" text="Fixed costs" />
       <Title title={KIND_LABEL[kind]} sub="What you pay each month" />
       {(err || missing) && <Alert>{missing ? SETUP : err}</Alert>}
@@ -379,7 +380,7 @@ export function CarForm() {
   const nextInsKind = INSURANCE_KINDS.find((k) => !insurances.some((x) => x.kind === k));
   const nextKind = PLATE_KINDS.find((k) => !plates.some((x) => x.kind === k));
   return (
-    <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8 lg:max-w-4xl">
+    <div className={`${PAGE_WIDTH.form} space-y-3 p-4 pb-28 md:p-8`}>
       <Back href="/personal/fixed" text="Fixed costs" />
       <Title title="My car" sub="Loan, insurance and license plate" />
       {(err || missing) && <Alert>{missing ? SETUP : err}</Alert>}
@@ -485,7 +486,7 @@ export function CreditCardForm() {
   const cardEntries = entries.filter((e) => e.kind === "card");
 
   return (
-    <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-3 p-4 pb-28 md:p-8`}>
       <Back href="/personal/fixed" text="Fixed costs" />
       <Title title="Credit card" sub="How you pay it" />
       {(err || form.err || missing) && <Alert>{missing ? SETUP : err || form.err}</Alert>}
@@ -547,7 +548,7 @@ export function GamblingForm() {
   };
 
   return (
-    <div className="mx-auto max-w-lg space-y-3 p-4 pb-28 md:p-8" data-testid="gambling">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-3 p-4 pb-28 md:p-8`} data-testid="gambling">
       <Back href="/personal/fixed" text="Fixed costs" />
       <Title title="Gambling limit" sub="Stay in control of what you spend" />
       {(err || form.err || missing) && <Alert>{missing ? SETUP : err || form.err}</Alert>}

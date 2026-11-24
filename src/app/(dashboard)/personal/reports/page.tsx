@@ -16,6 +16,7 @@ import { ReportLogoSwitch } from "@/components/reports/ReportLogoSwitch";
 import { createClient } from "@/lib/supabase/client";
 import { usePro } from "@/lib/use-pro";
 import { cn, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Scope = "month" | "groceries" | "project";
 const SCOPES: { id: Scope; label: string; includes: string }[] = [
@@ -56,7 +57,7 @@ export default function ReportsPage() {
   const current = SCOPES.find((s) => s.id === scope)!;
 
   return (
-    <div className="mx-auto max-w-3xl space-y-5 p-4 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-5 p-4 md:p-8`}>
       <PageHeader title="Personal reports" description="Your spending and your exports." />
       <PersonalTabs />
       <h2 className="sr-only">Reports</h2>

@@ -38,6 +38,7 @@ import { dollarCall, homeCurrency } from "@/lib/personal/currency-guess";
 import { AWG_PER_USD } from "@/lib/personal/dashboard";
 import { isMissingColumn } from "@/lib/columns";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 type Row = { key: string; name: string; quantity: string; unit_price: string; line_total: string; category: string; unit: string; flag?: string; alt?: number; confirmed?: boolean; sorted?: boolean; notWeighed?: boolean };
@@ -391,7 +392,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-4 md:p-8 pb-28">
+    <div className={`${PAGE_WIDTH.formColumn} p-4 md:p-8 pb-28`}>
       <Link href={receiptId ? `${BACK}/${receiptId}` : BACK} className="mb-6 inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back
       </Link>

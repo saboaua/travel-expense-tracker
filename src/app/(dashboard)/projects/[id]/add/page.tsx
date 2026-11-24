@@ -20,6 +20,7 @@ import { toUsd } from "@/lib/currencies";
 import { useCurrencies } from "@/lib/use-currencies";
 import { useExpenseCategories } from "@/lib/use-categories";
 import { formatCurrency, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 /** Scan or upload a receipt into one project: the photo is read for store, date and total, then saved with the project. */
 export default function AddProjectReceiptPage() {
@@ -114,7 +115,7 @@ export default function AddProjectReceiptPage() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} p-4 pb-28 md:p-8`}>
       <BackLink href={`/projects/${id}`} className="mb-6">Project</BackLink>
       <Card>
         <CardHeader>

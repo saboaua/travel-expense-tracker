@@ -163,17 +163,17 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
     <div className="space-y-4">
       <TrialBanner />
       <KeepHandy testId="keep-handy" />
-      <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6 lg:space-y-0">
         <div className="min-w-0 space-y-4">
           <BudgetCard />
-          <RemindersCard />
           <PricesGlance />
           <ActiveTrips rows={rows} projects={projects} today={today} />
           <HomeProjects rows={rows} projects={projects} />
-          {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="sm:grid-cols-2 xl:grid-cols-3" />}
         </div>
         <div className="min-w-0 space-y-4">
+          <RemindersCard />
           <SubscriptionsCard subs={subs} today={today} testId="subs-card" />
+          {canDocuments && <DocumentTiles tiles={docs} total={docTotal} idPrefix="personal-docs" gridClass="grid-cols-2" />}
           <MyIptv />
         </div>
       </div>

@@ -17,6 +17,7 @@ import { PAPER_BUCKET, paperRemovalDay, paperSub, type TripPaper } from "@/lib/t
 import { formatDate, todayISO } from "@/lib/utils";
 import { papersStatus } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 function Papers() {
   const { id } = useParams<{ id: string }>();
@@ -95,7 +96,7 @@ function Papers() {
 
   const removalDay = paperRemovalDay(trip?.end_date);
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 pb-28 md:p-8`}>
       <BackLink href={`/trips/${id}`}>{trip?.name ?? "Trip"}</BackLink>
       <PageHeader title="Trip papers" description="Transfers, tickets and booking details for this trip" />
       {state === "setup" && <Alert>Trip papers are not set up yet. Run supabase/migration_trip_papers.sql in the Supabase SQL Editor.</Alert>}

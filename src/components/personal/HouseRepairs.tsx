@@ -15,6 +15,7 @@ import { PERSONAL_SPEND_COLS, PERSONAL_SPEND_COLS_BASE, PERSONAL_SPEND_COLS_MID,
 import { convert, convertedCount, dominantCurrency, round2 } from "@/lib/personal/money";
 import { AREA_PREFIX, filterHouse, houseSpends, type SpendRow } from "@/lib/personal/quick-spend";
 import { formatDate, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const pill = (on: boolean) =>
   `inline-flex min-h-10 shrink-0 items-center rounded-full border px-3.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${on ? "border-slate-900 bg-slate-900 text-white dark:border-slate-100 dark:bg-slate-100 dark:text-slate-900" : "bg-card hover:bg-accent"}`;
@@ -59,7 +60,7 @@ export function HouseRepairs() {
   };
 
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-x-8">
+    <div className={`${PAGE_WIDTH.wide} p-4 pb-28 md:p-8 lg:grid lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start lg:gap-x-8`}>
       <div className="lg:col-span-2">
       <Link href="/personal/spend" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Quick spend</Link>
       <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl"><TileButton id="house" icon={Home} tone="house" />House &amp; repairs</h1>

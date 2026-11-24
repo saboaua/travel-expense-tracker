@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { cleanCustomerView, type CustomerView } from "@/lib/iptv";
 import { todayISO } from "@/lib/utils";
 import { ClientSubscription } from "@/components/iptv/ClientSubscription";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export default function MySubscriptionPage() {
   const supabase = useMemo(() => createClient(), []);
@@ -19,7 +20,7 @@ export default function MySubscriptionPage() {
     })();
   }, [supabase]);
   return (
-    <div className="mx-auto max-w-xl space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 pb-28 md:p-8`}>
       <h1 className="text-2xl font-bold tracking-tight md:text-3xl">My subscriptions</h1>
       {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
       {!views && !error && <p className="text-sm text-muted-foreground">Loading…</p>}

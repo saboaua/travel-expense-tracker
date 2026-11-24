@@ -30,6 +30,7 @@ import { browserBlobs } from "@/lib/offline-store";
 import { deleteRow, isRowSave, makeRowApi, saveRow } from "@/lib/row-outbox";
 import { DestinationTiles, QuickFuel, QuickGroceries, QuickUtilities } from "@/components/personal/QuickDestinations";
 import { DEST_KEY, isDest, type Dest } from "@/lib/personal/quick-targets";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Listed = SpendRow & { waiting?: boolean };
 
@@ -190,7 +191,7 @@ export function QuickSpend() {
   const yesterday = addDaysISO(todayISO(), -1);
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:grid lg:max-w-5xl lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8">
+    <div className={`${PAGE_WIDTH.wide} p-4 pb-28 md:p-8 lg:grid lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:gap-x-8`}>
       <div className="lg:col-span-2">
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl">{!editing && <TileButton id="spend" icon={Coins} tone="spend" />}{editing ? "Change spend" : "Quick spend"}</h1>

@@ -10,6 +10,7 @@ import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { BadgeShare } from "@/components/profile/BadgeShare";
 import { TravelerRow, TravelerUnlock, useTraveler } from "@/components/profile/TravelerBadge";
 import { Alert } from "@/components/ui/alert";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 /** Profile > Your badges: every level, which are earned and what the next one needs. Only you see it. */
 export default function BadgesPage() {
@@ -25,7 +26,7 @@ export default function BadgesPage() {
   const traveler = useTraveler();
   const p = progress(b?.total ?? 0);
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4 md:p-8" data-testid="badge-shelf">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 md:p-8`} data-testid="badge-shelf">
       <LevelUpNotice />
       <TravelerUnlock />
       <Link href="/profile" className="inline-flex min-h-8 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Profile</Link>

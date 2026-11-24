@@ -20,6 +20,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 import { TypeChip, TypeTile } from "@/components/personal/ProjectType";
 import { resolveType, typeId } from "@/lib/personal/project-types";
 import { cn } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 type Row = ProjectRow;
@@ -88,7 +89,7 @@ export function ProjectsList({ kind }: { kind: PersonalKind }) {
   };
 
   return (
-    <div className="mx-auto max-w-6xl p-4 md:p-8 space-y-8">
+    <div className={`${PAGE_WIDTH.wide} p-4 md:p-8 space-y-8`}>
       <BackLink href="/personal">Personal</BackLink>
       <div className="flex flex-col gap-4 border-b pb-6 sm:flex-row sm:items-center sm:justify-between">
         <div>

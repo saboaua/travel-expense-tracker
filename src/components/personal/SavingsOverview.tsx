@@ -13,6 +13,7 @@ import { fetchSavings } from "@/lib/personal/savings-data";
 import type { BudgetCurrency } from "@/lib/personal/budget";
 import { deposits, isPaused, monthlyTotals, progressPct, remaining, ruleText, savedSoFar, savingsSummary, type SavingsEvent, type SavingsPlan } from "@/lib/personal/savings";
 import { formatCurrency, formatDate, todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 const TEAL = "#0d9488";
 export const MONTH_SHORT = (m: string) => new Date(`${m}T12:00:00`).toLocaleString("en-US", { month: "short" });
@@ -68,7 +69,7 @@ export function SavingsOverview() {
   const max = Math.max(...(view?.chart.map((c) => c.total) ?? [0]), 1);
   const btn = "inline-flex min-h-[52px] w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 text-base font-semibold text-primary-foreground hover:bg-primary/90";
   return (
-    <div className="mx-auto max-w-lg p-4 pb-28 md:p-8 lg:max-w-5xl">
+    <div className={`${PAGE_WIDTH.wide} p-4 pb-28 md:p-8`}>
       <Link href="/personal" className="mb-4 inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Personal</Link>
       <h1 className="flex items-center gap-3 text-2xl font-bold tracking-tight md:text-3xl"><TileButton id="savings" icon={PiggyBank} tone="savings" />Savings</h1>
       <p className="mt-0.5 text-[13px] text-muted-foreground">What you set aside each month, and what you have saved so far.</p>

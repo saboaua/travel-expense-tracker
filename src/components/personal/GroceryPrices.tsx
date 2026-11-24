@@ -27,6 +27,7 @@ import { OfflineNotice } from "@/components/OfflineNotice";
 import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { compareOnline, FILE_STORES, OLD_FILE_DAYS, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Sort = "saving" | "increase" | "recent" | "purchases" | "name";
 
@@ -191,7 +192,7 @@ export function GroceryPrices() {
   );
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-28 md:p-8`}>
       <LevelUpNotice />
       <div className="flex items-center justify-between gap-3">
         <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>

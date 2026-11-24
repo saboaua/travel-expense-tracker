@@ -14,6 +14,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useConfirm } from "@/components/ui/confirm";
 import { DuplicateList } from "@/components/DuplicateList";
 import { formatCurrency } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 function Thumb({ blob }: { blob: Blob }) {
   const url = useMemo(() => URL.createObjectURL(blob), [blob]);
@@ -86,7 +87,7 @@ export default function PendingPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 pb-28 md:p-8`}>
       <div>
         <h1 className="text-2xl font-bold">Waiting to sync</h1>
         <p className="mt-1 text-sm text-muted-foreground">

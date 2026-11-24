@@ -24,6 +24,7 @@ import { browserOutbox } from "@/lib/outbox";
 import { deleteExpenseChange, isExpenseUpdate, makeExpenseChangeApi, RECEIPT_BUCKET, saveExpenseChange, type ExpenseFields } from "@/lib/expense-outbox";
 import { expenseKey } from "@/lib/offline-data";
 import { OfflineNotice } from "@/components/OfflineNotice";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 
 export default function EditExpensePage() {
@@ -214,7 +215,7 @@ export default function EditExpensePage() {
   const shownImage = preview || receiptUrl;
 
   return (
-    <div className="p-4 md:p-8 pb-28 max-w-lg mx-auto">
+    <div className={`${PAGE_WIDTH.formColumn} p-4 md:p-8 pb-28`}>
       <BackLink href={`/trips/${tripId}`} className="mb-6">Trip</BackLink>
       <Card>
         <CardHeader>

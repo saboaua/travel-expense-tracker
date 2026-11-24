@@ -16,6 +16,7 @@ import { gmailScript } from "@/lib/personal/gmail-script";
 import { featureLocked } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
 import { todayISO } from "@/lib/utils";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Sender = { id: string; name: string; email: string; accounts?: string[] };
 type LogRow = { id: string; sender: string | null; subject: string | null; status: string; summary: string | null; code: string | null; account?: string | null; created_at: string };
@@ -117,7 +118,7 @@ export function BillEmails() {
   const cap = "text-xs font-semibold uppercase tracking-wider text-muted-foreground";
   const label = "mb-1.5 block text-[13px] font-bold text-foreground/80";
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4 pb-28 md:p-8 lg:max-w-4xl">
+    <div className={`${PAGE_WIDTH.form} space-y-4 p-4 pb-28 md:p-8`}>
       <Link href="/personal/utilities" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Utilities</Link>
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Bill emails</h1>

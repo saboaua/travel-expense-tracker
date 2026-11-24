@@ -26,6 +26,7 @@ import { TypeChip, TypeTile } from "@/components/personal/ProjectType";
 import { resolveType } from "@/lib/personal/project-types";
 import { usePro } from "@/lib/use-pro";
 import { ReportLogoSwitch } from "@/components/reports/ReportLogoSwitch";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) {
   const meta = KIND_META[kind];
@@ -111,7 +112,7 @@ export function ProjectDetail({ kind, id }: { kind: PersonalKind; id: string }) 
   };
 
   return (
-    <div className="mx-auto max-w-4xl p-4 md:p-8 pb-28 space-y-6">
+    <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-28 space-y-6`}>
       <BackLink href={meta.path}>{meta.plural}</BackLink>
       <OfflineNotice savedAt={savedAt} writable />
       {error && <p className="text-sm text-red-600">{error}</p>}

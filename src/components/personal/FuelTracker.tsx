@@ -13,6 +13,7 @@ import { monthLabel } from "@/lib/personal/utilities";
 import { formatDate, todayISO } from "@/lib/utils";
 import { browserOutbox } from "@/lib/outbox";
 import { isRowSave } from "@/lib/row-outbox";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 type Listed = FuelRow & { waiting?: boolean };
 
@@ -46,7 +47,7 @@ export function FuelTracker() {
   const card = "rounded-2xl border bg-card p-4";
 
   return (
-    <div className="mx-auto max-w-lg space-y-4 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-28 md:p-8`}>
       <BackLink href="/personal">Personal</BackLink>
       <PageHeader title={<span className="flex items-center gap-3"><TileButton id="fuel" icon={Fuel} tone="projects" />Fuel</span>} description={monthLabel(month.slice(0, 7))} />
       {setup && <Alert>Run supabase/migration_fuel.sql in Supabase first.</Alert>}

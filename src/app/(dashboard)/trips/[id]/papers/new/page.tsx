@@ -15,6 +15,7 @@ import { PAPER_BUCKET, paperRemovalDay, parsePaper } from "@/lib/trip-papers";
 import { formatDate, todayISO } from "@/lib/utils";
 import { papersStatus } from "@/lib/limits";
 import { useLimits } from "@/lib/use-limits";
+import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 export default function NewTripPaperPage() {
   const { id } = useParams<{ id: string }>();
@@ -75,7 +76,7 @@ export default function NewTripPaperPage() {
 
   const removal = paperRemovalDay(endDate);
   return (
-    <div className="mx-auto max-w-xl space-y-5 p-4 pb-28 md:p-8">
+    <div className={`${PAGE_WIDTH.formColumn} space-y-5 p-4 pb-28 md:p-8`}>
       <BackLink href={`/trips/${id}/papers`}>Trip papers</BackLink>
       <PageHeader title="Add paper" description="A transfer, ticket or booking for this trip" />
       {error && <Alert>{error}</Alert>}
