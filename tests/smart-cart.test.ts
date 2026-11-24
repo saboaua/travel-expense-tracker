@@ -1,4 +1,4 @@
-import { DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, sanitizeSettings, smartBaskets, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, sanitizeSettings, smartBaskets, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -116,6 +116,34 @@ eq("the usual store is marked", rowsAll.find((r) => r.usual)?.store, "Usual Mart
 eq("distance shown", rowsAll.find((r) => r.store === "Shop A")?.km, 4.34);
 eq("a store with fewer items priced comes after", storeRows({ items, baskets: smartBaskets(items, products, stores, NOW, ext.filter((e) => e.store !== "Shop B" || e.key === key("Eggs")), free, "AWG"), where, origin: home, usual, s: free }).map((r) => r.store).pop(), "Shop B");
 eq("stores beyond the limit are left out", storeRows({ items, baskets, where, origin: home, usual, s: near }).map((r) => r.store), ["Usual Mart"]);
+
+// items added by hand
+eq("same words, same key", listedKey("Coconut  MILK", "400 ML"), listedKey("coconut milk", "400ml"));
+eq("a different size is a different item", listedKey("Coconut milk", "400 ml") === listedKey("Coconut milk", "1 l"), false);
+eq("accents and punctuation are ignored", listedKey("Crème fraîche!", null), "x:creme fraiche|");
+const mess = sanitizeAdded([
+  { key: "x:a|", name: " Coconut   milk ", size: "400 ml", qty: 500, kind: "listed", offers: [{ store: "Ling & Sons", price: 3.19, source: "online" }, { store: "Bad", price: -1, source: "online" }, { store: "Odd", price: 2, source: "own" }, { store: "", price: 2, source: "online" }] },
+  { key: "x:a|", name: "dup", kind: "listed" }, { key: "plain", name: "no x prefix", kind: "listed" }, { key: "k1", name: "Eggs", kind: "own", qty: 0, offers: [{ store: "A", price: 1, source: "online" }] },
+  { name: "no key", kind: "own" }, "junk", null, { key: "k2", name: "x", kind: "other" },
+]);
+eq("added items are made safe", mess.map((a) => [a.key, a.name, a.qty, a.offers.length]), [["x:a|", "Coconut milk", 99, 1], ["k1", "Eggs", 1, 0]]);
+eq("not a list", sanitizeAdded({ a: 1 }), []);
+eq("no more than 20", sanitizeAdded(Array.from({ length: 30 }, (_, i) => ({ key: `k${i}`, name: `n${i}`, kind: "own" }))).length, 20);
+const coco = { key: listedKey("Coconut milk", "400 ml"), name: "Coconut milk", size: "400 ml", qty: 2, kind: "listed" as const, offers: [{ store: "Shop B", price: 3.5, source: "online" as const }, { store: "Shop A", price: 3.19, source: "community" as const }] };
+eq("the cheapest price found", cheapestOffer(coco), { store: "Shop A", price: 3.19 });
+eq("no price found", cheapestOffer({ ...coco, offers: [] }), null);
+eq("an own item brings no outside prices", addedExternal({ ...coco, kind: "own" }), []);
+const cocoExt = addedExternal(coco);
+const withCoco = [...items, { key: coco.key, qty: 2 }];
+const prods2 = [...products, addedProduct(coco, "AWG")];
+const baskets2 = smartBaskets(withCoco, prods2, ["Usual Mart", "Shop A", "Shop B"], NOW, [...ext, ...cocoExt], free, "AWG");
+const set2 = planCart({ items: withCoco, baskets: baskets2, where, origin: home, usual, s: free });
+const cocoLine = set2.plans[1].stops.flatMap((st) => st.lines.map((l) => [st.store, l.name, l.qty, l.total, l.source])).find((l) => l[1] === "Coconut milk");
+eq("an added item is bought where it is cheapest", cocoLine, ["Shop A", "Coconut milk", 2, 6.38, "community"]);
+eq("it has no usual-store price, so no saving is claimed", set2.plans[1].stops.flatMap((st) => st.lines).find((l) => l.name === "Coconut milk")?.saving, null);
+const none = { ...coco, key: listedKey("Sparkling water", "1.5 l"), name: "Sparkling water", offers: [] };
+const set3 = planCart({ items: [...items, { key: none.key, qty: 1 }], baskets: smartBaskets([...items, { key: none.key, qty: 1 }], [...products, addedProduct(none, "AWG")], stores, NOW, ext, free, "AWG"), where, origin: home, usual, s: free });
+eq("an item with no price anywhere is left out, never guessed", [set3.plans[1].covered, set3.plans[1].uncovered], [3, 1]);
 
 if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1); }
 console.log("smart cart ok");

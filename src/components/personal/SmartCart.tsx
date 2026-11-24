@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
-import { Car, Check, Crosshair, Crown, Lock, MapPin, Minus, Navigation, Plus, Settings, ShoppingCart } from "lucide-react";
+import { Car, Check, Crosshair, Crown, Lock, MapPin, Minus, Navigation, Plus, Search, Settings, ShoppingCart, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { BackLink } from "@/components/ui/page-header";
@@ -17,7 +17,13 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { directionsUrl, everyText, type Plan, type PlanLine, type StoreRow } from "@/lib/personal/smart-cart";
+import { cheapestOffer, directionsUrl, everyText, listedKey, type AddedItem, type Plan, type PlanLine, type StoreRow } from "@/lib/personal/smart-cart";
+import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
+import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
+import { createClient } from "@/lib/supabase/client";
+import { useOnline } from "@/lib/use-online";
+import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
+import { countryForShared } from "@/lib/country";
 import { useSmartCart } from "@/components/personal/use-smart-cart";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-56 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
@@ -26,6 +32,8 @@ const GREEN = "text-emerald-700 dark:text-emerald-300";
 const pill = "inline-flex min-h-6 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold";
 const SOURCE: Record<string, string> = { own: "Your receipt", community: "Community", online: "Online list" };
 const SOURCE_CLS: Record<string, string> = { own: "bg-muted text-muted-foreground", community: "bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200", online: "bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200" };
+/** "Coconut milk 400 ml": the size is added only when the name does not already say it */
+const named = (name: string, size: string | null) => (size && !name.toLowerCase().replace(/\s+/g, "").includes(size.toLowerCase().replace(/\s+/g, "")) ? `${name} ${size}` : name);
 const ProBadge = () => <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-extrabold text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">PRO</span>;
 
 function Header({ pro, onSettings }: { pro: boolean; onSettings?: () => void }) {
@@ -59,6 +67,91 @@ function Lines({ lines, currency }: { lines: PlanLine[]; currency: string }) {
   );
 }
 
+type Sc = ReturnType<typeof useSmartCart>;
+
+/** Search for something that is not in the cart: what you have bought, the online store lists and community prices. */
+function AddItemSheet({ sc, onClose }: { sc: Sc; onClose: () => void }) {
+  const online = useOnline();
+  const [q, setQ] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [groups, setGroups] = useState<PriceGroup[] | null>(null);
+  const [asked, setAsked] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const inCart = new Set(sc.items.map((i) => i.key));
+  const full = sc.extra.length >= 20;
+
+  const run = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const text = q.trim();
+    if (text.length < 2) return;
+    setBusy(true); setErr(null);
+    let community: CommunityRow[] = [];
+    let shops: OnlineMatch[] = [];
+    if (online) {
+      const [c, o] = await Promise.all([
+        searchCommunity(createClient(), { q: text }, countryForShared(sc.currency, sc.country)),
+        sc.currency === ONLINE_CURRENCY
+          ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ search: text }) }).then(async (r) => (r.ok ? (((await r.json()) as { results?: OnlineMatch[] }).results ?? []) : [])).catch(() => [] as OnlineMatch[])
+          : Promise.resolve([] as OnlineMatch[]),
+      ]);
+      community = c; shops = o;
+    } else setErr("You are offline, so only what you have bought is searched.");
+    setGroups(searchBestPrices({ q: text, products: sc.products, community, online: shops, currency: sc.currency }));
+    setAsked(text);
+    setBusy(false);
+  };
+
+  const rows = (groups ?? []).map((g) => {
+    const own = sc.products.find((p) => productKey(p) === g.key) ?? null;
+    const key = own ? own.key : listedKey(g.name, g.size);
+    const low = g.offers[0];
+    const item: AddedItem = own
+      ? { key, name: own.name, size: own.size, qty: 1, kind: "own", offers: [] }
+      : { key, name: g.name, size: g.size, qty: 1, kind: "listed", offers: g.offers.filter((o) => o.source !== "own").map((o) => ({ store: o.store, price: o.price, source: o.source as "community" | "online" })) };
+    return { g, own, key, low, item, there: inCart.has(key) };
+  });
+  const Row = ({ r }: { r: (typeof rows)[number] }) => (
+    <li className="flex items-center gap-3 border-t py-2" data-testid="sc-add-row">
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-semibold">{named(r.g.name, r.g.size)}</span>
+        <span className="block text-xs text-muted-foreground">{r.own ? `Last bought ${r.own.lastDate}` : r.low.source === "community" ? "Community price" : "Online list"}</span>
+        <span className={`block text-xs font-bold ${GREEN}`}>{r.own ? "Lowest known" : "From"} <Money amount={r.low.price} currency={sc.currency} className="text-xs" /> at {r.low.store}</span>
+      </span>
+      {r.there
+        ? <span className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-emerald-100 px-4 text-sm font-extrabold text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200"><Check className="h-4 w-4" strokeWidth={3} aria-hidden="true" />In cart</span>
+        : <Button type="button" className="h-11 gap-1.5 px-4 font-extrabold" disabled={full} aria-label={`Add ${r.g.name}`} onClick={() => sc.add(r.item)}><Plus className="h-4 w-4" strokeWidth={3} aria-hidden="true" />Add</Button>}
+    </li>
+  );
+  const bought = rows.filter((r) => r.own), listed = rows.filter((r) => !r.own);
+  const text = asked;
+  const anyway: AddedItem = { key: listedKey(text, null), name: text.replace(/\s+/g, " ").slice(0, 160), size: null, qty: 1, kind: "listed", offers: [] };
+  return (
+    <BottomSheet title="Add to your cart" onClose={onClose} testId="sc-add-sheet" tall>
+      <div className="space-y-3">
+        <form onSubmit={run} className="flex gap-2" role="search">
+          <div className="relative flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" /><Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a product, e.g. coconut milk" aria-label="Search a product to add" className="h-11 pl-9" autoFocus /></div>
+          <Button type="submit" className="h-11" disabled={busy || q.trim().length < 2}>{busy ? "…" : "Search"}</Button>
+        </form>
+        {err && <Alert variant="info">{err}</Alert>}
+        {full && <Alert variant="info">Your cart has 20 added items. Remove one to add another.</Alert>}
+        {groups && (
+          <div data-testid="sc-add-results">
+            {bought.length > 0 && <><p className="mt-1 text-xs font-bold text-muted-foreground">You have bought</p><ul>{bought.map((r) => <Row key={r.key} r={r} />)}</ul></>}
+            {listed.length > 0 && <><p className="mt-3 text-xs font-bold text-muted-foreground">In store lists and community prices</p><ul>{listed.map((r) => <Row key={r.key} r={r} />)}</ul></>}
+            {rows.length === 0 && (
+              <div className="space-y-2 rounded-xl border p-3" data-testid="sc-add-empty">
+                <p className="text-sm text-muted-foreground">No price found for “{text}”. You can still add it: it stays in your cart and is left out of the totals until a store has a price.</p>
+                <Button type="button" variant="outline" className="h-11 w-full" disabled={full || inCart.has(anyway.key)} onClick={() => sc.add(anyway)} data-testid="sc-add-anyway">{inCart.has(anyway.key) ? "In cart" : `Add “${text}” anyway`}</Button>
+              </div>
+            )}
+          </div>
+        )}
+        <p className="text-xs text-muted-foreground">Prices are checked for every item you add, from your receipts, the community and online lists.</p>
+      </div>
+    </BottomSheet>
+  );
+}
+
 function planTitle(p: Plan, i: number): string {
   if (p.stops.length === 1) return `One stop: ${p.stops[0].store}`;
   return i === 1 ? `Smart split: ${p.stops.length} stops` : `${p.stops.length} stops`;
@@ -68,6 +161,7 @@ export function SmartCart() {
   const pro = usePro();
   const sc = useSmartCart();
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [pick, setPick] = useState<number | null>(null);
   const [sheet, setSheet] = useState<{ store: string; at: { lat: number; lng: number } | null; km: number | null; lines: PlanLine[]; total: number; saving: number | null } | null>(null);
   const { currency, plan, rows, settings } = sc;
@@ -148,7 +242,7 @@ export function SmartCart() {
         <div className="space-y-4 lg:order-1">
           <div className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-100 to-emerald-50 p-4 dark:border-emerald-500/30 dark:from-emerald-500/20 dark:to-emerald-500/5 lg:hidden" data-testid="sc-hero">{hero}</div>
           <Card><CardContent className="p-4" data-testid="sc-cart">
-            <div className="flex items-baseline justify-between"><h2 className="text-base font-bold">Your usual cart</h2><span className="text-xs text-muted-foreground">{sc.items.length} of {sc.habits.length} in</span></div>
+            <div className="flex items-baseline justify-between"><h2 className="text-base font-bold">{sc.extra.length > 0 ? "Your cart" : "Your usual cart"}</h2><span className="text-xs text-muted-foreground">{sc.extra.length > 0 ? `${sc.habits.length - sc.off.filter((k) => sc.habits.some((h) => h.key === k)).length} usual + ${sc.extra.length} added` : `${sc.items.length} of ${sc.habits.length} in`}</span></div>
             <ul className="mt-1 divide-y">
               {sc.habits.map((h) => {
                 const on = !sc.off.includes(h.key);
@@ -165,7 +259,27 @@ export function SmartCart() {
                   </li>
                 );
               })}
+              {sc.extra.map((a) => {
+                const best = cheapestOffer(a);
+                const priced = covered.has(a.key);
+                return (
+                  <li key={a.key} className="flex items-center gap-2 py-2" data-testid="sc-added-row">
+                    <span className="min-w-0 flex-1">
+                      <span className="flex flex-wrap items-center gap-1.5"><span className="break-words text-sm font-semibold">{named(a.name, a.size)}</span><span className={`${pill} bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200`}>Added</span></span>
+                      <span className="block text-xs text-muted-foreground">{a.kind === "own" ? "Bought before" : best ? <>Cheapest: {best.store} <Money amount={best.price} currency={currency} className="text-xs" /></> : "No price found yet"}</span>
+                      {!priced && sc.externalReady && <span className={`${pill} mt-1 bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>Left out of the totals until a store has a price</span>}
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label={`Less ${a.name}`} disabled={a.qty <= 1} onClick={() => sc.setQty(a.key, a.qty - 1)}><Minus className="h-3 w-3" /></Button>
+                      <span className="w-6 text-center text-sm font-bold tabular-nums">{a.qty}</span>
+                      <Button type="button" variant="outline" size="icon" className="h-11 w-11" aria-label={`More ${a.name}`} onClick={() => sc.setQty(a.key, a.qty + 1)}><Plus className="h-3 w-3" /></Button>
+                      <button type="button" onClick={() => sc.removeAdded(a.key)} aria-label={`Remove ${a.name}`} data-testid="sc-added-remove" className="flex h-11 w-9 items-center justify-center text-muted-foreground hover:text-foreground"><X className="h-5 w-5" aria-hidden="true" /></button>
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
+            <button type="button" onClick={() => setAddOpen(true)} data-testid="sc-add-open" className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-primary/40 font-bold text-primary hover:bg-primary/5"><Plus className="h-5 w-5" strokeWidth={3} aria-hidden="true" />Add an item</button>
           </CardContent></Card>
         </div>
 
@@ -269,6 +383,8 @@ export function SmartCart() {
           </div>
         </BottomSheet>
       )}
+
+      {addOpen && <AddItemSheet sc={sc} onClose={() => setAddOpen(false)} />}
 
       {settingsOpen && (
         <BottomSheet title="Smart Cart settings" onClose={() => setSettingsOpen(false)} testId="sc-settings" tall>

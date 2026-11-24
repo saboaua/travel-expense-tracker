@@ -6474,6 +6474,85 @@ try {
     }
   });
 
+  await test("smart cart: add an item that is not in the cart, see where it is priced, add one with no price, and remove it", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const names = ["Milk", "Bread", "Rice", "Eggs", "Butter", "Juice"];
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    [["Ling & Sons", [-30, -20, -10]]].forEach(([st, days], si) => {
+      days.forEach((d, di) => {
+        const rid = `9c000000-0000-4000-8000-0000000e6${si}${di}`;
+        fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: st, purchase_date: addDays(today, d), total: 60, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+        names.forEach((n, ni) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000e6${si}${di}${ni}`, receipt_id: rid, user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: 10, line_total: 10, unit: null, created_at: new Date().toISOString() }));
+      });
+    });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e6001", user_id: PAT, name: "Ling & Sons", lat: 12.525, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    me().home_lat = 12.52; me().home_lng = -70.03;
+    fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+    await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
+    const shop = (store, storeName, id, name, size, price) => ({ store, storeName, itemId: id, name, size, price, url: `https://shop.example/${id}`, fetchedAt: new Date().toISOString(), status: "same", confirmed: false, score: 1 });
+    await page.route("**/api/store-prices", async (r) => {
+      const body = r.request().postDataJSON();
+      if (!body || typeof body.search !== "string") return r.fallback();
+      const results = /coconut/i.test(body.search) ? [shop("ling", "Ling & Sons", "l1", "COCONUT MILK 400 ML", "400 ml", 3.19), shop("superfood", "Super Food Plaza", "s1", "COCONUT MILK 400 ML", "400 ml", 3.49)] : [];
+      await r.fulfill({ json: { results, enabled: ["superfood", "ling"], stores: [] } });
+    });
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/smart-cart`);
+      await page.getByTestId("smart-cart").waitFor();
+      assert((await page.getByTestId("sc-added-row").count()) === 0, "nothing is added yet");
+      // search, then add
+      await page.getByTestId("sc-add-open").click();
+      await page.getByLabel("Search a product to add").fill("coconut milk");
+      await page.getByRole("button", { name: "Search", exact: true }).click();
+      const row = page.getByTestId("sc-add-row").first();
+      await row.waitFor();
+      const t = await row.innerText();
+      assert(/Coconut milk/i.test(t) && /3\.19/.test(t) && /Ling & Sons/.test(t), `the result says where it is cheapest (got: ${t})`);
+      assert((await page.getByTestId("sc-add-row").count()) === 1, "the same product from two shops is one result");
+      await row.getByRole("button", { name: /^Add/ }).click();
+      await row.getByText("In cart").waitFor();
+      await page.keyboard.press("Escape");
+      const added = page.getByTestId("sc-added-row").first();
+      await added.waitFor();
+      const at = await added.innerText();
+      assert(/Added/.test(at) && /Cheapest: Ling & Sons/.test(at), `the added item shows its cheapest price (got: ${at})`);
+      assert((await added.getByText(/Left out of the totals/).count()) === 0, "a priced item is in the totals");
+      await added.getByRole("button", { name: /^More/ }).click();
+      // it is part of the plan, bought where it is cheapest
+      const detail = page.getByTestId("sc-plan-detail");
+      await detail.waitFor();
+      const lines = (await detail.innerText()).replace(/\s+/g, " ");
+      assert(/2 × COCONUT MILK|2 × Coconut milk/i.test(lines) && /6\.38/.test(lines), `two coconut milks are in a stop at 6.38 (got: ${lines.slice(0, 300)})`);
+      // kept after a reload
+      await page.reload();
+      await page.getByTestId("sc-added-row").first().waitFor();
+      assert(/Coconut milk/i.test(await page.getByTestId("sc-added-row").first().innerText()), "the added item is still there after a reload");
+      // an item with no price anywhere can still be added, and is left out of the totals
+      await page.getByTestId("sc-add-open").click();
+      await page.getByLabel("Search a product to add").fill("zzzxx");
+      await page.getByRole("button", { name: "Search", exact: true }).click();
+      await page.getByTestId("sc-add-empty").waitFor();
+      await page.getByTestId("sc-add-anyway").click();
+      await page.keyboard.press("Escape");
+      const none = page.getByTestId("sc-added-row").filter({ hasText: /zzzxx/i });
+      await none.waitFor();
+      assert(/No price found yet/.test(await none.innerText()), "it says there is no price yet");
+      await none.getByText(/Left out of the totals/).waitFor();
+      // remove it
+      await none.getByTestId("sc-added-remove").click();
+      assert((await page.getByTestId("sc-added-row").count()) === 1, "removing takes it out of the cart");
+    } finally {
+      await ctx.close();
+      me().home_lat = null; me().home_lng = null;
+      fake.table("user_plans").splice(0);
+      for (const t of ["grocery_receipts", "grocery_items", "store_locations"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e6")) a.splice(i, 1); }
+    }
+  });
+
   await admin.ctx.close();
   await browser.close();
 } catch (e) {

@@ -11,21 +11,24 @@ import { externalPrices } from "@/lib/personal/best-prices";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
 import { searchCommunity } from "@/lib/personal/community";
 import { distanceKm, sameStore, type ExternalPrice, type LatLng, type ListItem } from "@/lib/personal/basket";
-import { DEFAULT_SETTINGS, habitItems, learning, planCart, sanitizeSettings, smartBaskets, storeRows, usualStore, type HabitItem, type SmartSettings } from "@/lib/personal/smart-cart";
+import { DEFAULT_SETTINGS, MAX_ADDED, addedExternal, addedProduct, habitItems, learning, planCart, sanitizeAdded, sanitizeSettings, smartBaskets, storeRows, usualStore, type AddedItem, type HabitItem, type SmartSettings } from "@/lib/personal/smart-cart";
+import { searchBestPrices } from "@/lib/personal/best-prices";
+import { productWords } from "@/lib/personal/price-compare";
 import { useOnline } from "@/lib/use-online";
 import { useCountry } from "@/components/personal/use-country";
 import { countryForShared, currencyOfCountry } from "@/lib/country";
 
 type Loc = { name: string; lat: number; lng: number };
-type Saved = { settings: SmartSettings; off: string[]; qty: Record<string, number> };
+const clamp = (q: number) => Math.min(99, Math.max(1, Math.round(q)));
+type Saved = { settings: SmartSettings; off: string[]; qty: Record<string, number>; added: AddedItem[] };
 
 const read = (k: string): Saved => {
   try {
     const o = JSON.parse(localStorage.getItem(k) ?? "{}") as Partial<Saved>;
     const qty: Record<string, number> = {};
     for (const [key, v] of Object.entries(o.qty ?? {})) if (typeof v === "number" && v >= 1 && v <= 99) qty[key] = Math.round(v);
-    return { settings: sanitizeSettings(o.settings), off: Array.isArray(o.off) ? o.off.filter((x): x is string => typeof x === "string") : [], qty };
-  } catch { return { settings: DEFAULT_SETTINGS, off: [], qty: {} }; }
+    return { settings: sanitizeSettings(o.settings), off: Array.isArray(o.off) ? o.off.filter((x): x is string => typeof x === "string") : [], qty, added: sanitizeAdded(o.added) };
+  } catch { return { settings: DEFAULT_SETTINGS, off: [], qty: {}, added: [] }; }
 };
 
 /** Everything the Smart Cart screen needs: your usual cart, prices at each store, where you are, and what you changed (kept on this phone). */
@@ -59,7 +62,7 @@ export function useSmartCart() {
 
   // what the person changed: kept on this phone for this account
   const [uid, setUid] = useState<string | null>(null);
-  const [saved, setSaved] = useState<Saved>({ settings: DEFAULT_SETTINGS, off: [], qty: {} });
+  const [saved, setSaved] = useState<Saved>({ settings: DEFAULT_SETTINGS, off: [], qty: {}, added: [] });
   useEffect(() => {
     createClient().auth.getSession().then(({ data: { session } }) => { const id = session?.user.id ?? null; setUid(id); if (id) setSaved(read(`lifolio:smartcart:${id}`)); }).catch(() => {});
   }, []);
@@ -73,10 +76,30 @@ export function useSmartCart() {
   const settings = saved.settings;
   const setSettings = useCallback((p: Partial<SmartSettings>) => update((s) => ({ ...s, settings: sanitizeSettings({ ...s.settings, ...p }) })), [update]);
   const toggle = useCallback((key: string) => update((s) => ({ ...s, off: s.off.includes(key) ? s.off.filter((k) => k !== key) : [...s.off, key] })), [update]);
-  const setQty = useCallback((key: string, q: number) => update((s) => ({ ...s, qty: { ...s.qty, [key]: Math.min(99, Math.max(1, Math.round(q))) } })), [update]);
+  const setQty = useCallback((key: string, q: number) => update((s) => (s.added.some((a) => a.key === key)
+    ? { ...s, added: s.added.map((a) => (a.key === key ? { ...a, qty: clamp(q) } : a)) }
+    : { ...s, qty: { ...s.qty, [key]: clamp(q) } })), [update]);
+  /** Put something in the cart: a usual item that was left out comes back; anything else is added (up to 20). */
+  const add = useCallback((a: AddedItem) => update((s) => {
+    if (s.off.includes(a.key)) return { ...s, off: s.off.filter((k) => k !== a.key) };
+    if (s.added.some((x) => x.key === a.key) || s.added.length >= MAX_ADDED) return s;
+    return { ...s, added: [...s.added, a] };
+  }), [update]);
+  const removeAdded = useCallback((key: string) => update((s) => ({ ...s, added: s.added.filter((a) => a.key !== key) })), [update]);
 
-  const items = useMemo<ListItem[]>(() => habits.filter((h) => !saved.off.includes(h.key)).map((h) => ({ key: h.key, qty: saved.qty[h.key] ?? h.qty })), [habits, saved]);
-  const itemsKey = habits.map((h) => h.key).sort().join("|");
+  const habitKeys = useMemo(() => new Set(habits.map((h) => h.key)), [habits]);
+  const added = saved.added;
+  /** Added items that are also usual items are the usual item (never counted twice) */
+  const extra = useMemo(() => added.filter((a) => !habitKeys.has(a.key)), [added, habitKeys]);
+  const items = useMemo<ListItem[]>(() => [
+    ...habits.filter((h) => !saved.off.includes(h.key)).map((h) => ({ key: h.key, qty: saved.qty[h.key] ?? h.qty })),
+    ...extra.map((a) => ({ key: a.key, qty: a.qty })),
+  ], [habits, saved, extra]);
+  // prices are asked for what is bought before; a listed item brings its own prices
+  const itemsKey = [...habits.map((h) => h.key), ...extra.filter((a) => a.kind === "own").map((a) => a.key)].sort().join("|");
+  const listedItems = useMemo(() => extra.filter((a) => a.kind === "listed"), [extra]);
+  const extraProducts = useMemo(() => extra.filter((a) => a.kind === "listed").map((a) => addedProduct(a, currency)), [extra, currency]);
+  const extraExt = useMemo(() => extra.flatMap(addedExternal), [extra]);
 
   // prices from outside your receipts, for the whole usual cart
   const [external, setExternal] = useState<ExternalPrice[]>([]);
@@ -104,9 +127,34 @@ export function useSmartCart() {
   const stores = useMemo(() => {
     const out: string[] = [];
     const keys = itemsKey.split("|");
-    for (const n of [...inCur.flatMap((p) => p.stores.map((s) => s.store)), ...external.filter((e) => keys.includes(e.key)).map((e) => e.store)]) if (!out.some((x) => sameStore(x, n))) out.push(n);
+    for (const n of [...inCur.flatMap((p) => p.stores.map((s) => s.store)), ...external.filter((e) => keys.includes(e.key)).map((e) => e.store), ...extraExt.map((e) => e.store)]) if (!out.some((x) => sameStore(x, n))) out.push(n);
     return out;
-  }, [inCur, external, itemsKey]);
+  }, [inCur, external, itemsKey, extraExt]);
+
+  // a listed item's prices are looked up again when you are online, so they stay current
+  const listedKeys = listedItems.map((a) => a.key).join("\u0001");
+  useEffect(() => {
+    if (!online || !listedKeys) return;
+    let off = false;
+    (async () => {
+      for (const a of listedItems) {
+        const q = a.name;
+        const [c, o] = await Promise.all([
+          searchCommunity(createClient(), { q }, countryForShared(currency, country)).catch(() => []),
+          currency === ONLINE_CURRENCY
+            ? fetch("/api/store-prices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ search: q }) }).then(async (r) => (r.ok ? (((await r.json()) as { results?: OnlineMatch[] }).results ?? []) : [])).catch(() => [] as OnlineMatch[])
+            : Promise.resolve([] as OnlineMatch[]),
+        ]);
+        if (off) return;
+        const want = [...productWords(a.name)].sort().join(" ");
+        const g = searchBestPrices({ q, products: [], community: c, online: o, currency }).find((x) => [...productWords(x.name)].sort().join(" ") === want && (!a.size || !x.size || a.size.toLowerCase().replace(/\s+/g, "") === x.size.toLowerCase().replace(/\s+/g, "")));
+        const offers = g ? g.offers.filter((x) => x.source !== "own").map((x) => ({ store: x.store, price: x.price, source: x.source as "community" | "online" })) : [];
+        if (offers.length > 0) update((s) => ({ ...s, added: s.added.map((x) => (x.key === a.key ? { ...x, offers: offers.slice(0, 12) } : x)) }));
+      }
+    })();
+    return () => { off = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs when the set of listed items changes
+  }, [online, listedKeys, currency, country]);
 
   // where you start: your saved home, or where you are now
   const [home, setHome] = useState<LatLng | null>(null);
@@ -148,14 +196,14 @@ export function useSmartCart() {
     return m;
   }, [stores, locQ.data, placesQ.data, origin]);
 
-  const baskets = useMemo(() => smartBaskets(items, inCur, stores, now, external, settings, currency), [items, inCur, stores, now, external, settings, currency]);
+  const baskets = useMemo(() => smartBaskets(items, [...inCur, ...extraProducts], stores, now, [...external, ...extraExt], settings, currency), [items, inCur, extraProducts, stores, now, external, extraExt, settings, currency]);
   const usual = useMemo(() => usualStore(items, inCur), [items, inCur]);
   const plan = useMemo(() => planCart({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
   const rows = useMemo(() => storeRows({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
 
   return {
     loading: prices.loading || matches.loading || locQ.loading, error: prices.error, savedAt: prices.savedAt, currency, country, online,
-    habits, progress, items, off: saved.off, qty: saved.qty, toggle, setQty, settings, setSettings,
+    habits, progress, items, off: saved.off, qty: saved.qty, toggle, setQty, settings, setSettings, products: inCur, extra, add, removeAdded,
     externalReady, plan, rows, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
   };
 }

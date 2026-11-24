@@ -267,3 +267,55 @@ export function storeRows(a: { items: ListItem[]; baskets: StoreBasket[]; where:
   }
   return rows.sort((x, y) => y.priced - x.priced || x.total - y.total);
 }
+
+/* ---------------- items you add yourself ---------------- */
+
+export const MAX_ADDED = 20;
+/** An item added by hand: one you have bought before ("own": priced like the usual cart) or one found in the store lists and community prices ("listed"). */
+export type AddedItem = {
+  key: string; name: string; size: string | null; qty: number; kind: "own" | "listed";
+  /** For a listed item: the real prices found for it, kept so the cart opens without a lookup and refreshed when online */
+  offers: { store: string; price: number; source: "community" | "online"; similar?: boolean }[];
+};
+
+const clean = (s: unknown, max: number) => (typeof s === "string" ? s.replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** The key of a listed item: the same words always give the same key, so adding it twice is one item. */
+export const listedKey = (name: string, size: string | null) => `x:${clean(name, 80).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim()}|${(size ?? "").toLowerCase().replace(/\s+/g, "")}`;
+
+/** What was saved on the phone, made safe: wrong shapes are dropped, quantities and prices are limited. */
+export function sanitizeAdded(raw: unknown): AddedItem[] {
+  if (!Array.isArray(raw)) return [];
+  const out: AddedItem[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== "object") continue;
+    const o = r as Record<string, unknown>;
+    const key = clean(o.key, 300), name = clean(o.name, 160);
+    const kind = o.kind === "own" || o.kind === "listed" ? o.kind : null;
+    if (!key || !name || !kind || out.some((x) => x.key === key)) continue;
+    if (kind === "listed" && !key.startsWith("x:")) continue;
+    const offers = (Array.isArray(o.offers) ? o.offers : []).flatMap((x) => {
+      if (!x || typeof x !== "object") return [];
+      const p = x as Record<string, unknown>;
+      const store = clean(p.store, 120), price = typeof p.price === "number" ? p.price : NaN;
+      return store && Number.isFinite(price) && price > 0 && price < 100000 && (p.source === "community" || p.source === "online") ? [{ store, price: round2(price), source: p.source as "community" | "online", ...(p.similar === true ? { similar: true } : {}) }] : [];
+    }).slice(0, 12);
+    out.push({ key, name, size: clean(o.size, 40) || null, qty: Math.min(99, Math.max(1, Math.round(typeof o.qty === "number" ? o.qty : 1))), kind, offers: kind === "listed" ? offers : [] });
+    if (out.length >= MAX_ADDED) break;
+  }
+  return out;
+}
+
+/** The part of a product the basket maths reads (key, name, no receipts), for an item that has never been on one of your receipts. */
+export function addedProduct(a: AddedItem, currency: string): Product {
+  return { key: a.key, atomKeys: [], name: a.name, size: a.size, currency, unit: null, category: "Other", names: [{ atomKey: a.key, name: a.name }], history: [], stores: [], cheapestStore: null, saving: null, totalSpent: 0, lastDate: "", count: 0, trend: "flat", changePct: null } as unknown as Product;
+}
+
+/** A listed item's prices as the real prices the basket fills gaps with. */
+export const addedExternal = (a: AddedItem): ExternalPrice[] => (a.kind === "listed" ? a.offers.map((o) => ({ store: o.store, key: a.key, price: o.price, source: o.source, ...(o.similar ? { similar: true } : {}) })) : []);
+
+/** The cheapest price found for a listed item, for the line under its name. */
+export function cheapestOffer(a: AddedItem): { store: string; price: number } | null {
+  let best: { store: string; price: number } | null = null;
+  for (const o of a.offers) if (!best || o.price < best.price) best = { store: o.store, price: o.price };
+  return best;
+}
