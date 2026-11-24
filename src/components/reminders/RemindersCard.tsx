@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { dueText, filterReminders, normalizeReminder, repeatLabel, statusOf, type Reminder } from "@/lib/reminders";
 import { ReminderBadge } from "./reminder-icons";
 import { REMINDER_COLS } from "./RemindersList";
+import { PersonAvatar } from "./PersonAvatar";
+import { useReminderShares } from "./use-reminder-shares";
 
 const SHOW = 5;
 
@@ -18,6 +20,7 @@ export function RemindersCard() {
   const [me, setMe] = useState<string | null>(null);
   const [list, setList] = useState<Reminder[] | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const { shared: sharedWith, from } = useReminderShares();
 
   const load = useCallback(async () => {
     try {
@@ -48,6 +51,8 @@ export function RemindersCard() {
         {shown.map((r) => {
           const over = statusOf(r, now) === "overdue";
           const shared = me && r.user_id !== me;
+          const sender = from.get(r.id);
+          const people = sharedWith.get(r.id) ?? [];
           return (
             <li key={r.id} className="flex items-center gap-3 py-2" data-testid="reminders-card-row">
               <button type="button" onClick={() => tick(r)} aria-label={`Mark ${r.title} done`} data-testid="reminders-card-tick"
@@ -59,9 +64,11 @@ export function RemindersCard() {
                 <span className="min-w-0 flex-1">
                   <span className="block truncate font-semibold">{r.title}</span>
                   <span className={`block truncate text-xs ${over ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-                    {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatLabel(r)}` : ""}{shared ? " · Shared with you" : ""}
+                    {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatLabel(r)}` : ""}{shared ? ` · From ${sender ?? "a partner"}` : ""}
                   </span>
                 </span>
+                {shared && sender && <PersonAvatar name={sender} size={24} />}
+                {!shared && people.length > 0 && <span className="flex shrink-0 -space-x-2">{people.slice(0, 3).map((x) => <PersonAvatar key={x.partnershipId} name={x.name} size={24} />)}</span>}
               </Link>
             </li>
           );

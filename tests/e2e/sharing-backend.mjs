@@ -6,11 +6,13 @@
 import { readFileSync } from "node:fs";
 import { PGlite } from "@electric-sql/pglite";
 
-const TABLE_FUNCTIONS = new Set(["shared_loyalty_cards", "shared_trips"]);
+const TABLE_FUNCTIONS = new Set(["shared_loyalty_cards", "shared_trips", "my_reminder_partner_shares", "reminders_shared_with_me"]);
+const REMINDER_CHANGING = new Set(["share_reminder_partner", "unshare_reminder_partner"]);
 export const SHARING_FUNCTIONS = new Set([
   "sharing_overview", "set_sharing", "invite_partner", "respond_to_invite", "end_partnership", "share_item", "unshare_item",
   "shared_loyalty_cards", "shared_trips", "shared_loyalty_photo_path", "sharing_available",
   "log_share_view", "sharing_activity", "sharing_activity_export",
+  "share_reminder_partner", "unshare_reminder_partner", "my_reminder_partner_shares", "reminders_shared_with_me",
 ]);
 
 const IPTV_FUNCTIONS = new Set(["iptv_renew", "iptv_create_link", "iptv_stop_link", "iptv_link_user", "iptv_unlink_user", "iptv_public_view", "my_iptv_subscriptions"]);
@@ -21,6 +23,9 @@ export async function createSharingBackend(fake, serviceKey = "") {
   await db.exec(readFileSync("tests/sharing/stub.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_sharing_safety.sql", "utf8"));
+  // Reminders: the tables and functions only (the photo storage part needs Supabase Storage), then sharing them with a partner
+  await db.exec(readFileSync("supabase/migration_reminders.sql", "utf8").split("-- Photos live in a private bucket")[0]);
+  await db.exec(readFileSync("supabase/migration_reminder_partners.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_subscriptions.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_iptv_customers.sql", "utf8"));
   await db.exec(readFileSync("supabase/migration_iptv_manage.sql", "utf8"));
@@ -58,6 +63,9 @@ export async function createSharingBackend(fake, serviceKey = "") {
     }
     await mirror("loyalty_cards", ["id", "user_id", "store_name", "holder_name", "category", "card_number", "barcode_format", "color", "image_path"]);
     await mirror("trips", ["id", "user_id", "name", "destination", "start_date", "end_date"]);
+    await mirror("reminders", ["id", "user_id", "title", "due_at"]);
+    await db.query("delete from reminder_shares");
+    for (const r of fake.table("reminder_shares")) await db.query("insert into reminder_shares (reminder_id, owner_id, shared_with, can_complete) values ($1, $2, $3, $4) on conflict do nothing", [r.reminder_id, r.owner_id, r.shared_with, r.can_complete !== false]);
     await mirror("personal_projects", ["id", "user_id", "kind", "name", "destination", "start_date", "end_date"]);
   }
 
@@ -67,6 +75,14 @@ export async function createSharingBackend(fake, serviceKey = "") {
     put("iptv_customers", (await db.query("select row_to_json(t) as r from iptv_customers t")).rows.map((x) => x.r));
     put("iptv_clients", (await db.query("select row_to_json(t) as r from iptv_clients t")).rows.map((x) => x.r));
     put("iptv_renewals", (await db.query("select row_to_json(t) as r from iptv_renewals t")).rows.map((x) => x.r));
+  }
+
+  /** Copy who a reminder is shared with back into the fake, so the screens read it through the usual calls */
+  async function pullReminderShares() {
+    const rows = (await db.query("select row_to_json(t) as r from reminder_shares t")).rows.map((x) => x.r);
+    const tbl = fake.table("reminder_shares");
+    tbl.length = 0;
+    tbl.push(...rows);
   }
 
   async function call(fn, args, userId, service = false) {
@@ -80,6 +96,7 @@ export async function createSharingBackend(fake, serviceKey = "") {
       if (TABLE_FUNCTIONS.has(fn)) return { status: 200, body: r.rows };
       const v = r.rows[0]?.v;
       if (IPTV_CHANGING.has(fn)) { await db.exec("reset role"); await pullIptv(); }
+      if (REMINDER_CHANGING.has(fn)) { await db.exec("reset role"); await pullReminderShares(); }
       return v === null || v === undefined ? { status: 204, body: undefined } : { status: 200, body: v };
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

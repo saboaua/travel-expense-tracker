@@ -282,6 +282,11 @@ other_checks as (
                 and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'complete_reminder') then 'OK' else 'MISSING' end,
          'migration_reminders.sql'
   union all
+  select 'function', 'reminders can be shared with your partners',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'share_reminder_partner')
+                and exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'my_reminder_partner_shares') then 'OK' else 'MISSING' end,
+         'migration_reminder_partners.sql'
+  union all
   select 'function', 'product_match_cache keeps the AI verdicts on doubtful matches',
          case when to_regclass('public.product_match_cache') is not null then 'OK' else 'MISSING' end,
          'migration_match_cache.sql'

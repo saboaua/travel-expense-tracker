@@ -4349,6 +4349,66 @@ try {
     } finally { await ctx.close(); }
   });
 
+  await test("reminders: share with a partner by a switch, see who it is shared with, and the partner sees who sent it", async () => {
+    const RID = "a2a2a2a2-0000-4000-8000-000000000001";
+    fake.table("user_plans").push({ user_id: ALICE, plan: "pro", period: "monthly", ends_on: null });
+    fake.table("reminders"); fake.table("reminder_photos"); fake.table("reminder_shares");
+    fake.table("reminders").push({ id: RID, user_id: ALICE, title: "Take the trash out", notes: null, due_at: new Date(Date.now() + 36e5).toISOString(), repeat: "weekly", repeat_days: null, tz: null, alert: "at", color: "red", icon: "trash", done_at: null, snoozed_until: null, last_alerted_for: null, created_at: new Date().toISOString() });
+    const phone = async () => { const c = await browser.newContext({ viewport: { width: 390, height: 844 } }); c.setDefaultTimeout(60_000); return { ctx: c, page: await c.newPage() }; };
+    const signedIn = async (email, password) => { const x = await phone(); await signIn(x.page, email, password); await x.page.waitForURL((u) => u.pathname === "/"); return x; };
+    const a = await signedIn("alice@example.com", "Alice-Pass-123");
+    const b = await signedIn("bob@example.com", "Bob-Pass-12345");
+    // no partner yet: the sheet says so and points to Profile
+    await a.page.goto(`${BASE}/personal/reminders/${RID}`);
+    await a.page.getByTestId("reminder-share").click();
+    await a.page.getByTestId("share-no-partner").waitFor();
+    assert((await a.page.getByRole("link", { name: "Add a partner" }).getAttribute("href")) === "/profile#sharing", "the empty sheet links to Profile");
+    // become partners
+    await a.page.goto(`${BASE}/profile#sharing`);
+    await a.page.getByRole("button", { name: "Turn on sharing" }).click();
+    await a.page.getByRole("button", { name: "Add a partner" }).click();
+    await a.page.locator("#partner-email").fill("bob@example.com");
+    await a.page.getByRole("button", { name: "Next", exact: true }).click();
+    await a.page.getByRole("button", { name: "Send invite" }).click();
+    await a.page.getByRole("dialog", { name: "Invite sent" }).waitFor();
+    await a.page.getByRole("button", { name: "OK" }).click();
+    await b.page.goto(`${BASE}/profile#sharing`);
+    const invitePopup = b.page.getByRole("dialog", { name: "Sharing invite" });
+    await invitePopup.waitFor();
+    await invitePopup.getByRole("button", { name: "Later" }).click();
+    await b.page.locator("#sharing").getByRole("button", { name: "Accept" }).click();
+    await b.page.locator("#sharing").getByText("Approved").waitFor();
+    // Alice switches Bob on, and picks View only (she is told once that Bob accepted)
+    await a.page.goto(`${BASE}/personal/reminders/${RID}`);
+    const accepted = a.page.getByRole("dialog", { name: "Invite accepted" });
+    await accepted.waitFor({ timeout: 30000 });
+    await a.page.getByRole("button", { name: "OK" }).click();
+    await a.page.getByTestId("reminder-share").click();
+    const sw = a.page.getByRole("switch", { name: /Share this reminder with/ });
+    await sw.waitFor();
+    await sw.click();
+    await a.page.getByRole("radio", { name: "View only" }).click();
+    await a.page.getByRole("radio", { name: "View only", checked: true }).waitFor();
+    assert(fake.table("reminder_shares").length === 1 && fake.table("reminder_shares")[0].can_complete === false, "the share is saved as view only");
+    await a.page.keyboard.press("Escape");
+    await a.page.getByTestId("reminder-people").waitFor({ timeout: 30000 });
+    assert(/View only/.test(await a.page.getByTestId("reminder-people").innerText()), "the reminder page lists who it is shared with and what they can do");
+    await a.page.goto(`${BASE}/personal/reminders`);
+    await a.page.getByRole("tab", { name: /All/ }).click();
+    await a.page.getByTestId("reminder-people-row").first().waitFor();
+    assert((await a.page.getByRole("tab", { name: /Shared/ }).count()) === 1, "a Shared tab appears once something is shared");
+    // Bob: From Alice, can view but not mark done, and can remove it from his list
+    await b.page.goto(`${BASE}/personal/reminders`);
+    await b.page.getByRole("tab", { name: /Shared/ }).click();
+    await b.page.getByText(/From /).first().waitFor();
+    await b.page.getByTestId("reminder-row").first().getByRole("link").click();
+    await b.page.getByTestId("reminder-shared-by").waitFor();
+    assert(/Shared by/.test(await b.page.getByTestId("reminder-shared-by").innerText()), "the partner sees who shared it");
+    assert((await b.page.getByTestId("reminder-done").count()) === 0, "view only: no Mark done");
+    assert((await b.page.getByTestId("reminder-delete").count()) === 0, "the partner cannot delete it");
+    await a.ctx.close(); await b.ctx.close();
+  });
+
   await test("Reminders: type a sentence to add one, see it in the list, open it, and delete it", async () => {
     fake.table("reminders"); fake.table("reminder_photos"); fake.table("reminder_shares");
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });

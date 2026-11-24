@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { BellRing, Check, Mic, Plus, Users } from "lucide-react";
+import { BellRing, Check, Mic, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -11,6 +11,10 @@ import { Tabs } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { normalizeReminder, dueText, filterReminders, overdueOf, parseQuickAdd, quickWhen, repeatLabel, statusOf, type Filter, type Reminder } from "@/lib/reminders";
 import { ReminderBadge } from "./reminder-icons";
+import { PersonAvatar } from "./PersonAvatar";
+import { ReminderDetail } from "./ReminderDetail";
+import { useReminderShares } from "./use-reminder-shares";
+import { namesText } from "@/lib/reminder-partners";
 
 export const REMINDER_COLS = "id, user_id, title, notes, due_at, repeat, repeat_days, tz, alert, color, icon, done_at, snoozed_until, last_alerted_for, created_at";
 
@@ -24,7 +28,10 @@ export function RemindersList() {
   const [me, setMe] = useState<string | null>(null);
   const [list, setList] = useState<Reminder[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<Filter>("today");
+  const [filter, setFilter] = useState<Filter | "shared">("today");
+  const { shared, from, refresh: refreshShares } = useReminderShares();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [wide, setWide] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [listening, setListening] = useState(false);
@@ -35,7 +42,11 @@ export function RemindersList() {
     const w = window as unknown as { SpeechRecognition?: SpeechCtor; webkitSpeechRecognition?: SpeechCtor };
     canSpeak.current = !!(w.SpeechRecognition || w.webkitSpeechRecognition);
     const t = setInterval(() => setNow(new Date()), 60000);
-    return () => clearInterval(t);
+    const mq = window.matchMedia("(min-width: 1024px)");
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => { clearInterval(t); mq.removeEventListener("change", sync); };
   }, []);
 
   const load = useCallback(async () => {
@@ -84,33 +95,44 @@ export function RemindersList() {
     load();
   }
 
+  const isShared = useCallback((r: Reminder) => (me != null && r.user_id !== me) || (shared.get(r.id)?.length ?? 0) > 0, [me, shared]);
   const counts = useMemo(() => {
     const l = list ?? [];
-    return (["today", "upcoming", "all", "done"] as Filter[]).map((f) => ({ id: f, label: f === "today" ? "Today" : f === "upcoming" ? "Upcoming" : f === "all" ? "All" : "Done", count: filterReminders(l, f, now).length }));
-  }, [list, now]);
-  const shown = useMemo(() => filterReminders(list ?? [], filter, now), [list, filter, now]);
+    const base = (["today", "upcoming", "all", "done"] as Filter[]).map((f) => ({ id: f as Filter | "shared", label: f === "today" ? "Today" : f === "upcoming" ? "Upcoming" : f === "all" ? "All" : "Done", count: filterReminders(l, f, now).length }));
+    const n = l.filter(isShared).length;
+    // The Shared tab only appears once something is shared by you or with you
+    return n > 0 ? [...base.slice(0, 3), { id: "shared" as Filter | "shared", label: "Shared", count: n }, base[3]] : base;
+  }, [list, now, isShared]);
+  const shown = useMemo(() => (filter === "shared" ? (list ?? []).filter(isShared) : filterReminders(list ?? [], filter, now)), [list, filter, now, isShared]);
   const overdue = filter === "done" || filter === "upcoming" ? [] : overdueOf(shown, now);
   const rest = shown.filter((r) => !overdue.includes(r));
 
   const row = (r: Reminder) => {
     const over = statusOf(r, now) === "overdue";
     const isDone = !!r.done_at;
-    const shared = me && r.user_id !== me;
+    const incoming = me != null && r.user_id !== me;
+    const people = shared.get(r.id) ?? [];
+    const sender = from.get(r.id);
     return (
-      <li key={r.id} className="flex items-center gap-3 px-3 py-2.5" data-testid="reminder-row">
+      <li key={r.id} className={`flex items-center gap-3 px-3 py-2.5 ${wide && selected === r.id ? "bg-accent" : ""}`} data-testid="reminder-row">
         <button type="button" onClick={() => !isDone && tick(r)} disabled={isDone} aria-label={isDone ? `${r.title} is done` : `Mark ${r.title} done`} data-testid="reminder-tick"
           className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 ${isDone ? "border-green-600 bg-green-600 text-white" : "border-muted-foreground/40"}`}>
           {isDone && <Check className="h-4 w-4" />}
         </button>
-        <Link href={`/personal/reminders/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+        <Link href={`/personal/reminders/${r.id}`} onClick={(e) => { if (wide) { e.preventDefault(); setSelected(r.id); } }} className="flex min-w-0 flex-1 items-center gap-3">
           <ReminderBadge icon={r.icon} color={r.color} />
           <span className="min-w-0 flex-1">
             <span className={`block truncate font-semibold ${isDone ? "text-muted-foreground line-through" : ""}`}>{r.title}</span>
             <span className={`block truncate text-xs ${over ? "font-semibold text-red-600 dark:text-red-400" : "text-muted-foreground"}`}>
-              {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatLabel(r)}` : ""}{shared ? " · Shared with you" : ""}
+              {over ? "Overdue · " : ""}{dueText(r.snoozed_until ?? r.due_at, now)}{r.repeat !== "none" ? ` · ${repeatLabel(r)}` : ""}{incoming ? ` · From ${sender ?? "a partner"}` : ""}
             </span>
           </span>
-          {shared && <Users className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />}
+          {incoming && sender && <PersonAvatar name={sender} size={26} />}
+          {!incoming && people.length > 0 && (
+            <span className="flex shrink-0 -space-x-2" data-testid="reminder-people-row" aria-label={`Shared with ${namesText(people.map((x) => x.name))}`}>
+              {people.slice(0, 3).map((x) => <PersonAvatar key={x.partnershipId} name={x.name} size={26} />)}
+            </span>
+          )}
         </Link>
       </li>
     );
@@ -127,10 +149,12 @@ export function RemindersList() {
       <div className="flex justify-end -mt-1"><Link href="/personal/reminders/new" className="inline-flex min-h-11 items-center text-sm font-semibold text-primary" data-testid="reminder-new">More options</Link></div>
 
       {error && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200" data-testid="reminders-error">{error}</p>}
-      <Tabs options={counts} value={filter} onChange={(v) => setFilter(v as Filter)} label="Show reminders" fullWidth size="sm" />
+      <div className="space-y-3 lg:grid lg:grid-cols-[minmax(0,420px)_minmax(0,1fr)] lg:items-start lg:gap-6 lg:space-y-0">
+      <div className="min-w-0 space-y-3">
+      <Tabs options={counts} value={filter} onChange={(v) => setFilter(v as Filter | "shared")} label="Show reminders" fullWidth size="sm" />
 
       {list === null ? <Skeleton className="h-40 w-full rounded-2xl" /> : shown.length === 0 ? (
-        <EmptyState icon={BellRing} tone="notifications" testId="reminders-empty" title={filter === "done" ? "Nothing done yet" : filter === "today" ? "Nothing for today" : "No reminders"}
+        <EmptyState icon={BellRing} tone="notifications" testId="reminders-empty" title={filter === "done" ? "Nothing done yet" : filter === "today" ? "Nothing for today" : filter === "shared" ? "Nothing shared yet" : "No reminders"}
           action={<Button type="button" className="h-11 px-5" onClick={() => document.querySelector<HTMLInputElement>('[data-testid="reminder-quick"]')?.focus()}><Plus className="h-4 w-4" /> Add a reminder</Button>}>
           Type what you need to remember above. Add a day or time, like “Fri 9am”.
         </EmptyState>
@@ -140,6 +164,15 @@ export function RemindersList() {
           {rest.length > 0 && <Card className="rounded-2xl"><ul className="divide-y" data-testid="reminders-list">{rest.map(row)}</ul></Card>}
         </>
       )}
+      </div>
+      {wide && (
+        <aside className="min-w-0 lg:sticky lg:top-6" aria-label="Reminder" data-testid="reminder-pane">
+          {selected && list?.some((r) => r.id === selected)
+            ? <ReminderDetail key={selected} id={selected} embedded onChanged={() => { load(); refreshShares(); }} />
+            : <div className="rounded-2xl border-2 border-dashed p-8 text-center text-sm text-muted-foreground">Pick a reminder to see it here.</div>}
+        </aside>
+      )}
+      </div>
     </div>
   );
 }
