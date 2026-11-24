@@ -5,7 +5,13 @@ import PersonalHome from "@/components/personal/PersonalHome";
 import { useEffect, useState, type ReactNode } from "react";
 import { Briefcase, Wallet } from "lucide-react";
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
-import { TripPlaces } from "@/components/TripPlaces";
+import dynamic from "next/dynamic";
+
+/** Below the first screen: loaded after the top of Home, in grey shapes that hold the space so nothing jumps. */
+const TripPlaces = dynamic(() => import("@/components/TripPlaces").then((m) => m.TripPlaces), {
+  ssr: false,
+  loading: () => <div className="h-48 animate-pulse rounded-2xl bg-muted/60" aria-hidden="true" data-testid="places-loading" />,
+});
 import type { DocTile } from "@/components/documents/DocumentTiles";
 
 type View = "business" | "personal";

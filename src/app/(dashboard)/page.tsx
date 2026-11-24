@@ -10,7 +10,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plane, ChevronRight } from "lucide-react";
+import { Plane, ChevronRight, Camera } from "lucide-react";
 import { formatDate, formatDateRange, todayISO, daysBetween } from "@/lib/utils";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import { buildScanOptions } from "@/lib/scan-destination";
@@ -299,10 +299,10 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                     const tripTotal = tripTotals.get(trip.id)?.total ?? 0;
                     const sub = trip.start_date > today ? `in ${daysBetween(today, trip.start_date)} days` : isPassed(trip) ? "Passed" : "In progress";
                     return (
+                      <div key={trip.id} className="flex items-stretch gap-2">
                       <Link
-                        key={trip.id}
                         href={`/trips/${trip.id}`}
-                        className="flex min-h-16 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5 transition-colors hover:bg-accent"
+                        className="flex min-h-16 min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5 transition-colors hover:bg-accent"
                       >
                         <div className="min-w-0">
                           <p className="truncate font-semibold">{trip.name}</p>
@@ -317,6 +317,12 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
                           <ChevronRight className="h-4 w-4 text-muted-foreground" />
                         </div>
                       </Link>
+                      {sub === "In progress" && (
+                        <Link href={`/trips/${trip.id}/add-expense`} data-testid="also-add-expense" aria-label={`Add expense to ${trip.name}`} className="flex min-h-16 w-16 shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl bg-primary text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+                          <Camera className="h-4 w-4" aria-hidden="true" />Add
+                        </Link>
+                      )}
+                      </div>
                     );
                   })}
                 </div>

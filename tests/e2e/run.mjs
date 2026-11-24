@@ -1823,6 +1823,26 @@ try {
     }
   });
 
+  await test("home: a second trip that is under way has its own Add button, one tap to its expense form", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    for (const name of ["Under way A", "Under way B"]) {
+      await page.goto(`${BASE}/trips/new`);
+      await page.locator("#name").fill(name);
+      await page.locator("#startDate").fill(today);
+      await page.getByRole("button", { name: "Create trip" }).click();
+      await page.waitForURL((u) => /\/trips\/[^/]+$/.test(u.pathname), { timeout: 30000 });
+    }
+    await page.goto(`${BASE}/`);
+    await page.getByRole("tab", { name: "Business" }).click(); // Home opens on Personal first
+    const add = page.getByTestId("also-add-expense").first();
+    await add.waitFor({ timeout: 30000 });
+    assert(/^\/trips\/[^/]+\/add-expense$/.test(await add.getAttribute("href")), "Add goes to that trip's expense form");
+    assert((await add.boundingBox()).height >= 44, "the button is at least 44 px tall");
+    await ctx.close();
+  });
+
   await test("hotel: a trip can carry a hotel with a Directions button, and it shows on the trip card", async () => {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");

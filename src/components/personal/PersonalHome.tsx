@@ -10,7 +10,14 @@ import { SUBSCRIPTION_COLS } from "@/lib/columns";
 import { RenewalBar } from "@/components/subscriptions/RenewalBar";
 import { approxUsd, cycleLabel, daysUntil, myShare, nextDue, totalsByCurrency, upcoming, type Sub } from "@/lib/subscriptions";
 import { cn, formatCurrency, formatDate } from "@/lib/utils";
-import { DocumentTiles, type DocTile } from "@/components/documents/DocumentTiles";
+import dynamic from "next/dynamic";
+import type { DocTile } from "@/components/documents/DocumentTiles";
+
+/** Below the first screen: loads after the top of Home and holds its space meanwhile. */
+const DocumentTiles = dynamic(() => import("@/components/documents/DocumentTiles").then((m) => m.DocumentTiles), {
+  ssr: false,
+  loading: () => <div className="h-32 animate-pulse rounded-2xl bg-muted/60" aria-hidden="true" data-testid="docs-loading" />,
+});
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
 import { BudgetCard } from "@/components/personal/BudgetCard";

@@ -12,7 +12,7 @@ import { Waves } from "@/components/login/LoginArt";
 import { RequestAccountForm } from "@/components/login/RequestAccountForm";
 
 // One slim family for the whole sign-in screen: light for the big line, semibold for names, labels and buttons
-const manrope = Manrope({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700"], variable: "--font-login-display" });
+const manrope = Manrope({ subsets: ["latin"], display: "swap", preload: false, adjustFontFallback: true, weight: ["300", "400", "500", "600", "700"], variable: "--font-login-display" });
 const ONE_FONT = { "--font-login-body": "var(--font-login-display)" } as React.CSSProperties;
 
 const QUIET_FEATURES = [
