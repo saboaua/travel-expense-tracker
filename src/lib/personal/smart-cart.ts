@@ -321,6 +321,8 @@ export type DetailLine = PlanLine & {
   ref: { store: string; price: number } | null;
   /** At your usual store: the cheapest other store for it, when one is cheaper */
   better: { store: string; price: number; saving: number } | null;
+  /** The cheapest price at any other store, and what this store costs more (positive) or less (negative) than that, for the quantity in the cart */
+  elsewhere: { store: string; price: number; diff: number } | null;
 };
 export type StoreDetail = {
   store: string;
@@ -361,6 +363,8 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
     const r = ref ? priced(ref, it.key, s.useOld) : null;
     let sv: number | null = null;
     let better: DetailLine["better"] = null;
+    let el: { store: string; price: number } | null = null;
+    for (const o of others) { const x = priced(o, it.key, s.useOld); if (x && (!el || x.price! < el.price - 1e-9)) el = { store: o.store, price: x.price! }; }
     if (r) {
       sv = round2((r.price! - l.price!) * it.qty);
       compared++; base += r.price! * it.qty; saving += (r.price! - l.price!) * it.qty;
@@ -375,7 +379,7 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
         elseCount++; elseSaving += sav; byStore.set(best.store, (byStore.get(best.store) ?? 0) + sav);
       }
     }
-    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better });
+    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better, elsewhere: el ? { ...el, diff: round2((l.price! - el.price) * it.qty) } : null });
   }
   lines.sort((x, y) => (y.better?.saving ?? y.saving ?? -Infinity) - (x.better?.saving ?? x.saving ?? -Infinity));
   const top = [...byStore].sort((x, y) => y[1] - x[1])[0];

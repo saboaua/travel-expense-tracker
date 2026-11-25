@@ -183,6 +183,12 @@ eq("the usual store says where else it is cheaper", [dU.isUsual, dU.elsewhere.co
 eq("each line at the usual store names the cheaper store", dU.lines.map((l) => [l.name.toLowerCase(), l.better?.store, l.better?.saving]).sort(), [["eggs", "Shop B", 3], ["milk", "Shop A", 2], ["paste", "Shop A", 1]]);
 const dB = storeDetail({ store: "Shop B", items: [...items, { key: key("Soap"), qty: 1 }], baskets: smartBaskets([...items, { key: key("Soap"), qty: 1 }], products, stores, NOW, ext, free, "AWG"), usual, s: free })!;
 eq("an item with no price here is listed as not counted", dB.notPriced.map((n) => n.toLowerCase()), ["soap"]);
+eq("at the usual store a dearer item says what it costs more than the cheapest other store", dU.lines.find((l) => l.name.toLowerCase() === "eggs")?.elsewhere, { store: "Shop B", price: 9, diff: 3 });
+eq("a store that is the cheapest for an item has a negative difference", dA.lines.find((l) => l.name.toLowerCase() === "milk")?.elsewhere?.diff, -2);
+const mm: ExternalPrice[] = [{ store: "Folira", key: key("Milk"), price: 5.75, source: "community" }, { store: "Amazing", key: key("Milk"), price: 5.5, source: "community" }];
+const mmItems = [{ key: key("Milk"), qty: 1 }];
+const dF = storeDetail({ store: "Folira", items: mmItems, baskets: smartBaskets(mmItems, products, ["Folira", "Amazing"], NOW, mm, free, "AWG"), usual: null, s: free })!;
+eq("with no usual store the line still compares with the other store: 0.25 more", dF.lines[0].elsewhere, { store: "Amazing", price: 5.5, diff: 0.25 });
 eq("an unknown store has no detail", storeDetail({ store: "Nowhere", items, baskets, usual, s: free }), null);
 
 if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1); }

@@ -102,13 +102,19 @@ function StoreSavings({ d, currency }: { d: StoreDetail; currency: string }) {
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span>
               <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Money amount={l.price} currency={currency} className="text-xs" /><Tag line={l} /></span>
-              {l.ref && <span className="block text-xs text-muted-foreground">{l.ref.store} <Money amount={l.ref.price} currency={currency} className="text-xs" /></span>}
-              {d.isUsual && (l.better ? <span className="block text-xs text-muted-foreground">{l.better.store} <Money amount={l.better.price} currency={currency} className="text-xs" /></span> : <span className="block text-xs text-muted-foreground">Cheapest here</span>)}
+              {l.ref
+                ? <span className="block text-xs text-muted-foreground">{l.ref.store} <Money amount={l.ref.price} currency={currency} className="text-xs" /></span>
+                : l.elsewhere
+                  ? <span className="block text-xs text-muted-foreground">{l.elsewhere.store} <Money amount={l.elsewhere.price} currency={currency} className="text-xs" /></span>
+                  : <span className="block text-xs text-muted-foreground">No other store has a price for it yet</span>}
             </span>
-            <span className="shrink-0 text-right text-sm font-bold">
-              {l.better ? <span className={GREEN}>{l.better.store.split(/\s+/)[0]} saves <Money amount={l.better.saving} currency={currency} className="text-sm" /></span>
-                : l.saving != null && Math.abs(l.saving) >= 0.01 ? <span className={l.saving > 0 ? GREEN : "text-red-700 dark:text-red-300"}>{l.saving > 0 ? "saves" : "costs"} <Money amount={Math.abs(l.saving)} currency={currency} className="text-sm" />{l.saving < 0 ? " more" : ""}</span>
-                : d.isUsual ? <span className="text-muted-foreground">Cheapest here</span> : null}
+            <span className="shrink-0 text-right text-sm font-bold" data-testid="sc-detail-delta">
+              {l.ref && l.saving != null
+                ? Math.abs(l.saving) >= 0.01 ? <span className={l.saving > 0 ? GREEN : "text-red-700 dark:text-red-300"}>{l.saving > 0 ? "saves" : "costs"} <Money amount={Math.abs(l.saving)} currency={currency} className="text-sm" />{l.saving < 0 ? " more" : ""}</span> : <span className="text-muted-foreground">Same price</span>
+                : l.elsewhere
+                  ? l.elsewhere.diff > 0.004 ? <span className="text-red-700 dark:text-red-300">costs <Money amount={l.elsewhere.diff} currency={currency} className="text-sm" /> more</span>
+                    : l.elsewhere.diff < -0.004 ? <span className={GREEN}>Cheapest here</span> : <span className="text-muted-foreground">Same price</span>
+                  : null}
             </span>
           </li>
         ))}
