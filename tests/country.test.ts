@@ -1,4 +1,4 @@
-import { chooseCountry, codeOfCountryName, countryForShared, countryOfCurrency, currencyOfCountry, hasPriceData, normCountry, readCountryStats, readTraveler, shouldAnnounce } from "../src/lib/country";
+import { chooseCountry, codeOfCountryName, countryForShared, countryOfCurrency, currencyOfCountry, hasPriceData, normCountry, readCountryStats, readTraveler, sharedCountry, shouldAnnounce } from "../src/lib/country";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -28,6 +28,7 @@ eq("garbage gives no countries", readCountryStats("x"), []);
 
 // the country a shared price is sent for
 eq("SRD is Suriname whatever the person is", countryForShared("SRD", "AW"), "SR");
+eq("a receipt's own country comes first, whatever the currency", [sharedCountry("PA", "USD", "AW"), sharedCountry("sr", "AWG", "AW"), sharedCountry(null, "AWG", "SR"), sharedCountry("", "USD", "sr"), sharedCountry(null, "USD", null)], ["PA", "SR", "AW", "SR", null]);
 eq("USD takes the country the person is in", countryForShared("USD", "sr"), "SR");
 eq("USD with no country is unknown", countryForShared("USD", null), null);
 

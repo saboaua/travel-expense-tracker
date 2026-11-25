@@ -1,7 +1,7 @@
 import { normPaid, normTripRef, type PaidWith } from "@/lib/paid-with";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, GROCERY_RECEIPT_COLS_PAY, PRICE_CHECK_COLS, isMissingColumn, withColumnFallback, withColumnFallback3 } from "@/lib/columns";
+import { GROCERY_ITEM_COLS, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE, GROCERY_RECEIPT_COLS_PAY, PRICE_CHECK_COLS, isMissingColumn } from "@/lib/columns";
 import { checkToTracker, type PriceCheck } from "@/lib/personal/price-notes";
 import { fetchAll } from "@/lib/personal/fetch-all";
 import type { ItemLite, ReceiptLite } from "@/lib/personal/grocery";
@@ -14,7 +14,7 @@ import type { OutboxItem } from "@/lib/outbox";
 
 type Result<T> = Promise<{ data: T | null; error: unknown }>;
 
-export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null; area?: string | null; type_id?: string | null };
+export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null; area?: string | null; type_id?: string | null; country?: string | null };
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
 export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null; area?: string | null; type_id?: string | null };
@@ -99,11 +99,9 @@ export async function fetchPrices(supabase: SupabaseClient, forUser?: string): R
       const q = supabase.from("grocery_items").select(`name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(${cols})`);
       return (forUser ? q.eq("user_id", forUser) : q).order("created_at", { ascending: false }).range(a, b) as never;
     });
-    // Before the price-notes migration there is no prices_only column: every line is a purchase
-    const data = await load("store, purchase_date, currency, area, prices_only").catch((e) => {
-      if (!isMissingColumn({ message: e instanceof Error ? e.message : "" })) throw e;
-      return load("store, purchase_date, currency, area");
-    });
+    // Newest columns first: a database without the price-notes or receipt-country migration falls back to fewer
+    const AREA = "store, purchase_date, currency, area";
+    const data = await load(`${AREA}, prices_only, country`).catch(() => load(`${AREA}, prices_only`)).catch(() => load(AREA));
     // notebooks, clothes and other shopping lines are not grocery prices: they stay out of Best prices and what the community shares
     const shop = await fetchShoppingNames(supabase);
     const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase()) && (Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.area !== "other").map((d) => ({
@@ -113,8 +111,9 @@ export async function fetchPrices(supabase: SupabaseClient, forUser?: string): R
       receipt: Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts,
     }));
     // Prices seen in a shop sit beside the receipt lines. Before the price-notes migration there is no table: that just means none yet.
-    const seenQ = supabase.from("price_checks").select(PRICE_CHECK_COLS);
-    const seen = await (forUser ? seenQ.eq("user_id", forUser) : seenQ).order("seen_on", { ascending: false }).limit(2000);
+    const seenWith = (cols: string) => { const q = supabase.from("price_checks").select(cols); return (forUser ? q.eq("user_id", forUser) : q).order("seen_on", { ascending: false }).limit(2000); };
+    let seen = await seenWith(`${PRICE_CHECK_COLS}, country`); // before the receipt-country migration there is no country column
+    if (seen.error) seen = await seenWith(PRICE_CHECK_COLS);
     const checks = seen.error ? [] : ((seen.data ?? []) as unknown as PriceCheck[]).map(checkToTracker);
     return { data: [...lines, ...checks], error: null };
   } catch (error) {
@@ -136,7 +135,13 @@ export async function fetchPriceMatches(supabase: SupabaseClient, forUser?: stri
 
 export async function fetchReceiptBundle(supabase: SupabaseClient, id: string): Result<ReceiptBundle> {
   const [r, i] = await Promise.all([
-    withColumnFallback((cols) => withColumnFallback3((c2) => supabase.from("grocery_receipts").select(c2).eq("id", id).single(), cols, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE), `${GROCERY_RECEIPT_COLS_PAY}, type_id`, GROCERY_RECEIPT_COLS_PAY),
+    (async () => {
+      // Newest columns first; each migration that has not been run drops one level
+      const levels = [`${GROCERY_RECEIPT_COLS_PAY}, type_id, country`, `${GROCERY_RECEIPT_COLS_PAY}, type_id`, GROCERY_RECEIPT_COLS_PAY, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE];
+      let res = await supabase.from("grocery_receipts").select(levels[0]).eq("id", id).single();
+      for (let n = 1; n < levels.length && isMissingColumn(res.error); n++) res = await supabase.from("grocery_receipts").select(levels[n]).eq("id", id).single();
+      return res;
+    })(),
     supabase.from("grocery_items").select(GROCERY_ITEM_COLS).eq("receipt_id", id).order("created_at"),
   ]);
   if (r.error || !r.data) return { data: null, error: r.error ?? new Error("Receipt not found") };

@@ -106,6 +106,8 @@ need_cols(tbl, col, fix) as (values
   ('store_locations','lat','migration_basket.sql'),
   ('supermarket_places','name_key','migration_supermarket_places.sql'),
   ('supermarket_places','fixed','migration_places_fix.sql'),
+  ('grocery_receipts','country','migration_receipt_country.sql'),
+  ('price_checks','country','migration_receipt_country.sql'),
   ('supermarket_places','category','migration_directory_categories.sql'),
   ('supermarket_places','added','migration_directory_categories.sql'),
   ('store_categories','category','migration_directory_categories.sql'),

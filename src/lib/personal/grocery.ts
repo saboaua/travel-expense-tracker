@@ -344,7 +344,7 @@ export function effectiveUnit(unit: string | null | undefined, quantity: number)
 }
 
 /** noted: a price you wrote down or kept from a prices-only receipt, not something you bought */
-export type PricePoint = { date: string; price: number; store: string; noted?: boolean };
+export type PricePoint = { date: string; price: number; store: string; noted?: boolean; /** Where it was bought (two letters), when the receipt says */ country?: string | null };
 
 export type PriceStats = {
   count: number;
@@ -409,7 +409,7 @@ export type TrackerRow = {
   line_total: number;
   /** A price you noted (a price note or a prices-only receipt), not something you bought */
   noted?: boolean;
-  receipt: { store: string; purchase_date: string; currency: string };
+  receipt: { store: string; purchase_date: string; currency: string; /** Where it was bought, when the receipt says */ country?: string | null };
 };
 
 export type TrackedItem = {

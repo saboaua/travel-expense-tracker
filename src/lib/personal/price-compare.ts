@@ -135,7 +135,7 @@ export function summarizeStores(history: PricePoint[]): StoreSummary[] {
 }
 
 /** Every purchase with its change against the previous purchase at the same store (newest first). */
-export function historyWithChange(rows: { date: string; store: string; price: number; name: string; qty?: number; paid?: number; unit?: string | null; noted?: boolean }[]): HistoryEntry[] {
+export function historyWithChange(rows: { date: string; store: string; price: number; name: string; qty?: number; paid?: number; unit?: string | null; noted?: boolean; country?: string | null }[]): HistoryEntry[] {
   const asc = [...rows].sort((a, b) => a.date.localeCompare(b.date));
   const lastAt = new Map<string, number>();
   const out = asc.map((r) => {
@@ -216,7 +216,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
     const firstAtom = atoms.get(c.atoms[0])!.atom;
     const latestRow = [...c.rows].sort((a, b) => b.receipt.purchase_date.localeCompare(a.receipt.purchase_date))[0];
     const named = c.atoms.map((k) => ({ atomKey: k, name: atoms.get(k)!.rows[0].name }));
-    const history = historyWithChange(c.rows.map((r) => ({ date: r.receipt.purchase_date, store: r.receipt.store, price: r.unit_price, name: r.name, qty: r.quantity, paid: r.line_total, unit: effectiveUnit(r.unit, r.quantity), ...(r.noted ? { noted: true } : {}) })));
+    const history = historyWithChange(c.rows.map((r) => ({ date: r.receipt.purchase_date, store: r.receipt.store, price: r.unit_price, name: r.name, qty: r.quantity, paid: r.line_total, unit: effectiveUnit(r.unit, r.quantity), ...(r.noted ? { noted: true } : {}), ...(r.receipt.country ? { country: r.receipt.country } : {}) })));
     const asc = [...history].reverse();
     const stores = summarizeStores(asc);
     const lastStore = stores.find((s) => s.store === asc[asc.length - 1].store)!;

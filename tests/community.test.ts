@@ -21,6 +21,10 @@ eq("old prices are counted so the person can be told", oldPriceCount(products, N
 const noon = new Date(2026, 10, 14, 12, 0);
 eq("last shared label", [lastSharedLabel(null, noon), lastSharedLabel("2026-11-14T03:00:00", noon), lastSharedLabel("2026-11-13T03:00:00", noon), lastSharedLabel("2026-11-09T03:00:00", noon), lastSharedLabel("nonsense", noon)], ["", "today", "yesterday", "Nov 9", ""]);
 eq("AWG prices are sent for Aruba, whatever country the person is in now", [sharedRows(products, NOW)[0].country, sharedRows(products, NOW, "SR")[0].country], ["AW", "AW"]);
+// A receipt bought in Panama in dollars goes to Panama, even when the person is in Aruba now; the newest receipt's country counts
+const pa = (name: string, date: string, country?: string): TrackerRow => ({ ...row(name, 2, "Super 99", date), receipt: { store: "Super 99", purchase_date: date, currency: "USD", ...(country ? { country } : {}) } });
+eq("a receipt's own country is shared with, not where the person is now", sharedRows(buildProducts([pa("Rice 1KG", "2026-11-03", "PA")]).products, NOW, "AW")[0].country, "PA");
+eq("no receipt country keeps the old rule", sharedRows(buildProducts([pa("Rice 1KG", "2026-11-03")]).products, NOW, "AW")[0].country, "AW");
 eq("old prices are not shared", rows.some((r) => r.product_name.startsWith("Old")), false);
 eq("one row per product and store", rows.length, 2);
 // privacy: nothing but the allowed fields leaves the phone

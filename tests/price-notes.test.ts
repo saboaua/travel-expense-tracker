@@ -38,4 +38,6 @@ eq(c4?.stores.length, 3, "one product, three stores");
 
 eq(recentProducts([check("1", "C4", "A", 1, null, "2026-11-01"), check("2", "c4", "B", 1, null, "2026-11-02"), check("3", "Whey", "A", 1, null, "2026-11-05"), check("4", "", "A", 1, null, "2026-11-05")]), ["C4", "Whey"], "recent products, most checked first, blanks ignored");
 eq(knownStores(["Fit Stop", "fit  stop", "Island Health", " "]), ["Fit Stop", "Island Health"], "known stores merge by name");
+eq(checkToTracker({ ...check("1", "Milk", "Super Food", 3, null, "2026-11-12"), country: "PA" }).receipt?.country, "PA", "a price note carries the country it was bought in");
+eq("country" in (checkToTracker(check("1", "Milk", "Super Food", 3, null, "2026-11-12")).receipt ?? {}), false, "no country when none was set");
 process.exit(failed ? 1 : 0);

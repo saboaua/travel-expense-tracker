@@ -2,7 +2,11 @@
 
 import { setupNeeded } from "@/lib/setup-message";
 import { Money } from "@/components/ui/money";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { BoughtIn } from "@/components/personal/BoughtIn";
+import { useCountry } from "@/components/personal/use-country";
+import { normCountry } from "@/lib/country";
+import { isMissingColumn } from "@/lib/columns";
 import Link from "next/link";
 import { ArrowLeft, Check, Trash2 } from "lucide-react";
 import { useConfirm } from "@/components/ui/confirm";
@@ -37,6 +41,10 @@ export function PriceCheckForm() {
   const [date, setDate] = useState(todayISO());
   const [pickDate, setPickDate] = useState(false);
   const [notes, setNotes] = useState("");
+  const here = useCountry();
+  const [boughtIn, setBoughtIn] = useState<string | null>(null);
+  const countryChosen = useRef(false);
+  useEffect(() => { if (here.ready && !countryChosen.current) setBoughtIn(normCountry(here.country)); }, [here.ready, here.country]);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -104,12 +112,16 @@ export function PriceCheckForm() {
       const uid = session?.user.id;
       if (!uid) throw new Error("Sign in again to save.");
       const row = { product: product.trim(), store: store.trim(), price: amt, currency, size: size.trim() || null, seen_on: date, notes: notes.trim() || null };
-      const r = await saveRow({
-        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "price_checks", row,
+      const send = (data: typeof row) => saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: uid, table: "price_checks", row: data,
         file, fileColumn: file ? "photo_path" : undefined, bucket: file ? "receipts" : undefined, folder: "personal/price-checks",
         keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
         label: `${row.product} at ${row.store}`, summary: "Price added",
       });
+      // Without migration_receipt_country.sql the price still saves, just without the country
+      const r = boughtIn
+        ? await send({ ...row, country: boughtIn } as typeof row).catch((e: unknown) => { if (isMissingColumn(e as { code?: string; message?: string })) return send(row); throw e; })
+        : await send(row);
       setSavedMsg(`${r.queued ? "Saved on this phone, will send when you are online" : "Saved"}: ${row.product} at ${row.store}, ${formatCurrency(amt, currency)}`);
       setLastProduct(row.product);
       setPrice(""); setNotes(""); setFile(null); setPreview(null); setDate(todayISO()); setPickDate(false);
@@ -170,6 +182,7 @@ export function PriceCheckForm() {
             </Select>
           )}
         </div>
+        <BoughtIn value={boughtIn} detected={here.country} home={here.homeCountry} onChange={(c) => { countryChosen.current = true; setBoughtIn(c); }} />
 
         <div>
           <label htmlFor="pc-size" className={label}>Size <span className="font-normal text-muted-foreground">(optional)</span></label>

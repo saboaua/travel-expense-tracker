@@ -1208,6 +1208,35 @@ try {
     await ctx.close();
   });
 
+  await test("bought in: a receipt keeps the country it was bought in, picked from the sheet, and its detail page says so", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Super 99 Panama", date: null, total: 4.5, currency: "USD", source: "ai", items: [item("Rice 1kg", 4.5)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/groceries/new`);
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+    await page.getByTestId("bought-in").waitFor();
+    await page.getByTestId("bought-in-change").click();
+    await page.getByTestId("bought-in-sheet").waitFor();
+    await page.getByTestId("bought-in-other").selectOption("PA");
+    await page.getByTestId("bought-in-use").click();
+    assert(/Panama/.test(await page.getByTestId("bought-in-country").innerText()), "the row shows Panama");
+    assert(/only with people shopping in Panama/.test(await page.getByTestId("bought-in-note").innerText()), "the note names the community");
+    const before = fake.table("grocery_receipts").length;
+    await page.getByRole("button", { name: "Save receipt" }).click();
+    for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const saved = fake.table("grocery_receipts").find((r) => r.store === "Super 99 Panama");
+    assert(saved && saved.country === "PA" && saved.currency === "USD", "the country is saved with the receipt: " + JSON.stringify(saved));
+    await page.goto(`${BASE}/personal/groceries/${saved.id}`);
+    await page.getByTestId("bought-in-detail").waitFor({ timeout: 20_000 });
+    assert(/Panama/.test(await page.getByTestId("bought-in-detail").innerText()), "the detail page shows where it was bought");
+    fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Super 99 Panama"));
+    await ctx.close();
+  });
+
   await test("receipt types: a massage receipt goes to a new Personal care type (not Groceries), gets its own budget line, and the manager lists it", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

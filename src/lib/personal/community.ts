@@ -5,7 +5,7 @@
  */
 import { normStore } from "@/lib/personal/basket";
 import { productWords, type Product } from "@/lib/personal/price-compare";
-import { countryForShared } from "@/lib/country";
+import { sharedCountry } from "@/lib/country";
 
 export type SharedRow = { store_key: string; store_name: string; product_key: string; product_name: string; size_label: string | null; currency: string; price: number; country?: string | null };
 /** The only fields that may ever be sent. A test checks every row against this list. */
@@ -28,7 +28,7 @@ export function sharedRows(products: Product[], now: Date, current: string | nul
       if (age < 0 || age > 60 || !(s.latest.price > 0) || s.latest.price >= 100000) continue;
       const sk = storeKey(s.store);
       if (!sk) continue;
-      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100, country: countryForShared(p.currency, current) });
+      out.push({ store_key: sk, store_name: s.store.slice(0, 120), product_key: productKey(p), product_name: p.name.slice(0, 160), size_label: p.size, currency: p.currency, price: Math.round(s.latest.price * 100) / 100, country: sharedCountry(s.latest.country, p.currency, current) });
     }
   }
   return out;

@@ -1,6 +1,9 @@
 "use client";
 
 import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
+import { BoughtIn } from "@/components/personal/BoughtIn";
+import { useCountry } from "@/components/personal/use-country";
+import { normCountry } from "@/lib/country";
 import { TripPicker, useTripChoices } from "@/components/personal/TripPicker";
 import { lastPaid, normPaid, normTripRef, suggestTrip, type PaidWith } from "@/lib/paid-with";
 import { AiScanMeter } from "@/components/pro/AiScanMeter";
@@ -87,6 +90,12 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   const [store, setStore] = useState("");
   const [date, setDate] = useState(todayISO());
   const [currency, setCurrency] = useState("USD");
+  // Where it was bought: its prices go to that country's community. The budget does not look at it.
+  const here = useCountry();
+  const [boughtIn, setBoughtIn] = useState<string | null>(null);
+  const countryChosen = useRef(false);
+  const hadCountry = useRef(false);
+  useEffect(() => { if (!receiptId && here.ready && !countryChosen.current) setBoughtIn(normCountry(here.country)); }, [receiptId, here.ready, here.country]);
   const [total, setTotal] = useState("");
   const [notes, setNotes] = useState("");
   const [rows, setRows] = useState<Row[]>([]);
@@ -166,6 +175,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
       setStore(head.store ?? "");
       setDate(head.purchase_date ?? todayISO());
       setCurrency(head.currency ?? "USD");
+      { const c = normCountry((head as { country?: string | null }).country); setBoughtIn(c); countryChosen.current = true; hadCountry.current = !!c; }
       setTotal(String(head.total ?? ""));
       setNotes(head.notes || "");
       setPricesOnly(head.prices_only === true);
@@ -356,6 +366,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
 
       // Only sent when it matters, so a database without the price-notes migration still saves the receipt
       const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || typeId || wasArea.current ? { area: typeId ? "other" : asShopping ? "shopping" : "groceries", type_id: typeId } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
+      const withCountry = boughtIn || hadCountry.current ? { ...head, country: boughtIn } : head;
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -373,13 +384,15 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
         })),
       };
       const waitingList = await browserOutbox.list().catch(() => []);
-      const saved = await saveRow({
-        api: makeRowApi(supabase), store: browserOutbox, userId: owner, table: "grocery_receipts", id: receiptId, row: head, children,
+      const send = (row: typeof head) => saveRow({
+        api: makeRowApi(supabase), store: browserOutbox, userId: owner, table: "grocery_receipts", id: receiptId, row, children,
         file, fileColumn: "receipt_path", bucket: "receipts", folder: "personal/groceries", currentPath: existingPath,
         waiting: waitingList.find((i) => i.id === receiptId) ?? null,
         keep: (path, blob) => browserBlobs.put(`receipts/${path}`, blob),
         label: head.store, summary: `Grocery receipt · ${receiptId ? "changed" : "new"}`,
       });
+      // A database without migration_receipt_country.sql still saves the receipt, just without the country
+      const saved = await send(withCountry).catch((e: unknown) => { if (withCountry !== head && isMissingColumn(e as { code?: string; message?: string })) return send(head); throw e; });
       // Lines the person sorted by hand are remembered for next time
       if (remember && !typed) await saveItemRules(supabase, owner, clean.filter((r) => r.sorted && r.category !== "Other").map((r) => ({ normalized_name: normalizeItemName(r.name), category: r.category })));
       // A receipt that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
@@ -493,6 +506,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
                 {types.map((t) => <option key={t.id} value={`type:${t.id}`}>{t.name}</option>)}
               </Select>
             </div>
+            <BoughtIn value={boughtIn} detected={here.country} home={here.homeCountry} onChange={(c) => { countryChosen.current = true; setBoughtIn(c); }} />
             <PaidWithPicker value={paidWith} onChange={setPaidWith} />
             <TripPicker trips={trips} value={tripRef} suggested={suggestedTrip} onChange={(v) => { tripTouched.current = true; setTripRef(v); }} />
 

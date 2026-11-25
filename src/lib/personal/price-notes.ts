@@ -21,13 +21,13 @@ export function currencyForStore(receipts: { store: string; currency: string; pu
 /** A line with a price but no name (some receipts only say "1 ITEM") is saved as Item 1, 2, 3. */
 export const itemName = (name: string, position: number) => name.trim() || `Item ${position}`;
 
-export type PriceCheck = { id: string; product: string; store: string; price: number | string; currency: string; size?: string | null; seen_on: string; photo_path?: string | null; notes?: string | null; waiting?: boolean };
+export type PriceCheck = { id: string; product: string; store: string; price: number | string; currency: string; country?: string | null; size?: string | null; seen_on: string; photo_path?: string | null; notes?: string | null; waiting?: boolean };
 
 /** A price seen in a shop, shaped like a receipt line so the Price tracker compares it with everything else. The size goes into the name so same-size products pair up. */
 export function checkToTracker(c: PriceCheck): TrackerRow {
   const name = [c.product.trim(), c.size?.trim()].filter(Boolean).join(" ");
   const price = Math.round(Number(c.price) * 100) / 100;
-  return { name, normalized_name: normalizeItemName(name), category: "Other", unit_price: price, quantity: 1, unit: null, line_total: price, noted: true, receipt: { store: c.store.trim(), purchase_date: c.seen_on, currency: c.currency } };
+  return { name, normalized_name: normalizeItemName(name), category: "Other", unit_price: price, quantity: 1, unit: null, line_total: price, noted: true, receipt: { store: c.store.trim(), purchase_date: c.seen_on, currency: c.currency, ...(c.country ? { country: c.country } : {}) } };
 }
 
 /** Products you checked before, most checked first (case-insensitive), for one-tap chips. */

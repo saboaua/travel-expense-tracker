@@ -20,6 +20,8 @@ import { browserBlobs } from "@/lib/offline-store";
 import { browserOutbox } from "@/lib/outbox";
 import { useTripChoices } from "@/components/personal/TripPicker";
 import { normPaid, paidLabel } from "@/lib/paid-with";
+import { countryName } from "@/lib/scan-destination";
+import { normCountry } from "@/lib/country";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
@@ -86,6 +88,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
         <div>
           <h1 className="text-2xl font-bold">{receipt.store}</h1>
           <p className="text-sm text-muted-foreground">{formatDate(receipt.purchase_date)}</p>
+          {normCountry(receipt.country) && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground" data-testid="bought-in-detail"><MapPin className="h-3 w-3" aria-hidden="true" />Bought in {countryName(normCountry(receipt.country)!) ?? receipt.country}</p>}
           {(receipt.paid_with || receipt.trip_ref) && (
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="paid-detail">
               {receipt.paid_with && <span className="rounded-full bg-muted px-2.5 py-1">{paidLabel(normPaid(receipt.paid_with))}</span>}

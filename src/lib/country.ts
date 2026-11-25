@@ -76,3 +76,10 @@ export function readTraveler(row: unknown): TravelerState {
   const countries = Array.isArray(r?.countries) ? [...new Set((r!.countries as unknown[]).flatMap((c) => { const n = normCountry(typeof c === "string" ? c : null); return n ? [n] : []; }))].sort() : [];
   return { countries, seen: r?.seen === true, earned: countries.length >= TRAVELER_FROM };
 }
+
+/**
+ * The country a price is shared for. The receipt's own "Bought in" country comes first, so groceries bought in Panama reach Panama
+ * shoppers whatever currency was paid with. A receipt with no country keeps the old rule: the currency, or the country the person is in.
+ */
+export const sharedCountry = (receiptCountry: string | null | undefined, currency: string, current: string | null): string | null =>
+  normCountry(receiptCountry) ?? countryForShared(currency, current);
