@@ -37,6 +37,7 @@ export function OnlineOverview() {
     <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 pb-28 md:p-8`}>
       <BackLink href="/personal/shopping">Shopping</BackLink>
       <h1 className="text-2xl font-bold">Online shopping</h1>
+      <Link href="/personal/shopping/online/forward" data-testid="to-forward" className="flex min-h-14 items-center gap-3 rounded-2xl border bg-card p-3 text-sm shadow-sm hover:bg-muted/50"><span className="min-w-0 flex-1">Forward an order email and it is added for you. <strong>Set it up</strong></span><ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" /></Link>
       {setup && <p className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900" role="alert">Online orders need one database step: run migration_online_orders.sql in Supabase.</p>}
       <section className="space-y-3 rounded-2xl border bg-card p-4" data-testid="online-total">
         <div className="flex items-center justify-between">

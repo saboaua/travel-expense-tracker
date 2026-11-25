@@ -4,6 +4,9 @@ import { AWG_PER_USD } from "@/lib/personal/dashboard";
 import { isMissingColumn } from "@/lib/columns";
 import { todayISO } from "@/lib/utils";
 import { UTILITY_KINDS } from "@/lib/personal/utilities";
+import { orderSiteOfSender, parseOrderEmail } from "@/lib/personal/order-email";
+import { siteLabel } from "@/lib/personal/online-orders";
+import { normalizeItemName } from "@/lib/personal/grocery";
 
 /** What an email service hands us, in the shape Postmark's inbound webhook uses. */
 export type InboundPayload = {
@@ -14,7 +17,7 @@ export type InboundPayload = {
 };
 
 export type InboundResult =
-  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "wrong_account" | "unreadable" | "confirmation" | "skipped_duplicate" | "added" | "needs_pro"; billId?: string }
+  | { ok: true; status: "no_address" | "rate_limited" | "ignored_sender" | "wrong_account" | "unreadable" | "confirmation" | "skipped_duplicate" | "added" | "needs_pro" | "order_added" | "order_duplicate" | "order_unreadable"; billId?: string }
   | { ok: false; error: string };
 
 const MAX_PDF = 4 * 1024 * 1024;
@@ -106,6 +109,32 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   const since = new Date(Date.now() - 3600_000).toISOString();
   const recent = await db.from("bill_email_log").select("id", { count: "exact", head: true }).eq("user_id", userId).gte("created_at", since);
   if ((recent.count ?? 0) >= HOURLY_LIMIT) return { ok: true, status: "rate_limited" };
+
+  // An order email from Amazon, AliExpress or eBay becomes an online receipt. No sender list is needed: the address itself is private,
+  // and every order read this way is marked "check it" until the person has looked at it.
+  const site = orderSiteOfSender(sender || direct);
+  if (site && !/forwarding-noreply@google\.com/i.test(direct)) {
+    const label = siteLabel(site);
+    const order = parseOrderEmail({ site, text, date });
+    if (!order) { await log("unreadable", { summary: `Online order · ${label}: could not find the total. Add it by hand.` }); return { ok: true, status: "order_unreadable" }; }
+    if (order.order_ref) {
+      const dup = await db.from("grocery_receipts").select("id").eq("user_id", userId).eq("order_ref", order.order_ref).maybeSingle();
+      if (dup.data) { await log("skipped_duplicate", { summary: `Online order · ${label} ${order.order_ref}: already added` }); return { ok: true, status: "order_duplicate" }; }
+    }
+    const row = { user_id: userId, store: `${label} order`, purchase_date: order.order_date, total: order.total, currency: order.currency, online_site: site, arrives_on: order.arrives_on, area: "shopping", order_ref: order.order_ref, source: "email", needs_check: true };
+    const ins = await db.from("grocery_receipts").insert(row).select("id").single();
+    if (ins.error || !ins.data) {
+      const missing = ins.error && isMissingColumn(ins.error);
+      await log("unreadable", { summary: missing ? `Online order · ${label}: needs a database step (migration_online_email.sql)` : `Online order · ${label}: could not be saved` });
+      return { ok: true, status: "order_unreadable" };
+    }
+    const receiptId = (ins.data as { id: string }).id;
+    if (order.items.length) {
+      await db.from("grocery_items").insert(order.items.map((it) => ({ receipt_id: receiptId, user_id: userId, name: it.name, normalized_name: normalizeItemName(it.name), category: "Shopping", quantity: it.quantity, unit_price: it.unit_price, line_total: it.line_total })));
+    }
+    await log("added", { summary: `Online order · ${label} · ${order.currency} ${r2(order.total).toFixed(2)}${order.items.length ? ` · ${order.items.length} ${order.items.length === 1 ? "item" : "items"}` : ""}` });
+    return { ok: true, status: "order_added" };
+  }
 
   const parsed = parseBillEmail({ from: sender || direct, subject, text, date, messageId: p.MessageID });
 

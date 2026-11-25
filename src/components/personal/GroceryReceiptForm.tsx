@@ -101,6 +101,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   const [onlineSite, setOnlineSite] = useState<OnlineSite | null>(null);
   const [arrivesOn, setArrivesOn] = useState("");
   const hadOnline = useRef(false);
+  const hadCheck = useRef(false); // read from an email: saving it means it has been looked at
   useEffect(() => { if (!receiptId && here.ready && !countryChosen.current) setBoughtIn(normCountry(here.country)); }, [receiptId, here.ready, here.country]);
   const [total, setTotal] = useState("");
   const [notes, setNotes] = useState("");
@@ -182,7 +183,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
       setDate(head.purchase_date ?? todayISO());
       setCurrency(head.currency ?? "USD");
       { const c = normCountry((head as { country?: string | null }).country); setBoughtIn(c); countryChosen.current = true; hadCountry.current = !!c; }
-      { const h = head as { online_site?: string | null; arrives_on?: string | null }; setOnlineSite(asSite(h.online_site)); setArrivesOn(h.arrives_on ?? ""); hadOnline.current = !!asSite(h.online_site); }
+      { const h = head as { online_site?: string | null; arrives_on?: string | null }; setOnlineSite(asSite(h.online_site)); setArrivesOn(h.arrives_on ?? ""); hadOnline.current = !!asSite(h.online_site); hadCheck.current = (head as { needs_check?: boolean | null }).needs_check === true; }
       setTotal(String(head.total ?? ""));
       setNotes(head.notes || "");
       setPricesOnly(head.prices_only === true);
@@ -375,8 +376,8 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
       const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || typeId || wasArea.current ? { area: typeId ? "other" : asShopping ? "shopping" : "groceries", type_id: typeId } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
       // Online: the site and arrival date are saved and there is no country. In a shop: a country, and any old online mark is cleared.
       const withCountry = onlineSite
-        ? { ...head, online_site: onlineSite, arrives_on: arrivesOn || null, ...(hadCountry.current ? { country: null } : {}) }
-        : { ...head, ...(hadOnline.current ? { online_site: null, arrives_on: null } : {}), ...(boughtIn || hadCountry.current ? { country: boughtIn } : {}) };
+        ? { ...head, online_site: onlineSite, arrives_on: arrivesOn || null, ...(hadCountry.current ? { country: null } : {}), ...(hadCheck.current ? { needs_check: false } : {}) }
+        : { ...head, ...(hadOnline.current ? { online_site: null, arrives_on: null } : {}), ...(boughtIn || hadCountry.current ? { country: boughtIn } : {}), ...(hadCheck.current ? { needs_check: false } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",

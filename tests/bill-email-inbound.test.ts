@@ -11,7 +11,7 @@ const eq = (got: unknown, want: unknown, msg: string) => {
 // a tiny in-memory stand-in for the database client
 type Row = Record<string, unknown>;
 function makeDb(seed: Record<string, Row[]>) {
-  const t: Record<string, Row[]> = { bill_email_addresses: [], bill_email_senders: [], bill_email_log: [], utility_bills: [], ...seed };
+  const t: Record<string, Row[]> = { bill_email_addresses: [], bill_email_senders: [], bill_email_log: [], utility_bills: [], grocery_receipts: [], grocery_items: [], ...seed };
   const uploads: { path: string }[] = [];
   let n = 0;
   const from = (name: string) => {
@@ -20,7 +20,7 @@ function makeDb(seed: Record<string, Row[]>) {
     let op: "select" | "insert" | "update" | "delete" = "select"; let patch: Row = {}; let head = false; let slice: [number, number] | null = null; let single = false;
     const q: Record<string, unknown> = {
       select: (_c?: string, o?: { head?: boolean }) => { head = !!o?.head; return q; },
-      insert: (r: Row) => { op = "insert"; patch = { id: `id${++n}`, created_at: new Date().toISOString(), ...r }; return q; },
+      insert: (r: Row | Row[]) => { op = "insert"; if (Array.isArray(r)) { r.forEach((x) => tbl.push({ id: `id${++n}`, ...x })); op = "select"; filters.push(() => false); return q; } patch = { id: `id${++n}`, created_at: new Date().toISOString(), ...r }; return q; },
       update: (r: Row) => { op = "update"; patch = r; return q; },
       delete: () => { op = "delete"; return q; },
       eq: (c: string, v: unknown) => { filters.push((r) => r[c] === v); return q; },
@@ -159,5 +159,20 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   eq([row.amount, row.needs_check, row.amount_usd, row.paid_on], [0, true, 0, null], "no amount: saved as 0 and marked to check");
   const awg = billRow("u1", { ...noAmount, amount: 179, check: false }, "electricity", "Elmar");
   eq([awg.amount_usd, awg.currency], [100, "AWG"], "AWG converts at the peg");
+  // Online orders: a forwarded Amazon email becomes an online receipt, marked "check it", once
+  const AMAZON = "Order Confirmation\nOrder #123-4567890-1234567\nArriving Thursday, December 3\nPhone stand\nQuantity: 1\n$24.80\nOrder Total: $31.79";
+  const amazonMail = (extra: Record<string, unknown> = {}) => ({ From: "Amazon.com <auto-confirm@amazon.com>", To: `bills-${TOKEN}@in.example.com`, Subject: "Your Amazon.com order", Date: "2026-11-22T14:00:00Z", MessageID: "a1", TextBody: AMAZON, ...extra });
+  m = makeDb(seed());
+  r = await handleInbound(m.db, amazonMail(), notify, "strict");
+  const rc = m.t.grocery_receipts[0];
+  eq([r.ok && r.status, m.t.grocery_receipts.length, rc?.store, rc?.online_site, rc?.total, rc?.currency, rc?.arrives_on, rc?.area, rc?.source, rc?.needs_check, rc?.order_ref], ["order_added", 1, "Amazon order", "amazon", 31.79, "USD", "2026-12-03", "shopping", "email", true, "123-4567890-1234567"], "an Amazon order is added as an online receipt to check, with no sender list and no signature needed");
+  eq([m.t.grocery_items.length, m.t.grocery_items[0]?.name, m.t.grocery_items[0]?.receipt_id === rc?.id], [1, "Phone stand", true], "its items are saved with it");
+  r = await handleInbound(m.db, amazonMail({ MessageID: "a2" }), notify, "strict");
+  eq([r.ok && r.status, m.t.grocery_receipts.length], ["order_duplicate", 1], "the same order is not added twice");
+  r = await handleInbound(m.db, amazonMail({ TextBody: "Your package was delivered", MessageID: "a3" }), notify, "strict");
+  eq([r.ok && r.status, m.t.grocery_receipts.length], ["order_unreadable", 1], "an email without a total adds nothing");
+  r = await handleInbound(m.db, amazonMail({ From: "Amazon <orders@amazon.com.evil.io>", MessageID: "a4", TextBody: AMAZON.replace("123-4567890-1234567", "999-4567890-1234567") }), notify, "strict");
+  eq([r.ok && r.status, m.t.grocery_receipts.length], ["ignored_sender", 1], "a look-alike sender is not an order");
+
   process.exit(failed ? 1 : 0);
 })();
