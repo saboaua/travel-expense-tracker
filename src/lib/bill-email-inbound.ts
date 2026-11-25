@@ -4,7 +4,7 @@ import { AWG_PER_USD } from "@/lib/personal/dashboard";
 import { isMissingColumn } from "@/lib/columns";
 import { todayISO } from "@/lib/utils";
 import { UTILITY_KINDS } from "@/lib/personal/utilities";
-import { orderSiteOfSender, parseOrderEmail } from "@/lib/personal/order-email";
+import { orderSiteInForward, orderSiteOfSender, parseOrderEmail } from "@/lib/personal/order-email";
 import { siteLabel } from "@/lib/personal/online-orders";
 import { normalizeItemName } from "@/lib/personal/grocery";
 
@@ -112,7 +112,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
 
   // An order email from Amazon, AliExpress or eBay becomes an online receipt. No sender list is needed: the address itself is private,
   // and every order read this way is marked "check it" until the person has looked at it.
-  const site = orderSiteOfSender(sender || direct);
+  const site = orderSiteOfSender(sender || direct) ?? (/forwarding-noreply@google\.com/i.test(direct) ? null : orderSiteInForward(text));
   if (site && !/forwarding-noreply@google\.com/i.test(direct)) {
     const label = siteLabel(site);
     const order = parseOrderEmail({ site, text, date });

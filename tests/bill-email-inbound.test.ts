@@ -174,6 +174,10 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   r = await handleInbound(m.db, amazonMail({ From: "Amazon <orders@amazon.com.evil.io>", MessageID: "a4", TextBody: AMAZON.replace("123-4567890-1234567", "999-4567890-1234567") }), notify, "strict");
   eq([r.ok && r.status, m.t.grocery_receipts.length], ["ignored_sender", 1], "a look-alike sender is not an order");
 
+  m = makeDb(seed());
+  r = await handleInbound(m.db, { ...amazonMail(), From: "Pat <pat@gmail.com>", TextBody: `FYI\n\nFrom: Amazon.com <auto-confirm@amazon.com>\nSent: Sunday\nSubject: Your order\n\n${AMAZON}` }, notify, "strict");
+  eq([r.ok && r.status, m.t.grocery_receipts.length], ["order_added", 1], "an order forwarded without a Forwarded message line (Outlook, phone) is still read");
+
   // Forwarding order emails is Pro: on Free the email waits, and nothing is added
   m = makeDb(seed());
   const asked: unknown[] = [];

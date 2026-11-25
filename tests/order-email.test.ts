@@ -1,4 +1,4 @@
-import { orderSiteOfSender, parseOrderEmail, readAmount } from "../src/lib/personal/order-email";
+import { orderSiteInForward, orderSiteOfSender, parseOrderEmail, readAmount } from "../src/lib/personal/order-email";
 
 let fail = 0;
 const eq = (m: string, a: unknown, b: unknown) => { if (JSON.stringify(a) !== JSON.stringify(b)) { fail++; console.error(`FAIL ${m}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); } };
@@ -40,4 +40,5 @@ eq("a delivery day already past this year means next year", parseOrderEmail({ si
 eq("subtotal is not the total", parseOrderEmail({ site: "amazon", text: "Subtotal: $10.00\nOrder Total: $12.50", date: "2026-11-22" })?.total, 12.5);
 eq("no total, nothing is guessed", parseOrderEmail({ site: "amazon", text: "Your package was delivered", date: "2026-11-22" }), null);
 eq("euro", parseOrderEmail({ site: "amazon", text: "Order Total: EUR 1.234,56", date: "2026-11-22" })?.currency, "EUR");
+eq("a forward without a Forwarded message line, as Outlook writes it", [orderSiteInForward("FYI\n\nFrom: Amazon.com <auto-confirm@amazon.com>\nSent: Sunday\nSubject: Your order"), orderSiteInForward("> From: AliExpress <transaction@notice.aliexpress.com>"), orderSiteInForward("From: Pat <pat@gmail.com>\nhello"), orderSiteInForward("no header here")], ["amazon", "aliexpress", null, null]);
 process.exit(fail ? 1 : 0);

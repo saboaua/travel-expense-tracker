@@ -22,6 +22,13 @@ export function orderSiteOfSender(email: string | null | undefined): OnlineSite 
   return null;
 }
 
+/** A forward from Outlook, Yahoo or a phone has no "Forwarded message" line, only the old From: line. The shop's own address in the first From: lines of the body counts. */
+export function orderSiteInForward(text: string): OnlineSite | null {
+  const heads = [...text.replace(/\r/g, "").matchAll(/^[>\s*]*(?:From|De|Von|Van|Da):\s*([^\n]{0,200})/gim)].slice(0, 3);
+  for (const h of heads) { const a = /([A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})/.exec(h[1]); const s = a && orderSiteOfSender(a[1]); if (s) return s; }
+  return null;
+}
+
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const monthOf = (s: string) => MONTHS.indexOf(s.slice(0, 3).toLowerCase());
 const pad = (n: number) => String(n).padStart(2, "0");
