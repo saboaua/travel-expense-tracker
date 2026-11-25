@@ -1,0 +1,11 @@
+import { CATEGORIES, DEFAULT_CATEGORY, asCategory, categoryLabel, isCategory } from "../src/lib/personal/store-categories";
+import { viewPlaces } from "../src/lib/personal/places-fix";
+const eq = (a: unknown, b: unknown, m: string) => { if (JSON.stringify(a) !== JSON.stringify(b)) { console.error("FAIL", m, JSON.stringify(a), "!=", JSON.stringify(b)); process.exit(1); } };
+eq(CATEGORIES.map((c) => c.id), ["supermarkets", "clothing", "health", "other"], "the categories");
+eq(DEFAULT_CATEGORY, "supermarkets", "supermarkets is the default");
+eq([isCategory("clothing"), isCategory("shoes"), isCategory(null)], [true, false, false], "isCategory");
+eq([asCategory("health"), asCategory("nope"), asCategory(undefined), asCategory(null)], ["health", "supermarkets", "supermarkets", "supermarkets"], "anything unknown is a supermarket");
+eq([categoryLabel("health"), categoryLabel("x")], ["Health & nutrition", "Supermarkets"], "labels");
+const v = viewPlaces([{ id: "1", name: "A", address: null, lat: 12.5, lng: -70, category: "clothing", added: true }, { id: "2", name: "B", address: null, lat: 12.51, lng: -70 }]);
+eq(v.map((p) => [p.category, p.added]), [["clothing", true], ["supermarkets", false]], "places carry a category and an added flag, defaults for old rows");
+console.log("store categories ok");

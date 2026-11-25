@@ -1,9 +1,10 @@
 /** Checking and fixing supermarket places by hand. Pure, so it is unit-tested. */
 import { num, splitGps } from "@/lib/personal/supermarket-import";
+import { asCategory, type CategoryId } from "@/lib/personal/store-categories";
 
 export type PlaceFlag = "outside" | "same" | null;
-export type PlaceRow = { id: string; name: string; address: string | null; lat: number; lng: number; fixed?: boolean | null };
-export type PlaceView = PlaceRow & { fixed: boolean; flag: PlaceFlag; sameAs: string | null };
+export type PlaceRow = { id: string; name: string; address: string | null; lat: number; lng: number; fixed?: boolean | null; category?: string | null; added?: boolean | null };
+export type PlaceView = Omit<PlaceRow, "category" | "added"> & { fixed: boolean; category: CategoryId; added: boolean; flag: PlaceFlag; sameAs: string | null };
 export type PlaceFilter = "all" | "fixed" | "outside" | "same";
 
 /** Aruba with a little room around it. A shop outside this box is almost certainly a typo. */
@@ -20,7 +21,7 @@ export function viewPlaces(rows: PlaceRow[], country = "AW"): PlaceView[] {
   return rows.map((r) => {
     const other = (at.get(pointKey(r.lat, r.lng)) ?? []).find((o) => o.id !== r.id);
     const flag: PlaceFlag = country === "AW" && !inAruba(r.lat, r.lng) ? "outside" : other ? "same" : null;
-    return { ...r, fixed: !!r.fixed, flag, sameAs: flag === "same" && other ? other.name : null };
+    return { ...r, fixed: !!r.fixed, category: asCategory(r.category), added: !!r.added, flag, sameAs: flag === "same" && other ? other.name : null };
   });
 }
 

@@ -7,7 +7,7 @@ import { HubCountryChips } from "@/components/admin/HubCountryChips";
 import { SUPERMARKET_TOOLS } from "@/lib/admin-tools";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
-export const metadata = { title: "Supermarkets" };
+export const metadata = { title: "Directory" };
 
 const ICONS = { doit: FileSpreadsheet, places: MapPin, community: FileSpreadsheet } as const;
 
@@ -15,7 +15,7 @@ export default function AdminSupermarketsPage() {
   return (
     <div className={`${PAGE_WIDTH.wide} space-y-5 p-4 md:p-8`}>
       <BackLink href="/admin/settings">Global Settings</BackLink>
-      <PageHeader title="Supermarkets" description="Prices and places for the Price tracker and the Best store map" />
+      <PageHeader title="Directory" description="Prices and places for supermarkets and other stores, for the Price tracker and the Best store map" />
       <Card><CardContent className="divide-y p-0">
         {SUPERMARKET_TOOLS.map((t) => {
           const Icon = ICONS[t.id];

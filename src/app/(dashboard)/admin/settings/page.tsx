@@ -92,8 +92,8 @@ const sections: { href: string; feature: string; title: string; description: str
   {
     href: "/admin/supermarkets",
     feature: "admin.only",
-    title: "Supermarkets",
-    description: "Do it Aruba prices, supermarket places and community price imports.",
+    title: "Directory",
+    description: "Do it Aruba prices, places by category and community price imports.",
     icon: ShoppingCart,
     tone: "shop",
     tools: SUPERMARKET_TOOLS.length,

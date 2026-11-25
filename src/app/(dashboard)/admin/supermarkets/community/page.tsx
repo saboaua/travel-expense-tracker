@@ -65,7 +65,7 @@ export default function AdminCommunityPricesPage() {
   const sk = preview?.skipped;
   return (
     <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
-      <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
+      <BackLink href="/admin/supermarkets">Directory</BackLink>
       <PageHeader title="Community prices import" description="Add prices you checked, from receipts or the shelf, typed into Excel. People see them next to the prices from the app." />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success"><span data-testid="prices-done">{done}</span></Alert>}

@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types"]) fake.table(t);
+for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -692,6 +692,41 @@ try {
     await browser2.close();
   });
 
+  await test("admin: Directory places is a list of expandable parts, and Add a place drops a pin, names it, picks a category and keeps it", async () => {
+    const P = fake.table("supermarket_places");
+    const before = P.length;
+    const { ctx, page } = await newPage();
+    try {
+      await signIn(page, "admin@example.com", "Admin-Pass-123");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/admin/supermarkets`);
+      assert(/Directory/.test(await page.getByRole("heading", { name: /Directory/ }).first().innerText()), "the hub is called Directory");
+      await page.goto(`${BASE}/admin/supermarkets/places`);
+      await page.getByRole("heading", { name: "Directory places" }).waitFor();
+      for (const t of [/^Community products/, /^Check and fix places/, /^Saved list/, /^How to import places/, /^Import a file/]) {
+        const b = page.getByRole("button", { name: t });
+        await b.waitFor();
+        assert((await b.getAttribute("aria-expanded")) === "false", `${t} starts closed`);
+      }
+      await page.getByRole("button", { name: /^Check and fix places/ }).click();
+      await page.getByTestId("place-add").click();
+      await page.getByTestId("place-add-sheet").waitFor();
+      assert(await page.getByTestId("place-add-save").isDisabled(), "Save is off until the pin is dropped and the shop is named");
+      await page.getByTestId("fix-map").waitFor();
+      await page.getByTestId("fix-map").click({ position: { x: 150, y: 100 } });
+      await page.waitForFunction(() => /Point: \d/.test(document.querySelector("[data-testid=place-add-point]")?.textContent || ""));
+      await page.getByLabel("Name, as printed on the receipt").fill("Zara Palm Beach");
+      await page.getByLabel("Category").selectOption("clothing");
+      await page.getByTestId("place-add-save").click();
+      await page.getByText(/Zara Palm Beach was added/).waitFor();
+      const row = page.getByTestId("place-row").filter({ hasText: "Zara Palm Beach" });
+      await row.getByTestId("place-added").waitFor();
+      assert(/Clothing/.test(await row.getByTestId("place-category").innerText()), "the row says Clothing");
+      const saved = P.find((r) => r.name === "Zara Palm Beach");
+      assert(saved && saved.category === "clothing" && saved.added === true && saved.fixed === true, "saved as an added, kept place in Clothing");
+    } finally { P.splice(before); await ctx.close(); }
+  });
+
   await test("admin: Supermarket places shows how many different products the community shared, in total and per store, and the hub shows the total", async () => {
     const SP = fake.table("shared_prices");
     const before = SP.length;
@@ -705,12 +740,35 @@ try {
       await page.getByTestId("hub-community-products").first().waitFor();
       assert(/community products?/.test(await page.getByTestId("hub-community-products").first().innerText()), "the hub shows the community product total");
       await page.goto(`${BASE}/admin/supermarkets/places`);
+      await page.getByRole("button", { name: /^Community products/ }).click();
       await page.getByTestId("community-totals").waitFor();
       const tot = await page.getByTestId("community-totals").innerText();
       assert(/Unique products\s*3\b/.test(tot.replace(/\n+/g, " ")) || /3\s*Stores|Unique products\n3/.test(tot), `totals were: ${tot.replace(/\s+/g, " ")}`);
+      assert((await page.getByTestId("community-categories").locator("> li").count()) === 4, "four categories are listed");
+      assert((await page.getByTestId("community-store-row").count()) === 0, "a category is closed until it is tapped");
+      await page.getByTestId("community-category-supermarkets").getByRole("button").first().click();
       const rows = await page.getByTestId("community-store-row").allInnerTexts();
       assert(rows.length === 2 && /Super Food Plaza/.test(rows[0]) && /3\s*products/.test(rows[0].replace(/\s+/g, " ")), `store rows were: ${rows.join(" | ").replace(/\s+/g, " ")}`);
       assert(!/ a$| b$| c$/.test((await page.getByTestId("community-by-store").innerText()).trim()), "no shopper is named");
+      // move a store to Clothing: it leaves Supermarkets and shows up in Clothing
+      await page.getByTestId("community-store-row").filter({ hasText: "Ling & Sons" }).getByTestId("community-store-move").click();
+      await page.getByTestId("store-move-sheet").waitFor();
+      assert(await page.getByTestId("store-move-save").isDisabled(), "Move is off until another category is picked");
+      await page.getByTestId("store-move-sheet").getByText("Clothing", { exact: true }).click();
+      await page.getByTestId("store-move-save").click();
+      await page.getByText(/Ling & Sons is now in Clothing/).waitFor();
+      await page.waitForFunction(() => /1 store/.test(document.querySelector("[data-testid=community-category-clothing]")?.textContent || ""), null, { timeout: 15000 }); // the counts are read again after the move
+      assert((await page.getByTestId("community-category-supermarkets").innerText()).includes("1 store"), "Supermarkets lost one");
+      assert(fake.table("store_categories").some((r) => r.store_key === "ling" && r.category === "clothing"), "the category is saved");
+      await page.getByTestId("community-category-supermarkets").getByRole("button").first().click();
+      assert(!(await page.getByTestId("community-category-supermarkets").innerText()).includes("Ling & Sons"), "the moved store left the supermarket list");
+      // moving it back removes the row
+      await page.getByTestId("community-category-clothing").getByRole("button").first().click();
+      await page.getByTestId("community-category-clothing").getByTestId("community-store-move").click();
+      await page.getByTestId("store-move-sheet").getByText("Supermarkets", { exact: true }).click();
+      await page.getByTestId("store-move-save").click();
+      await page.getByText(/Ling & Sons is now in Supermarkets/).waitFor();
+      assert(!fake.table("store_categories").some((r) => r.store_key === "ling"), "back in Supermarkets, no row is kept");
       const status = await page.evaluate(async () => (await fetch("/api/admin/community-products")).status);
       assert(status === 200, "admin can read the overview");
     } finally { SP.length = before; await ctx.close(); }
@@ -2979,7 +3037,8 @@ try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
       await ap.goto(`${BASE}/admin/supermarkets/places`);
-      await ap.getByRole("heading", { name: "Supermarket places" }).waitFor();
+      await ap.getByRole("heading", { name: "Directory places" }).waitFor();
+      await ap.getByRole("button", { name: /^How to import places/ }).click();
       await ap.getByTestId("places-template").waitFor();
       const r = await ap.evaluate(async () => { const x = await fetch("/api/admin/supermarket-import?template=1"); const b = new Uint8Array(await x.arrayBuffer()); return { ok: x.ok, head: String.fromCharCode(b[0], b[1]) }; });
       assert(r.ok && r.head === "PK", "the example file is a real .xlsx");
@@ -3003,7 +3062,7 @@ try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
       await ap.goto(`${BASE}/admin/settings`);
-      await ap.getByRole("link", { name: /Supermarkets/ }).click();
+      await ap.getByRole("link", { name: /Directory/ }).click();
       await ap.getByTestId("supermarkets-row-community").click();
       await ap.waitForURL((u) => u.pathname === "/admin/supermarkets/community");
       await ap.getByRole("heading", { name: "Community prices import" }).waitFor();
@@ -3039,7 +3098,7 @@ try {
     } finally { SP.splice(0, SP.length); IM.splice(0, IM.length); await ctx.close(); await actx.close(); }
   });
 
-  await test("admin: Supermarkets is one card with its three tools; the old addresses still work; a regular user cannot open it", async () => {
+  await test("admin: Directory is one card with its three tools; the old addresses still work; a regular user cannot open it", async () => {
     const actx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     actx.setDefaultTimeout(60_000); ctx.setDefaultTimeout(60_000);
@@ -3048,23 +3107,23 @@ try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
       await ap.goto(`${BASE}/admin/settings`);
-      await ap.getByRole("link", { name: /Supermarkets/ }).waitFor();
-      for (const gone of [/Do it Aruba Prices/, /Supermarket Places/, /Community Prices Import/]) {
+      await ap.getByRole("link", { name: /Directory/ }).waitFor();
+      for (const gone of [/Do it Aruba Prices/, /Directory Places/, /Community Prices Import/]) {
         assert((await ap.getByRole("link", { name: gone }).count()) === 0, `${gone} is no longer a card of its own`);
       }
-      assert((await ap.getByTestId("tools-count-supermarkets").innerText()).trim() === "3 tools", "Supermarkets says it holds 3 tools");
+      assert((await ap.getByTestId("tools-count-supermarkets").innerText()).trim() === "3 tools", "Directory says it holds 3 tools");
       assert((await ap.getByTestId("tools-count-pro").innerText()).trim() === "5 tools", "Pro plan says it holds 5 tools");
       for (const [id, n] of [["branding", 4], ["currencies", 2], ["categories", 3], ["telegram", 2], ["users", 2]]) assert((await ap.getByTestId(`tools-count-${id}`).innerText()).trim() === `${n} tools`, `${id} says it holds ${n} tools`);
       for (const id of ["logos", "help", "support", "iptv", "account-requests"]) assert((await ap.getByTestId(`tools-count-${id}`).count()) === 0, `${id} holds one tool, so no count`);
       const badge = async (id) => ap.getByTestId(`tools-count-${id}`).evaluate((el) => el.className);
       assert((await badge("pro")) === (await badge("branding")) && (await badge("supermarkets")) === (await badge("telegram")), "every count badge has the same style");
-      await ap.getByRole("link", { name: /Supermarkets/ }).click();
+      await ap.getByRole("link", { name: /Directory/ }).click();
       await ap.waitForURL((u) => u.pathname === "/admin/supermarkets");
       await ap.getByTestId("supermarkets-row-doit").waitFor();
       assert((await ap.locator('[data-testid^="supermarkets-row-"]').count()) === 3, "three tools are listed");
       await ap.getByTestId("supermarkets-row-doit").click();
       await ap.waitForURL((u) => u.pathname === "/admin/supermarkets/doit");
-      await ap.getByRole("link", { name: "Supermarkets" }).first().waitFor();
+      await ap.getByRole("link", { name: "Directory" }).first().waitFor();
       for (const [old, now] of [["/admin/doit", "/admin/supermarkets/doit"], ["/admin/community-prices", "/admin/supermarkets/community"]]) {
         await ap.goto(`${BASE}${old}`);
         await ap.waitForURL((u) => u.pathname === now);
@@ -3184,6 +3243,7 @@ try {
       await ap.goto(`${BASE}/admin/supermarkets/places`);
       await ap.getByTestId("import-country").waitFor();
       await ap.getByTestId("import-country").selectOption("SR");
+      await ap.getByRole("button", { name: /^Import a file/ }).click();
       await ap.getByTestId("places-file").setInputFiles({ name: "sr.csv", mimeType: "text/csv", buffer: Buffer.from("Name,Latitude,Longitude\nTulip Supermarket,5.852,-55.2038\nChoi Supermarket,5.8301,-55.1702\n") });
       await ap.getByTestId("places-import").click();
       await ap.getByText(/Imported 2 supermarket places/).waitFor();
@@ -3221,6 +3281,7 @@ try {
       await signIn(ap, "admin@example.com", "Admin-Pass-123");
       await ap.waitForURL((u) => u.pathname === "/");
       await ap.goto(`${BASE}/admin/supermarkets/places`);
+      await ap.getByRole("button", { name: /^Check and fix places/ }).click();
       await ap.getByTestId("places-list").waitFor();
       assert((await ap.getByTestId("place-row").count()) === 4, "all four places are listed");
       await ap.getByTestId("place-flag-outside").waitFor();
@@ -3264,6 +3325,7 @@ try {
       await ap.waitForFunction(() => document.querySelectorAll("[data-testid=place-flag-same]").length === 0); // the other shop is no longer on a shared point
       // a later import keeps the fix, does not bring the removed one back, adds a new shop and drops an old one
       const csv = "Name,Latitude,Longitude\nLing & Sons Noord,52.5186,-70.0358\nLing & Sons Sasaki,12.5186,-70.0358\nNewmart,12.51,-70.03\n";
+      await ap.getByRole("button", { name: /^Import a file/ }).click();
       await ap.getByTestId("places-file").setInputFiles({ name: "p.csv", mimeType: "text/csv", buffer: Buffer.from(csv) });
       await ap.getByTestId("places-import").click();
       await ap.getByText(/Imported 3 supermarket places/).waitFor();

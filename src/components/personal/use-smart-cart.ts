@@ -41,11 +41,13 @@ export function useSmartCart() {
   const locQ = useCachedQuery<Loc[]>((uid) => `${uid}:basket:locs`, async (sb) => { const r = await sb.from("store_locations").select("name, lat, lng"); return { data: (r.data ?? []) as Loc[], error: r.error }; }, []);
   const placesQ = useCachedQuery<Loc[]>((uid) => `${uid}:basket:places:${country ?? "all"}`, async (sb) => {
     try {
-      const load = (withCountry: boolean) => fetchAll<Loc>((a, b) => {
-        const q = sb.from("supermarket_places").select("id, name, lat, lng");
-        return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b);
+      const load = (withCountry: boolean, withCategory = true) => fetchAll<Loc & { category?: string | null }>((a, b) => {
+        const q = sb.from("supermarket_places").select(withCategory ? "id, name, lat, lng, category" : "id, name, lat, lng");
+        return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b) as never;
       });
-      return { data: await load(true).catch(() => load(false)), error: null };
+      // before the categories migration every place is a supermarket; only supermarkets are planned into a trip
+      const rows = await load(true).catch(() => load(true, false)).catch(() => load(false, false));
+      return { data: rows.filter((r) => (r.category ?? "supermarkets") === "supermarkets"), error: null };
     } catch { return { data: [] as Loc[], error: null }; }
   }, [country]);
 

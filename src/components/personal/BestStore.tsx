@@ -61,12 +61,13 @@ export function BestStore() {
 
   const placesQ = useCachedQuery<Osm[]>((uid) => `${uid}:basket:places:${country ?? "all"}`, async (sb) => {
     try {
-      const load = (withCountry: boolean) => fetchAll<{ id: string; name: string; lat: number; lng: number }>((a, b) => {
-        const q = sb.from("supermarket_places").select("id, name, lat, lng");
-        return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b);
+      const load = (withCountry: boolean, withCategory = true) => fetchAll<{ id: string; name: string; lat: number; lng: number; category?: string | null }>((a, b) => {
+        const q = sb.from("supermarket_places").select(withCategory ? "id, name, lat, lng, category" : "id, name, lat, lng");
+        return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b) as never;
       });
-      // a database without migration_country.sql has no country column: every place then belongs to the one list
-      const rows = await load(true).catch(() => load(false));
+      // a database without migration_country.sql has no country column: every place then belongs to the one list. Before the categories migration every place is a supermarket.
+      const all = await load(true).catch(() => load(true, false)).catch(() => load(false, false));
+      const rows = all.filter((r) => (r.category ?? "supermarkets") === "supermarkets");
       return { data: rows.map((r) => ({ osmId: `place/${r.id}`, name: r.name, lat: r.lat, lng: r.lng })), error: null };
     } catch { return { data: [] as Osm[], error: null }; } // the table is not there until the migration has been run
   }, [country]);

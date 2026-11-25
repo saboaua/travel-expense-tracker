@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireAdminService } from "@/lib/admin-roles-api";
 import { summarizeShared, type SharedRowLite } from "@/lib/personal/community-stores";
+import { isCategory } from "@/lib/personal/store-categories";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -19,5 +20,9 @@ export async function GET() {
     rows.push(...((data ?? []) as SharedRowLite[]));
     if (!data || data.length < PAGE) break;
   }
-  return NextResponse.json({ countries: summarizeShared(rows), capped: rows.length >= MAX_ROWS }, { headers: { "Cache-Control": "no-store" } });
+  // The category an admin gave each store. Before migration_directory_categories.sql there is none: every store is a supermarket.
+  const cats = new Map<string, string>();
+  const cr = await a.admin.from("store_categories").select("country, store_key, category");
+  if (!cr.error) for (const c of cr.data ?? []) if (isCategory(c.category)) cats.set(`${c.country}|${c.store_key}`, c.category);
+  return NextResponse.json({ countries: summarizeShared(rows, cats), capped: rows.length >= MAX_ROWS }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import { Check, CircleAlert, MapPin, Search, Trash2, X } from "lucide-react";
+import { Check, CircleAlert, MapPin, Plus, Search, Trash2, X } from "lucide-react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BottomSheet } from "@/components/ui/bottom-sheet";
+import { Select } from "@/components/ui/select";
+import { CATEGORIES, DEFAULT_CATEGORY, categoryLabel, isCategory, type CategoryId } from "@/lib/personal/store-categories";
 import { Input } from "@/components/ui/input";
 import { useConfirm } from "@/components/ui/confirm";
 import { splitGps } from "@/lib/personal/supermarket-import";
@@ -14,7 +16,7 @@ import { cn } from "@/lib/utils";
 
 const FixMap = dynamic(() => import("@/components/admin/FixMap"), { ssr: false, loading: () => <div className="h-64 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
 
-type List = { total: number; matches: number; shown: number; counts: { fixed: number; outside: number; same: number }; places: PlaceView[]; setupNeeded?: boolean };
+type List = { categoriesNeeded?: boolean; total: number; matches: number; shown: number; counts: { fixed: number; outside: number; same: number }; places: PlaceView[]; setupNeeded?: boolean };
 const FILTERS: { id: PlaceFilter; label: string }[] = [{ id: "all", label: "All" }, { id: "fixed", label: "Fixed by hand" }, { id: "outside", label: "Outside Aruba" }, { id: "same", label: "Same point twice" }];
 
 /** Admin: search the saved places, see which look wrong, move a pin or remove a place. */
@@ -26,6 +28,7 @@ export function PlacesFix({ onChanged, country = "AW" }: { onChanged?: () => voi
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [edit, setEdit] = useState<PlaceView | null>(null);
+  const [adding, setAdding] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -47,16 +50,16 @@ export function PlacesFix({ onChanged, country = "AW" }: { onChanged?: () => voi
   };
 
   return (
-    <Card>
-      <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden="true" />Check and fix places</CardTitle></CardHeader>
-      <CardContent className="space-y-4">
+    <div className="space-y-4" data-testid="places-fix">
         {error && <Alert>{error}</Alert>}
         {notice && <Alert variant="success">{notice}</Alert>}
+        {list?.categoriesNeeded && !list.setupNeeded && <Alert>Run supabase/migration_directory_categories.sql in the Supabase SQL Editor to add places and categories. Until then every place is a supermarket.</Alert>}
         {list?.setupNeeded && <Alert>Run supabase/migration_places_fix.sql in the Supabase SQL Editor to fix or remove places.</Alert>}
         {edit ? (
           <EditPlace key={edit.id} place={edit} onClose={() => setEdit(null)} onSaved={(n) => { setEdit(null); setNotice(`${n} was fixed.`); load(); onChanged?.(); }} />
         ) : (
           <>
+            <Button className="min-h-[50px] w-full" onClick={() => { setNotice(null); setAdding(true); }} data-testid="place-add"><Plus className="h-5 w-5" aria-hidden="true" />Add a place</Button>
             <div className="relative">
               <Search className="pointer-events-none absolute left-3.5 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by name or address" aria-label="Search places" className="min-h-[50px] pl-10" data-testid="places-search" />
@@ -77,7 +80,8 @@ export function PlacesFix({ onChanged, country = "AW" }: { onChanged?: () => voi
                         {p.address && <p className="text-[13px] text-muted-foreground">{p.address}</p>}
                         <p className="mt-0.5 text-[13px] tabular-nums">{p.lat}, {p.lng}</p>
                       </div>
-                      {p.fixed && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11.5px] font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="place-fixed">Fixed by hand</span>}
+                      <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[11.5px] font-extrabold text-muted-foreground" data-testid="place-category">{categoryLabel(p.category)}</span>
+                      {p.added ? <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11.5px] font-extrabold text-amber-900 dark:bg-amber-950 dark:text-amber-200" data-testid="place-added">Added by hand</span> : p.fixed && <span className="shrink-0 rounded-full bg-blue-100 px-2 py-0.5 text-[11.5px] font-extrabold text-blue-800 dark:bg-blue-950 dark:text-blue-200" data-testid="place-fixed">Fixed by hand</span>}
                     </div>
                     {p.flag && <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-amber-700 dark:text-amber-300" data-testid={`place-flag-${p.flag}`}><CircleAlert className="h-4 w-4" aria-hidden="true" />{p.flag === "outside" ? "This point is outside Aruba" : `Same point as ${p.sameAs}`}</p>}
                     <div className="mt-2.5 flex gap-2">
@@ -91,8 +95,8 @@ export function PlacesFix({ onChanged, country = "AW" }: { onChanged?: () => voi
             {list && list.matches > 0 && <p className="text-center text-[13px] text-muted-foreground" data-testid="places-count">Showing {list.shown} of {list.matches}{list.matches !== list.total ? ` (${list.total} in all)` : ""}</p>}
           </>
         )}
-      </CardContent>
-    </Card>
+      {adding && <AddPlace country={country} onClose={() => setAdding(false)} onSaved={(n) => { setAdding(false); setNotice(`${n} was added.`); load(); onChanged?.(); }} />}
+    </div>
   );
 }
 
@@ -139,5 +143,44 @@ function EditPlace({ place, onClose, onSaved }: { place: PlaceView; onClose: () 
       <Button className="min-h-[52px] w-full" onClick={save} disabled={busy || !point || !name.trim()} data-testid="place-save"><Check className="h-5 w-5" aria-hidden="true" />{busy ? "Saving…" : "Save location"}</Button>
       <Button variant="outline" className="min-h-[52px] w-full" onClick={onClose} disabled={busy}><X className="h-5 w-5" aria-hidden="true" />Cancel</Button>
     </div>
+  );
+}
+
+/** Admin: add a place by hand. Tap the map or drag the pin, name it, pick the category. It is kept when a new list is imported. */
+function AddPlace({ country, onClose, onSaved }: { country: string; onClose: () => void; onSaved: (name: string) => void }) {
+  const [lat, setLat] = useState("");
+  const [lng, setLng] = useState("");
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<CategoryId>(DEFAULT_CATEGORY);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const pt = readPoint(lat, lng);
+  const point = "error" in pt ? null : pt;
+  const save = async () => {
+    setBusy(true); setError(null);
+    const r = await fetch("/api/admin/supermarket-places", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, lat, lng, category, country }) });
+    const d = await r.json().catch(() => ({}));
+    setBusy(false);
+    if (!r.ok) return setError(d.error || "Could not add it.");
+    onSaved(name.trim());
+  };
+  return (
+    <BottomSheet title="Add a place" onClose={onClose} testId="place-add-sheet" tall>
+      <div className="space-y-4">
+        {error && <Alert>{error}</Alert>}
+        <FixMap point={point} onPick={(p) => { setLat(p.lat.toFixed(6)); setLng(p.lng.toFixed(6)); }} />
+        <p className="text-center text-[13px] text-muted-foreground">Tap the map or drag the pin to the shop.</p>
+        <div className="space-y-1.5"><label htmlFor="add-name" className="text-sm font-semibold">Name, as printed on the receipt</label><Input id="add-name" value={name} onChange={(e) => setName(e.target.value)} maxLength={120} /></div>
+        <div className="space-y-1.5">
+          <label htmlFor="add-category" className="text-sm font-semibold">Category</label>
+          <Select id="add-category" className="h-12" value={category} onChange={(e) => isCategory(e.target.value) && setCategory(e.target.value)}>
+            {CATEGORIES.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
+          </Select>
+        </div>
+        <p className="text-[13px] text-muted-foreground" data-testid="place-add-point">{point ? `Point: ${point.lat}, ${point.lng}. Kept when you import a new list.` : "No point yet. Tap the map to drop the pin."}</p>
+        <Button className="min-h-[52px] w-full" onClick={save} disabled={busy || !point || !name.trim()} data-testid="place-add-save"><Check className="h-5 w-5" aria-hidden="true" />{busy ? "Saving…" : "Save place"}</Button>
+        <Button variant="outline" className="min-h-[52px] w-full" onClick={onClose} disabled={busy}><X className="h-5 w-5" aria-hidden="true" />Cancel</Button>
+      </div>
+    </BottomSheet>
   );
 }

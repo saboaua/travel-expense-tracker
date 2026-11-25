@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Download, MapPin } from "lucide-react";
+import { Download } from "lucide-react";
 import { BackLink, PageHeader } from "@/components/ui/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { AccordionGroup, AccordionSection } from "@/components/ui/accordion";
+import { useCommunityCounts } from "@/components/admin/use-community-counts";
 import { CountryField } from "@/components/admin/CountryField";
 import { PlacesFix } from "@/components/admin/PlacesFix";
 import { useAccess } from "@/lib/use-access";
@@ -25,6 +27,9 @@ export default function AdminSupermarketsPage() {
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [country, setCountry] = useState("AW");
+  const [ver, setVer] = useState(0);
+  const counts = useCommunityCounts(role === "admin", ver);
+  const here = counts?.find((x) => x.country === country) ?? null;
   const input = useRef<HTMLInputElement>(null);
 
   const load = useCallback(() => {
@@ -63,42 +68,44 @@ export default function AdminSupermarketsPage() {
   const sk = preview?.skipped;
   return (
     <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
-      <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
-      <PageHeader title="Supermarket places" description={<>Shops with their GPS point, shown on the Best store map for everyone. A receipt shows at the shop with the same name.</>} />
+      <BackLink href="/admin/supermarkets">Directory</BackLink>
+      <PageHeader title="Directory places" description={<>Stores by category, with their GPS point. Supermarkets show on the Best store map for everyone. A receipt shows at the shop with the same name.</>} />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success">{done}</Alert>}
 
       <Card><CardContent className="p-4"><CountryField value={country} onChange={(c) => { setCountry(c); reset(); }} disabled={busy} /></CardContent></Card>
 
-      <CommunityByStore country={country} />
+      <AccordionGroup>
+        <AccordionSection id="community" title="Community products" summary={!counts ? "Loading…" : here ? `${here.products.toLocaleString()} products · ${here.stores.toLocaleString()} stores · by category` : "No community prices for this country yet"}>
+          <CommunityByStore country={country} all={counts} onMoved={() => setVer((v) => v + 1)} />
+        </AccordionSection>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-lg">Saved list</CardTitle></CardHeader>
-        <CardContent className="text-sm" data-testid="places-status">
-          {!status ? "Loading…" : status.rows === 0 ? "Nothing imported yet." : <>{status.rows.toLocaleString()} places · imported {formatDate(status.importedAt!.slice(0, 10))}</>}
-        </CardContent>
-      </Card>
+        <AccordionSection id="fix" title="Check and fix places" summary={!status ? "Loading…" : `${status.rows.toLocaleString()} places · add one, move a pin or remove one`}>
+          <PlacesFix onChanged={load} country={country} />
+        </AccordionSection>
 
-      <PlacesFix onChanged={load} country={country} />
+        <AccordionSection id="saved" title="Saved list" summary={!status ? "Loading…" : status.rows === 0 ? "Nothing imported yet" : `${status.rows.toLocaleString()} places · imported ${formatDate(status.importedAt!.slice(0, 10))}`}>
+          <p className="text-sm" data-testid="places-status">
+            {!status ? "Loading…" : status.rows === 0 ? "Nothing imported yet." : <>{status.rows.toLocaleString()} places · imported {formatDate(status.importedAt!.slice(0, 10))}</>}
+          </p>
+        </AccordionSection>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="flex items-center gap-2 text-lg"><MapPin className="h-5 w-5" aria-hidden="true" />How to do it</CardTitle></CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <ol className="list-decimal space-y-1.5 pl-5">
-            <li>Download the example file and open it in Excel.</li>
-            <li>One row per shop: <b>Name</b> (as printed on the receipt), <b>Latitude</b>, <b>Longitude</b>. Address is optional. A chain with several shops gets one row each.</li>
-            <li>Aruba is about 12.5 and −70.0. Latitude is the first number. Use a dot and keep the minus sign.</li>
-            <li>Get the numbers from <b>openstreetmap.org</b> (right-click the shop, Show address) or from your phone&apos;s GPS while standing at the shop.</li>
-            <li>Delete the two EXAMPLE rows (they are skipped anyway), save as .xlsx or .csv, and choose it below.</li>
-          </ol>
-          <p className="text-xs text-muted-foreground">Do not copy coordinates from Google Maps: its terms do not allow keeping them. Importing replaces the saved list, so keep every shop in the file. Places you fixed by hand are kept, and places you removed stay removed.</p>
-          <a href="/api/admin/supermarket-import?template=1" download className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold hover:bg-muted" data-testid="places-template"><Download className="h-4 w-4" aria-hidden="true" />Download the example file</a>
-        </CardContent>
-      </Card>
+        <AccordionSection id="how" title="How to import places" summary="Example file and the steps">
+          <div className="space-y-3 text-sm">
+            <ol className="list-decimal space-y-1.5 pl-5">
+              <li>Download the example file and open it in Excel.</li>
+              <li>One row per shop: <b>Name</b> (as printed on the receipt), <b>Latitude</b>, <b>Longitude</b>. Address is optional. A chain with several shops gets one row each.</li>
+              <li>Aruba is about 12.5 and −70.0. Latitude is the first number. Use a dot and keep the minus sign.</li>
+              <li>Get the numbers from <b>openstreetmap.org</b> (right-click the shop, Show address) or from your phone&apos;s GPS while standing at the shop.</li>
+              <li>Delete the two EXAMPLE rows (they are skipped anyway), save as .xlsx or .csv, and choose it in Import a file.</li>
+            </ol>
+            <p className="text-xs text-muted-foreground">Do not copy coordinates from Google Maps: its terms do not allow keeping them. Importing replaces the saved list of imported places, so keep every shop in the file. Places you add by hand or fix by hand are kept.</p>
+            <a href="/api/admin/supermarket-import?template=1" download className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold hover:bg-muted" data-testid="places-template"><Download className="h-4 w-4" aria-hidden="true" />Download the example file</a>
+          </div>
+        </AccordionSection>
 
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-lg">Import a file</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+        <AccordionSection id="import" title="Import a file" summary="Replaces the imported places">
+          <div className="space-y-4">
           <input ref={input} type="file" accept=".xlsx,.csv" aria-label="Supermarket places file" data-testid="places-file" disabled={busy} onChange={(e) => choose(e.target.files?.[0] ?? null)} className="block w-full text-sm file:mr-3 file:min-h-11 file:cursor-pointer file:rounded-lg file:border file:bg-background file:px-4 file:text-sm file:font-semibold" />
           {busy && !preview && <p className="text-sm text-muted-foreground">Reading the file…</p>}
           {preview && sk && (
@@ -115,8 +122,9 @@ export default function AdminSupermarketsPage() {
               </div>
             </div>
           )}
-        </CardContent>
-      </Card>
+          </div>
+        </AccordionSection>
+      </AccordionGroup>
     </div>
   );
 }

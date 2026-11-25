@@ -62,7 +62,7 @@ export default function AdminDoitPage() {
   const sk = preview?.skipped;
   return (
     <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
-      <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
+      <BackLink href="/admin/supermarkets">Directory</BackLink>
       <PageHeader title="Do it Aruba prices" description={<>Imported from the exported Excel file, not read live. Shown in the Price tracker as an online store.</>} />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success">{done}</Alert>}
