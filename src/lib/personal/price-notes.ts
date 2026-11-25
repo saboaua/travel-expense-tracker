@@ -27,7 +27,7 @@ export type PriceCheck = { id: string; product: string; store: string; price: nu
 export function checkToTracker(c: PriceCheck): TrackerRow {
   const name = [c.product.trim(), c.size?.trim()].filter(Boolean).join(" ");
   const price = Math.round(Number(c.price) * 100) / 100;
-  return { name, normalized_name: normalizeItemName(name), category: "Other", unit_price: price, quantity: 1, unit: null, line_total: price, receipt: { store: c.store.trim(), purchase_date: c.seen_on, currency: c.currency } };
+  return { name, normalized_name: normalizeItemName(name), category: "Other", unit_price: price, quantity: 1, unit: null, line_total: price, noted: true, receipt: { store: c.store.trim(), purchase_date: c.seen_on, currency: c.currency } };
 }
 
 /** Products you checked before, most checked first (case-insensitive), for one-tap chips. */

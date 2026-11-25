@@ -123,7 +123,8 @@ export const LEVEL_LABEL: Record<Level, string> = { cheapest: "Cheapest", below:
 /* ---------------- basket ---------------- */
 
 export type ListItem = { key: string; qty: number };
-export type PriceSource = "own" | "community" | "online";
+/** own: bought by you; noted: a price you wrote down; community and online: from outside */
+export type PriceSource = "own" | "noted" | "community" | "online";
 export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean };
 export type StoreBasket = {
   store: string;
@@ -141,7 +142,7 @@ export type StoreBasket = {
 };
 
 /** Real prices from outside your receipts: community and online price lists, by store and product key. */
-export type ExternalPrice = { store: string; key: string; price: number; source: "community" | "online"; similar?: boolean };
+export type ExternalPrice = { store: string; key: string; price: number; source: "community" | "online"; similar?: boolean; /** The month a community price was shared (YYYY-MM-DD); online prices have none */ date?: string | null };
 
 /**
  * The list at each store, from real prices only: the latest price you paid there (flagged when older than 60 days), otherwise a
@@ -156,13 +157,16 @@ export function basketTotals(list: ListItem[], products: Product[], stores: stri
       const p = byKey.get(it.key);
       if (!p) return [];
       const here = p.stores.find((s) => s.store === store);
-      if (here) {
-        const old = !fresh(here.latest.date, now);
-        return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: "own" } as BasketLine];
-      }
       // community first (people paid it), then the online list; the cheapest of the two sources is not assumed, the community one wins
       const ext = external.filter((e) => e.key === it.key && sameStore(e.store, store) && e.price > 0).sort((a, b) => (a.similar ? 1 : 0) - (b.similar ? 1 : 0) || (a.source === b.source ? a.price - b.price : a.source === "community" ? -1 : 1))[0];
-      if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: null, source: ext.source, similar: ext.similar } as BasketLine];
+      // The newest price wins. A community price only has its month, so in the same month it beats a price you noted, not a receipt you paid.
+      const extNewer = !!ext && ext.source === "community" && !ext.similar && !!ext.date && !!here
+        && (ext.date.slice(0, 7) > here.latest.date.slice(0, 7) || (ext.date.slice(0, 7) === here.latest.date.slice(0, 7) && !!here.latest.noted));
+      if (here && !extNewer) {
+        const old = !fresh(here.latest.date, now);
+        return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: here.latest.noted ? "noted" : "own" } as BasketLine];
+      }
+      if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: ext.date ?? null, source: ext.source, similar: ext.similar } as BasketLine];
       return [{ key: p.key, name: p.name, qty: it.qty, price: null, total: null, status: "unknown", date: null, source: null } as BasketLine];
     });
     const total = round2(lines.reduce((s, l) => s + (l.total ?? 0), 0));

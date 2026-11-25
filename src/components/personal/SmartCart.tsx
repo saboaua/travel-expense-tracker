@@ -11,6 +11,7 @@ import { BottomSheet } from "@/components/ui/bottom-sheet";
 import { Card, CardContent } from "@/components/ui/card";
 import { IconTile } from "@/components/ui/icon-tile";
 import { Input } from "@/components/ui/input";
+import { formatDate } from "@/lib/utils";
 import { Money } from "@/components/ui/money";
 import { Select } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
@@ -31,8 +32,8 @@ const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const GREEN = "text-emerald-700 dark:text-emerald-300";
 const pill = "inline-flex min-h-6 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold";
-const SOURCE: Record<string, string> = { own: "Your receipt", community: "Community", online: "Online list" };
-const SOURCE_CLS: Record<string, string> = { own: "bg-muted text-muted-foreground", community: "bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200", online: "bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200" };
+const SOURCE: Record<string, string> = { own: "Your receipt", noted: "Price you noted", community: "Community", online: "Online list" };
+const SOURCE_CLS: Record<string, string> = { own: "bg-muted text-muted-foreground", noted: "bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200", community: "bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200", online: "bg-violet-100 text-violet-900 dark:bg-violet-500/20 dark:text-violet-200" };
 /** "Coconut milk 400 ml": the size is added only when the name does not already say it */
 const named = (name: string, size: string | null) => (size && !name.toLowerCase().replace(/\s+/g, "").includes(size.toLowerCase().replace(/\s+/g, "")) ? `${name} ${size}` : name);
 const ProBadge = () => <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-extrabold text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">PRO</span>;
@@ -101,7 +102,7 @@ function StoreSavings({ d, currency }: { d: StoreDetail; currency: string }) {
           <li key={l.key} className="flex items-center gap-3 py-2 text-sm" data-testid="sc-detail-line">
             <span className="min-w-0 flex-1">
               <span className="block font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span>
-              <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Money amount={l.price} currency={currency} className="text-xs" /><Tag line={l} /></span>
+              <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Money amount={l.price} currency={currency} className="text-xs" /><Tag line={l} />{l.date && <span data-testid="sc-detail-date">{l.source === "community" ? new Date(`${l.date}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" }) : formatDate(l.date)}</span>}</span>
               {l.ref
                 ? <span className="block text-xs text-muted-foreground">{l.ref.store} <Money amount={l.ref.price} currency={currency} className="text-xs" /></span>
                 : l.elsewhere

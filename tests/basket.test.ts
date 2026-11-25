@@ -98,5 +98,26 @@ const bk = basketTotals(all, two, ["A", "B"], [], NOW);
 eq("split advice far but worthwhile", splitAdvice(all, bk, dist)?.stores, [bk[0].store, bk[1].store]);
 eq("no split when the trip costs more", splitAdvice(all, bk, new Map([["A", 1], ["B", 40]])), null);
 
+
+// Price you noted, and the newest price wins
+{
+  const note = (name: string, price: number, store: string, date: string): TrackerRow => ({ ...row(name, price, store, date), noted: true });
+  const key = (rows: TrackerRow[]) => buildProducts(rows).products[0];
+  const com = (price: number, date: string) => [{ store: "Amazing Market", key: "", price, source: "community" as const, date }];
+  const lay = (rows: TrackerRow[], ext: ReturnType<typeof com>) => {
+    const p = key(rows);
+    return basketTotals([{ key: p.key, qty: 1 }], [p], ["Amazing Market"], storeIndex([p], "AWG", NOW), NOW, ext.map((e) => ({ ...e, key: p.key })))[0].lines[0];
+  };
+  const noted = [note("Lays Sour Cream", 8.5, "Amazing Market", "2026-11-11")];
+  const bought = [row("Lays Sour Cream", 8.9, "Amazing Market", "2026-11-11")];
+  eq("a price you noted is labelled noted", lay(noted, []).source, "noted");
+  eq("a purchase is labelled own", lay(bought, []).source, "own");
+  eq("a community price from the same month beats a price you noted", lay(noted, com(8.5, "2026-11-01")).source, "community");
+  eq("a community price from the same month does not beat a receipt", lay(bought, com(8.5, "2026-11-01")).source, "own");
+  eq("a newer community month beats a receipt", lay(bought, com(8.5, "2026-12-01")).source, "community");
+  eq("an older community month loses to your price", lay(noted, com(8.5, "2026-10-01")).source, "noted");
+  eq("the community line carries its month", lay(noted, com(8.5, "2026-11-01")).date, "2026-11-01");
+  eq("the community price is the one used", lay(noted, com(8.1, "2026-11-01")).price, 8.1);
+}
 if (fail) process.exit(1);
 console.log("PASS basket");

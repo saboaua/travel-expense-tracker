@@ -42,7 +42,7 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
     if (p.currency !== currency) continue;
     if (!nameMatches(q, p.name) && !p.names.some((n) => nameMatches(q, n.name))) continue;
     const g = put(productKey(p), p.name, p.size);
-    for (const s of p.stores) g.offers.push({ store: s.store, price: s.latest.price, source: "own", note: `Your receipt, ${s.latest.date}` });
+    for (const s of p.stores) g.offers.push({ store: s.store, price: s.latest.price, source: "own", note: `${s.latest.noted ? "Price you noted" : "Your receipt"}, ${s.latest.date}` });
   }
 
   for (const c of groupCommunity(community.filter((r) => r.currency === currency))) {
@@ -79,7 +79,7 @@ export function searchBestPrices(args: { q: string; products: Product[]; communi
  */
 export function externalPrices(community: CommunityRow[], online: Record<string, OnlineMatch[]>, currency: string): ExternalPrice[] {
   const out: ExternalPrice[] = [];
-  for (const r of community) if (r.currency === currency && Number(r.price) > 0) out.push({ store: r.store_name, key: r.product_key, price: Number(r.price), source: "community" });
+  for (const r of community) if (r.currency === currency && Number(r.price) > 0) out.push({ store: r.store_name, key: r.product_key, price: Number(r.price), source: "community", date: r.last_month ?? null });
   for (const [key, list] of Object.entries(online)) for (const m of list) if (m.price > 0) out.push({ store: m.storeName, key, price: m.price, source: "online", similar: m.status !== "same" });
   return out;
 }

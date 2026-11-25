@@ -23,7 +23,7 @@ eq([itemName("", 1), itemName("  ", 3), itemName(" Milk ", 2)], ["Item 1", "Item
 
 const check = (id: string, product: string, store: string, price: number, size: string | null, seen: string, currency = "AWG"): PriceCheck => ({ id, product, store, price, currency, size, seen_on: seen });
 eq(checkToTracker(check("1", "C4 Energy", "Fit Stop", 39.95, "30 servings", "2026-11-12")).name, "C4 Energy 30 servings", "the size goes into the name");
-eq(checkToTracker(check("1", "C4 Energy", " Fit Stop ", 39.949, null, "2026-11-12")), { name: "C4 Energy", normalized_name: checkToTracker(check("1", "C4 Energy", "x", 1, null, "2026-11-12")).normalized_name, category: "Other", unit_price: 39.95, quantity: 1, unit: null, line_total: 39.95, receipt: { store: "Fit Stop", purchase_date: "2026-11-12", currency: "AWG" } }, "a price check is shaped like a receipt line");
+eq(checkToTracker(check("1", "C4 Energy", " Fit Stop ", 39.949, null, "2026-11-12")), { name: "C4 Energy", normalized_name: checkToTracker(check("1", "C4 Energy", "x", 1, null, "2026-11-12")).normalized_name, category: "Other", unit_price: 39.95, quantity: 1, unit: null, line_total: 39.95, noted: true, receipt: { store: "Fit Stop", purchase_date: "2026-11-12", currency: "AWG" } }, "a price check is shaped like a receipt line");
 
 // Three shops for the same product show up as one product with three stores, cheapest first
 const rows = [

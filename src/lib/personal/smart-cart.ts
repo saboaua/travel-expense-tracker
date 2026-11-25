@@ -173,7 +173,7 @@ export function directionsUrl(origin: LatLng | null, stops: LatLng[]): string | 
 
 /* ---------------- plans ---------------- */
 
-export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean };
+export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; /** When the price was paid or shared (a community price has only its month) */ date?: string | null; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean };
 export type PlanStop = { store: string; at: LatLng; km: number; lines: PlanLine[]; total: number; saving: number; /** items here with a price at your usual store too */ comparedOn: number; /** of those, the ones cheaper here */ cheaperOn: number; /** percent less than your usual store on the compared items (0 when none) */ pct: number };
 export type Plan = {
   stops: PlanStop[];
@@ -242,7 +242,7 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
       itemsTotal += pick.l.total!;
       saving += sv ?? 0;
       const list = byStore.get(pick.n.b.store) ?? [];
-      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, similar: pick.l.similar, old: pick.l.status === "old", check: r ? isCheck(r.price!, pick.l.price!) : false });
+      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, date: pick.l.date, similar: pick.l.similar, old: pick.l.status === "old", check: r ? isCheck(r.price!, pick.l.price!) : false });
       byStore.set(pick.n.b.store, list);
     }
     const used = set.filter((n) => byStore.has(n.b.store));
@@ -297,7 +297,7 @@ export function storeRows(a: { items: ListItem[]; baskets: StoreBasket[]; where:
       const r = ref && !sameStore(b.store, ref.store) ? priced(ref, it.key, s.useOld) : null;
       const sv = r ? round2((r.price! - l.price!) * it.qty) : null;
       if (r) { shared++; diff += (l.price! - r.price!) * it.qty; baseSum += r.price! * it.qty; if (l.status !== "old") fresh++; }
-      lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false });
+      lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false });
     }
     if (lines.length === 0) continue;
     const at = where.get(b.store) ?? null;
@@ -379,7 +379,7 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
         elseCount++; elseSaving += sav; byStore.set(best.store, (byStore.get(best.store) ?? 0) + sav);
       }
     }
-    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better, elsewhere: el ? { ...el, diff: round2((l.price! - el.price) * it.qty) } : null });
+    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better, elsewhere: el ? { ...el, diff: round2((l.price! - el.price) * it.qty) } : null });
   }
   lines.sort((x, y) => (y.better?.saving ?? y.saving ?? -Infinity) - (x.better?.saving ?? x.saving ?? -Infinity));
   const top = [...byStore].sort((x, y) => y[1] - x[1])[0];

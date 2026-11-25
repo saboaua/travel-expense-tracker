@@ -343,7 +343,8 @@ export function effectiveUnit(unit: string | null | undefined, quantity: number)
   return Number.isFinite(quantity) && quantity > 0 && !Number.isInteger(quantity) ? "kg" : null;
 }
 
-export type PricePoint = { date: string; price: number; store: string };
+/** noted: a price you wrote down or kept from a prices-only receipt, not something you bought */
+export type PricePoint = { date: string; price: number; store: string; noted?: boolean };
 
 export type PriceStats = {
   count: number;
@@ -406,6 +407,8 @@ export type TrackerRow = {
   quantity: number;
   unit?: string | null;
   line_total: number;
+  /** A price you noted (a price note or a prices-only receipt), not something you bought */
+  noted?: boolean;
   receipt: { store: string; purchase_date: string; currency: string };
 };
 
