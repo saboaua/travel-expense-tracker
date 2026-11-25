@@ -22,6 +22,7 @@ import { useTripChoices } from "@/components/personal/TripPicker";
 import { normPaid, paidLabel } from "@/lib/paid-with";
 import { countryName } from "@/lib/scan-destination";
 import { normCountry } from "@/lib/country";
+import { arrivesText, asSite, daysUntil, siteLabel } from "@/lib/personal/online-orders";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { shoppingSet, splitReceipt } from "@/lib/personal/item-categories";
 import { fetchShoppingNames } from "@/lib/personal/item-rules";
@@ -88,6 +89,7 @@ export function GroceryReceiptDetail({ id }: { id: string }) {
         <div>
           <h1 className="text-2xl font-bold">{receipt.store}</h1>
           <p className="text-sm text-muted-foreground">{formatDate(receipt.purchase_date)}</p>
+          {asSite(receipt.online_site) && <p className="mt-1 text-xs text-muted-foreground" data-testid="online-detail">Bought online · {siteLabel(receipt.online_site)}{receipt.arrives_on ? ` · arrives ${formatDate(receipt.arrives_on)}${daysUntil(receipt.arrives_on, new Date().toLocaleDateString("en-CA")) >= 0 ? ` (${arrivesText(daysUntil(receipt.arrives_on, new Date().toLocaleDateString("en-CA"))).toLowerCase()})` : ""}` : ""}</p>}
           {normCountry(receipt.country) && <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground" data-testid="bought-in-detail"><MapPin className="h-3 w-3" aria-hidden="true" />Bought in {countryName(normCountry(receipt.country)!) ?? receipt.country}</p>}
           {(receipt.paid_with || receipt.trip_ref) && (
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-semibold" data-testid="paid-detail">

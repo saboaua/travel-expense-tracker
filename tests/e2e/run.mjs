@@ -1237,6 +1237,37 @@ try {
     await ctx.close();
   });
 
+  await test("online: a receipt bought online keeps its site and arrival day, has no country, and shows under Online shopping with what is on its way", async () => {
+    const { ctx, page } = await newPage();
+    const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });
+    await page.route("**/api/ocr", (route) => route.fulfill({ json: { result: { store: "Amazon order", date: null, total: 24.8, currency: "USD", source: "ai", items: [item("Phone stand", 24.8)] } } }));
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/shopping/new`);
+    await page.locator("input[type=file]:not([capture])").setInputFiles({ name: "receipt.jpg", mimeType: "image/jpeg", buffer: JPEG });
+    await page.getByRole("button", { name: "Use full image" }).click({ timeout: 10_000 }).catch(() => {});
+    await page.getByTestId("items-total").waitFor({ timeout: 20_000 });
+    await page.getByTestId("where-online").click();
+    await page.getByTestId("site-ebay").click();
+    assert((await page.getByTestId("bought-in").count()) === 0, "the country row is hidden for an online order");
+    const d = new Date(Date.now() + 8 * 86400000).toLocaleDateString("en-CA");
+    await page.getByTestId("arrives-on").fill(d);
+    const before = fake.table("grocery_receipts").length;
+    await page.getByRole("button", { name: "Save receipt" }).click();
+    for (let i = 0; i < 40 && fake.table("grocery_receipts").length === before; i++) await new Promise((ok) => setTimeout(ok, 250));
+    const saved = fake.table("grocery_receipts").find((r) => r.store === "Amazon order");
+    assert(saved && saved.online_site === "ebay" && saved.arrives_on === d && !saved.country, "site and arrival day are saved, no country: " + JSON.stringify(saved));
+    await page.goto(`${BASE}/personal/shopping/${saved.id}`);
+    await page.getByTestId("online-detail").waitFor({ timeout: 20_000 });
+    assert(/eBay/.test(await page.getByTestId("online-detail").innerText()), "the detail page says it was bought online on eBay");
+    await page.goto(`${BASE}/personal/shopping/online`);
+    await page.getByTestId("online-way").waitFor({ timeout: 20_000 });
+    assert(/In 8 days/.test(await page.getByTestId("online-way").innerText()), "it is on its way: " + (await page.getByTestId("online-way").innerText()));
+    assert((await page.getByTestId("online-site-ebay").count()) === 1, "eBay is listed by site");
+    fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.store !== "Amazon order"));
+    await ctx.close();
+  });
+
   await test("receipt types: a massage receipt goes to a new Personal care type (not Groceries), gets its own budget line, and the manager lists it", async () => {
     const { ctx, page } = await newPage();
     const item = (name, t) => ({ name, quantity: 1, unit_price: t, line_total: t, category: "Other", unit: null });

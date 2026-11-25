@@ -108,6 +108,8 @@ need_cols(tbl, col, fix) as (values
   ('supermarket_places','fixed','migration_places_fix.sql'),
   ('grocery_receipts','country','migration_receipt_country.sql'),
   ('price_checks','country','migration_receipt_country.sql'),
+  ('grocery_receipts','online_site','migration_online_orders.sql'),
+  ('grocery_receipts','arrives_on','migration_online_orders.sql'),
   ('supermarket_places','category','migration_directory_categories.sql'),
   ('supermarket_places','added','migration_directory_categories.sql'),
   ('store_categories','category','migration_directory_categories.sql'),

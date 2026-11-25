@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ChevronLeft, ChevronRight, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBag, Map as MapIcon } from "lucide-react";
+import { ChevronLeft, ChevronRight, Globe, CloudOff, Plus, Tag, TrendingUp, ShoppingCart, ShoppingBag, Map as MapIcon } from "lucide-react";
 import { Bars } from "@/components/personal/Bars";
 import { categoryTotals, monthlyTotals, monthOf, percentChange, topItems, type ReceiptLite } from "@/lib/personal/grocery";
 import { fetchMonthItems, fetchOverview, monthItemsKey, monthItemsLoaded, overviewItemsWithWaiting, overviewKey, type Overview } from "@/lib/offline-grocery";
@@ -160,6 +160,13 @@ export function GroceryOverview({ area = "groceries", typeId }: { area?: "grocer
         <Link href="/personal/shopping" data-testid="to-shopping" className="flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm shadow-sm transition-colors hover:bg-muted/50">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600 dark:bg-violet-500/15 dark:text-violet-300"><ShoppingBag className="h-5 w-5" aria-hidden="true" /></span>
           <span className="min-w-0 flex-1">Looking for clothes, electronics or home items? They are in <strong>Shopping</strong>.</span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+        </Link>
+      )}
+      {shopping && !typed && (
+        <Link href="/personal/shopping/online" data-testid="to-online" className="flex items-center gap-3 rounded-2xl border bg-card p-3 text-sm shadow-sm transition-colors hover:bg-muted/50">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/15 dark:text-indigo-300"><Globe className="h-5 w-5" aria-hidden="true" /></span>
+          <span className="min-w-0 flex-1">Bought on Amazon, AliExpress or eBay? See <strong>Online shopping</strong>.</span>
           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
         </Link>
       )}

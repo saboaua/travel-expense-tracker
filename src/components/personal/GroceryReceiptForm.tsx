@@ -2,6 +2,8 @@
 
 import { PaidWithPicker } from "@/components/personal/PaidWithPicker";
 import { BoughtIn } from "@/components/personal/BoughtIn";
+import { BoughtOnline } from "@/components/personal/BoughtOnline";
+import { asSite, type OnlineSite } from "@/lib/personal/online-orders";
 import { useCountry } from "@/components/personal/use-country";
 import { normCountry } from "@/lib/country";
 import { TripPicker, useTripChoices } from "@/components/personal/TripPicker";
@@ -95,6 +97,10 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   const [boughtIn, setBoughtIn] = useState<string | null>(null);
   const countryChosen = useRef(false);
   const hadCountry = useRef(false);
+  // Online orders: the site and when it arrives. An online receipt has no country.
+  const [onlineSite, setOnlineSite] = useState<OnlineSite | null>(null);
+  const [arrivesOn, setArrivesOn] = useState("");
+  const hadOnline = useRef(false);
   useEffect(() => { if (!receiptId && here.ready && !countryChosen.current) setBoughtIn(normCountry(here.country)); }, [receiptId, here.ready, here.country]);
   const [total, setTotal] = useState("");
   const [notes, setNotes] = useState("");
@@ -176,6 +182,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
       setDate(head.purchase_date ?? todayISO());
       setCurrency(head.currency ?? "USD");
       { const c = normCountry((head as { country?: string | null }).country); setBoughtIn(c); countryChosen.current = true; hadCountry.current = !!c; }
+      { const h = head as { online_site?: string | null; arrives_on?: string | null }; setOnlineSite(asSite(h.online_site)); setArrivesOn(h.arrives_on ?? ""); hadOnline.current = !!asSite(h.online_site); }
       setTotal(String(head.total ?? ""));
       setNotes(head.notes || "");
       setPricesOnly(head.prices_only === true);
@@ -366,7 +373,10 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
 
       // Only sent when it matters, so a database without the price-notes migration still saves the receipt
       const head = { store: store.trim(), purchase_date: date, total: totalNum, currency, notes: notes.trim() || null, ...(pricesOnly || wasPricesOnly.current ? { prices_only: pricesOnly } : {}), ...(asShopping || typeId || wasArea.current ? { area: typeId ? "other" : asShopping ? "shopping" : "groceries", type_id: typeId } : {}), ...(paidWith || wasPaid.current ? { paid_with: paidWith } : {}), ...(tripRef || wasTrip.current ? { trip_ref: tripRef } : {}) };
-      const withCountry = boughtIn || hadCountry.current ? { ...head, country: boughtIn } : head;
+      // Online: the site and arrival date are saved and there is no country. In a shop: a country, and any old online mark is cleared.
+      const withCountry = onlineSite
+        ? { ...head, online_site: onlineSite, arrives_on: arrivesOn || null, ...(hadCountry.current ? { country: null } : {}) }
+        : { ...head, ...(hadOnline.current ? { online_site: null, arrives_on: null } : {}), ...(boughtIn || hadCountry.current ? { country: boughtIn } : {}) };
       // The items are made here, with their own ids, and replace the receipt's items when it is sent
       const children = {
         table: "grocery_items",
@@ -506,7 +516,8 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
                 {types.map((t) => <option key={t.id} value={`type:${t.id}`}>{t.name}</option>)}
               </Select>
             </div>
-            <BoughtIn value={boughtIn} detected={here.country} home={here.homeCountry} onChange={(c) => { countryChosen.current = true; setBoughtIn(c); }} />
+            <BoughtOnline site={onlineSite} arrives={arrivesOn} onSite={setOnlineSite} onArrives={setArrivesOn} />
+            {!onlineSite && <BoughtIn value={boughtIn} detected={here.country} home={here.homeCountry} onChange={(c) => { countryChosen.current = true; setBoughtIn(c); }} />}
             <PaidWithPicker value={paidWith} onChange={setPaidWith} />
             <TripPicker trips={trips} value={tripRef} suggested={suggestedTrip} onChange={(v) => { tripTouched.current = true; setTripRef(v); }} />
 

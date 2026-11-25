@@ -14,7 +14,7 @@ import type { OutboxItem } from "@/lib/outbox";
 
 type Result<T> = Promise<{ data: T | null; error: unknown }>;
 
-export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null; area?: string | null; type_id?: string | null; country?: string | null };
+export type GroceryReceipt = { id: string; store: string; purchase_date: string; total: number; currency: string; receipt_path: string | null; notes: string | null; prices_only?: boolean | null; paid_with?: string | null; trip_ref?: string | null; area?: string | null; type_id?: string | null; country?: string | null; online_site?: string | null; arrives_on?: string | null };
 export type GroceryItem = { id: string; name: string; category: string; quantity: number; unit_price: number; line_total: number; unit: string | null; normalized_name?: string };
 export type ReceiptBundle = { receipt: GroceryReceipt; items: GroceryItem[] };
 export type OverviewReceipt = ReceiptLite & { store: string; prices_only?: boolean | null; paid_with?: PaidWith | null; trip_ref?: string | null; area?: string | null; type_id?: string | null };
@@ -94,17 +94,17 @@ export async function fetchOverview(supabase: SupabaseClient, today: string): Re
 /** Your prices. The nightly community share passes `forUser` (it reads with the service key, which has no row security of its own). */
 export async function fetchPrices(supabase: SupabaseClient, forUser?: string): Result<TrackerRow[]> {
   try {
-    type Raw = Omit<TrackerRow, "receipt"> & { grocery_receipts: (TrackerRow["receipt"] & { area?: string | null; prices_only?: boolean | null }) | (TrackerRow["receipt"] & { area?: string | null; prices_only?: boolean | null })[] };
+    type Raw = Omit<TrackerRow, "receipt"> & { grocery_receipts: (TrackerRow["receipt"] & { area?: string | null; prices_only?: boolean | null; online_site?: string | null }) | (TrackerRow["receipt"] & { area?: string | null; prices_only?: boolean | null; online_site?: string | null })[] };
     const load = (cols: string) => fetchAll<Raw>((a, b) => {
       const q = supabase.from("grocery_items").select(`name, normalized_name, category, unit_price, quantity, unit, line_total, grocery_receipts!inner(${cols})`);
       return (forUser ? q.eq("user_id", forUser) : q).order("created_at", { ascending: false }).range(a, b) as never;
     });
     // Newest columns first: a database without the price-notes or receipt-country migration falls back to fewer
     const AREA = "store, purchase_date, currency, area";
-    const data = await load(`${AREA}, prices_only, country`).catch(() => load(`${AREA}, prices_only`)).catch(() => load(AREA));
+    const data = await load(`${AREA}, prices_only, country, online_site`).catch(() => load(`${AREA}, prices_only, country`)).catch(() => load(`${AREA}, prices_only`)).catch(() => load(AREA));
     // notebooks, clothes and other shopping lines are not grocery prices: they stay out of Best prices and what the community shares
     const shop = await fetchShoppingNames(supabase);
-    const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase()) && (Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.area !== "other").map((d) => ({
+    const lines = data.filter((d) => !shop.has((d.category ?? "").trim().toLowerCase()) && (Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.area !== "other" && !(Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.online_site).map((d) => ({
       name: d.name, normalized_name: d.normalized_name, category: d.category, unit_price: Number(d.unit_price), quantity: Number(d.quantity),
       unit: d.unit ?? null, line_total: Number(d.line_total),
       ...((Array.isArray(d.grocery_receipts) ? d.grocery_receipts[0] : d.grocery_receipts)?.prices_only ? { noted: true } : {}),
@@ -137,7 +137,7 @@ export async function fetchReceiptBundle(supabase: SupabaseClient, id: string): 
   const [r, i] = await Promise.all([
     (async () => {
       // Newest columns first; each migration that has not been run drops one level
-      const levels = [`${GROCERY_RECEIPT_COLS_PAY}, type_id, country`, `${GROCERY_RECEIPT_COLS_PAY}, type_id`, GROCERY_RECEIPT_COLS_PAY, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE];
+      const levels = [`${GROCERY_RECEIPT_COLS_PAY}, type_id, country, online_site, arrives_on`, `${GROCERY_RECEIPT_COLS_PAY}, type_id, country`, `${GROCERY_RECEIPT_COLS_PAY}, type_id`, GROCERY_RECEIPT_COLS_PAY, GROCERY_RECEIPT_COLS, GROCERY_RECEIPT_COLS_BASE];
       let res = await supabase.from("grocery_receipts").select(levels[0]).eq("id", id).single();
       for (let n = 1; n < levels.length && isMissingColumn(res.error); n++) res = await supabase.from("grocery_receipts").select(levels[n]).eq("id", id).single();
       return res;
