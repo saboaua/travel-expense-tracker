@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { handleInbound, verifyMode, type InboundPayload } from "@/lib/bill-email-inbound";
 import { isLocked } from "@/lib/limits-server";
 import { sendPush, serviceClient } from "@/lib/push";
+import { inboundAddress } from "@/lib/personal/bill-email";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -24,7 +25,7 @@ export async function GET(req: Request) {
   const u = await userFor(req);
   if (!u?.userId || !u.db) return NextResponse.json({ error: u && !u.db ? "Service role key missing" : "Forbidden" }, { status: u && !u.db ? 503 : 403 });
   const r = await u.db.from("bill_email_senders").select("email").eq("user_id", u.userId).limit(100);
-  return NextResponse.json({ senders: ((r.data ?? []) as { email: string }[]).map((x) => x.email) }, { headers: { "Cache-Control": "no-store" } });
+  return NextResponse.json({ senders: ((r.data ?? []) as { email: string }[]).map((x) => x.email), forwardTo: inboundAddress(process.env.INBOUND_EMAIL_BASE, u.key) }, { headers: { "Cache-Control": "no-store" } });
 }
 
 /** One email from the script. Answers 200 for anything it should not be sent again. */

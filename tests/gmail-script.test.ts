@@ -14,6 +14,7 @@ let parses = true;
 try { new Function(src); } catch { parses = false; }
 eq(parses, true, "the script is valid JavaScript");
 eq([src.includes("Authentication-Results"), src.includes("mx\\.google\\.com"), src.includes("getAttachments"), src.includes("newer_than:3d")], [true, true, true, true], "it sends Gmail's own signature check, the PDF, and only recent mail");
+eq([src.includes("info.forwardTo"), src.includes('parts.push("to:" + forwardTo)'), src.includes('"(" + parts.join(" OR ") + ") newer_than:3d"')], [true, true, true], "it also looks for mail sent to your private forwarding address, so forwarded orders are found");
 // a key with odd characters cannot break out of the string
 const odd = gmailScript('a"; evil(); "', "https://x.y/z");
 let oddParses = true; try { new Function(odd); } catch { oddParses = false; }

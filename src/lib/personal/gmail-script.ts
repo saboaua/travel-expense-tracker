@@ -4,18 +4,24 @@
  * "Authentication-Results" line) to the app with the person's private key. The key is the only secret in it.
  */
 export function gmailScript(key: string, endpoint: string): string {
-  return `// Bill emails. Your private key is in this script: keep it to yourself.
+  return `// Bill emails and forwarded online orders (version 2). Your private key is in this script: keep it to yourself.
 const KEY = ${JSON.stringify(key)};
 const ENDPOINT = ${JSON.stringify(endpoint)};
 
 function sendBills() {
   const got = UrlFetchApp.fetch(ENDPOINT, { headers: { "x-bill-key": KEY }, muteHttpExceptions: true });
   if (got.getResponseCode() !== 200) return;
-  const senders = (JSON.parse(got.getContentText()).senders || []).filter(function (s) { return /^[^\\s@()]+@[^\\s@()]+$/.test(s); });
-  if (!senders.length) return;
+  const info = JSON.parse(got.getContentText());
+  const senders = (info.senders || []).filter(function (s) { return /^[^\\s@()]+@[^\\s@()]+$/.test(s); });
+  // Order emails you forward to your private address land in this Gmail too, so they are found by the address they were sent to
+  const forwardTo = /^[^\\s@()]+@[^\\s@()]+$/.test(info.forwardTo || "") ? info.forwardTo : "";
+  const parts = [];
+  if (senders.length) parts.push("from:(" + senders.join(" OR ") + ")");
+  if (forwardTo) parts.push("to:" + forwardTo);
+  if (!parts.length) return;
   const props = PropertiesService.getScriptProperties();
   const done = JSON.parse(props.getProperty("done") || "[]");
-  GmailApp.search("from:(" + senders.join(" OR ") + ") newer_than:3d", 0, 30).forEach(function (thread) {
+  GmailApp.search("(" + parts.join(" OR ") + ") newer_than:3d", 0, 30).forEach(function (thread) {
     thread.getMessages().forEach(function (m) {
       const id = m.getId();
       if (done.indexOf(id) >= 0) return;
