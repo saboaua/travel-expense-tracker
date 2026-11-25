@@ -120,7 +120,7 @@ export function PriceCheckForm() {
       });
       // Without migration_receipt_country.sql the price still saves, just without the country
       const r = boughtIn
-        ? await send({ ...row, country: boughtIn } as typeof row).catch((e: unknown) => { if (isMissingColumn(e as { code?: string; message?: string })) return send(row); throw e; })
+        ? await send({ ...row, country: boughtIn } as typeof row).catch((e: unknown) => { if ((isMissingColumn(e as { code?: string; message?: string }) || /latest migration/i.test((e as Error)?.message ?? ""))) return send(row); throw e; })
         : await send(row);
       setSavedMsg(`${r.queued ? "Saved on this phone, will send when you are online" : "Saved"}: ${row.product} at ${row.store}, ${formatCurrency(amt, currency)}`);
       setLastProduct(row.product);

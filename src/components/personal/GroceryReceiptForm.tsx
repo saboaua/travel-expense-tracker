@@ -405,7 +405,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
         label: head.store, summary: `Grocery receipt · ${receiptId ? "changed" : "new"}`,
       });
       // A database without migration_receipt_country.sql still saves the receipt, just without the country
-      const saved = await send(withCountry).catch((e: unknown) => { if (withCountry !== head && isMissingColumn(e as { code?: string; message?: string })) return send(head); throw e; });
+      const saved = await send(withCountry).catch((e: unknown) => { if (withCountry !== head && (isMissingColumn(e as { code?: string; message?: string }) || /latest migration/i.test((e as Error)?.message ?? ""))) return send(head); throw e; });
       // Lines the person sorted by hand are remembered for next time
       if (remember && !typed) await saveItemRules(supabase, owner, clean.filter((r) => r.sorted && r.category !== "Other").map((r) => ({ normalized_name: normalizeItemName(r.name), category: r.category })));
       // A receipt that is still waiting has no page of its own yet, so go to the list, where it shows as waiting
