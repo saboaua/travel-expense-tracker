@@ -66,7 +66,7 @@ export default function AdminCommunityPricesPage() {
   return (
     <div className={`${PAGE_WIDTH.form} p-4 md:p-8 pb-24 space-y-6`}>
       <BackLink href="/admin/supermarkets">Supermarkets</BackLink>
-      <PageHeader title="Community prices import" description="Add prices from receipts you typed into Excel. People see them next to the prices from the app." />
+      <PageHeader title="Community prices import" description="Add prices you checked, from receipts or the shelf, typed into Excel. People see them next to the prices from the app." />
       {error && <Alert>{error}</Alert>}
       {done && <Alert variant="success"><span data-testid="prices-done">{done}</span></Alert>}
 
@@ -90,7 +90,7 @@ export default function AdminCommunityPricesPage() {
             <li>Delete the EXAMPLE rows, save as .xlsx or .csv, and choose it below.</li>
           </ol>
           <a href="/api/admin/community-import?template=1" download className="inline-flex min-h-11 items-center gap-2 rounded-lg border px-4 text-sm font-semibold hover:bg-muted" data-testid="prices-template"><Download className="h-4 w-4" aria-hidden="true" />Download the template</a>
-          <p className="text-xs text-muted-foreground">Importing only adds. Nothing already there is changed or removed. Each upload counts as one shopper, like one more person. A price shows right away and gets a Confirmed badge once 3 shoppers agree.</p>
+          <p className="text-xs text-muted-foreground">Importing only adds. Nothing already there is changed or removed. Prices you upload show right away as Confirmed, because you checked them. Prices people share from the app get the Confirmed badge once 3 shoppers agree.</p>
         </CardContent>
       </Card>
 

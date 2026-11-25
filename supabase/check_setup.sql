@@ -75,6 +75,7 @@ need_cols(tbl, col, fix) as (values
   ('shared_prices','price','migration_shared_prices.sql'),
   ('shared_prices','contributor','migration_shared_prices.sql'),
   ('price_imports','file_hash','migration_community_confirm.sql'),
+  ('shared_prices','trusted','migration_admin_confirmed.sql'),
   ('fuel_fillups','quantity','migration_fuel.sql'),
   ('price_share_secret','salt','migration_shared_prices.sql'),
   ('account_requests','phone','migration_account_requests.sql'),
@@ -302,6 +303,10 @@ other_checks as (
   select 'function', 'community_search shows Confirmed',
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'community_search' and pg_get_function_result(p.oid) like '%confirmed%') then 'OK' else 'MISSING' end,
          'migration_community_confirm.sql'
+  union all
+  select 'function', 'admin uploads are Confirmed',
+         case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'import_prices' and p.prosrc like '%trusted%') then 'OK' else 'MISSING' end,
+         'migration_admin_confirmed.sql'
   union all
   select 'privacy', 'shared_prices: nobody can read it directly',
          case when to_regclass('public.shared_prices') is null then 'MISSING'

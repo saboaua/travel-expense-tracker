@@ -45,7 +45,7 @@ async function template(): Promise<Buffer> {
     "Unit: leave empty for items sold per piece or pack. Type kg or lb when the price is per weight (tomatoes 4.95 per kg).",
     "Rows that start with EXAMPLE are never imported. Delete them or leave them.",
     "Importing only adds. Nothing already in the community prices is changed or removed.",
-    "Each upload counts as one more shopper. A price shows right away and is Confirmed once 3 shoppers paid about the same price.",
+    "Prices you upload are Confirmed right away: they count as checked. The prices people share from the app are Confirmed once 3 shoppers paid about the same price.",
     "Use each receipt once. Uploading the same prices again is refused so they cannot count twice.",
     "Save as .xlsx or .csv. Up to 5,000 rows per file.",
   ].forEach((t, i) => how.addRow([`${i + 1}. ${t}`]));
