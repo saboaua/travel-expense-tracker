@@ -5411,7 +5411,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.getByRole("switch").count()) === 17, "device switch, sixteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
+    assert((await card.locator("[role=switch]:not([aria-label$=\" on Telegram\"])").count()) === 18, "device switch, sixteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);

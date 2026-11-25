@@ -201,7 +201,7 @@ export default function ProfilePage() {
 
 
       {/* Edit form */}
-      {/* Two columns from 1024px, the same order down a phone. The column break sits after the fifth item. */}
+      {/* Two columns from 1024px, the same order down a phone. The column break sits after the fifth item. Sections are in A to Z order so people can find them: Community prices, Details for entry cards, Home place, Notifications, Password, Personal information, Recommend, Sharing, Sign-in email, Telegram, Your data. */}
       <AccordionGroup className="lg:columns-2 lg:gap-4 lg:space-y-0 lg:[&>*]:mb-3 lg:[&>*]:break-inside-avoid">
       {/* Avatar + basic info card */}
       <div className="pb-3 lg:pb-0">
@@ -260,6 +260,17 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
       </div>
+
+      <CommunityCard />
+
+      <EntryCardLink />
+
+      <HomePlaceCard />
+
+      <NotificationsCard />
+
+      <div className="lg:break-after-column"><PasswordCard /></div>
+
       <AccordionSection
         id="personal"
         title="Personal information"
@@ -342,25 +353,16 @@ export default function ProfilePage() {
           </form>
       </AccordionSection>
 
-      <SharingCard />
-
-      <HomePlaceCard />
-
-      <EntryCardLink />
-
-      <div className="lg:break-after-column"><CommunityCard /></div>
-
       <RecommendCard />
 
+      <SharingCard />
+
       <EmailCard />
-
-      <PasswordCard />
-
-      <NotificationsCard />
 
       <TelegramCard />
 
       <YourDataCard />
+
       </AccordionGroup>
     </PageShell>
   );
