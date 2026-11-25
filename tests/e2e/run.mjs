@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types"]) fake.table(t);
+for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types", "telegram_notify_prefs"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -5320,6 +5320,47 @@ try {
     assert((await c2.getByRole("switch", { name: "Support requests" }).count()) === 0, "a normal person is not offered Support requests");
     assert((await c2.getByRole("switch", { name: "Account requests" }).count()) === 0, "a normal person is not offered Account requests");
     await user.ctx.close();
+  });
+
+  await test("profile: every alert has a Telegram switch next to the phone one, greyed until Telegram is connected", async () => {
+    const user = await newPage();
+    try {
+      let linked = false;
+      await user.page.route("**/api/telegram/link", (route) => route.fulfill({ json: { enabled: true, linked, bot: "lifolio_test_bot", botUrl: "https://t.me/lifolio_test_bot", code: null, expires: null, link: null } }));
+      await signIn(user.page, "pat@example.com", "Correct-Horse-1");
+      await user.page.waitForURL((u) => u.pathname === "/");
+      await user.page.goto(`${BASE}/profile#notifications`);
+      const card = user.page.getByTestId("notifications-card");
+      await card.waitFor();
+      await card.getByTestId("telegram-not-connected").waitFor();
+      assert(await card.getByRole("switch", { name: "Budget alerts on Telegram" }).isDisabled(), "the Telegram switches are off-limits until Telegram is connected");
+      assert((await card.getByRole("button", { name: "Connect Telegram" }).count()) === 1, "there is a Connect Telegram button");
+      assert((await card.getByTestId("telegram-col-summary").count()) === 1 && (await card.getByTestId("phone-col-summary").innerText()).includes("Phone"), "the weekly summary row is there with no phone switch");
+      linked = true;
+      await user.page.reload();
+      await card.waitFor();
+      await card.getByTestId("telegram-col-budget").waitFor();
+      assert((await card.getByTestId("telegram-not-connected").count()) === 0, "no Connect button once connected");
+      const sw = card.getByRole("switch", { name: "Budget alerts on Telegram" });
+      assert((await sw.getAttribute("aria-checked")) === "false" && (await card.getByRole("switch", { name: "Trip coming up on Telegram" }).getAttribute("aria-checked")) === "true", "new alerts start off for Telegram, trip reminders stay on");
+      await sw.click();
+      await user.page.waitForTimeout(1500);
+      await user.page.waitForFunction(() => document.querySelector('[aria-label="Budget alerts on Telegram"]')?.getAttribute("aria-checked") === "true");
+      assert(fake.table("telegram_notify_prefs").some((r) => r.kinds?.budget === true), "the choice is saved");
+      assert((await card.getByRole("switch", { name: "Budget alerts", exact: true }).getAttribute("aria-checked")) === "true", "the phone switch is separate");
+      // The Telegram card: count, shortcut, copy
+      const tgCard = user.page.getByTestId("telegram-prefs");
+      await user.page.goto(`${BASE}/profile#telegram`);
+      await tgCard.waitFor();
+      assert(/\d+ of \d+ alerts are on for Telegram/.test(await tgCard.getByTestId("telegram-count").innerText()), "the card says how many alerts are on");
+      await tgCard.getByTestId("telegram-copy-phone").click();
+      await user.page.waitForFunction(() => /Copied/.test(document.querySelector('[data-testid="telegram-copy-phone"]')?.textContent || ""));
+      assert(fake.table("telegram_notify_prefs").some((r) => r.kinds?.views === false && r.kinds?.gambling === true), "copying takes the phone choices");
+      await tgCard.getByTestId("telegram-sample").waitFor();
+    } finally {
+      fake.table("telegram_notify_prefs").length = 0;
+      await user.ctx.close();
+    }
   });
 
   await test("profile: Notifications are grouped, new kinds are offered, the message style and quiet hours are saved", async () => {

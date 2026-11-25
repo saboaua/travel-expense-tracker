@@ -23,9 +23,9 @@ eq(shouldSend(DEFAULT_PREFS, "trip_reminder", day).send, true, "reminder in the 
 eq(shouldSend(DEFAULT_PREFS, "trip_reminder", night).reason, "quiet", "reminder at night waits");
 eq(shouldSend(DEFAULT_PREFS, "admin_alert", night, true).send, true, "urgent alert ignores quiet hours");
 eq(shouldSend({ ...DEFAULT_PREFS, enabled: false }, "admin_alert", day, true).reason, "off", "master switch beats urgent");
-eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "trip_reminder", day).reason, "kind_off", "reminders switched off");
-eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "document_reminder", day).reason, "kind_off", "document reminders follow the same switch");
-eq(shouldSend({ ...DEFAULT_PREFS, trip_reminders: false }, "admin_alert", day).send, true, "other kinds unaffected");
+eq(shouldSend({ ...DEFAULT_PREFS, kinds: { ...DEFAULT_PREFS.kinds, trips: false } }, "trip_reminder", day).reason, "kind_off", "reminders switched off");
+eq(shouldSend({ ...DEFAULT_PREFS, kinds: { ...DEFAULT_PREFS.kinds, documents: false } }, "document_reminder", day).reason, "kind_off", "document reminders have their own switch");
+eq(shouldSend({ ...DEFAULT_PREFS, kinds: { ...DEFAULT_PREFS.kinds, trips: false } }, "admin_alert", day).send, true, "other kinds unaffected");
 
 eq(normalizePrefs(null), DEFAULT_PREFS, "no row gives defaults");
 eq(normalizePrefs({ quiet_start: 99, tz: "" }).quiet_start, 22, "bad hour falls back");

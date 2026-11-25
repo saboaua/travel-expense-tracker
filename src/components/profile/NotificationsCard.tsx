@@ -11,10 +11,13 @@ import { currentSubscription, enablePush, isRegistered, pushSupport, type PushSu
 import { pushState, type PushState } from "@/lib/push-state";
 import { DEFAULT_PUSH_SETTINGS, hourLabel, type PushDetail, type PushPref, type PushSettings } from "@/lib/push-prefs";
 import { Select } from "@/components/ui/select";
+import { useTelegramKinds } from "@/components/profile/use-telegram-kinds";
+import { useTelegramLink } from "@/components/profile/use-telegram-link";
+import type { TelegramKey } from "@/lib/telegram-kinds";
 
 type Prefs = PushSettings;
 const DEFAULTS: Prefs = DEFAULT_PUSH_SETTINGS;
-type Row = { key: PushPref; title: string; hint: string; example?: string; isNew?: boolean };
+type Row = { key: TelegramKey; title: string; hint: string; example?: string; isNew?: boolean };
 type Group = { title: string; rows: Row[] };
 const HOURS = Array.from({ length: 24 }, (_, h) => h);
 const post = (path: string, body: unknown) => fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
@@ -39,6 +42,9 @@ export function NotificationsCard() {
   const [msg, setMsg] = useState<{ tone: "ok" | "bad"; text: string } | null>(null);
   // Decided in the browser after the page loads (the server cannot know), so the first paint matches on both sides
   const [support, setSupport] = useState<PushSupport | null>(null);
+  const tg = useTelegramKinds();
+  const tgLink = useTelegramLink();
+  const tgLinked = tgLink.status?.linked ?? tg.linked;
   useEffect(() => { setSupport(pushSupport()); }, []);
 
   const load = useCallback(async () => {
@@ -106,6 +112,7 @@ export function NotificationsCard() {
     { title: "Money and papers", rows: [
       { key: "reminders", title: "Subscription payments", hint: "Before a payment is due, in the days you chose.", example: "\u201cNetflix is due in 3 days (Nov 14).\u201d" },
       { key: "documents", title: "Document expiry", hint: "Passport, visa and ID, well before they expire.", example: "\u201cYour passport expires in 60 days (Jan 9, 2027).\u201d", isNew: true },
+      { key: "summary", title: "Weekly summary", hint: "Telegram only. A short summary every Monday.", example: "\u201cYour week: 3 trips coming up, 2 documents to renew.\u201d" },
     ] },
     { title: "Sharing", rows: [
       { key: "invites", title: "Invites and replies", hint: "Someone invites you, or answers your invite.", example: "\u201cAlice invited you to share.\u201d" },
@@ -151,6 +158,15 @@ export function NotificationsCard() {
           <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">Either way, messages never show amounts, card numbers, document numbers or confirmation codes.</p>
         </Section>
 
+        {tg.featureOn && !tgLinked && (
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl border p-3" data-testid="telegram-not-connected">
+            <span className="min-w-0 flex-1 text-[13px] text-muted-foreground"><span className="block text-[15px] font-semibold text-foreground">Telegram is not connected</span>Connect it to get these alerts there too. Your phone alerts are not affected.</span>
+            <Button type="button" variant="outline" className="min-h-[44px]" onClick={tgLink.enable} disabled={tgLink.linking}>Connect Telegram</Button>
+          </div>
+        )}
+        {tg.featureOn && tgLinked && !tg.enabled && <p className="rounded-lg border p-3 text-[13px] text-muted-foreground" data-testid="telegram-master-off">Messages from the app are off in Telegram, so none of the Telegram switches send anything. Turn them on in the Telegram card.</p>}
+        {tg.error && <p role="alert" className="text-sm text-destructive">{tg.error}</p>}
+
         {GROUPS.map((g) => (
           <Section key={g.title} title={g.title}>
             <ul className="divide-y rounded-2xl border px-4" data-testid={`push-group-${g.title.toLowerCase().replace(/\W+/g, "-")}`}>
@@ -161,7 +177,18 @@ export function NotificationsCard() {
                     <span className="mt-0.5 block text-[13px] text-muted-foreground">{r.hint}</span>
                     {r.example && <span className="mt-1.5 block rounded-lg bg-muted px-2.5 py-1.5 text-[13px] leading-snug text-foreground/80">{r.example}</span>}
                   </span>
-                  <Switch checked={prefs[r.key]} label={r.title} onChange={(v) => change({ [r.key]: v } as Partial<Prefs>)} />
+                  <span className="flex shrink-0 items-start gap-1">
+                    <span className="flex w-14 flex-col items-center" data-testid={`phone-col-${r.key}`}>
+                      <span className="text-[11px] font-medium text-muted-foreground">Phone</span>
+                      {r.key === "summary" ? <span className="flex h-11 items-center text-muted-foreground" aria-label="No phone alert for this">&ndash;</span> : <Switch checked={prefs[r.key as PushPref]} label={r.title} onChange={(v) => change({ [r.key]: v } as Partial<Prefs>)} />}
+                    </span>
+                    {tg.featureOn && (
+                      <span className={`flex w-14 flex-col items-center ${tgLinked ? "" : "opacity-40"}`} data-testid={`telegram-col-${r.key}`}>
+                        <span className="text-[11px] font-medium text-muted-foreground">Telegram</span>
+                        <Switch checked={tg.kinds[r.key]} label={`${r.title} on Telegram`} disabled={!tgLinked} onChange={(v) => tg.setKind(r.key, v)} />
+                      </span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>

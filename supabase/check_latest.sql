@@ -8,6 +8,7 @@ with need(tbl, col, file) as (values
   ('grocery_receipts','order_ref','migration_online_email.sql'),
   ('grocery_receipts','source','migration_online_email.sql'),
   ('grocery_receipts','needs_check','migration_online_email.sql'),
+  ('telegram_notify_prefs','kinds','migration_telegram_kinds.sql'),
   ('pro_limits','starts_orders_email','migration_orders_email_limit.sql'),
   ('supermarket_places','category','migration_directory_categories.sql'),
   ('supermarket_places','added','migration_directory_categories.sql'),

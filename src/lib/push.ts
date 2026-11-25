@@ -4,7 +4,8 @@ import { createClient } from "@supabase/supabase-js";
 
 import { DEFAULT_PUSH_PREFS, normalizePushSettings, PUSH_TZ, type PushPref, type PushPrefs, type PushSettings } from "@/lib/push-prefs";
 import { PUSH_TEXT, pushMessage, type PushData, type PushKind } from "@/lib/push-text";
-import { inQuietHours, localHour } from "@/lib/telegram-notify";
+import { escapeHtml, inQuietHours, localHour, sendToUser } from "@/lib/telegram-notify";
+import { TELEGRAM_KEYS, type TelegramKey } from "@/lib/telegram-kinds";
 export { DEFAULT_PUSH_PREFS, PUSH_TEXT };
 export type { PushPref, PushPrefs, PushSettings, PushData, PushKind };
 
@@ -39,6 +40,38 @@ export type SendOptions = { now?: Date; today?: string; /** send even in quiet h
  * In the person's quiet hours the alert is held (saved) and sent by the next daily run instead.
  */
 export async function sendPushDetailed(userId: string | null | undefined, kind: PushKind, pref: PushPref | null, data?: PushData, opts: SendOptions = {}): Promise<PushResult> {
+  const phone = await sendToPhone(userId, kind, pref, data, opts);
+  await sendToTelegram(userId, kind, pref, data, opts, phone.reason === "held");
+  return phone;
+}
+
+/** Trip reminders and document expiry already go to Telegram from their own daily runs, with the same switch, so they are not sent twice. */
+const OWN_TELEGRAM_RUN: PushPref[] = ["trips", "documents"];
+
+/** The same alert in Telegram, when the person turned that alert on there. Never throws and never blocks the phone. */
+async function sendToTelegram(userId: string | null | undefined, kind: PushKind, pref: PushPref | null, data: PushData | undefined, opts: SendOptions, alreadyHeld: boolean): Promise<void> {
+  try {
+    if (!userId || !pref || OWN_TELEGRAM_RUN.includes(pref) || !(TELEGRAM_KEYS as readonly string[]).includes(pref)) return;
+    const db = serviceClient();
+    if (!db) return;
+    const { data: p } = await db.from("profiles").select("push_prefs").eq("id", userId).maybeSingle();
+    const settings = normalizePushSettings(p?.push_prefs);
+    const message = pushMessage(kind, data, settings.detail, opts.today);
+    const appName = await getBrand().then((b) => b.appName, () => null);
+    const title = appName || message.title;
+    const text = `<b>${escapeHtml(title)}</b>\n${escapeHtml(message.body)}`;
+    const r = await sendToUser(db, userId, "alert", text, { key: pref as TelegramKey, urgent: opts.skipQuiet, now: opts.now });
+    // Quiet hours: keep it for the morning, unless the phone side already did
+    if (r === "quiet" && !alreadyHeld && !opts.skipQuiet) {
+      const { error } = await db.from("push_queue").insert({ user_id: userId, kind, pref, data: data ?? null });
+      if (error) console.error("[push] hold telegram", error.message);
+    }
+  } catch (e) {
+    console.error("[push] telegram", e instanceof Error ? e.message : e);
+  }
+}
+
+async function sendToPhone(userId: string | null | undefined, kind: PushKind, pref: PushPref | null, data?: PushData, opts: SendOptions = {}): Promise<PushResult> {
   try {
     if (!userId || !pushConfigured()) return { sent: 0, reason: "not_configured", devices: 0 };
     const db = serviceClient();

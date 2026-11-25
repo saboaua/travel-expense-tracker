@@ -112,6 +112,7 @@ need_cols(tbl, col, fix) as (values
   ('grocery_receipts','online_site','migration_online_orders.sql'),
   ('grocery_receipts','arrives_on','migration_online_orders.sql'),
   ('grocery_receipts','order_ref','migration_online_email.sql'),
+  ('telegram_notify_prefs','kinds','migration_telegram_kinds.sql'),
   ('grocery_receipts','needs_check','migration_online_email.sql'),
   ('supermarket_places','category','migration_directory_categories.sql'),
   ('supermarket_places','added','migration_directory_categories.sql'),

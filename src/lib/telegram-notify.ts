@@ -5,8 +5,10 @@
 import { isLocked } from "@/lib/limits-server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { sendMessage } from "@/lib/telegram";
+import { legacyFlags, normalizeKinds, type TelegramKey, type TelegramKinds } from "@/lib/telegram-kinds";
+import { normalizePushSettings } from "@/lib/push-prefs";
 
-export type NotifyKind = "trip_reminder" | "document_reminder" | "summary" | "admin_alert" | "system";
+export type NotifyKind = "trip_reminder" | "document_reminder" | "summary" | "admin_alert" | "alert" | "system";
 
 export type NotifyPrefs = {
   /** Master switch */
@@ -18,11 +20,13 @@ export type NotifyPrefs = {
   /** Local hour when quiet time ends (7 = 7 am) */
   quiet_end: number;
   tz: string;
+  /** One switch per alert (see telegram-kinds.ts) */
+  kinds: TelegramKinds;
   /** Where the last upload went, e.g. "grocery" or "trip:<id>" */
   last_choice: string | null;
 };
 
-export const DEFAULT_PREFS: NotifyPrefs = { enabled: true, trip_reminders: true, admin_alerts: true, quiet_start: 22, quiet_end: 7, tz: "America/Aruba", last_choice: null };
+export const DEFAULT_PREFS: NotifyPrefs = { enabled: true, trip_reminders: true, admin_alerts: true, quiet_start: 22, quiet_end: 7, tz: "America/Aruba", kinds: normalizeKinds(null, { trip_reminders: true, admin_alerts: true }), last_choice: null };
 
 /** The hour (0-23) it is in the given time zone. */
 export function localHour(now: Date, tz: string): number {
@@ -44,10 +48,11 @@ export function inQuietHours(hour: number, start: number, end: number): boolean 
 export type SendDecision = { send: boolean; reason: "ok" | "off" | "kind_off" | "quiet" };
 
 /** `urgent` messages (an admin alert about a break-in, say) ignore quiet hours but never the switches. */
-export function shouldSend(prefs: NotifyPrefs, kind: NotifyKind, now: Date, urgent = false): SendDecision {
+export function shouldSend(prefs: NotifyPrefs, kind: NotifyKind, now: Date, urgent = false, key?: TelegramKey): SendDecision {
   if (!prefs.enabled) return { send: false, reason: "off" };
-  // the weekly summary shares the "reminders" switch: one setting for everything about your own trips
-  if ((kind === "trip_reminder" || kind === "document_reminder" || kind === "summary") && !prefs.trip_reminders) return { send: false, reason: "kind_off" };
+  // each alert has its own switch; the three that existed before follow the key of their kind
+  const own: TelegramKey | undefined = key ?? (kind === "trip_reminder" ? "trips" : kind === "document_reminder" ? "documents" : kind === "summary" ? "summary" : undefined);
+  if (own && !prefs.kinds[own]) return { send: false, reason: "kind_off" };
   if (kind === "admin_alert" && !prefs.admin_alerts) return { send: false, reason: "kind_off" };
   if (!urgent && inQuietHours(localHour(now, prefs.tz), prefs.quiet_start, prefs.quiet_end)) return { send: false, reason: "quiet" };
   return { send: true, reason: "ok" };
@@ -63,6 +68,7 @@ export function normalizePrefs(row: Partial<NotifyPrefs> | null | undefined): No
     quiet_start: hour(row?.quiet_start, DEFAULT_PREFS.quiet_start),
     quiet_end: hour(row?.quiet_end, DEFAULT_PREFS.quiet_end),
     tz: typeof row?.tz === "string" && row.tz ? row.tz : DEFAULT_PREFS.tz,
+    kinds: normalizeKinds((row as { kinds?: unknown } | null | undefined)?.kinds, { trip_reminders: row?.trip_reminders ?? true, admin_alerts: row?.admin_alerts ?? true }),
     last_choice: row?.last_choice ?? null,
   };
 }
@@ -74,14 +80,30 @@ export const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, 
 const PREF_COLS = "enabled, trip_reminders, admin_alerts, quiet_start, quiet_end, tz, last_choice";
 
 export async function loadPrefs(supabase: SupabaseClient, userId: string): Promise<NotifyPrefs> {
-  const { data, error } = await supabase.from("telegram_notify_prefs").select(PREF_COLS).eq("user_id", userId).maybeSingle();
+  // `kinds` only exists after migration_telegram_kinds.sql: without it the old switches decide
+  let res = await supabase.from("telegram_notify_prefs").select(`${PREF_COLS}, kinds`).eq("user_id", userId).maybeSingle();
+  if (res.error) res = await supabase.from("telegram_notify_prefs").select(PREF_COLS).eq("user_id", userId).maybeSingle();
   // Table missing (migration not run) or no row yet: defaults
-  return error ? DEFAULT_PREFS : normalizePrefs(data as Partial<NotifyPrefs> | null);
+  const base = res.error ? DEFAULT_PREFS : normalizePrefs(res.data as Partial<NotifyPrefs> | null);
+  // Quiet hours are the phone's, once the person has set them there
+  const { data: p } = await supabase.from("profiles").select("push_prefs").eq("id", userId).maybeSingle();
+  const raw = (p?.push_prefs as { quiet?: unknown } | null)?.quiet;
+  if (raw && typeof raw === "object") {
+    const q = normalizePushSettings(p?.push_prefs).quiet;
+    return { ...base, quiet_start: q.on ? q.start : 0, quiet_end: q.on ? q.end : 0 };
+  }
+  return base;
 }
 
 export async function savePrefs(supabase: SupabaseClient, userId: string, patch: Partial<NotifyPrefs>): Promise<boolean> {
   const current = await loadPrefs(supabase, userId);
-  const { error } = await supabase.from("telegram_notify_prefs").upsert({ user_id: userId, ...current, ...patch, updated_at: new Date().toISOString() });
+  const row = { user_id: userId, ...current, ...patch, ...(patch.kinds ? legacyFlags(patch.kinds) : {}), updated_at: new Date().toISOString() };
+  let { error } = await supabase.from("telegram_notify_prefs").upsert(row);
+  if (error) {
+    const { kinds: _kinds, ...withoutKinds } = row;
+    void _kinds;
+    ({ error } = await supabase.from("telegram_notify_prefs").upsert(withoutKinds));
+  }
   if (error) console.error("[telegram] save prefs", error.message);
   return !error;
 }
@@ -97,14 +119,14 @@ export async function sendToUser(
   userId: string,
   kind: NotifyKind,
   text: string,
-  opts: { dedupeKey?: string; urgent?: boolean; replyMarkup?: unknown; now?: Date } = {}
+  opts: { dedupeKey?: string; urgent?: boolean; replyMarkup?: unknown; now?: Date; key?: TelegramKey } = {}
 ): Promise<SendResult> {
-  const { data: profile } = await supabase.from("profiles").select("telegram_id").eq("id", userId).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("telegram_id, push_prefs").eq("id", userId).maybeSingle();
   if (!profile?.telegram_id) return "not_linked";
   // Summaries and document expiry reminders are Pro features once the limits have started
-  if ((kind === "summary" || kind === "document_reminder") && (await isLocked(supabase, userId, kind === "summary" ? "telegram_summary" : "doc_reminders").catch(() => false))) return "kind_off";
+  if ((kind === "summary" || kind === "document_reminder" || opts.key === "documents") && (await isLocked(supabase, userId, kind === "summary" ? "telegram_summary" : "doc_reminders").catch(() => false))) return "kind_off";
 
-  const decision = shouldSend(await loadPrefs(supabase, userId), kind, opts.now ?? new Date(), opts.urgent);
+  const decision = shouldSend(await loadPrefs(supabase, userId), kind, opts.now ?? new Date(), opts.urgent, opts.key);
   if (!decision.send) return decision.reason === "ok" ? "failed" : decision.reason;
 
   let logId: number | null = null;
@@ -114,7 +136,10 @@ export async function sendToUser(
     logId = data.id as number;
   }
   try {
-    await sendMessage(Number(profile.telegram_id), text, opts.replyMarkup ? { reply_markup: opts.replyMarkup } : undefined);
+    // Private mode (set in Notifications) applies here too: only say that something is coming up
+    const generic = kind === "trip_reminder" ? "A trip is coming up. Open the app to check your plans." : kind === "document_reminder" ? "A document is about to expire. Open the app to check it." : null;
+    const body = generic && normalizePushSettings(profile.push_prefs).detail === "private" ? generic : text;
+    await sendMessage(Number(profile.telegram_id), body, opts.replyMarkup ? { reply_markup: opts.replyMarkup } : undefined);
     return "sent";
   } catch (e) {
     console.error("[telegram] send failed", e instanceof Error ? e.message : e);
