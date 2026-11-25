@@ -1,4 +1,4 @@
-import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, sanitizeSettings, smartBaskets, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, tripsPerMonth, sanitizeSettings, smartBaskets, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -144,6 +144,26 @@ eq("it has no usual-store price, so no saving is claimed", set2.plans[1].stops.f
 const none = { ...coco, key: listedKey("Sparkling water", "1.5 l"), name: "Sparkling water", offers: [] };
 const set3 = planCart({ items: [...items, { key: none.key, qty: 1 }], baskets: smartBaskets([...items, { key: none.key, qty: 1 }], [...products, addedProduct(none, "AWG")], stores, NOW, ext, free, "AWG"), where, origin: home, usual, s: free });
 eq("an item with no price anywhere is left out, never guessed", [set3.plans[1].covered, set3.plans[1].uncovered], [3, 1]);
+
+// like-for-like savings, per stop and per store
+eq("the saving is worked out on the items priced at the usual store and another store", [set.comparable, set.itemCount], [3, 3]);
+eq("a second stop says what it adds", [set.plans[0].adds, set.plans[1].adds], [null, 3.5]);
+const aStop = set.plans[0].stops[0];
+eq("a stop says how many items it is compared on and cheaper on", [aStop.comparedOn, aStop.cheaperOn, aStop.pct], [3, 2, 9]);
+eq("a normal saving is not flagged", set.plans[1].checks, 0);
+const wild: ExternalPrice[] = [{ store: "Shop A", key: key("Milk"), price: 4, source: "community" }];
+const wildSet = planCart({ items, baskets: smartBaskets(items, products, stores, NOW, wild, free, "AWG"), where, origin: home, usual, s: free });
+eq("a saving over 40% on one item is flagged to check", [wildSet.plans[0].checks, wildSet.plans[0].stops[0].lines.find((l) => l.key === key("Milk"))?.check], [1, true]);
+eq("shopping trips a month from the days you shopped", tripsPerMonth(products, "AWG", NOW), 5);
+eq("too few shopping days, no pace", tripsPerMonth(twos, "AWG", NOW), null);
+const fiveKeys = ["Milk", "Eggs", "Paste", "Soap", "Rare"].map((n) => ({ key: key(n), qty: 1 }));
+const ext5: ExternalPrice[] = [...ext.filter((e) => e.store === "Shop A"), { store: "Shop A", key: key("Soap"), price: 2.7, source: "community" }, { store: "Shop A", key: key("Rare"), price: 8.1, source: "community" }];
+const rows5 = storeRows({ items: fiveKeys, baskets: smartBaskets(fiveKeys, products, ["Usual Mart", "Shop A"], NOW, ext5, free, "AWG"), where, origin: home, usual, s: free });
+const a5 = rows5.find((r) => r.store === "Shop A")!;
+eq("a store compared on 5 items shows an average", [a5.compared, a5.avgPct, a5.confidence], [5, -9, "strong"]);
+const a3 = storeRows({ items, baskets, where, origin: home, usual, s: free }).find((r) => r.store === "Shop A")!;
+eq("fewer than 5 items to compare, no average", [a3.compared, a3.avgPct, a3.confidence], [3, null, "few"]);
+eq("the usual store has no average", storeRows({ items, baskets, where, origin: home, usual, s: free }).find((r) => r.usual)?.confidence, null);
 
 if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1); }
 console.log("smart cart ok");

@@ -6454,6 +6454,8 @@ try {
       assert((await page.getByTestId("sc-cart-row").count()) === 6, "the usual cart has the six things bought again");
       const hero = await page.getByTestId("sc-hero").innerText();
       assert(/6 items/.test(hero) && /could save/.test(hero), `the hero says what could be saved (got: ${hero})`);
+      assert(/Based on \d+ of 6 usual items/.test(await page.getByTestId("sc-hero").getByTestId("sc-coverage").innerText()), "the hero says how many of the usual items the saving is worked out on");
+      assert(/cheaper on \d+ of \d+ items/.test(await page.getByTestId("sc-stop").first().innerText()), "each stop says how many items it is cheaper on");
       await page.getByTestId("sc-plan").first().waitFor();
       assert((await page.getByTestId("sc-plan").count()) >= 2, "one stop and two stops are offered");
       assert(/Best/.test(await page.getByTestId("sc-plans").innerText()), "the best plan is marked");

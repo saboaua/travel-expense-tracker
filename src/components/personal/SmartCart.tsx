@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { cheapestOffer, directionsUrl, everyText, listedKey, type AddedItem, type Plan, type PlanLine, type StoreRow } from "@/lib/personal/smart-cart";
+import { CHECK_PCT, cheapestOffer, directionsUrl, everyText, listedKey, type AddedItem, type Plan, type PlanLine, type StoreRow } from "@/lib/personal/smart-cart";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -28,6 +28,7 @@ import { useSmartCart } from "@/components/personal/use-smart-cart";
 
 const StoreMap = dynamic(() => import("@/components/personal/StoreMap"), { ssr: false, loading: () => <div className="h-56 w-full animate-pulse rounded-xl border bg-muted" aria-label="Loading map" /> });
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
 const GREEN = "text-emerald-700 dark:text-emerald-300";
 const pill = "inline-flex min-h-6 items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-bold";
 const SOURCE: Record<string, string> = { own: "Your receipt", community: "Community", online: "Online list" };
@@ -51,7 +52,7 @@ function Header({ pro, onSettings }: { pro: boolean; onSettings?: () => void }) 
 }
 
 function Tag({ line }: { line: PlanLine }) {
-  return <span className="inline-flex flex-wrap gap-1"><span className={`${pill} ${SOURCE_CLS[line.source ?? "own"]}`}>{SOURCE[line.source ?? "own"]}</span>{line.similar && <span className={`${pill} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>Similar item</span>}{line.old && <span className={`${pill} bg-muted text-muted-foreground`}>Old price</span>}</span>;
+  return <span className="inline-flex flex-wrap gap-1"><span className={`${pill} ${SOURCE_CLS[line.source ?? "own"]}`}>{SOURCE[line.source ?? "own"]}</span>{line.similar && <span className={`${pill} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>Similar item</span>}{line.old && <span className={`${pill} bg-muted text-muted-foreground`}>Old price</span>}{line.check && <span className={`${pill} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`} data-testid="sc-check">Check this price</span>}</span>;
 }
 
 function Lines({ lines, currency }: { lines: PlanLine[]; currency: string }) {
@@ -217,10 +218,22 @@ export function SmartCart() {
   const bestPlan = plan.best >= 0 ? plan.plans[plan.best] : null;
   const openStore = (r: { store: string; at: { lat: number; lng: number } | null; km: number | null; lines: PlanLine[]; total: number; saving: number | null }) => setSheet(r);
 
+  const monthly = (n: number) => (sc.trips != null && n > 0.005 ? round2(n * sc.trips) : null);
+  const coverage = plan.comparable > 0 && plan.itemCount > 0 ? Math.round(plan.comparable / plan.itemCount * 100) : 0;
   const hero = driving && bestPlan
     ? <><p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Your usual cart, {sc.items.length} item{sc.items.length === 1 ? "" : "s"}</p>
-        <p className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100"><Money amount={bestPlan.itemsTotal} currency={currency} /> <span className="text-sm font-bold">at the best price</span></p>
-        <p className="text-sm text-emerald-800 dark:text-emerald-200">{plan.usualTotal > 0 && sc.usual ? <>vs <Money amount={plan.usualTotal} currency={currency} className="text-sm" /> at {sc.usual}. </> : null}You could save <b><Money amount={bestPlan.net} currency={currency} className="text-sm" /></b> a trip.</p></>
+        {monthly(bestPlan.net) != null
+          ? <p className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100" data-testid="sc-month">Save about <Money amount={monthly(bestPlan.net)!} currency={currency} /> <span className="text-sm font-bold">a month</span></p>
+          : <p className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100"><Money amount={bestPlan.itemsTotal} currency={currency} /> <span className="text-sm font-bold">at the best price</span></p>}
+        <p className="text-sm text-emerald-800 dark:text-emerald-200">{plan.usualTotal > 0 && sc.usual && monthly(bestPlan.net) == null ? <>vs <Money amount={plan.usualTotal} currency={currency} className="text-sm" /> at {sc.usual}. </> : null}You could save <b><Money amount={bestPlan.net} currency={currency} className="text-sm" /></b> a trip{bestPlan.driving > 0 ? " after driving" : ""}{monthly(bestPlan.net) != null ? <>, about {sc.trips} trip{sc.trips === 1 ? "" : "s"} a month</> : null}.</p>
+        {plan.comparable > 0 && (
+          <div className="mt-2 space-y-1" data-testid="sc-coverage">
+            <p className="text-xs font-bold text-emerald-800 dark:text-emerald-200">Based on {plan.comparable} of {plan.itemCount} usual item{plan.itemCount === 1 ? "" : "s"}</p>
+            <div className="h-2 overflow-hidden rounded-full bg-emerald-200/70 dark:bg-emerald-500/20" role="progressbar" aria-valuenow={coverage} aria-valuemin={0} aria-valuemax={100} aria-label="Items the saving is worked out on"><div className="h-full rounded-full bg-emerald-600" style={{ width: `${coverage}%` }} /></div>
+            {plan.comparable < plan.itemCount && <p className="text-xs text-emerald-800 dark:text-emerald-200">{plan.itemCount - plan.comparable} item{plan.itemCount - plan.comparable === 1 ? " has" : "s have"} no price at a second store yet, so {plan.itemCount - plan.comparable === 1 ? "it is" : "they are"} not counted.</p>}
+            {bestPlan.checks > 0 && <p className="text-xs text-amber-800 dark:text-amber-200" data-testid="sc-checks">{bestPlan.checks} saving{bestPlan.checks === 1 ? " is" : "s are"} over {CHECK_PCT}% on one item. Check {bestPlan.checks === 1 ? "that price" : "those prices"}.</p>}
+          </div>
+        )}</>
     : driving
       ? <><p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Your usual cart, {sc.items.length} item{sc.items.length === 1 ? "" : "s"}</p>
           <p className="text-xl font-extrabold text-emerald-900 dark:text-emerald-100">{sc.usual ? `${sc.usual} is already your best choice` : "No trip saves you enough"}</p>
@@ -318,7 +331,7 @@ export function SmartCart() {
                 <button key={i} type="button" onClick={() => setPick(i)} aria-pressed={i === shown} data-testid="sc-plan" className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left ${i === shown ? "border-2 border-primary bg-primary/5" : "bg-card"}`}>
                   <span className="min-w-0 flex-1"><span className="flex flex-wrap items-center gap-1.5"><span className="text-[15px] font-extrabold">{planTitle(p, i)}</span>{i === plan.best && <span className={`${pill} bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200`}>Best</span>}</span>
                     <span className="block text-xs text-muted-foreground">{p.stops.length === 1 ? `${p.stops[0].km.toFixed(1)} km` : p.stops.map((s) => s.store).join(" + ")}</span></span>
-                  <span className="shrink-0 text-right">{p.net > 0.005 ? <span className={`block text-base font-extrabold ${GREEN}`}>Save <Money amount={p.net} currency={currency} className="text-base" /></span> : <span className="block text-sm font-bold text-muted-foreground">No saving</span>}<span className="block text-xs text-muted-foreground">{i === 0 ? `${p.km.toFixed(1)} km round trip` : "after driving"}</span></span>
+                  <span className="shrink-0 text-right">{p.net > 0.005 ? <span className={`block text-base font-extrabold ${GREEN}`}>Save <Money amount={p.net} currency={currency} className="text-base" /></span> : <span className="block text-sm font-bold text-muted-foreground">No saving</span>}<span className="block text-xs text-muted-foreground">{monthly(p.net) != null ? `about ${monthly(p.net)!.toFixed(0)} a month` : i === 0 ? `${p.km.toFixed(1)} km round trip` : "after driving"}</span>{p.adds != null && <span className="block text-xs text-muted-foreground" data-testid="sc-adds">adds <Money amount={Math.max(0, p.adds)} currency={currency} className="text-xs" />{plan.best >= 0 && i > plan.best ? ", not suggested" : ""}</span>}</span>
                 </button>
               ))}
               {current && (
@@ -332,7 +345,7 @@ export function SmartCart() {
                     <Card key={s.store} data-testid="sc-stop"><CardContent className="p-4">
                       <button type="button" onClick={() => openStore({ store: s.store, at: s.at, km: s.km, lines: s.lines, total: s.total, saving: s.saving })} className="flex w-full items-center gap-3 text-left" aria-label={`${s.store}, show on the map`} data-testid="sc-stop-open">
                         <IconTile tone="groceries" color="#16a34a" className="h-10 w-10"><ShoppingCart className="h-5 w-5" /></IconTile>
-                        <span className="min-w-0 flex-1"><span className="block font-extrabold text-primary">{s.store}</span><span className="block text-xs text-muted-foreground">{s.km.toFixed(1)} km</span></span>
+                        <span className="min-w-0 flex-1"><span className="block font-extrabold text-primary">{s.store}</span><span className="block text-xs text-muted-foreground">{s.km.toFixed(1)} km{s.comparedOn > 0 ? ` · cheaper on ${s.cheaperOn} of ${s.comparedOn} items${s.pct > 0 ? `, ${s.pct}% less` : ""}` : ""}</span></span>
                         <Money amount={s.total} currency={currency} className="text-base" />
                       </button>
                       <div className="mt-2"><Lines lines={s.lines} currency={currency} /></div>
@@ -353,6 +366,7 @@ export function SmartCart() {
                   <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5"><span className="font-extrabold text-primary">{r.store}</span>{i === 0 && rows.length > 1 && <span className={`${pill} bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200`}>Cheapest</span>}</span>
                     <span className="block text-xs text-muted-foreground">{r.km != null ? `${r.km.toFixed(1)} km · ` : ""}{r.priced} of {sc.items.length} items priced</span>
+                    {!r.usual && <span className="block text-xs text-muted-foreground" data-testid="sc-store-avg">{r.avgPct != null ? `${r.avgPct === 0 ? "Same as" : `${Math.abs(r.avgPct)}% ${r.avgPct < 0 ? "less" : "more"} than`} your usual store, on ${r.compared} items` : r.compared > 0 ? `Only ${r.compared} item${r.compared === 1 ? "" : "s"} to compare, too few for an average` : "Nothing to compare yet"}{r.confidence && r.avgPct != null ? ` · ${r.confidence === "strong" ? "Strong" : "Fair"} prices` : ""}</span>}
                     {r.unpriced > 0 && <span className={`${pill} mt-1 bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{r.unpriced} item{r.unpriced === 1 ? "" : "s"} not priced here</span>}
                   </span>
                   <span className="shrink-0 text-right"><Money amount={r.total} currency={currency} className="text-base" />

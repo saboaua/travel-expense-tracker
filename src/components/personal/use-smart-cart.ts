@@ -11,7 +11,7 @@ import { externalPrices } from "@/lib/personal/best-prices";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
 import { searchCommunity } from "@/lib/personal/community";
 import { distanceKm, sameStore, type ExternalPrice, type LatLng, type ListItem } from "@/lib/personal/basket";
-import { DEFAULT_SETTINGS, MAX_ADDED, addedExternal, addedProduct, habitItems, learning, planCart, sanitizeAdded, sanitizeSettings, smartBaskets, storeRows, usualStore, type AddedItem, type HabitItem, type SmartSettings } from "@/lib/personal/smart-cart";
+import { DEFAULT_SETTINGS, MAX_ADDED, addedExternal, addedProduct, habitItems, learning, planCart, tripsPerMonth, sanitizeAdded, sanitizeSettings, smartBaskets, storeRows, usualStore, type AddedItem, type HabitItem, type SmartSettings } from "@/lib/personal/smart-cart";
 import { searchBestPrices } from "@/lib/personal/best-prices";
 import { productWords } from "@/lib/personal/price-compare";
 import { useOnline } from "@/lib/use-online";
@@ -198,12 +198,13 @@ export function useSmartCart() {
 
   const baskets = useMemo(() => smartBaskets(items, [...inCur, ...extraProducts], stores, now, [...external, ...extraExt], settings, currency), [items, inCur, extraProducts, stores, now, external, extraExt, settings, currency]);
   const usual = useMemo(() => usualStore(items, inCur), [items, inCur]);
+  const trips = useMemo(() => tripsPerMonth(inCur, currency, now), [inCur, currency, now]);
   const plan = useMemo(() => planCart({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
   const rows = useMemo(() => storeRows({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
 
   return {
     loading: prices.loading || matches.loading || locQ.loading, error: prices.error, savedAt: prices.savedAt, currency, country, online,
     habits, progress, items, off: saved.off, qty: saved.qty, toggle, setQty, settings, setSettings, products: inCur, extra, add, removeAdded,
-    externalReady, plan, rows, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
+    externalReady, plan, rows, trips, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
   };
 }
