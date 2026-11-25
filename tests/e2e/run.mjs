@@ -6480,9 +6480,12 @@ try {
       const first = await page.getByTestId("sc-store-row").first().innerText();
       assert(/Ling & Sons/.test(first) && /Usual store/.test(first), `the usual store is marked (got: ${first})`);
       assert(/more/.test(await page.getByTestId("sc-store-row").nth(1).innerText()), "the other store says how much more");
+      assert(/Cheapest/.test(first), `the store with the lowest average is Cheapest (got: ${first})`);
       assert((await page.getByTestId("sc-plans").count()) === 0, "no trips are planned while driving is not counted");
       await page.getByTestId("sc-store-row").nth(1).click();
       assert(/destination=12\.56/.test(await page.getByTestId("sc-directions").getAttribute("href")), "a store row opens directions to that store");
+      await page.getByTestId("sc-detail-summary").waitFor();
+      assert(/usual store/i.test(await page.getByTestId("sc-detail-summary").innerText()) && (await page.getByTestId("sc-detail-line").count()) >= 1, "a store opens with what you save or lose against your usual store, item by item");
       await page.keyboard.press("Escape");
       // Settings
       await page.getByTestId("sc-settings-open").click();

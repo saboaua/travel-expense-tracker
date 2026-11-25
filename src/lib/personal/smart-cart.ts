@@ -278,7 +278,7 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
 
 /* ---------------- every supermarket (driving not counted) ---------------- */
 
-export type StoreRow = { store: string; km: number | null; at: LatLng | null; total: number; priced: number; unpriced: number; /** against your usual store, on the items both price; null for the usual store itself or when nothing is shared */ vsUsual: number | null; usual: boolean; lines: PlanLine[]; /** items priced here and at your usual store */ compared: number; /** average percent against your usual store on those (negative is cheaper); null with fewer than MIN_COMPARED items */ avgPct: number | null; confidence: "strong" | "fair" | "few" | null };
+export type StoreRow = { store: string; km: number | null; at: LatLng | null; total: number; priced: number; unpriced: number; /** against your usual store, on the items both price; null for the usual store itself or when nothing is shared */ vsUsual: number | null; usual: boolean; lines: PlanLine[]; /** items priced here and at your usual store */ compared: number; /** average percent against your usual store on those (negative is cheaper); null with fewer than MIN_COMPARED items */ avgPct: number | null; confidence: "strong" | "fair" | "few" | null; /** the lowest average against your usual store, among stores with enough items to compare (the usual store counts as 0) */ cheapest: boolean };
 
 /** Fewer comparable items than this and no average is shown as a saving. */
 export const MIN_COMPARED = 5;
@@ -303,9 +303,88 @@ export function storeRows(a: { items: ListItem[]; baskets: StoreBasket[]; where:
     const at = where.get(b.store) ?? null;
     const km = at && origin ? round2(distanceKm(origin, at) * ROAD_FACTOR) : null;
     if (at && origin && distanceKm(origin, at) > s.maxKm) continue;
-    rows.push({ store: b.store, km, at, total: round2(lines.reduce((x, l) => x + l.total, 0)), priced: lines.length, unpriced: items.length - lines.length, vsUsual: shared > 0 ? round2(diff) : null, usual: !!usual && sameStore(b.store, usual), lines, compared: shared, avgPct: shared >= MIN_COMPARED && baseSum > 0 ? Math.round(diff / baseSum * 100) : null, confidence: !usual || sameStore(b.store, usual) ? null : shared < MIN_COMPARED ? "few" : fresh / shared >= 0.7 ? "strong" : "fair" });
+    rows.push({ store: b.store, km, at, total: round2(lines.reduce((x, l) => x + l.total, 0)), priced: lines.length, unpriced: items.length - lines.length, vsUsual: shared > 0 ? round2(diff) : null, usual: !!usual && sameStore(b.store, usual), lines, compared: shared, avgPct: shared >= MIN_COMPARED && baseSum > 0 ? Math.round(diff / baseSum * 100) : null, confidence: !usual || sameStore(b.store, usual) ? null : shared < MIN_COMPARED ? "few" : fresh / shared >= 0.7 ? "strong" : "fair", cheapest: false });
   }
-  return rows.sort((x, y) => y.priced - x.priced || x.total - y.total);
+  // "Cheapest" is the lowest average against your usual store, among stores with enough items to compare. It is never just the store that prices most.
+  const value = (r: StoreRow) => (r.usual ? 0 : r.avgPct);
+  if (rows.some((r) => !r.usual && r.avgPct != null) && rows.some((r) => r.usual)) {
+    const ranked = rows.filter((r) => value(r) != null).sort((x, y) => value(x)! - value(y)! || (x.usual ? -1 : 0) - (y.usual ? -1 : 0));
+    if (ranked[0]) ranked[0].cheapest = true;
+  }
+  return rows.sort((x, y) => Number(y.cheapest) - Number(x.cheapest) || y.priced - x.priced || x.total - y.total);
+}
+
+/* ---------------- one store, item by item ---------------- */
+
+export type DetailLine = PlanLine & {
+  /** The usual store's price for it (when this is not the usual store) */
+  ref: { store: string; price: number } | null;
+  /** At your usual store: the cheapest other store for it, when one is cheaper */
+  better: { store: string; price: number; saving: number } | null;
+};
+export type StoreDetail = {
+  store: string;
+  usual: string | null;
+  isUsual: boolean;
+  lines: DetailLine[];
+  /** Cart items this store has no real price for: left out, never guessed */
+  notPriced: string[];
+  /** Items priced here and at your usual store */
+  compared: number;
+  cheaper: number;
+  dearer: number;
+  /** Money saved by buying the compared items here instead of at your usual store (negative: costs more) */
+  saving: number;
+  /** Percent less than your usual store on the compared items (negative: more); null with fewer than MIN_COMPARED items */
+  pct: number | null;
+  confidence: "strong" | "fair" | "few" | null;
+  /** At your usual store: the items cheaper somewhere else, what that saves, and the store that saves most */
+  elsewhere: { count: number; saving: number; store: string | null };
+};
+
+/** What tapping a store shows: each item here against your usual store, and for the usual store itself where else it is cheaper. */
+export function storeDetail(a: { store: string; items: ListItem[]; baskets: StoreBasket[]; usual: string | null; s: SmartSettings; /** only compare with these stores (the ones within reach) */ among?: string[] }): StoreDetail | null {
+  const { store, items, baskets, usual, s } = a;
+  const b = baskets.find((x) => sameStore(x.store, store));
+  if (!b) return null;
+  const isUsual = !!usual && sameStore(store, usual);
+  const ref = usual && !isUsual ? baskets.find((x) => sameStore(x.store, usual)) ?? null : null;
+  const others = baskets.filter((x) => !sameStore(x.store, store) && (!a.among || a.among.some((n) => sameStore(n, x.store))));
+  const lines: DetailLine[] = [];
+  const notPriced: string[] = [];
+  let cheaper = 0, dearer = 0, saving = 0, base = 0, fresh = 0, compared = 0;
+  const byStore = new Map<string, number>();
+  let elseCount = 0, elseSaving = 0;
+  for (const it of items) {
+    const l = priced(b, it.key, s.useOld);
+    if (!l) { notPriced.push(baskets.flatMap((x) => x.lines).find((x) => x.key === it.key)?.name ?? it.key); continue; }
+    const r = ref ? priced(ref, it.key, s.useOld) : null;
+    let sv: number | null = null;
+    let better: DetailLine["better"] = null;
+    if (r) {
+      sv = round2((r.price! - l.price!) * it.qty);
+      compared++; base += r.price! * it.qty; saving += (r.price! - l.price!) * it.qty;
+      if (sv > 0.004) cheaper++; else if (sv < -0.004) dearer++;
+      if (l.status !== "old") fresh++;
+    } else if (isUsual) {
+      let best: { store: string; price: number } | null = null;
+      for (const o of others) { const x = priced(o, it.key, s.useOld); if (x && (!best || x.price! < best.price - 1e-9)) best = { store: o.store, price: x.price! }; }
+      if (best && best.price < l.price! - 1e-9) {
+        const sav = round2((l.price! - best.price) * it.qty);
+        better = { store: best.store, price: best.price, saving: sav };
+        elseCount++; elseSaving += sav; byStore.set(best.store, (byStore.get(best.store) ?? 0) + sav);
+      }
+    }
+    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better });
+  }
+  lines.sort((x, y) => (y.better?.saving ?? y.saving ?? -Infinity) - (x.better?.saving ?? x.saving ?? -Infinity));
+  const top = [...byStore].sort((x, y) => y[1] - x[1])[0];
+  return {
+    store: b.store, usual, isUsual, lines, notPriced, compared, cheaper, dearer, saving: round2(saving),
+    pct: compared >= MIN_COMPARED && base > 0 ? Math.round(saving / base * 100) : null,
+    confidence: !ref ? null : compared < MIN_COMPARED ? "few" : fresh / compared >= 0.7 ? "strong" : "fair",
+    elsewhere: { count: elseCount, saving: round2(elseSaving), store: top ? top[0] : null },
+  };
 }
 
 /* ---------------- items you add yourself ---------------- */

@@ -1,4 +1,4 @@
-import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, tripsPerMonth, sanitizeSettings, smartBaskets, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -164,6 +164,26 @@ eq("a store compared on 5 items shows an average", [a5.compared, a5.avgPct, a5.c
 const a3 = storeRows({ items, baskets, where, origin: home, usual, s: free }).find((r) => r.store === "Shop A")!;
 eq("fewer than 5 items to compare, no average", [a3.compared, a3.avgPct, a3.confidence], [3, null, "few"]);
 eq("the usual store has no average", storeRows({ items, baskets, where, origin: home, usual, s: free }).find((r) => r.usual)?.confidence, null);
+
+// "Cheapest" is the lowest average against the usual store, never just the store that prices most
+eq("the store with the lowest average is Cheapest, and comes first", [rows5[0].store, rows5[0].cheapest, rows5.filter((r) => r.cheapest).length], ["Shop A", true, 1]);
+eq("with too few items to compare, nobody is Cheapest", storeRows({ items, baskets, where, origin: home, usual, s: free }).some((r) => r.cheapest), false);
+const dear5: ExternalPrice[] = fiveKeys.map((k) => ({ store: "Shop A", key: k.key, price: 99, source: "community" as const }));
+const rowsDear = storeRows({ items: fiveKeys, baskets: smartBaskets(fiveKeys, products, ["Usual Mart", "Shop A"], NOW, dear5, free, "AWG"), where, origin: home, usual, s: free });
+eq("when no one beats the usual store, it is the cheapest", rowsDear.filter((r) => r.cheapest).map((r) => r.store), ["Usual Mart"]);
+
+// one store, item by item
+const dA = storeDetail({ store: "Shop A", items, baskets, usual, s: free })!;
+eq("a store against the usual one: saving, cheaper, dearer", [dA.saving, dA.cheaper, dA.dearer, dA.compared, dA.pct, dA.confidence], [2.5, 2, 1, 3, null, "few"]);
+eq("biggest saving first", dA.lines.map((l) => l.name.toLowerCase()), ["milk", "paste", "eggs"]);
+eq("each line carries the usual store price", dA.lines[0].ref, { store: "Usual Mart", price: 10 });
+eq("nothing missing", dA.notPriced, []);
+const dU = storeDetail({ store: "Usual Mart", items, baskets, usual, s: free })!;
+eq("the usual store says where else it is cheaper", [dU.isUsual, dU.elsewhere.count, dU.elsewhere.saving], [true, 3, 6]);
+eq("each line at the usual store names the cheaper store", dU.lines.map((l) => [l.name.toLowerCase(), l.better?.store, l.better?.saving]).sort(), [["eggs", "Shop B", 3], ["milk", "Shop A", 2], ["paste", "Shop A", 1]]);
+const dB = storeDetail({ store: "Shop B", items: [...items, { key: key("Soap"), qty: 1 }], baskets: smartBaskets([...items, { key: key("Soap"), qty: 1 }], products, stores, NOW, ext, free, "AWG"), usual, s: free })!;
+eq("an item with no price here is listed as not counted", dB.notPriced.map((n) => n.toLowerCase()), ["soap"]);
+eq("an unknown store has no detail", storeDetail({ store: "Nowhere", items, baskets, usual, s: free }), null);
 
 if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1); }
 console.log("smart cart ok");

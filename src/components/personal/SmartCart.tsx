@@ -17,7 +17,7 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { CHECK_PCT, cheapestOffer, directionsUrl, everyText, listedKey, type AddedItem, type Plan, type PlanLine, type StoreRow } from "@/lib/personal/smart-cart";
+import { CHECK_PCT, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -65,6 +65,56 @@ function Lines({ lines, currency }: { lines: PlanLine[]; currency: string }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/** Tapping a store: what you save here against your usual store, item by item. For the usual store: where else it is cheaper. */
+function StoreSavings({ d, currency }: { d: StoreDetail; currency: string }) {
+  const money = (n: number) => <Money amount={Math.abs(n)} currency={currency} className="text-sm" />;
+  return (
+    <div className="space-y-3" data-testid="sc-detail">
+      {d.isUsual ? (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-500/30 dark:bg-blue-500/10" data-testid="sc-detail-summary">
+          <span className={`${pill} bg-blue-100 text-blue-900 dark:bg-blue-500/20 dark:text-blue-200`}>Your usual store</span>
+          {d.elsewhere.count > 0
+            ? <><p className="mt-1 text-lg font-extrabold leading-tight">Other stores are cheaper on {d.elsewhere.count} of your items</p>
+                <p className="text-sm text-muted-foreground">{d.elsewhere.store ? <>Buying those at {d.elsewhere.store} saves {money(d.elsewhere.saving)} a trip. Here is where.</> : <>Buying them there saves {money(d.elsewhere.saving)} a trip.</>}</p></>
+            : <><p className="mt-1 text-lg font-extrabold leading-tight">Nothing here is cheaper elsewhere</p>
+                <p className="text-sm text-muted-foreground">No other store we know has a lower price for these items.</p></>}
+        </div>
+      ) : d.usual && d.compared > 0 ? (
+        <div className={`rounded-2xl border p-3 ${d.saving > 0 ? "border-emerald-200 bg-gradient-to-b from-emerald-100 to-emerald-50 dark:border-emerald-500/30 dark:from-emerald-500/20 dark:to-emerald-500/5" : "bg-muted/40"}`} data-testid="sc-detail-summary">
+          <p className="text-xs font-bold text-muted-foreground">Buying your usual cart here</p>
+          <p className={`text-2xl font-extrabold leading-tight ${d.saving > 0 ? "text-emerald-900 dark:text-emerald-100" : ""}`}>{d.saving > 0.004 ? "Saves " : d.saving < -0.004 ? "Costs " : "Same as "}{Math.abs(d.saving) > 0.004 ? <>{money(d.saving)} a trip</> : d.usual}</p>
+          <p className="text-sm text-muted-foreground">{d.pct != null && d.pct !== 0 ? `${Math.abs(d.pct)}% ${d.pct > 0 ? "less" : "more"} than ` : "Against "}{d.usual}, your usual store, on the {d.compared} item{d.compared === 1 ? "" : "s"} we can compare.{d.confidence === "few" ? " That is too few for an average." : ""}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className={`${pill} bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200`}>Cheaper on {d.cheaper}</span>
+            {d.dearer > 0 && <span className={`${pill} bg-red-100 text-red-900 dark:bg-red-500/20 dark:text-red-200`}>Dearer on {d.dearer}</span>}
+            {d.confidence && d.confidence !== "few" && <span className={`${pill} bg-muted text-muted-foreground`}>{d.confidence === "strong" ? "Strong" : "Fair"} prices</span>}
+          </div>
+        </div>
+      ) : (
+        <p className="rounded-xl bg-muted/60 p-3 text-sm text-muted-foreground" data-testid="sc-detail-summary">{d.usual ? "None of your items has a price at both this store and your usual one yet, so there is nothing to compare." : "There is no usual store yet, so there is nothing to compare."}</p>
+      )}
+      <ul className="divide-y rounded-2xl border bg-card px-3">
+        {d.lines.map((l: DetailLine) => (
+          <li key={l.key} className="flex items-center gap-3 py-2 text-sm" data-testid="sc-detail-line">
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span>
+              <span className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground"><Money amount={l.price} currency={currency} className="text-xs" /><Tag line={l} /></span>
+              {l.ref && <span className="block text-xs text-muted-foreground">{l.ref.store} <Money amount={l.ref.price} currency={currency} className="text-xs" /></span>}
+              {d.isUsual && (l.better ? <span className="block text-xs text-muted-foreground">{l.better.store} <Money amount={l.better.price} currency={currency} className="text-xs" /></span> : <span className="block text-xs text-muted-foreground">Cheapest here</span>)}
+            </span>
+            <span className="shrink-0 text-right text-sm font-bold">
+              {l.better ? <span className={GREEN}>{l.better.store.split(/\s+/)[0]} saves <Money amount={l.better.saving} currency={currency} className="text-sm" /></span>
+                : l.saving != null && Math.abs(l.saving) >= 0.01 ? <span className={l.saving > 0 ? GREEN : "text-red-700 dark:text-red-300"}>{l.saving > 0 ? "saves" : "costs"} <Money amount={Math.abs(l.saving)} currency={currency} className="text-sm" />{l.saving < 0 ? " more" : ""}</span>
+                : d.isUsual ? <span className="text-muted-foreground">Cheapest here</span> : null}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {d.notPriced.length > 0 && <p className="text-xs text-muted-foreground" data-testid="sc-detail-missing">{d.notPriced.length} item{d.notPriced.length === 1 ? " has" : "s have"} no price here yet, so {d.notPriced.length === 1 ? "it is" : "they are"} not counted: {d.notPriced.join(", ")}.</p>}
+    </div>
   );
 }
 
@@ -360,11 +410,11 @@ export function SmartCart() {
             <div className="space-y-2" data-testid="sc-stores">
               <h2 className="text-base font-bold">Your cart at each supermarket</h2>
               <p className="text-xs text-muted-foreground">{settings.includeDriving ? "No store places are saved yet, so trips cannot be planned. Open Best Prices near a store to save it." : "The store that prices most of your cart comes first, then the lowest price. Tap a store for its items, the map and directions."}</p>
-              {rows.map((r: StoreRow, i) => (
-                <button key={r.store} type="button" onClick={() => openStore({ store: r.store, at: r.at, km: r.km, lines: r.lines, total: r.total, saving: r.vsUsual != null ? -r.vsUsual : null })} data-testid="sc-store-row" className={`flex w-full items-center gap-3 rounded-2xl border bg-card p-3 text-left ${i === 0 && rows.length > 1 ? "border-2 border-emerald-600" : ""}`}>
+              {rows.map((r: StoreRow) => (
+                <button key={r.store} type="button" onClick={() => openStore({ store: r.store, at: r.at, km: r.km, lines: r.lines, total: r.total, saving: r.vsUsual != null ? -r.vsUsual : null })} data-testid="sc-store-row" className={`flex w-full items-center gap-3 rounded-2xl border bg-card p-3 text-left ${r.cheapest ? "border-2 border-emerald-600" : ""}`}>
                   <IconTile tone="groceries" color="#16a34a" className="h-10 w-10"><ShoppingCart className="h-5 w-5" /></IconTile>
                   <span className="min-w-0 flex-1">
-                    <span className="flex flex-wrap items-center gap-1.5"><span className="font-extrabold text-primary">{r.store}</span>{i === 0 && rows.length > 1 && <span className={`${pill} bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200`}>Cheapest</span>}</span>
+                    <span className="flex flex-wrap items-center gap-1.5"><span className="font-extrabold text-primary">{r.store}</span>{r.cheapest && <span className={`${pill} bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200`} data-testid="sc-cheapest">Cheapest</span>}</span>
                     <span className="block text-xs text-muted-foreground">{r.km != null ? `${r.km.toFixed(1)} km · ` : ""}{r.priced} of {sc.items.length} items priced</span>
                     {!r.usual && <span className="block text-xs text-muted-foreground" data-testid="sc-store-avg">{r.avgPct != null ? `${r.avgPct === 0 ? "Same as" : `${Math.abs(r.avgPct)}% ${r.avgPct < 0 ? "less" : "more"} than`} your usual store, on ${r.compared} items` : r.compared > 0 ? `Only ${r.compared} item${r.compared === 1 ? "" : "s"} to compare, too few for an average` : "Nothing to compare yet"}{r.confidence && r.avgPct != null ? ` · ${r.confidence === "strong" ? "Strong" : "Fair"} prices` : ""}</span>}
                     {r.unpriced > 0 && <span className={`${pill} mt-1 bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{r.unpriced} item{r.unpriced === 1 ? "" : "s"} not priced here</span>}
@@ -393,7 +443,7 @@ export function SmartCart() {
             ) : (
               <Alert variant="info">No place is saved for this store yet. Open <Link href="/personal/groceries/basket" className="font-semibold underline">Best Prices</Link> while you are near it to save it.</Alert>
             )}
-            <Lines lines={sheet.lines} currency={currency} />
+            {(() => { const d = storeDetail({ store: sheet.store, items: sc.items, baskets: sc.baskets, usual: sc.usual, s: settings, among: rows.map((r) => r.store) }); return d ? <StoreSavings d={d} currency={currency} /> : <Lines lines={sheet.lines} currency={currency} />; })()}
           </div>
         </BottomSheet>
       )}

@@ -205,6 +205,6 @@ export function useSmartCart() {
   return {
     loading: prices.loading || matches.loading || locQ.loading, error: prices.error, savedAt: prices.savedAt, currency, country, online,
     habits, progress, items, off: saved.off, qty: saved.qty, toggle, setQty, settings, setSettings, products: inCur, extra, add, removeAdded,
-    externalReady, plan, rows, trips, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
+    externalReady, plan, rows, trips, baskets, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
   };
 }
