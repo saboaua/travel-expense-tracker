@@ -1,8 +1,8 @@
 import { isMissingColumn } from "@/lib/columns";
 /** What the Free plan allows and what only Pro has. The admin sets every number and switch; nothing here removes what people already saved. */
 
-export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects" | "trip_reports";
-export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers", "projects", "trip_reports"];
+export type LimitKey = "ai_scans" | "documents" | "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "card_sharing" | "trip_papers" | "projects" | "trip_reports" | "orders_email";
+export const LIMIT_KEYS: LimitKey[] = ["ai_scans", "documents", "bills_email", "telegram_save", "telegram_summary", "doc_reminders", "card_sharing", "trip_papers", "projects", "trip_reports", "orders_email"];
 export type Limits = {
   /** The day each limit begins. Empty: that limit is off and everything works as before. */
   starts: Record<LimitKey, string | null>;
@@ -16,15 +16,15 @@ export type Limits = {
   free_projects: number;
   pro_projects: number;
 };
-export type ProFeature = "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "trip_reports";
+export type ProFeature = "bills_email" | "telegram_save" | "telegram_summary" | "doc_reminders" | "trip_reports" | "orders_email";
 
 const NO_STARTS = Object.fromEntries(LIMIT_KEYS.map((k) => [k, null])) as Record<LimitKey, string | null>;
 /** Business projects are limited from the start (2 active on Free); the admin can switch it off or move the day. */
-export const DEFAULT_LIMITS: Limits = { starts: { ...NO_STARTS, projects: "2026-01-01" }, free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, free_projects: 2, pro_projects: 50 };
+export const DEFAULT_LIMITS: Limits = { starts: { ...NO_STARTS, projects: "2026-01-01", orders_email: "2026-01-01" }, free_ai_scans: 10, free_documents: 2, pro_documents: 100, free_shared_cards: 1, free_trip_papers: 3, pro_trip_papers: 50, free_projects: 2, pro_projects: 50 };
 export const startCol = (k: LimitKey) => `starts_${k}`;
 export const LIMITS_COLS = [...LIMIT_KEYS.map(startCol), "free_ai_scans", "free_documents", "pro_documents", "free_shared_cards", "free_trip_papers", "pro_trip_papers", "free_projects", "pro_projects"].join(", ");
-export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers", projects: "Business projects", trip_reports: "Business trip reports" };
-export const FEATURE_LABEL: Record<ProFeature, string> = { bills_email: LIMIT_LABEL.bills_email, telegram_save: LIMIT_LABEL.telegram_save, telegram_summary: LIMIT_LABEL.telegram_summary, doc_reminders: LIMIT_LABEL.doc_reminders, trip_reports: LIMIT_LABEL.trip_reports };
+export const LIMIT_LABEL: Record<LimitKey, string> = { ai_scans: "AI receipt scans", documents: "Documents", bills_email: "Bills by email", telegram_save: "Saving by chat on Telegram", telegram_summary: "Telegram summaries", doc_reminders: "Document expiry reminders", card_sharing: "Sharing loyalty cards", trip_papers: "Trip papers", projects: "Business projects", trip_reports: "Business trip reports", orders_email: "Online orders by email" };
+export const FEATURE_LABEL: Record<ProFeature, string> = { bills_email: LIMIT_LABEL.bills_email, telegram_save: LIMIT_LABEL.telegram_save, telegram_summary: LIMIT_LABEL.telegram_summary, doc_reminders: LIMIT_LABEL.doc_reminders, trip_reports: LIMIT_LABEL.trip_reports, orders_email: LIMIT_LABEL.orders_email };
 
 /** Who is asking: Pro and admins have everything the Free limits would hold back. */
 export type Who = { pro: boolean; admin: boolean };
@@ -165,6 +165,7 @@ export function proComparison(l: Limits): { label: string; free: string; pro: st
   const has = (k: LimitKey) => !!l.starts[k];
   const rows: { label: string; free: string; pro: string }[] = [];
   if (has("ai_scans")) rows.push({ label: "AI receipt scans", free: `${l.free_ai_scans} a month`, pro: "No limit" });
+  if (has("orders_email")) rows.push({ label: "Online orders by email", free: "Photo, upload or by hand", pro: "Forward the email" });
   if (has("bills_email")) rows.push({ label: "Bills by email", free: "No", pro: "Yes" });
   if (has("telegram_save")) rows.push({ label: "Telegram: save by chat", free: "No", pro: "Yes" });
   if (has("telegram_summary")) rows.push({ label: "Telegram: summaries", free: "No", pro: "Yes" });

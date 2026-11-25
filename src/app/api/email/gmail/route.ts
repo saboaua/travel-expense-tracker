@@ -42,7 +42,7 @@ export async function POST(req: Request) {
     Attachments: Array.isArray(body.Attachments) ? (body.Attachments as InboundPayload["Attachments"])!.slice(0, 1) : [],
   };
   try {
-    const result = await handleInbound(u.db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH), (uid) => isLocked(u.db, uid, "bills_email"));
+    const result = await handleInbound(u.db, payload, (userId, b) => sendPush(userId, "billEmail", "reminders", { item: b.company, label: b.month, date: b.due ?? undefined }), verifyMode(process.env.INBOUND_EMAIL_AUTH), (uid, feature) => isLocked(u.db, uid, feature ?? "bills_email"));
     if (!result.ok) console.error("[bill-email]", result.error);
     return NextResponse.json(result.ok ? { ok: true, status: result.status } : { ok: false }, { status: result.ok ? 200 : 500 });
   } catch (e) {

@@ -19,6 +19,7 @@ const FREE_LIMITS: { key: LimitKey; icon: LucideIcon }[] = [
 ];
 const PRO_ONLY: { key: LimitKey; icon: LucideIcon; hint: string }[] = [
   { key: "bills_email", icon: Mail, hint: "Free people see Get Pro" },
+  { key: "orders_email", icon: Mail, hint: "Free keeps photo, upload and by hand" },
   { key: "telegram_save", icon: Send, hint: "Pro only" },
   { key: "telegram_summary", icon: Send, hint: "Pro only" },
   { key: "doc_reminders", icon: Bell, hint: "By push and Telegram" },

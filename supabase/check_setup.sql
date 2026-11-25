@@ -31,6 +31,7 @@ need_cols(tbl, col, fix) as (values
   ('pro_limits','starts_trip_papers','migration_limit_starts.sql'),
   ('pro_limits','starts_projects','migration_projects.sql'),
   ('pro_limits','starts_trip_reports','migration_trip_reports.sql'),
+  ('pro_limits','starts_orders_email','migration_orders_email_limit.sql'),
   ('pro_limits','free_projects','migration_projects.sql'),
   ('pro_limits','pro_projects','migration_projects.sql'),
   ('business_projects','status','migration_projects.sql'),

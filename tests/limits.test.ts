@@ -11,6 +11,9 @@ eq("off with no date", limitsActive({ ...DEFAULT_LIMITS, starts: starts("2099-01
 eq("projects are limited from the start", limitOn(DEFAULT_LIMITS, "projects", "2026-12-05"), true);
 eq("off before the date", limitsActive(on, "2026-11-30"), false);
 eq("on from the date", limitsActive(on, "2026-12-01"), true);
+eq("forwarding order emails is Pro from the start, Pro and admins keep it", [featureLocked(DEFAULT_LIMITS, FREE, "orders_email", "2026-11-25"), featureLocked(DEFAULT_LIMITS, { pro: true, admin: false }, "orders_email", "2026-11-25"), featureLocked(DEFAULT_LIMITS, { pro: false, admin: true }, "orders_email", "2026-11-25")], [true, false, false]);
+eq("a database without the orders column still reads it as on", readLimits({ starts_bills_email: null }).starts.orders_email, "2026-01-01");
+eq("the admin can switch it off", featureLocked(readLimits({ starts_orders_email: null }), FREE, "orders_email", "2026-11-25"), false);
 eq("nothing locked before", featureLocked(on, FREE, "bills_email", "2026-11-30"), false);
 eq("free is locked after", featureLocked(on, FREE, "bills_email", "2026-12-01"), true);
 eq("pro is never locked", featureLocked(on, PRO, "bills_email", "2026-12-01"), false);
@@ -136,7 +139,7 @@ eq("row round trip", readLimits(limitsRow(on)), on);
 
 // The table on the Get Pro page follows the limits that have a start day
 eq("table follows the starts", proComparison({ ...on, starts: starts("2026-12-01", ["ai_scans", "documents"]) }).map((r) => r.label), ["AI receipt scans", "Documents", "Share a reminder with someone", "Photos on a reminder", "Excel and PDF reports"]);
-eq("full table", proComparison(on).length, 13);
+eq("full table", proComparison(on).length, 14);
 eq("table numbers", proComparison(on)[0], { label: "AI receipt scans", free: "10 a month", pro: "No limit" });
 eq("new rows", proComparison({ ...on, starts: starts("2026-12-01", ["card_sharing", "trip_papers"]) }).slice(0, 2), [{ label: "Shared loyalty cards", free: "1", pro: "No limit" }, { label: "Papers per trip", free: "3", pro: "50" }]);
 

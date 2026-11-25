@@ -75,7 +75,7 @@ type Notify = (userId: string, bill: { company: string; month: string; due: stri
  * One email arriving at someone's private address. `db` is the service client (nobody signed in is calling).
  * Never throws for bad mail: everything ends in a log line the person can read.
  */
-export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0, verify: VerifyMode = "off", locked?: (userId: string) => Promise<boolean>): Promise<InboundResult> {
+export async function handleInbound(db: SupabaseClient, p: InboundPayload, notify: Notify = async () => 0, verify: VerifyMode = "off", locked?: (userId: string, feature?: "bills_email" | "orders_email") => Promise<boolean>): Promise<InboundResult> {
   const token = tokenFromRecipient(p.OriginalRecipient || p.To, p.MailboxHash);
   if (!token) return { ok: true, status: "no_address" };
   const addr = await db.from("bill_email_addresses").select("user_id").eq("token", token).maybeSingle();
@@ -116,6 +116,12 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   if (site && !/forwarding-noreply@google\.com/i.test(direct)) {
     const label = siteLabel(site);
     const order = parseOrderEmail({ site, text, date });
+    // Forwarding order emails is Pro: a checked email waits and is added when Pro starts (photo, upload and by hand stay free)
+    if (order && locked && (await locked(userId, "orders_email"))) {
+      await holdBill(db, userId, p);
+      await log("needs_pro", { summary: `Online order · ${label}: waiting for Pro` });
+      return { ok: true, status: "needs_pro" };
+    }
     if (!order) { await log("unreadable", { summary: `Online order · ${label}: could not find the total. Add it by hand.` }); return { ok: true, status: "order_unreadable" }; }
     if (order.order_ref) {
       const dup = await db.from("grocery_receipts").select("id").eq("user_id", userId).eq("order_ref", order.order_ref).maybeSingle();
@@ -160,7 +166,7 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
   }
 
   // Bills by email is a Pro feature: keep this verified bill and add it when Pro is on
-  if (locked && (await locked(userId))) {
+  if (locked && (await locked(userId, "bills_email"))) {
     await holdBill(db, userId, p);
     await log("needs_pro", { summary: `${parsed.company} · ${monthName(parsed.bill_month)}: waiting for Pro`, account: parsed.account });
     return { ok: true, status: "needs_pro" };

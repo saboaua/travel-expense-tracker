@@ -117,6 +117,8 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   const [incoming, setIncoming] = useState<File | null>(null);
   // "Add by hand": no photo step, for when the camera or the scan does not work
   const [manual, setManual] = useState(false);
+  // ?manual=1 opens the form straight on adding by hand (the Free way to add an online order)
+  useEffect(() => { if (!receiptId && new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); } }, [receiptId]);
   // "Just keeping the prices": a receipt for something you did not pay for. Its items feed the Price tracker, but it is never counted as spending.
   const [paidWith, setPaidWith] = useState<PaidWith | null>(null);
   const [tripRef, setTripRef] = useState<string | null>(null);

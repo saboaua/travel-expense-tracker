@@ -174,5 +174,13 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   r = await handleInbound(m.db, amazonMail({ From: "Amazon <orders@amazon.com.evil.io>", MessageID: "a4", TextBody: AMAZON.replace("123-4567890-1234567", "999-4567890-1234567") }), notify, "strict");
   eq([r.ok && r.status, m.t.grocery_receipts.length], ["ignored_sender", 1], "a look-alike sender is not an order");
 
+  // Forwarding order emails is Pro: on Free the email waits, and nothing is added
+  m = makeDb(seed());
+  const asked: unknown[] = [];
+  r = await handleInbound(m.db, amazonMail({ MessageID: "p1" }), notify, "strict", async (_u, f) => { asked.push(f); return f === "orders_email"; });
+  eq([r.ok && r.status, m.t.grocery_receipts.length, (m.t.bill_email_held ?? []).length, m.t.bill_email_log.map((l) => l.status), asked], ["needs_pro", 0, 1, ["needs_pro"], ["orders_email"]], "on Free a forwarded order waits for Pro and the order limit is the one asked");
+  r = await handleInbound(m.db, amazonMail({ MessageID: "p2" }), notify, "strict", async () => false);
+  eq([r.ok && r.status, m.t.grocery_receipts.length], ["order_added", 1], "with Pro the same email is added");
+
   process.exit(failed ? 1 : 0);
 })();

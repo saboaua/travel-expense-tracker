@@ -1271,6 +1271,7 @@ try {
   await test("order emails: the forwarding page names the app, lists what arrived with Check it, and saving the receipt clears the mark", async () => {
     const { ctx, page } = await newPage();
     const rid = "00000000-0000-4000-8000-0000000000e1";
+    fake.table("pro_limits").push({ id: 1, starts_orders_email: null }); // the admin has switched the Pro limit off
     fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store: "Amazon order", purchase_date: new Date().toLocaleDateString("en-CA"), total: 31.79, currency: "USD", receipt_path: null, notes: null, area: "shopping", online_site: "amazon", arrives_on: null, source: "email", needs_check: true, order_ref: "123-4567890-1234567", created_at: new Date().toISOString() });
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
@@ -1287,7 +1288,22 @@ try {
     await page.getByRole("button", { name: "Save receipt" }).click();
     for (let i = 0; i < 40 && fake.table("grocery_receipts").find((r) => r.id === rid)?.needs_check; i++) await new Promise((ok) => setTimeout(ok, 250));
     assert(fake.table("grocery_receipts").find((r) => r.id === rid)?.needs_check === false, "the check mark is cleared once the receipt is saved: ");
+    fake.table("pro_limits").length = 0;
     fake.table("grocery_receipts").splice(0, fake.table("grocery_receipts").length, ...fake.table("grocery_receipts").filter((r) => r.id !== rid));
+    await ctx.close();
+  });
+
+  await test("order emails: Free sees the Pro lock with photo, upload and by hand, and by hand opens the form ready to type", async () => {
+    const { ctx, page } = await newPage();
+    await signIn(page, "pat@example.com", "Correct-Horse-1");
+    await page.waitForURL((u) => u.pathname === "/");
+    await page.goto(`${BASE}/personal/shopping/online/forward`);
+    await page.getByTestId("orders-email-locked").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("forward-card").count()) === 0, "no forwarding address on Free");
+    assert((await page.getByTestId("orders-email-get-pro").getAttribute("href")) === "/personal/pro", "Get Pro goes to the Pro page");
+    await page.getByTestId("free-manual").click();
+    await page.waitForURL((u) => u.pathname === "/personal/shopping/new", { timeout: 20_000 });
+    await page.getByText("Add receipt by hand").waitFor({ timeout: 20_000 });
     await ctx.close();
   });
 
