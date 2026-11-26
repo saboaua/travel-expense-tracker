@@ -19,6 +19,7 @@ import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
 import { CHECK_PCT, ROAD_FACTOR, agoText, weightText, type Run, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
+import { sameStore } from "@/lib/personal/basket";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -61,7 +62,7 @@ function Lines({ lines, currency }: { lines: PlanLine[]; currency: string }) {
     <ul className="divide-y">
       {lines.map((l) => (
         <li key={l.key} className="flex items-center gap-3 py-2 text-sm" data-testid="sc-line">
-          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span><Tag line={l} />{(() => { const ago = agoText(l.date, new Date()); const per = l.qty > 0 ? l.total / l.qty : l.price; const m = (n: number) => `${currency} ${n.toFixed(2)}`; const notes = [l.last != null ? `Last paid ${m(l.last)}, typical of your last 3: ${m(per)}` : null, l.weight != null ? `Counted at ${weightText(l.weight)}. Buy it and the price is updated.` : null, l.check && l.usualPrice != null ? `${Math.round((l.usualPrice - per) / l.usualPrice * 100)}% under the usual ${m(l.usualPrice)}. Counted only up to ${CHECK_PCT}% until you check it.` : null].filter(Boolean); return ago || notes.length ? <span className="block text-xs text-muted-foreground" data-testid="sc-line-note">{[ago, ...notes].filter(Boolean).join(" · ")}</span> : null; })()}</span>
+          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span><Tag line={l} />{(() => { const ago = agoText(l.date, new Date()); const per = l.qty > 0 ? l.total / l.qty : l.price; const m = (n: number) => `${currency} ${n.toFixed(2)}`; const notes = [l.card ? `after ${l.card}% card` : null, l.last != null ? `Last paid ${m(l.last)}, typical of your last 3: ${m(per)}` : null, l.weight != null ? `Counted at ${weightText(l.weight)}. Buy it and the price is updated.` : null, l.check && l.usualPrice != null ? `${Math.round((l.usualPrice - per) / l.usualPrice * 100)}% under the usual ${m(l.usualPrice)}. Counted only up to ${CHECK_PCT}% until you check it.` : null].filter(Boolean); return ago || notes.length ? <span className="block text-xs text-muted-foreground" data-testid="sc-line-note">{[ago, ...notes].filter(Boolean).join(" · ")}</span> : null; })()}</span>
           <span className="shrink-0 text-right"><Money amount={l.total} currency={currency} className="text-sm" />{l.saving != null && Math.abs(l.saving) >= 0.01 && <span className={`block text-xs font-bold ${l.saving > 0 ? GREEN : "text-red-700 dark:text-red-300"}`}>{l.saving > 0 ? "saves" : "costs"} <Money amount={Math.abs(l.saving)} currency={currency} className="text-xs" /></span>}</span>
         </li>
       ))}
@@ -419,6 +420,13 @@ export function SmartCart() {
           {!sc.externalReady && <p className="text-xs text-muted-foreground" aria-live="polite">Looking up community and online prices…</p>}
           {missing > 0 && sc.externalReady && <p className="text-xs text-muted-foreground" data-testid="sc-missing">{missing} item{missing === 1 ? " has" : "s have"} no real price at any store yet, so {missing === 1 ? "it is" : "they are"} left out.</p>}
 
+          {(() => { const top = [...sc.baskets].filter((b) => (b.cardSaving ?? 0) > 0.005).sort((x, y) => (y.cardSaving ?? 0) - (x.cardSaving ?? 0))[0]; return top ? (
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-3 dark:border-emerald-500/30 dark:bg-emerald-500/10" data-testid="sc-cards-note">
+              <p className="text-sm font-bold text-emerald-900 dark:text-emerald-200">With your cards</p>
+              <p className="text-sm">{top.store} is <b className={GREEN}><Money amount={top.cardSaving ?? 0} currency={currency} className="text-sm" /></b> cheaper on this cart.</p>
+              <p className="text-xs text-muted-foreground">Shown as &quot;after {Object.entries(settings.cards).find(([k]) => sameStore(k, top.store))?.[1] ?? ""}% card&quot; next to those prices. Your receipt prices stay as you paid them.</p>
+            </div>
+          ) : null; })()}
           {driving && sc.split && (
             <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="group" aria-label="How to shop" data-testid="sc-view">
               <button type="button" aria-pressed={view === "one"} onClick={() => setView("one")} className={`min-h-11 rounded-lg px-3 text-sm font-bold ${view === "one" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>One trip</button>
@@ -570,6 +578,20 @@ export function SmartCart() {
                   </label>
                 ))}
               </div>
+            </section>
+            <section className="space-y-1" aria-labelledby="sc-cards-h" data-testid="sc-cards">
+              <h3 id="sc-cards-h" className="text-base font-bold">Your store cards</h3>
+              <p className="text-xs text-muted-foreground">Turn on the stores where you have a card or app, and set about how much it takes off. Community and online prices there then count after the discount.</p>
+              {[...new Set([...sc.baskets.map((b) => b.store), ...Object.keys(settings.cards)])].sort((a, b) => a.localeCompare(b)).map((st) => {
+                const cur = Object.entries(settings.cards).find(([k]) => sameStore(k, st))?.[1] ?? 0;
+                const opts = [0, 5, 10, 15, 20, 25, ...([0, 5, 10, 15, 20, 25].includes(cur) ? [] : [cur])].sort((a, b) => a - b);
+                return (
+                  <div key={st} className="flex min-h-14 items-center gap-3 border-t pt-2 first:border-0">
+                    <label htmlFor={`sc-card-${st.replace(/[^a-z0-9]+/gi, "-")}`} className="min-w-0 flex-1 truncate text-sm font-semibold">{st}</label>
+                    <Select id={`sc-card-${st.replace(/[^a-z0-9]+/gi, "-")}`} value={cur} onChange={(e) => { const n = Number(e.target.value); const next = Object.fromEntries(Object.entries(settings.cards).filter(([k]) => !sameStore(k, st))); sc.setSettings({ cards: n > 0 ? { ...next, [st]: n } : next }); }} className="h-11 w-28">{opts.map((o) => <option key={o} value={o}>{o === 0 ? "No card" : `${o}%`}</option>)}</Select>
+                  </div>
+                );
+              })}
             </section>
             <p className="text-xs text-muted-foreground">These choices and your cart edits are kept on this device.</p>
           </div>

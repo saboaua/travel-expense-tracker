@@ -1,4 +1,4 @@
-import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, splitRuns, agoText, oldWeight, weightText, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, splitRuns, sanitizeCards, cardFor, agoText, oldWeight, weightText, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -239,6 +239,23 @@ eq("weight text", [weightText(0.5), weightText(0.3)], ["half weight", "30% weigh
   eq("an old price counted in full", full, 2);
   eq("an old price counted less saves less", (mk("less", 18) ?? 0) < (full ?? 0), true);
   eq("a price 50% under the usual is capped at 40%", mk("full", 10), 8);
+}
+
+// store cards
+{
+  eq("cards are made safe", sanitizeCards({ "Ling & Sons": 10, Bad: 80, Zero: 0, Text: "5", "": 5 }), { "Ling & Sons": 10 });
+  eq("cards: nonsense is empty", sanitizeCards([1, 2]), {});
+  eq("a card is found by the store name", cardFor({ "Ling & Sons Food Market": 10 }, "Ling & Sons"), 10);
+  eq("no card", cardFor({ "Ling & Sons": 10 }, "Usual Mart"), 0);
+  const base = smartBaskets(items, products, stores, NOW, ext, free, "AWG");
+  const carded = smartBaskets(items, products, stores, NOW, ext, { ...free, cards: { "Shop A": 10, "Usual Mart": 10 } }, "AWG");
+  const a0 = base.find((b) => b.store === "Shop A")!, a1 = carded.find((b) => b.store === "Shop A")!;
+  eq("a card takes its percent off community and online prices", a1.lines.find((l) => l.key === key("Milk"))?.price, 7.2);
+  eq("and says so", a1.lines.find((l) => l.key === key("Milk"))?.card, 10);
+  eq("what the card saves is counted", a1.cardSaving, Math.round((a0.total - a1.total) * 100) / 100);
+  const u0 = base.find((b) => b.store === "Usual Mart")!, u1 = carded.find((b) => b.store === "Usual Mart")!;
+  eq("what you paid is never discounted again", [u1.total, u1.cardSaving], [u0.total, 0]);
+  eq("a store with no card is unchanged", carded.find((b) => b.store === "Shop B")?.total, base.find((b) => b.store === "Shop B")?.total);
 }
 
 console.log("smart cart ok");

@@ -31,11 +31,28 @@ export type SmartSettings = {
   useOnline: boolean;
   /** Prices older than 60 days: count them like any other, count them less the older they are, or leave them out. All are flagged. */
   oldMode: "full" | "less" | "leave";
+  /** Store cards or apps: store name to the percent it takes off. Counted on community and online prices, never on what you paid. */
+  cards: Record<string, number>;
 };
-export const DEFAULT_SETTINGS: SmartSettings = { includeDriving: true, perKm: 0.35, minSaving: 5, maxKm: 10, maxStops: 3, useOwn: true, useCommunity: true, useOnline: true, oldMode: "less" };
+export const DEFAULT_SETTINGS: SmartSettings = { includeDriving: true, perKm: 0.35, minSaving: 5, maxKm: 10, maxStops: 3, useOwn: true, useCommunity: true, useOnline: true, oldMode: "less", cards: {} };
 
 const num = (v: unknown, lo: number, hi: number, d: number) => { const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".")) : NaN; return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
+export const MAX_CARD_PCT = 50;
+/** Store cards, made safe: a store name and a whole percent from 1 to 50. */
+export function sanitizeCards(raw: unknown): Record<string, number> {
+  const out: Record<string, number> = {};
+  if (raw && typeof raw === "object" && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>).slice(0, 60)) {
+      const n = typeof v === "number" ? Math.round(v) : NaN;
+      if (k.trim() && k.length <= 120 && Number.isFinite(n) && n >= 1 && n <= MAX_CARD_PCT) out[k] = n;
+    }
+  }
+  return out;
+}
+/** The card percent for a store, or 0. */
+export const cardFor = (cards: Record<string, number>, store: string): number => { const k = Object.keys(cards).find((c) => sameStore(c, store)); return k ? cards[k] : 0; };
+
 /** Whatever was saved on the phone, made safe: wrong types and silly numbers fall back to the defaults. */
 export function sanitizeSettings(raw: unknown): SmartSettings {
   const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
@@ -48,6 +65,7 @@ export function sanitizeSettings(raw: unknown): SmartSettings {
     maxKm: num(o.maxKm, 1, 100, d.maxKm),
     maxStops: stops,
     useOwn: bool(o.useOwn, d.useOwn), useCommunity: bool(o.useCommunity, d.useCommunity), useOnline: bool(o.useOnline, d.useOnline), oldMode: o.oldMode === "full" || o.oldMode === "less" || o.oldMode === "leave" ? o.oldMode : o.useOld === false ? "leave" : d.oldMode,
+    cards: sanitizeCards(o.cards),
   };
 }
 
@@ -102,7 +120,22 @@ export function smartBaskets(items: ListItem[], products: Product[], stores: str
   const index = storeIndex(products, currency, now);
   const own = s.useOwn ? products : products.map((p) => ({ ...p, stores: [] }));
   const ext = external.filter((e) => (e.source === "community" ? s.useCommunity : s.useOnline));
-  return basketTotals(items, own, stores, index, now, ext);
+  const out = basketTotals(items, own, stores, index, now, ext);
+  if (Object.keys(s.cards).length === 0) return out;
+  // a card takes its percent off community and online prices; what you paid already had it
+  return out.map((b) => {
+    const pct = cardFor(s.cards, b.store);
+    if (!pct) return b;
+    let cut = 0;
+    const lines = b.lines.map((l) => {
+      if (l.price == null || l.total == null || (l.source !== "community" && l.source !== "online")) return l;
+      const price = round2(l.price * (1 - pct / 100));
+      const total = round2(price * l.qty);
+      cut += l.total - total;
+      return { ...l, price, total, card: pct };
+    });
+    return { ...b, lines, total: round2(lines.reduce((t, l) => t + (l.total ?? 0), 0)), cardSaving: round2(cut) };
+  });
 }
 
 /** The real price of a cart line at a store, or null (no price, or an old one the person chose not to count). */
@@ -192,7 +225,7 @@ export function directionsUrl(origin: LatLng | null, stops: LatLng[]): string | 
 
 /* ---------------- plans ---------------- */
 
-export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; /** When the price was paid or shared (a community price has only its month) */ date?: string | null; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean; /** How much this old price counts for (under 1 only when old prices are counted less) */ weight?: number; /** The newest price you paid, when the typical one of your last 3 is used */ last?: number; /** The price at your usual store, for a price that looks like a sale */ usualPrice?: number };
+export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; /** When the price was paid or shared (a community price has only its month) */ date?: string | null; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean; /** How much this old price counts for (under 1 only when old prices are counted less) */ weight?: number; /** the price is after this percent store card */ card?: number; /** The newest price you paid, when the typical one of your last 3 is used */ last?: number; /** The price at your usual store, for a price that looks like a sale */ usualPrice?: number };
 export type PlanStop = { store: string; at: LatLng; km: number; lines: PlanLine[]; total: number; saving: number; /** items here with a price at your usual store too */ comparedOn: number; /** of those, the ones cheaper here */ cheaperOn: number; /** percent less than your usual store on the compared items (0 when none) */ pct: number };
 export type Plan = {
   stops: PlanStop[];
@@ -266,7 +299,7 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
       itemsTotal += pick.l.total!;
       saving += sv ?? 0;
       const list = byStore.get(pick.n.b.store) ?? [];
-      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, date: pick.l.date, similar: pick.l.similar, old: pick.l.status === "old", check: flagged, ...(w < 1 ? { weight: w } : {}), ...(pick.l.last != null ? { last: pick.l.last } : {}), ...(flagged ? { usualPrice: r!.price! } : {}) });
+      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, date: pick.l.date, similar: pick.l.similar, old: pick.l.status === "old", check: flagged, ...(w < 1 ? { weight: w } : {}), ...(pick.l.last != null ? { last: pick.l.last } : {}), ...(flagged ? { usualPrice: r!.price! } : {}), ...(pick.l.card ? { card: pick.l.card } : {}) });
       byStore.set(pick.n.b.store, list);
     }
     const used = set.filter((n) => byStore.has(n.b.store));
@@ -364,7 +397,7 @@ export function storeRows(a: { items: ListItem[]; baskets: StoreBasket[]; where:
       const r = ref && !sameStore(b.store, ref.store) ? priced(ref, it.key, (s.oldMode !== "leave")) : null;
       const sv = r ? round2((r.price! - l.price!) * it.qty) : null;
       if (r) { shared++; diff += (l.price! - r.price!) * it.qty; baseSum += r.price! * it.qty; if (l.status !== "old") fresh++; }
-      lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false });
+      lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ...(l.card ? { card: l.card } : {}) });
     }
     if (lines.length === 0) continue;
     const at = where.get(b.store) ?? null;
@@ -446,7 +479,7 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
         elseCount++; elseSaving += sav; byStore.set(best.store, (byStore.get(best.store) ?? 0) + sav);
       }
     }
-    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ref: r ? { store: ref!.store, price: r.price! } : null, better, elsewhere: el ? { ...el, diff: round2((l.price! - el.price) * it.qty) } : null });
+    lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false, ...(l.card ? { card: l.card } : {}), ref: r ? { store: ref!.store, price: r.price! } : null, better, elsewhere: el ? { ...el, diff: round2((l.price! - el.price) * it.qty) } : null });
   }
   lines.sort((x, y) => (y.better?.saving ?? y.saving ?? -Infinity) - (x.better?.saving ?? x.saving ?? -Infinity));
   const top = [...byStore].sort((x, y) => y[1] - x[1])[0];

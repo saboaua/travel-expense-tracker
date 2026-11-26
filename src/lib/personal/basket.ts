@@ -125,7 +125,7 @@ export const LEVEL_LABEL: Record<Level, string> = { cheapest: "Cheapest", below:
 export type ListItem = { key: string; qty: number };
 /** own: bought by you; noted: a price you wrote down; community and online: from outside */
 export type PriceSource = "own" | "noted" | "community" | "online";
-export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean; /** The newest price you paid, when the price used is the typical one of your last 3 and differs from it */ last?: number };
+export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean; /** The newest price you paid, when the price used is the typical one of your last 3 and differs from it */ last?: number; /** Percent the store card takes off a community or online price here (the price is already after it) */ card?: number };
 export type StoreBasket = {
   store: string;
   /** The total of the items that have a real price here (items with no price are left out, never guessed) */
@@ -139,6 +139,8 @@ export type StoreBasket = {
   extra: number;
   level: Level;
   levelPct: number | null;
+  /** What your store card takes off this list here, when it is set */
+  cardSaving?: number;
 };
 
 /** Real prices from outside your receipts: community and online price lists, by store and product key. */

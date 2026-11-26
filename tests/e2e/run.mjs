@@ -6746,6 +6746,12 @@ try {
       await page.getByTestId("smart-cart").waitFor();
       await page.getByTestId("sc-settings-open").click();
       assert(await page.getByTestId("sc-old-prices").getByRole("radio", { name: "Leave them out" }).isChecked(), "the old-price choice stays after a reload");
+      await page.getByTestId("sc-cards").getByLabel("New Ten Sing").selectOption("10");
+      await page.keyboard.press("Escape");
+      await page.reload();
+      await page.getByTestId("smart-cart").waitFor();
+      await page.getByTestId("sc-settings-open").click();
+      assert((await page.getByTestId("sc-cards").getByLabel("New Ten Sing").inputValue()) === "10", "a store card and its percent stay after a reload");
       await page.keyboard.press("Escape");
       assert((await page.getByRole("switch", { name: "Include driving cost", exact: true }).getAttribute("aria-checked")) === "false", "the switch stays off after a reload");
     } finally {
