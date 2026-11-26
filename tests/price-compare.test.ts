@@ -1,4 +1,4 @@
-import { parseSize, atomOf, buildProducts, looksAlike, wordsClose, cleanName, summarizeStores, historyWithChange, matchesFilter, priceSummary } from "../src/lib/personal/price-compare";
+import { coreWords, learnedBrands, brandOnly, productWords, parseSize, atomOf, buildProducts, looksAlike, wordsClose, cleanName, summarizeStores, historyWithChange, matchesFilter, priceSummary } from "../src/lib/personal/price-compare";
 import { effectiveUnit, type TrackerRow } from "../src/lib/personal/grocery";
 
 let fail = 0;
@@ -136,6 +136,33 @@ eq("summary", priceSummary(all), { up: 1, down: 1, elsewhere: 1, saveTotal: 0.26
   eq("kale paid", products[0].history[0].paid, 7.47);
   eq("kale qty", products[0].history[0].qty, 0.25);
 }
+
+// Same product, different label wording (cat food "Gati" sold as Pollo Adulto / Sabor Pollo / just the brand)
+{
+  const gati = [row("Gati Pollo Adulto", 10, "A", "2026-11-01"), row("Gati Sabor Pollo", 11, "B", "2026-11-02"), row("Gati", 10, "C", "2026-11-03"), row("Gati Carne Adulto", 10, "A", "2026-11-04"), row("Gati Kitten Pollo", 12, "A", "2026-11-05")];
+  const { products, suggestions } = buildProducts(gati);
+  const together = products.find((p) => p.names.length === 2);
+  eq("gati: pollo adulto + sabor pollo combine on their own", together?.names.map((n) => n.name).sort(), ["Gati Pollo Adulto", "Gati Sabor Pollo"]);
+  eq("gati: carne stays apart from pollo", products.some((p) => p.names.some((n) => n.name === "Gati Carne Adulto") && p.names.some((n) => /pollo/i.test(n.name))), false);
+  eq("gati: kitten stays apart (a real variant)", products.some((p) => p.names.some((n) => /kitten/i.test(n.name)) && p.names.length > 1), false);
+  eq("gati: the bare brand is asked about, not merged", products.some((p) => p.names.some((n) => n.name === "Gati") && p.names.length > 1), false);
+  eq("gati: the brand name is offered as a question", suggestions.some((s) => [s.a.name, s.b.name].includes("Gati")), true);
+  // your No still wins over the automatic match
+  const a = atomOf("Gati Pollo Adulto", "AWG", null).key, b = atomOf("Gati Sabor Pollo", "AWG", null).key;
+  const kept = buildProducts(gati, [{ key_a: a < b ? a : b, key_b: a < b ? b : a, same: false }]);
+  eq("gati: your No keeps them apart", kept.products.some((p) => p.names.length === 2), false);
+  // your Yes on a pair joins the chain
+  const g = atomOf("Gati", "AWG", null).key;
+  const yes = buildProducts(gati, [{ key_a: g < a ? g : a, key_b: g < a ? a : g, same: true }]);
+  eq("gati: your Yes joins the brand-only name, and the chain follows", yes.products.find((p) => p.names.length === 3)?.names.length, 3);
+}
+eq("core words drop soft words", coreWords(["gati", "sabor", "pollo"]), ["gati", "pollo"]);
+eq("a name of only soft words keeps them", coreWords(["original"]), ["original"]);
+eq("brands are learned from names that share a first word", [...learnedBrands(["Gati Pollo", "Gati Carne", "Milk Whole"])], ["gati"]);
+eq("one name is not a brand", [...learnedBrands(["Gati Pollo", "Milk Whole"])], []);
+eq("brand-only matches the brand's product", brandOnly(["gati"], ["gati", "pollo", "adulto"], new Set(["gati"])), true);
+eq("brand-only needs a known brand", brandOnly(["milk"], ["milk", "whole"], new Set(["gati"])), false);
+eq("product words still sorted and normalised", productWords("Gati Pollo")[0], "gati");
 
 console.log(fail ? `${fail} FAILED` : "price-compare: all checks passed");
 process.exit(fail ? 1 : 0);

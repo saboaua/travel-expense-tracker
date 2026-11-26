@@ -42,6 +42,18 @@ const NOISE = new Set(["bot", "btl", "bottle", "bottles", "can", "cans", "tin", 
 
 export const productWords = (name: string): string[] => normalizeItemName(name).split(" ").filter((w) => w && !NOISE.has(w));
 
+/**
+ * Words that describe the wording of a label, not the product: "Gati Sabor Pollo" (flavour chicken) and "Gati Pollo Adulto" are one
+ * product, because "sabor", "adulto" and "original" do not change what is in the bag. Words that do ("carne", "kitten", "light", "diet")
+ * are never in this list. English, Spanish, Dutch and Papiamento labels all show up on one island.
+ */
+const SOFT = new Set(["sabor", "sabores", "flavor", "flavour", "flavored", "flavoured", "smaak", "gusto", "original", "orig", "regular", "natural", "classic", "clasico", "classico", "adult", "adulto", "adulta", "adulten", "volwassen", "premium", "formula", "pro"]);
+/** The words that make a product what it is. Never empty: a name made only of soft words keeps them. */
+export const coreWords = (words: string[]): string[] => {
+  const core = words.filter((w) => !SOFT.has(w));
+  return core.length ? core : words;
+};
+
 export type Atom = { key: string; match: string; size: Size | null; words: string[]; currency: string; unit: string | null };
 
 /** One distinct receipt wording (kept apart so a wrong match can be undone). */
@@ -51,7 +63,7 @@ export function atomOf(name: string, currency: string, unit: string | null): Ato
   const raw = normalizeItemName(name);
   return {
     key: `${currency}|${raw}|${sizeKey(size)}|${unit ?? ""}`,
-    match: `${currency}|${[...words].sort().join(" ")}|${sizeKey(size)}|${unit ?? ""}`,
+    match: `${currency}|${[...coreWords(words)].sort().join(" ")}|${sizeKey(size)}|${unit ?? ""}`,
     size, words, currency, unit,
   };
 }
@@ -189,7 +201,7 @@ function cluster(rows: TrackerRow[], decisions: MatchDecision[]) {
   const family = new Map<string, { sized: Map<string, string[]>; bare: string[] }>();
   for (const [k, g] of atoms) {
     if (!g.atom.words.length) continue;
-    const fk = `${g.atom.currency}|${[...g.atom.words].sort().join(" ")}|${g.atom.unit ?? ""}`;
+    const fk = `${g.atom.currency}|${[...coreWords(g.atom.words)].sort().join(" ")}|${g.atom.unit ?? ""}`;
     const f = family.get(fk) ?? { sized: new Map<string, string[]>(), bare: [] };
     const sk = sizeKey(g.atom.size);
     if (sk) f.sized.set(sk, [...(f.sized.get(sk) ?? []), k]); else f.bare.push(k);
@@ -261,6 +273,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
     bucket.set(k, [...(bucket.get(k) ?? []), p]);
   }
   const sizeOf = (p: Product) => atoms.get(p.atomKeys[0])!.atom.size;
+  const brands = learnedBrands([...atoms.values()].map((g) => g.rows[0].name));
   const ranked: { s: Suggestion; score: number }[] = [];
   for (const list of bucket.values()) {
     for (let i = 0; i < list.length; i++) for (let j = i + 1; j < list.length; j++) {
@@ -269,7 +282,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
       if (sa && sb && sizeKey(sa) !== sizeKey(sb)) continue;
       if (A.atomKeys.some((x) => B.atomKeys.some((y) => decided.has(pairId(x, y))))) continue;
       const wa = wordsOf(A, atoms), wb = wordsOf(B, atoms);
-      if (!looksAlike(wa, wb)) continue;
+      if (!looksAlike(wa, wb) && !brandOnly(wa, wb, brands)) continue;
       // Price is only a hint: a very different price means a different pack, a close one puts the pair first
       const pa = A.stats.last, pb = B.stats.last;
       const gap = pa > 0 && pb > 0 ? Math.abs(pa - pb) / Math.max(pa, pb) : 0;
@@ -288,6 +301,29 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
   ranked.sort((x, y) => x.score - y.score);
   for (const r of ranked) suggestions.push(r.s);
   return { products, suggestions: suggestions.slice(0, 5) };
+}
+
+/**
+ * Brands the app has learned from your own receipts: the first word of a name that starts at least two different names ("Gati Pollo",
+ * "Gati Carne"). A name that is only the brand ("Gati") is then the brand's generic item, worth asking about.
+ */
+export function learnedBrands(names: string[]): Set<string> {
+  const firsts = new Map<string, Set<string>>();
+  for (const n of names) {
+    const w = productWords(n);
+    const first = normalizeItemName(n.trim().split(/\s+/)[0] ?? "").split(" ")[0];
+    if (!first || first.length < 3 || !w.includes(first) || SOFT.has(first)) continue;
+    const set = firsts.get(first) ?? new Set<string>();
+    set.add(coreWords(w).sort().join(" "));
+    firsts.set(first, set);
+  }
+  return new Set([...firsts].filter(([, v]) => v.size >= 2).map(([k]) => k));
+}
+
+/** One name is only a known brand and the other starts with that brand: "Gati" and "Gati Pollo Adulto". */
+export function brandOnly(a: string[], b: string[], brands: Set<string>): boolean {
+  const [small, big] = a.length <= b.length ? [coreWords(a), coreWords(b)] : [coreWords(b), coreWords(a)];
+  return small.length === 1 && big.length > 1 && brands.has(small[0]) && big.some((w) => wordsClose(w, small[0]));
 }
 
 const wordsOf = (p: Product, atoms: Map<string, { atom: Atom }>) => [...new Set(p.atomKeys.flatMap((k) => atoms.get(k)!.atom.words))];
