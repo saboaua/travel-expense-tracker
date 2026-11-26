@@ -40,7 +40,18 @@ const sizeKey = (s: Size | null) => (s ? `${s.kind[0]}${s.amount}` : "");
 /** Words that describe the package or how it is served, not the product: "Bot" and "Cold" must not split a beer. */
 const NOISE = new Set(["bot", "btl", "bottle", "bottles", "can", "cans", "tin", "cold", "chilled", "pet", "glass", "nr", "pcs", "pc", "each", "ea", "x"]);
 
-export const productWords = (name: string): string[] => normalizeItemName(name).split(" ").filter((w) => w && !NOISE.has(w));
+/**
+ * The same word in the languages on the labels here (English, Spanish, Dutch, Papiamento), so "Gati Pollo" and "Gati Chicken" are one
+ * wording. A short list of everyday food words; one word can become two ("coke" is "coca cola"). Words not here are left alone.
+ */
+const SYNONYMS: Record<string, string[]> = {
+  pollo: ["chicken"], kip: ["chicken"], leche: ["milk"], melk: ["milk"], lechi: ["milk"], queso: ["cheese"], kaas: ["cheese"], keso: ["cheese"],
+  huevo: ["egg"], huevos: ["egg"], ei: ["egg"], eieren: ["egg"], arroz: ["rice"], rijst: ["rice"], azucar: ["sugar"], suiker: ["sugar"],
+  pan: ["bread"], brood: ["bread"], cerveza: ["beer"], bier: ["beer"], atun: ["tuna"], pescado: ["fish"], vis: ["fish"],
+  papa: ["potato"], aardappel: ["potato"], cebolla: ["onion"], ui: ["onion"], tomate: ["tomato"], mantequilla: ["butter"], boter: ["butter"],
+  agua: ["water"], jugo: ["juice"], sap: ["juice"], coke: ["coca", "cola"],
+};
+export const productWords = (name: string): string[] => normalizeItemName(name).split(" ").filter((w) => w && !NOISE.has(w)).flatMap((w) => SYNONYMS[w] ?? [w]);
 
 /**
  * Words that describe the wording of a label, not the product: "Gati Sabor Pollo" (flavour chicken) and "Gati Pollo Adulto" are one
@@ -73,7 +84,7 @@ export const pairOf = (a: string, b: string): [string, string] => (a < b ? [a, b
 const pairId = (a: string, b: string) => pairOf(a, b).join("\u0001");
 
 /** "Same product" suggestion between two groups that look alike but are not certain. */
-export type Suggestion = { keyA: string; keyB: string; a: { name: string; stores: string[] }; b: { name: string; stores: string[] }; /** How far apart the latest prices are, in percent of the higher one */ priceGapPct?: number };
+export type Suggestion = { keyA: string; keyB: string; a: { name: string; stores: string[] }; b: { name: string; stores: string[] }; /** Why it is asked, in plain words */ reason: string; /** How far apart the latest prices are, in percent of the higher one */ priceGapPct?: number };
 
 /* ---------------- products ---------------- */
 
@@ -282,7 +293,8 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
       if (sa && sb && sizeKey(sa) !== sizeKey(sb)) continue;
       if (A.atomKeys.some((x) => B.atomKeys.some((y) => decided.has(pairId(x, y))))) continue;
       const wa = wordsOf(A, atoms), wb = wordsOf(B, atoms);
-      if (!looksAlike(wa, wb) && !brandOnly(wa, wb, brands)) continue;
+      const brandOnlyPair = brandOnly(wa, wb, brands);
+      if (!looksAlike(wa, wb) && !brandOnlyPair) continue;
       // Price is only a hint: a very different price means a different pack, a close one puts the pair first
       const pa = A.stats.last, pb = B.stats.last;
       const gap = pa > 0 && pb > 0 ? Math.abs(pa - pb) / Math.max(pa, pb) : 0;
@@ -293,6 +305,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
           keyA: A.atomKeys[0], keyB: B.atomKeys[0],
           a: { name: A.names[0].name, stores: [...new Set(A.history.map((h) => h.store))] },
           b: { name: B.names[0].name, stores: [...new Set(B.history.map((h) => h.store))] },
+          reason: brandOnlyPair ? "One name is only the brand. Is it this product?" : "The names are almost the same. Is it the same product?",
           priceGapPct: Math.round(gap * 1000) / 10,
         },
       });
@@ -300,7 +313,7 @@ export function buildProducts(rows: TrackerRow[], decisions: MatchDecision[] = [
   }
   ranked.sort((x, y) => x.score - y.score);
   for (const r of ranked) suggestions.push(r.s);
-  return { products, suggestions: suggestions.slice(0, 5) };
+  return { products, suggestions: suggestions.slice(0, 60) };
 }
 
 /**

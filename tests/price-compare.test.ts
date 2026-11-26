@@ -164,5 +164,16 @@ eq("brand-only matches the brand's product", brandOnly(["gati"], ["gati", "pollo
 eq("brand-only needs a known brand", brandOnly(["milk"], ["milk", "whole"], new Set(["gati"])), false);
 eq("product words still sorted and normalised", productWords("Gati Pollo")[0], "gati");
 
+// Synonyms across the languages on the labels
+{
+  eq("pollo and chicken are one word", atomOf("Gati Pollo", "AWG", null).match === atomOf("Gati Chicken", "AWG", null).match, true);
+  eq("coke is coca cola", atomOf("Coke Zero 33CL", "AWG", null).match === atomOf("Coca Cola Zero 33CL", "AWG", null).match, true);
+  eq("leche and melk are milk", productWords("Leche Entera").includes("milk") && productWords("Melk Vol").includes("milk"), true);
+  eq("an unknown word is left alone", productWords("Gati Pollo").includes("gati"), true);
+  const many = Array.from({ length: 8 }, (_, i) => [row(`Bravo Alpha${i}x Sauce`, 5, "A", "2026-11-01"), row(`Bravo Alpha${i}y Sauce`, 5, "B", "2026-11-02")]).flat();
+  eq("every question is returned, not only 5", buildProducts(many).suggestions.length > 5, true);
+  eq("each question says why", buildProducts([row("Gati Pollo", 10, "A", "2026-11-01"), row("Gati Carne", 10, "A", "2026-11-02"), row("Gati", 10, "B", "2026-11-03")]).suggestions.every((s) => s.reason.length > 10), true);
+}
+
 console.log(fail ? `${fail} FAILED` : "price-compare: all checks passed");
 process.exit(fail ? 1 : 0);

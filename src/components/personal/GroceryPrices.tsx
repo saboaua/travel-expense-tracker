@@ -231,6 +231,7 @@ export function GroceryPrices() {
             <Button variant="outline" className="h-11" disabled={!online} onClick={() => answer([[suggestion.keyA, suggestion.keyB]], false)}>No, keep apart</Button>
           </div>
           {!online && <p className="mt-2 text-xs text-muted-foreground">Needs a connection to save your answer.</p>}
+          {suggestions.length > 1 && <Link href="/personal/groceries/prices/check" className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-2 hover:underline" data-testid="price-check-all">Check all {suggestions.length} matches</Link>}
         </div>
       )}
 

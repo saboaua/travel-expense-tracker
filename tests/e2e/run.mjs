@@ -6125,6 +6125,39 @@ try {
     }
   });
 
+  await test("prices: Gati Pollo Adulto and Gati Sabor Pollo combine on their own, and Check matches lists the unsure ones", async () => {
+    const { ctx, page } = await newPage();
+    const R = ["9c000000-0000-4000-8000-00000000f001", "9c000000-0000-4000-8000-00000000f002", "9c000000-0000-4000-8000-00000000f003"];
+    const mk = (id, store, days) => ({ id, user_id: PAT, store, purchase_date: addDays(today, days), total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    const item = (n, rid, name, price) => ({ id: `9d000000-0000-4000-8000-00000000f10${n}`, receipt_id: rid, user_id: PAT, name, normalized_name: name.toLowerCase(), category: "Other", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() });
+    fake.table("grocery_receipts").push(mk(R[0], "Ling & Sons", -10), mk(R[1], "Super Food Plaza", -5), mk(R[2], "Ling & Sons", -3));
+    fake.table("grocery_items").push(item(1, R[0], "Gati Pollo Adulto", 10), item(2, R[1], "Gati Sabor Pollo", 10.5), item(3, R[2], "Gati", 10), item(4, R[2], "Gati Carne Adulto", 10.2));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const together = page.getByTestId("price-product").filter({ hasText: "Gati" });
+      await together.first().waitFor({ timeout: 60000 });
+      const all = await together.allInnerTexts();
+      assert(all.some((t) => /Gati (Sabor )?Pollo/.test(t) && /2 stores/i.test(t)), "the two Pollo wordings are one product sold in two stores: " + JSON.stringify(all));
+      assert((await page.getByTestId("price-check-all").count()) === 1 || (await page.getByTestId("price-suggestion").count()) === 1, "the unsure ones are offered");
+      await page.goto(`${BASE}/personal/groceries/prices/check`);
+      await page.getByTestId("price-match-review").waitFor();
+      await page.getByTestId("match-card").first().waitFor({ timeout: 30000 });
+      const n = await page.getByTestId("match-card").count();
+      assert(n >= 1 && /\d+ to check/.test(await page.getByTestId("match-count").innerText()), "the unsure pairs are listed with a count");
+      const first = await page.getByTestId("match-card").first().innerText();
+      assert(/Gati/.test(first) && /Combine/.test(first) && /Keep apart/.test(first), "both names and both answers are on the card: " + first);
+      await page.getByTestId("match-apart").first().click();
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="match-card"]').length >= 0);
+      assert(fake.table("grocery_price_matches").some((m) => m.user_id === PAT && m.same === false), "Keep apart is saved");
+      assert((await page.getByTestId("match-card").count()) === n - 1 || n === 1, "the answered pair leaves the list");
+    } finally {
+      await ctx.close();
+      for (const t of ["grocery_receipts", "grocery_items", "grocery_price_matches"]) { const rows = fake.table(t); for (let i = rows.length - 1; i >= 0; i--) if (/^9[cd]0000/.test(String(rows[i].id ?? rows[i].key_a ?? "")) || t === "grocery_price_matches") rows.splice(i, 1); }
+    }
+  });
+
   await test("prices: the same beer from two supermarkets is one product that says which store is cheaper, and a wrong match can be undone", async () => {
     const { ctx, page } = await newPage();
     const R = ["9c000000-0000-4000-8000-00000000c001", "9c000000-0000-4000-8000-00000000c002", "9c000000-0000-4000-8000-00000000c003"];
