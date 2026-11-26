@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { CHECK_PCT, ROAD_FACTOR, type Run, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
+import { CHECK_PCT, ROAD_FACTOR, agoText, weightText, type Run, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -61,7 +61,7 @@ function Lines({ lines, currency }: { lines: PlanLine[]; currency: string }) {
     <ul className="divide-y">
       {lines.map((l) => (
         <li key={l.key} className="flex items-center gap-3 py-2 text-sm" data-testid="sc-line">
-          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span><Tag line={l} /></span>
+          <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}</span><Tag line={l} />{(() => { const ago = agoText(l.date, new Date()); const per = l.qty > 0 ? l.total / l.qty : l.price; const m = (n: number) => `${currency} ${n.toFixed(2)}`; const notes = [l.last != null ? `Last paid ${m(l.last)}, typical of your last 3: ${m(per)}` : null, l.weight != null ? `Counted at ${weightText(l.weight)}. Buy it and the price is updated.` : null, l.check && l.usualPrice != null ? `${Math.round((l.usualPrice - per) / l.usualPrice * 100)}% under the usual ${m(l.usualPrice)}. Counted only up to ${CHECK_PCT}% until you check it.` : null].filter(Boolean); return ago || notes.length ? <span className="block text-xs text-muted-foreground" data-testid="sc-line-note">{[ago, ...notes].filter(Boolean).join(" · ")}</span> : null; })()}</span>
           <span className="shrink-0 text-right"><Money amount={l.total} currency={currency} className="text-sm" />{l.saving != null && Math.abs(l.saving) >= 0.01 && <span className={`block text-xs font-bold ${l.saving > 0 ? GREEN : "text-red-700 dark:text-red-300"}`}>{l.saving > 0 ? "saves" : "costs"} <Money amount={Math.abs(l.saving)} currency={currency} className="text-xs" /></span>}</span>
         </li>
       ))}
@@ -552,13 +552,24 @@ export function SmartCart() {
                 ["My receipts", "What I paid, newest first", "useOwn"],
                 ["Community prices", "Shared by other people in my country", "useCommunity"],
                 ["Online store lists", "Super Food, Ling, Do it", "useOnline"],
-                ["Prices older than 60 days", "They are marked Old price", "useOld"],
               ] as const).map(([label, sub, field]) => (
                 <div key={field} className="flex min-h-14 items-center gap-3 border-t pt-2 first:border-0">
                   <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{label}</p><p className="text-xs text-muted-foreground">{sub}</p></div>
                   <Switch checked={settings[field]} onChange={(v) => sc.setSettings({ [field]: v })} label={label} />
                 </div>
               ))}
+            </section>
+            <section className="space-y-1" aria-labelledby="sc-old-h" data-testid="sc-old-prices">
+              <h3 id="sc-old-h" className="text-base font-bold">Old prices</h3>
+              <p className="text-xs text-muted-foreground">A price from months ago may not be today&apos;s price.</p>
+              <div role="radiogroup" aria-labelledby="sc-old-h" className="space-y-1">
+                {([["full", "Count them like any other"], ["less", "Count them less, the older the less"], ["leave", "Leave them out"]] as const).map(([v, label]) => (
+                  <label key={v} className="flex min-h-12 cursor-pointer items-center gap-3">
+                    <input type="radio" name="sc-old" checked={settings.oldMode === v} onChange={() => sc.setSettings({ oldMode: v })} className="h-5 w-5 accent-primary" />
+                    <span className="text-sm font-semibold">{label}</span>
+                  </label>
+                ))}
+              </div>
             </section>
             <p className="text-xs text-muted-foreground">These choices and your cart edits are kept on this device.</p>
           </div>

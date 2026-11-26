@@ -1,4 +1,4 @@
-import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, splitRuns, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, splitRuns, agoText, oldWeight, weightText, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -105,7 +105,7 @@ eq("a priced-nowhere-else item is bought at the usual store only", rareSet.plans
 const olds = buildProducts([row("Tea", 4, "Usual Mart", "2026-06-01"), row("Tea", 4, "Usual Mart", "2026-06-20")]).products;
 const oldItems = [{ key: olds[0].key, qty: 1 }];
 eq("an old price is flagged but counted", storeRows({ items: oldItems, baskets: smartBaskets(oldItems, olds, ["Usual Mart"], NOW, [], free, "AWG"), where, origin: home, usual: "Usual Mart", s: free })[0]?.lines[0].old, true);
-eq("an old price can be left out", storeRows({ items: oldItems, baskets: smartBaskets(oldItems, olds, ["Usual Mart"], NOW, [], { ...free, useOld: false }, "AWG"), where, origin: home, usual: "Usual Mart", s: { ...free, useOld: false } }).length, 0);
+eq("an old price can be left out", storeRows({ items: oldItems, baskets: smartBaskets(oldItems, olds, ["Usual Mart"], NOW, [], { ...free, oldMode: "leave" as const }, "AWG"), where, origin: home, usual: "Usual Mart", s: { ...free, oldMode: "leave" as const } }).length, 0);
 
 // every supermarket
 const rowsAll = storeRows({ items, baskets, where, origin: home, usual, s: { ...free, includeDriving: false } });
@@ -205,6 +205,40 @@ if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1)
   eq("no split without a starting point", splitRuns({ items, habits: habs, baskets, where, origin: null, usual, s: free, minItems: 1 }), null);
   eq("no split when driving is not counted", splitRuns({ items, habits: habs, baskets, where, origin: home, usual, s: { ...free, includeDriving: false }, minItems: 1 }), null);
   eq("no split when everything is weekly", splitRuns({ items, habits: [hab("Milk", 7), hab("Eggs", 7), hab("Paste", 7)], baskets, where, origin: home, usual, s: free, minItems: 1 }), null);
+}
+
+// how old a price is, and what it counts for
+eq("ago today", agoText("2026-11-11", NOW), "today");
+eq("ago days", agoText("2026-11-08", NOW), "3 days ago");
+eq("ago weeks", agoText("2026-10-06", NOW), "5 weeks ago");
+eq("ago months", agoText("2026-07-10", NOW), "4 months ago");
+eq("ago month only", agoText("2026-09", NOW), "2 months ago");
+eq("ago nothing", agoText(null, NOW), null);
+eq("fresh counts in full", oldWeight("2026-10-01", NOW), 1);
+eq("4 months counts half", oldWeight("2026-07-14", NOW), 0.5);
+eq("very old keeps a quarter", oldWeight("2025-01-01", NOW), 0.25);
+eq("weight text", [weightText(0.5), weightText(0.3)], ["half weight", "30% weight"]);
+{
+  // typical of the last 3 receipts: a one-off sale does not set the price
+  const sale = buildProducts([row("Rice", 15, "Usual Mart", "2026-09-20"), row("Rice", 14, "Usual Mart", "2026-10-10"), row("Rice", 9, "Usual Mart", "2026-11-05")]).products;
+  const it = [{ key: sale[0].key, qty: 1 }];
+  const line = smartBaskets(it, sale, ["Usual Mart"], NOW, [], free, "AWG")[0].lines[0];
+  eq("typical price is the middle of the last 3", line.price, 14);
+  eq("the newest price paid is kept for display", line.last, 9);
+  const two = buildProducts([row("Tea", 5, "Usual Mart", "2026-10-10"), row("Tea", 4, "Usual Mart", "2026-11-05")]).products;
+  eq("fewer than 3 receipts use the newest price", smartBaskets([{ key: two[0].key, qty: 1 }], two, ["Usual Mart"], NOW, [], free, "AWG")[0].lines[0].price, 4);
+  // an old price counts less, and a price that looks like a sale is capped
+  const stale = buildProducts([row("Oil", 20, "Usual Mart", "2026-11-01"), row("Oil", 20, "Usual Mart", "2026-11-05")]).products;
+  const oi = [{ key: stale[0].key, qty: 1 }];
+  const mk = (mode: "full" | "less" | "leave", price: number) => {
+    const ex: ExternalPrice[] = [{ store: "Old Mart", key: stale[0].key, price, source: "community", date: "2026-07" }];
+    const st = { ...free, oldMode: mode };
+    return planCart({ items: oi, baskets: smartBaskets(oi, stale, ["Usual Mart", "Old Mart"], NOW, ex, st, "AWG"), where: new Map([["Usual Mart", at(0.01)], ["Old Mart", at(0.012)]]), origin: home, usual: "Usual Mart", s: st, now: NOW }).plans[0]?.saving;
+  };
+  const full = mk("full", 18);
+  eq("an old price counted in full", full, 2);
+  eq("an old price counted less saves less", (mk("less", 18) ?? 0) < (full ?? 0), true);
+  eq("a price 50% under the usual is capped at 40%", mk("full", 10), 8);
 }
 
 console.log("smart cart ok");

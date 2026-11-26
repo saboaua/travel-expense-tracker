@@ -216,8 +216,8 @@ export function useSmartCart() {
   const baskets = useMemo(() => smartBaskets(items, [...inCur, ...extraProducts], stores, now, [...external, ...extraExt], settings, currency), [items, inCur, extraProducts, stores, now, external, extraExt, settings, currency]);
   const usual = useMemo(() => usualStore(items, inCur), [items, inCur]);
   const trips = useMemo(() => tripsPerMonth(inCur, currency, now), [inCur, currency, now]);
-  const plan = useMemo(() => planCart({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
-  const split = useMemo(() => splitRuns({ items, habits, baskets, where, origin, usual, s: settings }), [items, habits, baskets, where, origin, usual, settings]);
+  const plan = useMemo(() => planCart({ items, baskets, where, origin, usual, s: settings, now }), [items, baskets, where, origin, usual, settings, now]);
+  const split = useMemo(() => splitRuns({ items, habits, baskets, where, origin, usual, s: settings, now }), [items, habits, baskets, where, origin, usual, settings, now]);
   const rows = useMemo(() => storeRows({ items, baskets, where, origin, usual, s: settings }), [items, baskets, where, origin, usual, settings]);
 
   return {

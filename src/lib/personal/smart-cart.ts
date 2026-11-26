@@ -4,7 +4,7 @@
  * an item with no real price at a store is left out of that store and never guessed.
  */
 import type { Product } from "@/lib/personal/price-compare";
-import { ageDays, basketTotals, distanceKm, sameStore, storeIndex, type BasketLine, type ExternalPrice, type LatLng, type ListItem, type StoreBasket } from "@/lib/personal/basket";
+import { ageDays, basketTotals, distanceKm, sameStore, STALE_DAYS, storeIndex, type BasketLine, type ExternalPrice, type LatLng, type ListItem, type StoreBasket } from "@/lib/personal/basket";
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 const median = (xs: number[]) => { const s = [...xs].sort((a, b) => a - b); const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
@@ -29,10 +29,10 @@ export type SmartSettings = {
   useOwn: boolean;
   useCommunity: boolean;
   useOnline: boolean;
-  /** Count prices older than 60 days (they are flagged) */
-  useOld: boolean;
+  /** Prices older than 60 days: count them like any other, count them less the older they are, or leave them out. All are flagged. */
+  oldMode: "full" | "less" | "leave";
 };
-export const DEFAULT_SETTINGS: SmartSettings = { includeDriving: true, perKm: 0.35, minSaving: 5, maxKm: 10, maxStops: 3, useOwn: true, useCommunity: true, useOnline: true, useOld: true };
+export const DEFAULT_SETTINGS: SmartSettings = { includeDriving: true, perKm: 0.35, minSaving: 5, maxKm: 10, maxStops: 3, useOwn: true, useCommunity: true, useOnline: true, oldMode: "less" };
 
 const num = (v: unknown, lo: number, hi: number, d: number) => { const n = typeof v === "number" ? v : typeof v === "string" ? Number(v.replace(",", ".")) : NaN; return Number.isFinite(n) ? Math.min(hi, Math.max(lo, n)) : d; };
 const bool = (v: unknown, d: boolean) => (typeof v === "boolean" ? v : d);
@@ -47,7 +47,7 @@ export function sanitizeSettings(raw: unknown): SmartSettings {
     minSaving: round2(num(o.minSaving, 0, 1000, d.minSaving)),
     maxKm: num(o.maxKm, 1, 100, d.maxKm),
     maxStops: stops,
-    useOwn: bool(o.useOwn, d.useOwn), useCommunity: bool(o.useCommunity, d.useCommunity), useOnline: bool(o.useOnline, d.useOnline), useOld: bool(o.useOld, d.useOld),
+    useOwn: bool(o.useOwn, d.useOwn), useCommunity: bool(o.useCommunity, d.useCommunity), useOnline: bool(o.useOnline, d.useOnline), oldMode: o.oldMode === "full" || o.oldMode === "less" || o.oldMode === "leave" ? o.oldMode : o.useOld === false ? "leave" : d.oldMode,
   };
 }
 
@@ -117,6 +117,25 @@ function priced(b: StoreBasket, key: string, useOld: boolean): BasketLine | null
 export const CHECK_PCT = 40;
 const isCheck = (baseline: number, price: number) => baseline > 0 && (baseline - price) / baseline * 100 > CHECK_PCT;
 
+/** How much an old price counts for: 1 up to 60 days, then 60 divided by its age (half at 4 months), never under a quarter. */
+export const oldWeight = (date: string | null, now: Date): number => {
+  if (!date) return 1;
+  const age = ageDays(date.length === 7 ? `${date}-01` : date, now);
+  return age <= STALE_DAYS ? 1 : Math.max(0.25, Math.round(STALE_DAYS / age * 100) / 100);
+};
+/** "today", "3 days ago", "5 weeks ago", "4 months ago". A community price has only its month. */
+export function agoText(date: string | null | undefined, now: Date): string | null {
+  if (!date) return null;
+  const d = ageDays(date.length === 7 ? `${date}-01` : date, now);
+  if (date.length === 7) { const m = Math.round(d / 30); return m < 1 ? "this month" : m === 1 ? "last month" : `${m} months ago`; }
+  if (d < 1) return "today";
+  if (d === 1) return "yesterday";
+  if (d < 14) return `${d} days ago`;
+  if (d < 60) return `${Math.round(d / 7)} weeks ago`;
+  return `${Math.round(d / 30)} months ago`;
+}
+export const weightText = (w: number) => (Math.abs(w - 0.5) < 0.03 ? "half weight" : `${Math.round(w * 100)}% weight`);
+
 /** How many items a stop is compared on, how many are cheaper there, and the average percent less (against the usual store, on those). */
 function stopStats(lines: PlanLine[], refTotals: Map<string, number>) {
   const compared = lines.filter((l) => l.saving != null);
@@ -173,7 +192,7 @@ export function directionsUrl(origin: LatLng | null, stops: LatLng[]): string | 
 
 /* ---------------- plans ---------------- */
 
-export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; /** When the price was paid or shared (a community price has only its month) */ date?: string | null; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean };
+export type PlanLine = { key: string; name: string; qty: number; price: number; total: number; /** against the usual store; null when the usual store has no price for it */ saving: number | null; source: BasketLine["source"]; /** When the price was paid or shared (a community price has only its month) */ date?: string | null; similar?: boolean; old: boolean; /** over 40% cheaper than your usual store on this one item: worth a second look */ check?: boolean; /** How much this old price counts for (under 1 only when old prices are counted less) */ weight?: number; /** The newest price you paid, when the typical one of your last 3 is used */ last?: number; /** The price at your usual store, for a price that looks like a sale */ usualPrice?: number };
 export type PlanStop = { store: string; at: LatLng; km: number; lines: PlanLine[]; total: number; saving: number; /** items here with a price at your usual store too */ comparedOn: number; /** of those, the ones cheaper here */ cheaperOn: number; /** percent less than your usual store on the compared items (0 when none) */ pct: number };
 export type Plan = {
   stops: PlanStop[];
@@ -207,15 +226,16 @@ function combos<T>(xs: T[], k: number): T[][] {
  * usual store, on the items it has a price for. With driving counted, the extra kilometres against the trip to your usual store are
  * taken off; a further stop is only recommended when it adds at least the smallest worthwhile saving.
  */
-export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: Map<string, LatLng>; origin: LatLng | null; usual: string | null; s: SmartSettings }): PlanSet {
+export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: Map<string, LatLng>; origin: LatLng | null; usual: string | null; s: SmartSettings; now?: Date }): PlanSet {
   const { items, baskets, where, origin, usual, s } = a;
+  const now = a.now ?? new Date();
   const empty: PlanSet = { plans: [], best: -1, usual, usualTotal: 0, comparable: 0, itemCount: items.length };
   if (!origin || items.length === 0) return empty;
   const ref = usual ? baskets.find((b) => sameStore(b.store, usual)) ?? null : null;
-  const refLine = (key: string) => (ref ? priced(ref, key, s.useOld) : null);
+  const refLine = (key: string) => (ref ? priced(ref, key, (s.oldMode !== "leave")) : null);
   const usualTotal = round2(items.reduce((t, it) => { const l = refLine(it.key); return t + (l?.total ?? 0); }, 0));
   const near = baskets
-    .flatMap((b) => { const at = where.get(b.store); return at && distanceKm(origin, at) <= s.maxKm && items.some((it) => priced(b, it.key, s.useOld)) ? [{ b, at, d: distanceKm(origin, at) }] : []; })
+    .flatMap((b) => { const at = where.get(b.store); return at && distanceKm(origin, at) <= s.maxKm && items.some((it) => priced(b, it.key, (s.oldMode !== "leave"))) ? [{ b, at, d: distanceKm(origin, at) }] : []; })
     .sort((x, y) => x.d - y.d)
     .slice(0, 8);
   if (near.length === 0) return empty;
@@ -224,7 +244,7 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
   const refTotals = new Map<string, number>();
   for (const it of items) { const l = refLine(it.key); if (l) refTotals.set(it.key, l.price! * it.qty); }
   // the items a saving is worked out on: priced at your usual store and at another store nearby
-  const comparable = items.filter((it) => refLine(it.key) && near.some((n) => !sameStore(n.b.store, usual ?? "") && priced(n.b, it.key, s.useOld))).length;
+  const comparable = items.filter((it) => refLine(it.key) && near.some((n) => !sameStore(n.b.store, usual ?? "") && priced(n.b, it.key, (s.oldMode !== "leave")))).length;
 
   const build = (set: typeof near): Plan => {
     const byStore = new Map<string, PlanLine[]>();
@@ -232,17 +252,21 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
     for (const it of items) {
       let pick: { n: (typeof near)[number]; l: BasketLine } | null = null;
       for (const n of set) {
-        const l = priced(n.b, it.key, s.useOld);
+        const l = priced(n.b, it.key, (s.oldMode !== "leave"));
         if (l && (!pick || l.price! < pick.l.price! - 1e-9 || (Math.abs(l.price! - pick.l.price!) < 1e-9 && n.d < pick.n.d))) pick = { n, l };
       }
       if (!pick) continue;
       covered++;
       const r = refLine(it.key);
-      const sv = r ? round2((r.price! - pick.l.price!) * it.qty) : null;
+      const w = s.oldMode === "less" ? Math.min(oldWeight(pick.l.date, now), r ? oldWeight(r.date, now) : 1) : 1;
+      const flagged = r ? isCheck(r.price!, pick.l.price!) : false;
+      // a price that looks like a sale only counts up to the check limit until it is looked at
+      const raw = r ? (r.price! - pick.l.price!) * it.qty : null;
+      const sv = raw == null ? null : round2((flagged ? Math.min(raw, r!.price! * it.qty * CHECK_PCT / 100) : raw) * w);
       itemsTotal += pick.l.total!;
       saving += sv ?? 0;
       const list = byStore.get(pick.n.b.store) ?? [];
-      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, date: pick.l.date, similar: pick.l.similar, old: pick.l.status === "old", check: r ? isCheck(r.price!, pick.l.price!) : false });
+      list.push({ key: it.key, name: pick.l.name, qty: it.qty, price: pick.l.price!, total: pick.l.total!, saving: sv, source: pick.l.source, date: pick.l.date, similar: pick.l.similar, old: pick.l.status === "old", check: flagged, ...(w < 1 ? { weight: w } : {}), ...(pick.l.last != null ? { last: pick.l.last } : {}), ...(flagged ? { usualPrice: r!.price! } : {}) });
       byStore.set(pick.n.b.store, list);
     }
     const used = set.filter((n) => byStore.has(n.b.store));
@@ -299,7 +323,7 @@ export type SplitPlan = { weekly: Run; stockup: Run; /** both runs together, per
  * Your cart split by how often you buy things: what you buy every week or two gets one quick trip, what keeps gets a monthly stock-up
  * that is allowed a second stop. Each run is planned on its own, with driving counted per trip. Null when either run is too small.
  */
-export function splitRuns(a: { items: ListItem[]; habits: HabitItem[]; baskets: StoreBasket[]; where: Map<string, LatLng>; origin: LatLng | null; usual: string | null; s: SmartSettings; minItems?: number }): SplitPlan | null {
+export function splitRuns(a: { items: ListItem[]; habits: HabitItem[]; baskets: StoreBasket[]; where: Map<string, LatLng>; origin: LatLng | null; usual: string | null; s: SmartSettings; minItems?: number; now?: Date }): SplitPlan | null {
   const { items, habits, baskets, where, origin, usual, s } = a;
   const min = a.minItems ?? MIN_RUN_ITEMS;
   if (!origin || !s.includeDriving) return null;
@@ -309,7 +333,7 @@ export function splitRuns(a: { items: ListItem[]; habits: HabitItem[]; baskets: 
   const stockItems = items.filter((i) => !weeklyItems.includes(i));
   if (weeklyItems.length < min || stockItems.length < min) return null;
   const run = (kind: Run["kind"], list: ListItem[], settings: SmartSettings, perMonth: number): Run => {
-    const set = planCart({ items: list, baskets, where, origin, usual, s: settings });
+    const set = planCart({ items: list, baskets, where, origin, usual, s: settings, now: a.now });
     const plan = set.best >= 0 ? set.plans[set.best] : null;
     const net = plan ? Math.max(0, plan.net) : 0;
     return { kind, items: list, plan, net: round2(net), monthlyNet: round2(net * perMonth) };
@@ -335,9 +359,9 @@ export function storeRows(a: { items: ListItem[]; baskets: StoreBasket[]; where:
     const lines: PlanLine[] = [];
     let shared = 0, diff = 0, baseSum = 0, fresh = 0;
     for (const it of items) {
-      const l = priced(b, it.key, s.useOld);
+      const l = priced(b, it.key, (s.oldMode !== "leave"));
       if (!l) continue;
-      const r = ref && !sameStore(b.store, ref.store) ? priced(ref, it.key, s.useOld) : null;
+      const r = ref && !sameStore(b.store, ref.store) ? priced(ref, it.key, (s.oldMode !== "leave")) : null;
       const sv = r ? round2((r.price! - l.price!) * it.qty) : null;
       if (r) { shared++; diff += (l.price! - r.price!) * it.qty; baseSum += r.price! * it.qty; if (l.status !== "old") fresh++; }
       lines.push({ key: it.key, name: l.name, qty: it.qty, price: l.price!, total: l.total!, saving: sv, source: l.source, date: l.date, similar: l.similar, old: l.status === "old", check: r ? isCheck(r.price!, l.price!) : false });
@@ -401,13 +425,13 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
   const byStore = new Map<string, number>();
   let elseCount = 0, elseSaving = 0;
   for (const it of items) {
-    const l = priced(b, it.key, s.useOld);
+    const l = priced(b, it.key, (s.oldMode !== "leave"));
     if (!l) { notPriced.push(baskets.flatMap((x) => x.lines).find((x) => x.key === it.key)?.name ?? it.key); continue; }
-    const r = ref ? priced(ref, it.key, s.useOld) : null;
+    const r = ref ? priced(ref, it.key, (s.oldMode !== "leave")) : null;
     let sv: number | null = null;
     let better: DetailLine["better"] = null;
     let el: { store: string; price: number } | null = null;
-    for (const o of others) { const x = priced(o, it.key, s.useOld); if (x && (!el || x.price! < el.price - 1e-9)) el = { store: o.store, price: x.price! }; }
+    for (const o of others) { const x = priced(o, it.key, (s.oldMode !== "leave")); if (x && (!el || x.price! < el.price - 1e-9)) el = { store: o.store, price: x.price! }; }
     if (r) {
       sv = round2((r.price! - l.price!) * it.qty);
       compared++; base += r.price! * it.qty; saving += (r.price! - l.price!) * it.qty;
@@ -415,7 +439,7 @@ export function storeDetail(a: { store: string; items: ListItem[]; baskets: Stor
       if (l.status !== "old") fresh++;
     } else if (isUsual) {
       let best: { store: string; price: number } | null = null;
-      for (const o of others) { const x = priced(o, it.key, s.useOld); if (x && (!best || x.price! < best.price - 1e-9)) best = { store: o.store, price: x.price! }; }
+      for (const o of others) { const x = priced(o, it.key, (s.oldMode !== "leave")); if (x && (!best || x.price! < best.price - 1e-9)) best = { store: o.store, price: x.price! }; }
       if (best && best.price < l.price! - 1e-9) {
         const sav = round2((l.price! - best.price) * it.qty);
         better = { store: best.store, price: best.price, saving: sav };

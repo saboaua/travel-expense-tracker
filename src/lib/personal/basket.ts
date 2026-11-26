@@ -125,7 +125,7 @@ export const LEVEL_LABEL: Record<Level, string> = { cheapest: "Cheapest", below:
 export type ListItem = { key: string; qty: number };
 /** own: bought by you; noted: a price you wrote down; community and online: from outside */
 export type PriceSource = "own" | "noted" | "community" | "online";
-export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean };
+export type BasketLine = { key: string; name: string; qty: number; price: number | null; total: number | null; status: "priced" | "old" | "unknown"; date: string | null; source: PriceSource | null; similar?: boolean; /** The newest price you paid, when the price used is the typical one of your last 3 and differs from it */ last?: number };
 export type StoreBasket = {
   store: string;
   /** The total of the items that have a real price here (items with no price are left out, never guessed) */
@@ -164,7 +164,11 @@ export function basketTotals(list: ListItem[], products: Product[], stores: stri
         && (ext.date.slice(0, 7) > here.latest.date.slice(0, 7) || (ext.date.slice(0, 7) === here.latest.date.slice(0, 7) && !!here.latest.noted));
       if (here && !extNewer) {
         const old = !fresh(here.latest.date, now);
-        return [{ key: p.key, name: p.name, qty: it.qty, price: here.latest.price, total: round2(here.latest.price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: here.latest.noted ? "noted" : "own" } as BasketLine];
+        // one sale does not skew the plan: the typical (middle) price of your last 3 receipts here
+        const recent = here.latest.noted ? [] : p.history.filter((h) => h.store === store && h.price > 0 && !h.noted).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 3).map((h) => h.price);
+        const typical = recent.length === 3 ? round2([...recent].sort((a, b) => a - b)[1]) : null;
+        const price = typical ?? here.latest.price;
+        return [{ key: p.key, name: p.name, qty: it.qty, price, total: round2(price * it.qty), status: old ? "old" : "priced", date: here.latest.date, source: here.latest.noted ? "noted" : "own", ...(typical != null && Math.abs(typical - here.latest.price) >= 0.005 ? { last: here.latest.price } : {}) } as BasketLine];
       }
       if (ext) return [{ key: p.key, name: p.name, qty: it.qty, price: ext.price, total: round2(ext.price * it.qty), status: "priced", date: ext.date ?? null, source: ext.source, similar: ext.similar } as BasketLine];
       return [{ key: p.key, name: p.name, qty: it.qty, price: null, total: null, status: "unknown", date: null, source: null } as BasketLine];

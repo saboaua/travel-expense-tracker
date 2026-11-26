@@ -6700,6 +6700,7 @@ try {
       const route = await page.getByTestId("sc-route").getAttribute("href");
       assert(/google\.com\/maps\/dir\/\?api=1&destination=12\.\d+,-70\.03/.test(route) && /origin=12\.52/.test(route), `directions go from home to the store (got: ${route})`);
       assert((await page.getByTestId("sc-stop").count()) >= 1 && (await page.getByTestId("sc-line").count()) >= 1, "each stop lists what to buy there");
+      assert(/ago|today|yesterday/.test(await page.getByTestId("sc-line-note").first().innerText()), "each price says how old it is");
       // A store name opens its map
       await page.getByTestId("sc-stop-open").first().click();
       await page.getByTestId("sc-store-sheet").waitFor();
@@ -6737,10 +6738,15 @@ try {
       // Settings
       await page.getByTestId("sc-settings-open").click();
       await page.getByTestId("sc-settings").waitFor();
+      assert(await page.getByTestId("sc-old-prices").getByRole("radio", { name: "Count them less, the older the less" }).isChecked(), "old prices are counted less by default");
+      await page.getByTestId("sc-old-prices").getByRole("radio", { name: "Leave them out" }).click();
       await page.getByLabel("Driving cost per km").fill("0.5");
       await page.getByLabel("Driving cost per km").blur();
       await page.reload();
       await page.getByTestId("smart-cart").waitFor();
+      await page.getByTestId("sc-settings-open").click();
+      assert(await page.getByTestId("sc-old-prices").getByRole("radio", { name: "Leave them out" }).isChecked(), "the old-price choice stays after a reload");
+      await page.keyboard.press("Escape");
       assert((await page.getByRole("switch", { name: "Include driving cost", exact: true }).getAttribute("aria-checked")) === "false", "the switch stays off after a reload");
     } finally {
       await ctx.close();
