@@ -252,7 +252,7 @@ export function BestStore() {
   const noReceipts = !loading && inCur.length === 0;
   
   return (
-    <div className="mx-auto max-w-2xl space-y-4 pb-8">
+    <div className="mx-auto w-full max-w-2xl space-y-4 p-4 pb-28 md:p-8">
       <div>
         <Link href="/personal/groceries" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
         <h1 className="mt-1 text-2xl font-bold">Best Prices</h1>
