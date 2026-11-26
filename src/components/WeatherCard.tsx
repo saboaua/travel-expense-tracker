@@ -1,5 +1,6 @@
 "use client";
 
+import { getFix } from "@/lib/geo";
 import { useEffect, useState } from "react";
 import {
   Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudMoon, CloudRain, CloudSnow, CloudSun, Droplets, MapPin, Moon, Sun,
@@ -30,14 +31,7 @@ type State = { status: "loading" } | { status: "ready"; data: WeatherNow } | { s
 
 /** Position of the device right now; null if permission is denied or unavailable. */
 function getPosition(): Promise<{ lat: number; lon: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      (p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }),
-      () => resolve(null),
-      { timeout: 6000, maximumAge: 10 * 60 * 1000, enableHighAccuracy: false }
-    );
-  });
+  return getFix({ timeoutMs: 6000 }).then((f) => (f ? { lat: f.lat, lon: f.lng } : null));
 }
 
 /**

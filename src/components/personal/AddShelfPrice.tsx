@@ -1,5 +1,6 @@
 "use client";
 
+import { getFix, lastFix } from "@/lib/geo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Camera, Check, Crosshair, Loader2, MapPin, Search, Users } from "lucide-react";
@@ -87,14 +88,11 @@ export function AddShelfPrice() {
   const locate = useCallback(() => {
     if (!navigator.geolocation) { setGeo("denied"); return; }
     setGeo("asking");
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setMe({ lat: p.coords.latitude, lng: p.coords.longitude }); setGeo("idle"); },
-      () => setGeo("denied"),
-      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
-    );
+    void getFix({ maxAgeMs: 3 * 60 * 1000 }).then((f) => { if (f) { setMe({ lat: f.lat, lng: f.lng }); setGeo("idle"); } else setGeo("denied"); });
   }, []);
   useEffect(() => {
     if (!sharing) return;
+    if (lastFix(3 * 60 * 1000)) { locate(); return; }
     navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {});
   }, [sharing, locate]);
 

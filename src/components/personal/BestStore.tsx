@@ -1,5 +1,6 @@
 "use client";
 
+import { getFix, lastFix } from "@/lib/geo";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Money } from "@/components/ui/money";
 import Link from "next/link";
@@ -169,14 +170,11 @@ export function BestStore() {
   const locate = useCallback(() => {
     if (!navigator.geolocation) { setGeo("denied"); return; }
     setGeo("asking");
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setHere({ lat: p.coords.latitude, lng: p.coords.longitude }); setGeo("idle"); },
-      () => setGeo("denied"),
-      { timeout: 8000, maximumAge: 5 * 60 * 1000 }
-    );
+    void getFix().then((f) => { if (f) { setHere({ lat: f.lat, lng: f.lng }); setGeo("idle"); } else setGeo("denied"); });
   }, []);
   useEffect(() => {
-    // Only look straight away when the person has already allowed it; otherwise they tap the button
+    // A recent place from any screen is used as it is; otherwise only look straight away when the person has already allowed it, or they tap the button
+    if (lastFix()) { locate(); return; }
     navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {});
   }, [locate]);
 

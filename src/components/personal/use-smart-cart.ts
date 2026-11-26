@@ -1,5 +1,6 @@
 "use client";
 
+import { getFix, lastFix } from "@/lib/geo";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchPrices, pricesKey, fetchPriceMatches, priceMatchesKey } from "@/lib/offline-grocery";
@@ -184,13 +185,10 @@ export function useSmartCart() {
   const locate = useCallback(() => {
     if (!navigator.geolocation) { setGeo("denied"); return; }
     setGeo("asking");
-    navigator.geolocation.getCurrentPosition(
-      (p) => { setHere({ lat: p.coords.latitude, lng: p.coords.longitude }); setFrom("here"); setGeo("idle"); },
-      () => setGeo("denied"),
-      { timeout: 8000, maximumAge: 5 * 60 * 1000 },
-    );
+    void getFix().then((f) => { if (f) { setHere({ lat: f.lat, lng: f.lng }); setFrom("here"); setGeo("idle"); } else setGeo("denied"); });
   }, []);
-  useEffect(() => { navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {}); }, [locate]);
+  // a place found a few minutes ago on any screen is used without asking again
+  useEffect(() => { if (lastFix()) { locate(); return; } navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {}); }, [locate]);
 
   // the place of each store: the one you chose, else a checked one, else the nearest
   const allPlaces = useMemo(() => [...(locQ.data ?? []), ...(placesQ.data ?? [])], [locQ.data, placesQ.data]);

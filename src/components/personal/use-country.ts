@@ -1,5 +1,6 @@
 "use client";
 
+import { getFix } from "@/lib/geo";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { chooseCountry, codeOfCountryName, normCountry, shouldAnnounce, type CountrySource } from "@/lib/country";
@@ -19,10 +20,7 @@ export const knownCountry = (): string | null => normCountry(read(LAST));
 
 export type Detected = { code: string; how: "gps" | "network" };
 
-const gps = () => new Promise<{ lat: number; lon: number } | null>((resolve) => {
-  if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(null);
-  navigator.geolocation.getCurrentPosition((p) => resolve({ lat: p.coords.latitude, lon: p.coords.longitude }), () => resolve(null), { timeout: 8000, maximumAge: 10 * 60 * 1000, enableHighAccuracy: false });
-});
+const gps = () => getFix().then((f) => (f ? { lat: f.lat, lon: f.lng } : null));
 const countryAt = async (q: string): Promise<string | null> => {
   try {
     const r = await fetch(`/api/country${q}`, { cache: "no-store", signal: AbortSignal.timeout(5000) });
