@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { CHECK_PCT, ROAD_FACTOR, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
+import { CHECK_PCT, ROAD_FACTOR, type Run, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -210,6 +210,42 @@ function AddItemSheet({ sc, onClose }: { sc: Sc; onClose: () => void }) {
   );
 }
 
+function SplitRuns({ split, currency, everyOf, onOpen }: { split: NonNullable<Sc["split"]>; currency: string; everyOf: (r: Run) => string; onOpen: (r: { store: string; at: { lat: number; lng: number }; km: number; lines: PlanLine[]; total: number; saving: number }) => void }) {
+  const card = (r: Run) => {
+    const stop = r.plan?.stops[0];
+    const weekly = r.kind === "weekly";
+    return (
+      <Card key={r.kind} data-testid={`sc-run-${r.kind}`}><CardContent className="space-y-3 p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0"><h3 className="text-base font-extrabold">{weekly ? "Weekly run" : "Monthly stock-up"}</h3><p className="text-xs text-muted-foreground">{everyOf(r)}</p></div>
+          {r.net > 0.005 ? <span className={`shrink-0 text-right text-sm font-extrabold ${GREEN}`}>Save <Money amount={r.net} currency={currency} className="text-sm" /> {weekly ? "a week" : "a month"}</span> : <span className="shrink-0 text-sm font-bold text-muted-foreground">No saving</span>}
+        </div>
+        {r.plan && r.plan.stops.length > 0 ? r.plan.stops.map((s) => (
+          <div key={s.store} className="space-y-2" data-testid="sc-run-stop">
+            <button type="button" onClick={() => onOpen({ store: s.store, at: s.at, km: s.km, lines: s.lines, total: s.total, saving: s.saving })} className="flex w-full items-center gap-3 text-left" aria-label={`${s.store}, show on the map`}>
+              <IconTile tone="groceries" color="#16a34a" className="h-10 w-10"><ShoppingCart className="h-5 w-5" /></IconTile>
+              <span className="min-w-0 flex-1"><span className="block font-extrabold text-primary">{s.store}</span><span className="block text-xs text-muted-foreground">{s.km.toFixed(1)} km, {Math.max(1, Math.round((s.km / 35) * 60))} min</span></span>
+            </button>
+            <Lines lines={s.lines.slice(0, 3)} currency={currency} />
+          </div>
+        )) : <p className="text-sm text-muted-foreground">Nothing beats your usual store{split.usual ? ` (${split.usual})` : ""} for these after driving.</p>}
+        {stop && <p className="text-xs text-muted-foreground">{(() => { const more = r.plan!.stops.reduce((n, x) => n + Math.max(0, x.lines.length - 3), 0); return more > 0 ? `${more} more item${more === 1 ? "" : "s"}. ` : ""; })()}{r.plan!.driving > 0.005 ? <>After driving <Money amount={r.plan!.driving} currency={currency} className="text-xs" />. </> : null}{weekly ? "One quick stop for what you buy often." : r.plan!.stops.length > 1 ? "A second stop pays off for things that keep." : "Worth the drive, because you only go about once a month."}</p>}
+      </CardContent></Card>
+    );
+  };
+  return (
+    <div className="space-y-3" data-testid="sc-split">
+      {card(split.weekly)}
+      {card(split.stockup)}
+      <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-500/30 dark:bg-emerald-500/10" data-testid="sc-split-total">
+        <p className="text-sm font-semibold text-emerald-800 dark:text-emerald-200">Together, a month</p>
+        <p className={`text-2xl font-extrabold ${GREEN}`}><Money amount={split.monthlyNet} currency={currency} className="text-2xl" /> saved</p>
+        <p className="text-xs text-muted-foreground">Against buying everything at your usual store{split.usual ? ` (${split.usual})` : ""}, after driving.</p>
+      </div>
+    </div>
+  );
+}
+
 function planTitle(p: Plan, i: number): string {
   if (p.stops.length === 1) return `One stop: ${p.stops[0].store}`;
   return i === 1 ? `Smart split: ${p.stops.length} stops` : `${p.stops.length} stops`;
@@ -221,6 +257,7 @@ export function SmartCart() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pick, setPick] = useState<number | null>(null);
+  const [view, setView] = useState<"one" | "split">("one");
   const [placeMsg, setPlaceMsg] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ store: string; at: { lat: number; lng: number } | null; km: number | null; lines: PlanLine[]; total: number; saving: number | null } | null>(null);
   const { currency, plan, rows, settings } = sc;
@@ -382,7 +419,15 @@ export function SmartCart() {
           {!sc.externalReady && <p className="text-xs text-muted-foreground" aria-live="polite">Looking up community and online prices…</p>}
           {missing > 0 && sc.externalReady && <p className="text-xs text-muted-foreground" data-testid="sc-missing">{missing} item{missing === 1 ? " has" : "s have"} no real price at any store yet, so {missing === 1 ? "it is" : "they are"} left out.</p>}
 
-          {driving ? (
+          {driving && sc.split && (
+            <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1" role="group" aria-label="How to shop" data-testid="sc-view">
+              <button type="button" aria-pressed={view === "one"} onClick={() => setView("one")} className={`min-h-11 rounded-lg px-3 text-sm font-bold ${view === "one" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>One trip</button>
+              <button type="button" aria-pressed={view === "split"} onClick={() => setView("split")} className={`min-h-11 rounded-lg px-3 text-sm font-bold ${view === "split" ? "bg-card shadow-sm" : "text-muted-foreground"}`}>Weekly + stock-up</button>
+            </div>
+          )}
+          {driving && sc.split && view === "split" ? (
+            <SplitRuns split={sc.split} currency={currency} everyOf={(r) => (r.kind === "weekly" ? `Every week or two · ${r.items.length} items you buy often` : `About once a month · ${r.items.length} items that keep`)} onOpen={openStore} />
+          ) : driving ? (
             <div className="space-y-3" data-testid="sc-plans">
               <h2 className="text-base font-bold">Where to buy it</h2>
               {plan.plans.map((p, i) => (

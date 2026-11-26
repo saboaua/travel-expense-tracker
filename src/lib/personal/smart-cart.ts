@@ -276,6 +276,49 @@ export function planCart(a: { items: ListItem[]; baskets: StoreBasket[]; where: 
   return { plans, best, usual, usualTotal, comparable, itemCount: items.length };
 }
 
+/* ---------------- a weekly run and a monthly stock-up ---------------- */
+
+/** Bought at least this often (days between purchases) is a weekly thing; anything rarer waits for the stock-up. */
+export const WEEKLY_MAX_DAYS = 14;
+/** Each run needs at least this many items to be worth a trip of its own. */
+export const MIN_RUN_ITEMS = 3;
+const WEEKS_PER_MONTH = 52 / 12;
+
+export type Run = {
+  kind: "weekly" | "stockup";
+  items: ListItem[];
+  /** The best plan for these items, or null when nothing beats shopping at your usual store */
+  plan: Plan | null;
+  /** Saving after driving per trip, and per month (a weekly run happens about 4.3 times a month) */
+  net: number;
+  monthlyNet: number;
+};
+export type SplitPlan = { weekly: Run; stockup: Run; /** both runs together, per month */ monthlyNet: number; usual: string | null };
+
+/**
+ * Your cart split by how often you buy things: what you buy every week or two gets one quick trip, what keeps gets a monthly stock-up
+ * that is allowed a second stop. Each run is planned on its own, with driving counted per trip. Null when either run is too small.
+ */
+export function splitRuns(a: { items: ListItem[]; habits: HabitItem[]; baskets: StoreBasket[]; where: Map<string, LatLng>; origin: LatLng | null; usual: string | null; s: SmartSettings; minItems?: number }): SplitPlan | null {
+  const { items, habits, baskets, where, origin, usual, s } = a;
+  const min = a.minItems ?? MIN_RUN_ITEMS;
+  if (!origin || !s.includeDriving) return null;
+  const every = new Map(habits.map((h) => [h.key, h.everyDays]));
+  // things with no buying history (added by hand) count as weekly: you are shopping for them now
+  const weeklyItems = items.filter((i) => { const d = every.get(i.key); return d == null || d <= WEEKLY_MAX_DAYS; });
+  const stockItems = items.filter((i) => !weeklyItems.includes(i));
+  if (weeklyItems.length < min || stockItems.length < min) return null;
+  const run = (kind: Run["kind"], list: ListItem[], settings: SmartSettings, perMonth: number): Run => {
+    const set = planCart({ items: list, baskets, where, origin, usual, s: settings });
+    const plan = set.best >= 0 ? set.plans[set.best] : null;
+    const net = plan ? Math.max(0, plan.net) : 0;
+    return { kind, items: list, plan, net: round2(net), monthlyNet: round2(net * perMonth) };
+  };
+  const weekly = run("weekly", weeklyItems, { ...s, maxStops: 1 }, WEEKS_PER_MONTH);
+  const stockup = run("stockup", stockItems, { ...s, maxStops: (s.maxStops >= 2 ? 2 : 1) }, 1);
+  return { weekly, stockup, monthlyNet: round2(weekly.monthlyNet + stockup.monthlyNet), usual };
+}
+
 /* ---------------- every supermarket (driving not counted) ---------------- */
 
 export type StoreRow = { store: string; km: number | null; at: LatLng | null; total: number; priced: number; unpriced: number; /** against your usual store, on the items both price; null for the usual store itself or when nothing is shared */ vsUsual: number | null; usual: boolean; lines: PlanLine[]; /** items priced here and at your usual store */ compared: number; /** average percent against your usual store on those (negative is cheaper); null with fewer than MIN_COMPARED items */ avgPct: number | null; confidence: "strong" | "fair" | "few" | null; /** the lowest average against your usual store, among stores with enough items to compare (the usual store counts as 0) */ cheapest: boolean };

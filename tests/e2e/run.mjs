@@ -6750,6 +6750,50 @@ try {
     }
   });
 
+  await test("smart cart: a weekly run and a monthly stock-up, with what a month saves", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const me = () => fake.table("profiles").find((p) => p.id === PAT);
+    const weekly = ["Milk", "Bread", "Eggs"], keeps = ["Rice", "Cooking oil", "Flour"];
+    let n = 0;
+    const buy = (store, day, list, price) => {
+      const rid = `9c000000-0000-4000-8000-0000000e6${String(++n).padStart(3, "0")}`;
+      fake.table("grocery_receipts").push({ id: rid, user_id: PAT, store, purchase_date: addDays(today, day), total: 30, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+      list.forEach((nm, i) => fake.table("grocery_items").push({ id: `9d000000-0000-4000-8000-0000000e6${String(n).padStart(3, "0")}${i}`, receipt_id: rid, user_id: PAT, name: nm, normalized_name: nm.toLowerCase(), category: "Other", quantity: 1, unit_price: price, line_total: price, unit: null, created_at: new Date().toISOString() }));
+    };
+    // Ling & Sons is the usual store; New Ten Sing is a little cheaper
+    for (const d of [-28, -21, -14, -7]) buy("Ling & Sons", d, weekly, 10);
+    for (const d of [-120, -80, -40]) buy("Ling & Sons", d, keeps, 20);
+    buy("New Ten Sing", -3, [...weekly, ...keeps], 8);
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e6001", user_id: PAT, name: "Ling & Sons", lat: 12.525, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e6002", user_id: PAT, name: "New Ten Sing", lat: 12.53, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    me().home_lat = 12.52; me().home_lng = -70.03;
+    fake.table("user_plans").push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+    await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/smart-cart`);
+      await page.getByTestId("smart-cart").waitFor();
+      const view = page.getByTestId("sc-view");
+      await view.waitFor();
+      assert((await page.getByTestId("sc-split").count()) === 0, "one trip is shown first");
+      await view.getByRole("button", { name: "Weekly + stock-up" }).click();
+      await page.getByTestId("sc-split").waitFor();
+      assert(/3 items you buy often/.test(await page.getByTestId("sc-run-weekly").innerText()), "the weekly run counts its items");
+      assert(/3 items that keep/.test(await page.getByTestId("sc-run-stockup").innerText()), "the stock-up counts its items");
+      assert(/Together, a month/.test(await page.getByTestId("sc-split-total").innerText()) && /usual store/.test(await page.getByTestId("sc-split-total").innerText()), "a month is added up against the usual store");
+      await view.getByRole("button", { name: "One trip" }).click();
+      await page.getByTestId("sc-plans").waitFor();
+    } finally {
+      await ctx.close();
+      me().home_lat = null; me().home_lng = null;
+      fake.table("user_plans").splice(0);
+      for (const t of ["grocery_receipts", "grocery_items", "store_locations"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("0000000e6")) a.splice(i, 1); }
+    }
+  });
+
   await test("smart cart: add an item that is not in the cart, see where it is priced, add one with no price, and remove it", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 } });
     ctx.setDefaultTimeout(60_000);

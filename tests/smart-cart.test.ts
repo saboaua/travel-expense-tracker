@@ -1,4 +1,4 @@
-import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
+import { addedExternal, addedProduct, cheapestOffer, listedKey, sanitizeAdded, DEFAULT_SETTINGS, directionsUrl, everyText, habitItems, learning, planCart, splitRuns, tripsPerMonth, sanitizeSettings, smartBaskets, storeDetail, storeRows, tour, usualStore } from "../src/lib/personal/smart-cart";
 import { buildProducts } from "../src/lib/personal/price-compare";
 import type { TrackerRow } from "../src/lib/personal/grocery";
 import type { ExternalPrice, LatLng } from "../src/lib/personal/basket";
@@ -192,4 +192,19 @@ eq("with no usual store the line still compares with the other store: 0.25 more"
 eq("an unknown store has no detail", storeDetail({ store: "Nowhere", items, baskets, usual, s: free }), null);
 
 if (fail) { console.error(`${fail} smart cart check(s) failed`); process.exit(1); }
+// weekly run and monthly stock-up
+{
+  const hab = (k: string, d: number | null) => ({ key: key(k), name: k, size: null, count: 3, everyDays: d, qty: 1, lastDate: "2026-11-01" });
+  const habs = [hab("Milk", 7), hab("Eggs", 10), hab("Paste", 40)];
+  const split = splitRuns({ items, habits: habs, baskets, where, origin: home, usual, s: free, minItems: 1 })!;
+  eq("weekly items", split.weekly.items.map((i) => i.key).sort(), [key("Eggs"), key("Milk")].sort());
+  eq("stock-up items", split.stockup.items.map((i) => i.key), [key("Paste")]);
+  eq("the weekly run is one stop", split.weekly.plan?.stops.length, 1);
+  eq("a month counts a weekly run about 4.3 times", split.monthlyNet, Math.round((split.weekly.net * 52 / 12 + split.stockup.net) * 100) / 100);
+  eq("too small a run is not offered", splitRuns({ items, habits: habs, baskets, where, origin: home, usual, s: free }), null);
+  eq("no split without a starting point", splitRuns({ items, habits: habs, baskets, where, origin: null, usual, s: free, minItems: 1 }), null);
+  eq("no split when driving is not counted", splitRuns({ items, habits: habs, baskets, where, origin: home, usual, s: { ...free, includeDriving: false }, minItems: 1 }), null);
+  eq("no split when everything is weekly", splitRuns({ items, habits: [hab("Milk", 7), hab("Eggs", 7), hab("Paste", 7)], baskets, where, origin: home, usual, s: free, minItems: 1 }), null);
+}
+
 console.log("smart cart ok");
