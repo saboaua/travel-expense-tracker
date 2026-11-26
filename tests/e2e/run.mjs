@@ -6668,6 +6668,9 @@ try {
     });
     fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5001", user_id: PAT, name: "Ling & Sons", lat: 12.525, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
     fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5002", user_id: PAT, name: "New Ten Sing", lat: 12.56, lng: -70.03, source: "pin", created_at: new Date().toISOString() });
+    // a copy 20 m from the first (merged away) and a second branch far away (offered as a choice)
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5003", user_id: PAT, name: "New Ten Sing", lat: 12.5602, lng: -70.03, source: "osm", created_at: new Date().toISOString() });
+    fake.table("store_locations").push({ id: "9e000000-0000-4000-8000-0000000e5004", user_id: PAT, name: "New Ten Sing", lat: 12.60, lng: -70.03, source: "osm", created_at: new Date().toISOString() });
     me().home_lat = 12.52; me().home_lng = -70.03;
     await page.route("https://tile.openstreetmap.org/**", (r) => r.fulfill({ contentType: "image/png", body: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64") }));
     try {
@@ -6719,6 +6722,15 @@ try {
       assert((await page.getByTestId("sc-plans").count()) === 0, "no trips are planned while driving is not counted");
       await page.getByTestId("sc-store-row").nth(1).click();
       assert(/destination=12\.56/.test(await page.getByTestId("sc-directions").getAttribute("href")), "a store row opens directions to that store");
+      // Which place is this store: near copies are merged, the nearest is used until you choose
+      const picker = page.getByTestId("sc-place-picker");
+      await picker.waitFor();
+      assert((await picker.getByRole("radio").count()) === 2, "two places are offered; the copy 20 m away is merged");
+      assert(await picker.getByRole("radio").first().isChecked(), "the nearest place is used until one is chosen");
+      await picker.getByRole("radio").nth(1).click();
+      await page.waitForFunction(() => /destination=12\.6[,0]/.test(document.querySelector('[data-testid="sc-directions"]')?.getAttribute("href") ?? ""));
+      assert(fake.table("store_locations").some((r) => r.id.endsWith("e5004") && r.preferred === true), "the choice is saved");
+      assert(/your choice/.test(await picker.innerText()), "the chosen place says it is your choice");
       await page.getByTestId("sc-detail-summary").waitFor();
       assert(/usual store/i.test(await page.getByTestId("sc-detail-summary").innerText()) && (await page.getByTestId("sc-detail-line").count()) >= 1, "a store opens with what you save or lose against your usual store, item by item");
       await page.keyboard.press("Escape");

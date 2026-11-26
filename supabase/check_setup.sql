@@ -105,6 +105,7 @@ need_cols(tbl, col, fix) as (values
   -- Best store for your list
   ('shopping_list_items','product_key','migration_basket.sql'),
   ('store_locations','lat','migration_basket.sql'),
+  ('store_locations','preferred','migration_store_place_choice.sql'),
   ('supermarket_places','name_key','migration_supermarket_places.sql'),
   ('supermarket_places','fixed','migration_places_fix.sql'),
   ('grocery_receipts','country','migration_receipt_country.sql'),

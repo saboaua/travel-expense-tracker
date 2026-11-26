@@ -10,15 +10,15 @@ import type { TrackerRow } from "@/lib/personal/grocery";
 import { externalPrices } from "@/lib/personal/best-prices";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
 import { searchCommunity } from "@/lib/personal/community";
-import { distanceKm, sameStore, type ExternalPrice, type LatLng, type ListItem } from "@/lib/personal/basket";
+import { sameStore, type ExternalPrice, type LatLng, type ListItem } from "@/lib/personal/basket";
 import { DEFAULT_SETTINGS, MAX_ADDED, addedExternal, addedProduct, habitItems, learning, planCart, tripsPerMonth, sanitizeAdded, sanitizeSettings, smartBaskets, storeRows, usualStore, type AddedItem, type HabitItem, type SmartSettings } from "@/lib/personal/smart-cart";
 import { searchBestPrices } from "@/lib/personal/best-prices";
 import { productWords } from "@/lib/personal/price-compare";
 import { useOnline } from "@/lib/use-online";
+import { chosenPlaces, placeOptions, type PlaceLoc, type PlaceOption } from "@/lib/personal/store-places";
 import { useCountry } from "@/components/personal/use-country";
 import { countryForShared, currencyOfCountry } from "@/lib/country";
 
-type Loc = { name: string; lat: number; lng: number };
 const clamp = (q: number) => Math.min(99, Math.max(1, Math.round(q)));
 type Saved = { settings: SmartSettings; off: string[]; qty: Record<string, number>; added: AddedItem[] };
 
@@ -38,17 +38,23 @@ export function useSmartCart() {
   const online = useOnline();
   const prices = useCachedQuery<TrackerRow[]>((uid) => pricesKey(uid), (sb) => fetchPrices(sb), []);
   const matches = useCachedQuery<MatchDecision[]>((uid) => priceMatchesKey(uid), (sb) => fetchPriceMatches(sb), []);
-  const locQ = useCachedQuery<Loc[]>((uid) => `${uid}:basket:locs`, async (sb) => { const r = await sb.from("store_locations").select("name, lat, lng"); return { data: (r.data ?? []) as Loc[], error: r.error }; }, []);
-  const placesQ = useCachedQuery<Loc[]>((uid) => `${uid}:basket:places:${country ?? "all"}`, async (sb) => {
+  const locQ = useCachedQuery<PlaceLoc[]>((uid) => `${uid}:basket:locs2`, async (sb) => {
+    // before the place-choice migration there is no "preferred" column
+    let r = await sb.from("store_locations").select("id, name, lat, lng, source, preferred");
+    if (r.error) r = await sb.from("store_locations").select("id, name, lat, lng, source");
+    return { data: (r.data ?? []) as unknown as PlaceLoc[], error: r.error };
+  }, []);
+  const placesQ = useCachedQuery<PlaceLoc[]>((uid) => `${uid}:basket:places2:${country ?? "all"}`, async (sb) => {
     try {
-      const load = (withCountry: boolean, withCategory = true) => fetchAll<Loc & { category?: string | null }>((a, b) => {
-        const q = sb.from("supermarket_places").select(withCategory ? "id, name, lat, lng, category" : "id, name, lat, lng");
+      type Row = { id: string; name: string; lat: number; lng: number; category?: string | null; fixed?: boolean | null };
+      const load = (withCountry: boolean, cols: string) => fetchAll<Row>((a, b) => {
+        const q = sb.from("supermarket_places").select(cols);
         return (withCountry && country ? q.eq("country", country) : q).order("id").range(a, b) as never;
       });
-      // before the categories migration every place is a supermarket; only supermarkets are planned into a trip
-      const rows = await load(true).catch(() => load(true, false)).catch(() => load(false, false));
-      return { data: rows.filter((r) => (r.category ?? "supermarkets") === "supermarkets"), error: null };
-    } catch { return { data: [] as Loc[], error: null }; }
+      // older databases lack the categories and checked-place columns; every place was then a supermarket
+      const rows = await load(true, "id, name, lat, lng, category, fixed").catch(() => load(true, "id, name, lat, lng, category")).catch(() => load(true, "id, name, lat, lng")).catch(() => load(false, "id, name, lat, lng"));
+      return { data: rows.filter((r) => (r.category ?? "supermarkets") === "supermarkets").map((r) => ({ id: r.id, name: r.name, lat: r.lat, lng: r.lng, source: "directory" as const, fixed: !!r.fixed })), error: null };
+    } catch { return { data: [] as PlaceLoc[], error: null }; }
   }, [country]);
 
   const now = useMemo(() => new Date(), []);
@@ -186,17 +192,26 @@ export function useSmartCart() {
   }, []);
   useEffect(() => { navigator.permissions?.query({ name: "geolocation" }).then((s) => { if (s.state === "granted") locate(); }).catch(() => {}); }, [locate]);
 
-  // the nearest place of each store
-  const where = useMemo(() => {
-    const m = new Map<string, LatLng>();
-    const all = [...(locQ.data ?? []), ...(placesQ.data ?? [])];
-    for (const s of stores) {
-      let best: LatLng | null = null, d = Infinity;
-      for (const l of all) if (sameStore(l.name, s)) { const k = origin ? distanceKm(origin, l) : 0; if (k < d) { d = k; best = { lat: l.lat, lng: l.lng }; } }
-      if (best) m.set(s, best);
-    }
-    return m;
-  }, [stores, locQ.data, placesQ.data, origin]);
+  // the place of each store: the one you chose, else a checked one, else the nearest
+  const allPlaces = useMemo(() => [...(locQ.data ?? []), ...(placesQ.data ?? [])], [locQ.data, placesQ.data]);
+  const where = useMemo(() => chosenPlaces(stores, allPlaces, origin), [stores, allPlaces, origin]);
+  const placesOf = useCallback((store: string): PlaceOption[] => placeOptions(store, allPlaces, origin), [allPlaces, origin]);
+  /** Remember which place is this store. Returns an error message, or null when saved. */
+  const choosePlace = useCallback(async (store: string, o: PlaceOption): Promise<string | null> => {
+    const sb = createClient();
+    const { data: { session } } = await sb.auth.getSession();
+    const uid = session?.user.id;
+    if (!uid) return "Sign in again to save this.";
+    const mine = (locQ.data ?? []).filter((l) => l.id && l.preferred && sameStore(l.name, store)).map((l) => l.id as string);
+    if (mine.length) { const r = await sb.from("store_locations").update({ preferred: false }).in("id", mine); if (r.error) return /preferred/.test(r.error.message) ? "Run supabase/migration_store_place_choice.sql in Supabase to remember your choice." : r.error.message; }
+    const own = o.source !== "directory" && o.id;
+    const r = own
+      ? await sb.from("store_locations").update({ preferred: true }).eq("id", o.id as string)
+      : await sb.from("store_locations").insert({ user_id: uid, name: store, lat: o.lat, lng: o.lng, source: "manual", preferred: true });
+    if (r.error) return /preferred/.test(r.error.message) ? "Run supabase/migration_store_place_choice.sql in Supabase to remember your choice." : r.error.message;
+    await locQ.reload();
+    return null;
+  }, [locQ]);
 
   const baskets = useMemo(() => smartBaskets(items, [...inCur, ...extraProducts], stores, now, [...external, ...extraExt], settings, currency), [items, inCur, extraProducts, stores, now, external, extraExt, settings, currency]);
   const usual = useMemo(() => usualStore(items, inCur), [items, inCur]);
@@ -207,6 +222,6 @@ export function useSmartCart() {
   return {
     loading: prices.loading || matches.loading || locQ.loading, error: prices.error, savedAt: prices.savedAt, currency, country, online,
     habits, progress, items, off: saved.off, qty: saved.qty, toggle, setQty, settings, setSettings, products: inCur, extra, add, removeAdded,
-    externalReady, plan, rows, trips, baskets, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, noReceipts: inCur.length === 0,
+    externalReady, plan, rows, trips, baskets, usual, origin, homeHere, here, from, setFrom, geo, locate, hasPlaces: where.size > 0, placesOf, choosePlace, noReceipts: inCur.length === 0,
   };
 }

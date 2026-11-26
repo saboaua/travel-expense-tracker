@@ -18,7 +18,7 @@ import { Switch } from "@/components/ui/switch";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 import { OfflineNotice } from "@/components/OfflineNotice";
 import { usePro } from "@/lib/use-pro";
-import { CHECK_PCT, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
+import { CHECK_PCT, ROAD_FACTOR, cheapestOffer, directionsUrl, everyText, listedKey, storeDetail, type AddedItem, type DetailLine, type Plan, type PlanLine, type StoreDetail, type StoreRow } from "@/lib/personal/smart-cart";
 import { searchBestPrices, type PriceGroup } from "@/lib/personal/best-prices";
 import { productKey, searchCommunity, type CommunityRow } from "@/lib/personal/community";
 import { createClient } from "@/lib/supabase/client";
@@ -221,6 +221,7 @@ export function SmartCart() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pick, setPick] = useState<number | null>(null);
+  const [placeMsg, setPlaceMsg] = useState<string | null>(null);
   const [sheet, setSheet] = useState<{ store: string; at: { lat: number; lng: number } | null; km: number | null; lines: PlanLine[]; total: number; saving: number | null } | null>(null);
   const { currency, plan, rows, settings } = sc;
 
@@ -441,15 +442,37 @@ export function SmartCart() {
       {sheet && (
         <BottomSheet title={sheet.store} onClose={() => setSheet(null)} testId="sc-store-sheet" tall>
           <div className="space-y-3">
-            {sheet.at ? (
+            {(() => {
+              const opts = sc.placesOf(sheet.store);
+              const cur = opts.find((o) => o.chosen);
+              const at = cur ? { lat: cur.lat, lng: cur.lng } : sheet.at;
+              const km = cur?.km != null ? Math.round(cur.km * ROAD_FACTOR * 10) / 10 : sheet.km;
+              return (
+                <>
+            {at ? (
               <>
-                <StoreMap me={sc.origin ?? sheet.at} km={Math.max(1, Math.ceil(sc.origin ? Math.hypot((sc.origin.lat - sheet.at.lat) * 111, (sc.origin.lng - sheet.at.lng) * 108) : 1))} pins={[{ lat: sheet.at.lat, lng: sheet.at.lng, name: sheet.store, n: 1, best: true, label: sheet.store }]} />
-                <p className="text-sm text-muted-foreground">{sheet.km != null ? `${sheet.km.toFixed(1)} km by road, about ${Math.max(1, Math.round((sheet.km / 35) * 60))} min by car. ` : ""}{sheet.lines.length} item{sheet.lines.length === 1 ? "" : "s"} here, <Money amount={sheet.total} currency={currency} className="text-sm" />{sheet.saving != null && sheet.saving > 0.005 ? <> — you save <b className={GREEN}><Money amount={sheet.saving} currency={currency} className="text-sm" /></b> on this stop.</> : "."}</p>
-                {(() => { const u = directionsUrl(sc.origin, [sheet.at]); return u ? <a href={u} target="_blank" rel="noopener noreferrer" data-testid="sc-directions" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground"><Navigation className="h-5 w-5" aria-hidden="true" />Directions in Google Maps</a> : null; })()}
+                <StoreMap me={sc.origin ?? at} km={Math.max(1, Math.ceil(sc.origin ? Math.hypot((sc.origin.lat - at.lat) * 111, (sc.origin.lng - at.lng) * 108) : 1))} pins={[{ lat: at.lat, lng: at.lng, name: sheet.store, n: 1, best: true, label: sheet.store }]} />
+                <p className="text-sm text-muted-foreground">{km != null ? `${km.toFixed(1)} km by road, about ${Math.max(1, Math.round((km / 35) * 60))} min by car. ` : ""}{sheet.lines.length} item{sheet.lines.length === 1 ? "" : "s"} here, <Money amount={sheet.total} currency={currency} className="text-sm" />{sheet.saving != null && sheet.saving > 0.005 ? <> — you save <b className={GREEN}><Money amount={sheet.saving} currency={currency} className="text-sm" /></b> on this stop.</> : "."}</p>
+                {(() => { const u = directionsUrl(sc.origin, [at]); return u ? <a href={u} target="_blank" rel="noopener noreferrer" data-testid="sc-directions" className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-primary px-4 font-bold text-primary-foreground"><Navigation className="h-5 w-5" aria-hidden="true" />Directions in Google Maps</a> : null; })()}
               </>
             ) : (
               <Alert variant="info">No place is saved for this store yet. Open <Link href="/personal/groceries/basket" className="font-semibold underline">Best Prices</Link> while you are near it to save it.</Alert>
             )}
+                  {opts.length > 1 && (
+                    <fieldset data-testid="sc-place-picker" className="space-y-2 rounded-xl border p-3">
+                      <legend className="px-1 text-sm font-semibold">Which place is this store?</legend>
+                      {opts.map((o, i) => (
+                        <label key={`${o.source}-${o.id ?? i}`} className="flex min-h-12 cursor-pointer items-center gap-3 rounded-lg px-1">
+                          <input type="radio" name="sc-place" checked={o.chosen} onChange={async () => { setPlaceMsg(null); setPlaceMsg(await sc.choosePlace(sheet.store, o)); }} className="h-5 w-5 accent-primary" />
+                          <span className="min-w-0 flex-1 text-sm"><span className="block truncate font-medium">{o.name}</span><span className="block text-xs text-muted-foreground">{o.km != null ? `${o.km.toFixed(1)} km away · ` : ""}{o.preferred ? "your choice" : o.fixed ? "checked place" : o.source === "directory" ? "shared directory" : o.source === "pin" ? "your pin" : "map data"}</span></span>
+                        </label>
+                      ))}
+                      {placeMsg ? <p role="alert" className="text-xs text-destructive">{placeMsg}</p> : <p className="text-xs text-muted-foreground">Your choice is remembered for this store and decides the pin, distance and drive cost.</p>}
+                    </fieldset>
+                  )}
+                </>
+              );
+            })()}
             {(() => { const d = storeDetail({ store: sheet.store, items: sc.items, baskets: sc.baskets, usual: sc.usual, s: settings, among: rows.map((r) => r.store) }); return d ? <StoreSavings d={d} currency={currency} /> : <Lines lines={sheet.lines} currency={currency} />; })()}
           </div>
         </BottomSheet>
