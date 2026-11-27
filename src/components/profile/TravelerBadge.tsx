@@ -53,7 +53,7 @@ export function TravelerUnlock({ check = 0 }: { check?: number }) {
   return (
     <div className="fixed inset-0 z-[55] flex items-end justify-center bg-slate-900/60 sm:items-center" role="dialog" aria-modal="true" aria-label="New badge: Groceries traveler" data-testid="traveler-unlock">
       <div className="relative w-full max-w-md rounded-t-[28px] bg-gradient-to-b from-teal-100 via-teal-50 to-white px-5 pb-6 pt-6 text-center shadow-2xl dark:from-teal-900/60 dark:via-slate-900 dark:to-slate-900 sm:rounded-[28px]">
-        <button type="button" onClick={done} aria-label="Close" className="absolute right-3.5 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/70 text-slate-600"><X className="h-5 w-5" aria-hidden="true" /></button>
+        <button type="button" onClick={done} aria-label="Close" className="absolute right-3.5 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/70 text-slate-600"><X className="h-5 w-5" aria-hidden="true" /></button>
         <p className="text-sm font-extrabold text-teal-700 dark:text-teal-300">New badge</p>
         <div className="my-4 flex justify-center"><TravelerMedal size={140} count={t.countries.length} /></div>
         <h2 className="text-2xl font-extrabold">Groceries traveler</h2>

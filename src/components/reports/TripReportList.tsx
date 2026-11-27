@@ -106,16 +106,16 @@ export function TripReportList({ trips, year, locked = false }: { trips: TripRep
                 )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <a href={`/api/export/trip/${t.id}/zip?images=1`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent" data-testid="trip-images"><ImageIcon className="h-3.5 w-3.5" /> Images</a>
+                  <a href={`/api/export/trip/${t.id}/zip?images=1`} className="inline-flex h-11 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent" data-testid="trip-images"><ImageIcon className="h-3.5 w-3.5" /> Images</a>
                   {locked ? (
-                    <Link href="/personal/pro" className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent" data-testid="trip-excel-pro"><Crown className="h-3.5 w-3.5 text-amber-600" /> Excel</Link>
+                    <Link href="/personal/pro" className="inline-flex h-11 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent" data-testid="trip-excel-pro"><Crown className="h-3.5 w-3.5 text-amber-600" /> Excel</Link>
                   ) : (
                     <>
-                      <a href={`/api/export/trip/${t.id}/excel`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent"><Download className="h-3.5 w-3.5" /> Excel</a>
-                      <a href={`/api/export/trip/${t.id}/zip`} className="inline-flex h-8 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent"><Archive className="h-3.5 w-3.5" /> ZIP with receipts</a>
+                      <a href={`/api/export/trip/${t.id}/excel`} className="inline-flex h-11 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent"><Download className="h-3.5 w-3.5" /> Excel</a>
+                      <a href={`/api/export/trip/${t.id}/zip`} className="inline-flex h-11 items-center gap-1.5 rounded-lg border bg-background px-3 text-xs font-medium hover:bg-accent"><Archive className="h-3.5 w-3.5" /> ZIP with receipts</a>
                     </>
                   )}
-                  <Link href={`/trips/${t.id}`} className="inline-flex h-8 items-center gap-1 rounded-lg px-3 text-xs font-medium text-primary hover:bg-primary/10">Open trip <ArrowUpRight className="h-3.5 w-3.5" /></Link>
+                  <Link href={`/trips/${t.id}`} className="inline-flex h-11 items-center gap-1 rounded-lg px-3 text-xs font-medium text-primary hover:bg-primary/10">Open trip <ArrowUpRight className="h-3.5 w-3.5" /></Link>
                 </div>
               </li>
             );

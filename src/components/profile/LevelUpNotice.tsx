@@ -56,7 +56,7 @@ export function LevelUpNotice({ check = 0 }: { check?: number }) {
         </div>
         <div className="relative max-h-[96vh] w-full max-w-md overflow-y-auto rounded-t-[28px] bg-white px-4 pb-5 pt-3 shadow-2xl dark:bg-slate-900" style={{ ["--lu-to" as string]: b.total }}>
           <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300" aria-hidden="true" />
-          <button type="button" onClick={done} aria-label="Close" className="absolute right-3.5 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800"><X className="h-[18px] w-[18px]" aria-hidden="true" /></button>
+          <button type="button" onClick={done} aria-label="Close" className="absolute right-3.5 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800"><X className="h-[18px] w-[18px]" aria-hidden="true" /></button>
           <div className="flex justify-center">
             <div className="lu-rise inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-amber-50 px-3.5 py-1.5 text-xs font-extrabold tracking-wider text-amber-800">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="#f59e0b" aria-hidden="true"><path d="M12 1l2.6 8.4L23 12l-8.4 2.6L12 23l-2.6-8.4L1 12l8.4-2.6z" /></svg>CONGRATULATIONS!

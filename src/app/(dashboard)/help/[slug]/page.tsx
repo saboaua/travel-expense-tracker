@@ -50,7 +50,7 @@ export default function HelpTopicPage() {
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t pt-4 text-xs text-muted-foreground">
             <span>Updated {formatDate(topic.updated_at)}</span>
             {perms.has("help.manage") && (
-              <Link href={`/admin/help?edit=${encodeURIComponent(topic.slug)}`} className="inline-flex min-h-9 items-center gap-1.5 font-medium text-primary hover:underline">
+              <Link href={`/admin/help?edit=${encodeURIComponent(topic.slug)}`} className="inline-flex min-h-11 items-center gap-1.5 font-medium text-primary hover:underline">
                 <Pencil className="h-3.5 w-3.5" aria-hidden="true" /> Edit this topic
               </Link>
             )}

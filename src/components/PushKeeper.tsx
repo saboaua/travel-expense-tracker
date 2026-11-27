@@ -67,7 +67,7 @@ export function PushKeeper() {
           {error && <p role="alert" className="mt-1 text-xs text-destructive">{error}</p>}
           <button type="button" onClick={turnOn} disabled={busy} data-testid="push-restore-on" className="mt-2 h-10 rounded-lg bg-primary px-4 text-sm font-bold text-primary-foreground disabled:opacity-70">Turn alerts back on</button>
         </div>
-        <button type="button" onClick={dismiss} aria-label="Not now" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><X className="h-4 w-4" aria-hidden="true" /></button>
+        <button type="button" onClick={dismiss} aria-label="Not now" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><X className="h-4 w-4" aria-hidden="true" /></button>
       </div>
     </div>
   );

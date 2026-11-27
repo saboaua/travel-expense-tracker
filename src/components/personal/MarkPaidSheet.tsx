@@ -88,7 +88,7 @@ export function MarkPaidSheet({ bill, onClose, onSaved }: { bill: BillRow; onClo
             <p className="text-[13px] text-muted-foreground">for {monthLabel(bill.bill_month).split(" ")[0]}{bill.due_date ? ` · due ${formatDate(bill.due_date)}` : ""}</p>
           </div>
           {due.state === "late" && <LateChip text={due.text} />}
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><X className="h-5 w-5" aria-hidden="true" /></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><X className="h-5 w-5" aria-hidden="true" /></button>
         </div>
 
         <div className="mt-4 space-y-3">

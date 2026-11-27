@@ -59,7 +59,7 @@ export function ScanSheet({
               </p>
             )}
           </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label="Cancel">
+          <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label="Cancel">
             <X className="h-5 w-5" />
           </button>
         </div>

@@ -35,7 +35,7 @@ export function CountrySwitch({ state, stats }: { state: CountryState; stats: Co
         <div role="status" className="flex items-center gap-3 rounded-2xl bg-slate-900 px-3.5 py-3 text-white" data-testid="country-notice">
           <Flag code={notice.to} size={34} />
           <div className="min-w-0 flex-1"><p className="text-sm font-bold">Now showing {name(notice.to)} prices</p><p className="text-xs text-slate-300">You are in {name(notice.to)}.{cur(notice.to) ? ` Prices are in ${cur(notice.to)}.` : ""}</p></div>
-          <button type="button" onClick={state.undo} className="min-h-10 px-2 text-sm font-bold text-blue-300" data-testid="country-undo">Undo</button>
+          <button type="button" onClick={state.undo} className="min-h-11 px-2 text-sm font-bold text-blue-300" data-testid="country-undo">Undo</button>
         </div>
       )}
       <button type="button" onClick={() => setOpen(true)} aria-haspopup="dialog" className="flex min-h-14 w-full items-center gap-3 rounded-2xl border bg-card px-3 py-2 text-left" data-testid="country-button">
@@ -44,7 +44,7 @@ export function CountrySwitch({ state, stats }: { state: CountryState; stats: Co
         <ChevronDown className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
       </button>
       {source !== "manual" && state.how !== "gps" && (
-        <button type="button" onClick={state.locate} disabled={state.locating} className="inline-flex min-h-10 items-center gap-1.5 px-1 text-sm font-bold text-primary" data-testid="country-locate"><LocateFixed className="h-4 w-4" aria-hidden="true" />{state.locating ? "Finding you…" : "Use my exact location"}</button>
+        <button type="button" onClick={state.locate} disabled={state.locating} className="inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-bold text-primary" data-testid="country-locate"><LocateFixed className="h-4 w-4" aria-hidden="true" />{state.locating ? "Finding you…" : "Use my exact location"}</button>
       )}
       {open && (
         <BottomSheet title="Show prices for" onClose={() => setOpen(false)} testId="country-sheet">

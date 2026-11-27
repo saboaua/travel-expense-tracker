@@ -19,7 +19,7 @@ export function AiScanMeter({ className = "" }: { className?: string }) {
       <div className={`rounded-2xl border border-amber-200 bg-amber-50 p-3.5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100 ${className}`} role="status" data-testid="ai-meter-used-up">
         <p className="flex items-center gap-2 text-sm font-extrabold"><Sparkles className="h-4 w-4" aria-hidden="true" />AI scans used up: {u.used} of {u.limit}</p>
         <p className="mt-1.5 text-[13px] leading-relaxed">Receipts are read on this phone, so check the amounts before you save. AI scanning is back on <b>{u.resetsLabel}</b>. Pro has no limit.</p>
-        <Link href="/personal/pro" className="mt-2.5 inline-flex min-h-10 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground" data-testid="ai-meter-get-pro"><Crown className="h-4 w-4" aria-hidden="true" />Get Pro</Link>
+        <Link href="/personal/pro" className="mt-2.5 inline-flex min-h-11 items-center gap-2 rounded-lg bg-primary px-3.5 text-sm font-bold text-primary-foreground" data-testid="ai-meter-get-pro"><Crown className="h-4 w-4" aria-hidden="true" />Get Pro</Link>
       </div>
     );
   }

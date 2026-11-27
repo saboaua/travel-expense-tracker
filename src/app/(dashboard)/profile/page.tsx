@@ -214,7 +214,7 @@ export default function ProfilePage() {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={avatarUrl}
-                    alt={displayName}
+                    alt={`${displayName}, your profile photo`}
                     className="h-full w-full object-cover"
                   />
                 ) : (

@@ -63,7 +63,7 @@ export function BadgeShare({ level, total, onClose }: { level: number; total: nu
       <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-3xl bg-white p-4 pb-6 dark:bg-slate-900 sm:rounded-3xl">
         <div className="flex items-start justify-between gap-2">
           <div><b className="text-lg">Share your badge</b><p className="text-sm text-muted-foreground">Only the badge and the count are in the picture. No stores, no prices.</p></div>
-          <button type="button" onClick={onClose} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-muted"><X className="h-5 w-5" aria-hidden="true" /></button>
+          <button type="button" onClick={onClose} aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-muted"><X className="h-5 w-5" aria-hidden="true" /></button>
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
         {src && <img src={src} alt={`${shareTitle(t.name, useName ? first : null)}, ${total} prices shared`} className="mx-auto my-3 w-56 rounded-2xl shadow-lg" data-testid="badge-share-preview" />}

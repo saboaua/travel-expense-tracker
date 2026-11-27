@@ -23,10 +23,10 @@ export function DocumentViewer({ title, url, path, onClose }: { title: string; u
       <div className="flex items-center justify-between gap-3 px-4 py-3 text-white">
         <p className="min-w-0 truncate font-medium">{title}</p>
         <div className="flex shrink-0 items-center gap-1">
-          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center gap-1.5 rounded-lg px-3 text-sm hover:bg-white/10" aria-label="Open in a new tab or download">
+          <a href={url} target="_blank" rel="noopener noreferrer" className="inline-flex h-11 items-center gap-1.5 rounded-lg px-3 text-sm hover:bg-white/10" aria-label="Open in a new tab or download">
             <Download className="h-4 w-4" /> <span className="hidden sm:inline">Open / download</span>
           </a>
-          <button type="button" onClick={onClose} className="inline-flex h-9 w-9 items-center justify-center rounded-lg hover:bg-white/10" aria-label="Close viewer" autoFocus>
+          <button type="button" onClick={onClose} className="inline-flex h-11 w-11 items-center justify-center rounded-lg hover:bg-white/10" aria-label="Close viewer" autoFocus>
             <X className="h-5 w-5" />
           </button>
         </div>

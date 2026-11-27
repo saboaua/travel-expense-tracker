@@ -65,7 +65,7 @@ export function AccordionSection({ id, title, icon, tone, summary, badge, descri
     const onHash = () => fromUrl(true);
     window.addEventListener("hashchange", onHash);
     return () => window.removeEventListener("hashchange", onHash);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- follows the hash for this section only; the open state is set, never read
   }, [id]);
 
   const btn = `${id}-header`;

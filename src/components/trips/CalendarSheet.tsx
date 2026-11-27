@@ -113,7 +113,7 @@ export function CalendarSheet({
         <div className="mx-auto mb-2 h-1.5 w-10 rounded-full bg-muted sm:hidden" aria-hidden="true" />
         <div className="mb-4 flex items-center justify-between gap-3">
           <h2 className="text-lg font-bold">{state === "none" ? "Add to calendar" : "In your calendar"}</h2>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground" aria-label="Close">
+          <button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full bg-muted text-muted-foreground hover:text-foreground" aria-label="Close">
             <X className="h-5 w-5" />
           </button>
         </div>

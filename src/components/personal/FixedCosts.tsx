@@ -242,7 +242,7 @@ function InsuranceCard({ d, i, chips, onChange, onRemove, removing, onKeep, onCo
     <div className="space-y-3 rounded-2xl border bg-card p-4" data-testid={`ins-card-${i + 1}`}>
       <div className="flex items-start justify-between gap-3">
         <div><b className="block text-base">{title}</b><span className="text-[13px] text-muted-foreground">Paid once a year. Leave empty if you have none.</span></div>
-        {onRemove && <button type="button" onClick={onRemove} className="min-h-9 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`ins-remove-${i + 1}`}>Remove</button>}
+        {onRemove && <button type="button" onClick={onRemove} className="min-h-11 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`ins-remove-${i + 1}`}>Remove</button>}
       </div>
       {removing && (
         <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950" role="alertdialog" aria-label={`Remove ${title}`}>
@@ -276,7 +276,7 @@ function PlateCard({ d, i, onChange, onRemove, removing, onKeep, onConfirm }: { 
     <div className="space-y-3 rounded-2xl border bg-card p-4" data-testid={`plate-card-${i + 1}`}>
       <div className="flex items-start justify-between gap-3">
         <div><b className="block text-base">{title}</b><span className="text-[13px] text-muted-foreground">Paid every year. Two payments cost a little more.</span></div>
-        {onRemove && <button type="button" onClick={onRemove} className="min-h-9 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`plate-remove-${i + 1}`}>Remove</button>}
+        {onRemove && <button type="button" onClick={onRemove} className="min-h-11 px-1 text-[13px] font-bold text-red-700 dark:text-red-300" data-testid={`plate-remove-${i + 1}`}>Remove</button>}
       </div>
       {removing && (
         <div className="space-y-2 rounded-xl border border-red-200 bg-red-50 p-3 dark:border-red-900 dark:bg-red-950" role="alertdialog" aria-label={`Remove ${title}`}>

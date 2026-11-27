@@ -19,7 +19,7 @@ export function BottomSheet({ title, onClose, children, testId, tall = false }: 
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-border sm:hidden" aria-hidden="true" />
         <div className="mb-3 flex items-center gap-2">
           <h2 className="flex-1 text-lg font-bold">{title}</h2>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close"><X className="h-5 w-5" /></button>
+          <button type="button" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted" aria-label="Close"><X className="h-5 w-5" /></button>
         </div>
         {children}
       </div>

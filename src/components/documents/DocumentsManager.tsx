@@ -378,7 +378,7 @@ export function DocumentsManager({ tripId = null, defaultKind = "other", onChang
         <form ref={formRef} onSubmit={save} role="dialog" aria-modal="true" aria-label={editing ? "Edit document" : "Add document"} className="flex max-h-full w-full max-w-lg flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
           <div className="flex items-center justify-between border-b px-4 py-3">
             <h2 className="text-lg font-bold">{editing ? "Edit document" : "Add document"}</h2>
-            <button type="button" onClick={requestClose} disabled={saving} aria-label="Close" className="flex h-10 w-10 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><X className="h-5 w-5" /></button>
+            <button type="button" onClick={requestClose} disabled={saving} aria-label="Close" className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted"><X className="h-5 w-5" /></button>
           </div>
           <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-4 py-3">
           {error && <Alert>{error}</Alert>}

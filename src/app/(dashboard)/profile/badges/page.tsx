@@ -29,7 +29,7 @@ export default function BadgesPage() {
     <div className={`${PAGE_WIDTH.formColumn} space-y-4 p-4 md:p-8`} data-testid="badge-shelf">
       <LevelUpNotice />
       <TravelerUnlock />
-      <Link href="/profile" className="inline-flex min-h-8 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Profile</Link>
+      <Link href="/profile" className="inline-flex min-h-11 items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" aria-hidden="true" /> Profile</Link>
       <div><h1 className="text-2xl font-extrabold">Your badges</h1><p className="text-sm text-muted-foreground">Earned by sharing prices. Only you see them.</p></div>
       {missing && <Alert variant="info">Badges are not set up yet. An admin needs to run supabase/migration_badges.sql.</Alert>}
       {b && (

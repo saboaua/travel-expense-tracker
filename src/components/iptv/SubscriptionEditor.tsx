@@ -64,7 +64,7 @@ export function SubscriptionEditor({ customerId, subId }: { customerId: string |
     setRenewals((ren ?? []) as typeof renewals);
     setLoaded(true);
   }, [supabase, subId, isNew, customerId, pick]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- reloads when the client or subscription changes, not when the picked customer does
   useEffect(() => { void load(); }, [supabase, subId]);
 
   const set = (k: keyof SubscriptionInput, v: string) => setForm((f) => {

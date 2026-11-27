@@ -235,7 +235,7 @@ export function CardForm({ userId, card, waiting, onSaved, onClose }: { userId: 
               <div role="alert" data-testid="card-read-fail" className="space-y-2 rounded-lg bg-orange-50 px-3 py-2 text-sm text-orange-800 dark:bg-orange-950/30 dark:text-orange-300">
                 <p>{readFail}</p>
                 <div className="flex gap-2">
-                  <button type="button" onClick={readDetails} className="h-9 rounded-lg border border-orange-300 bg-background px-3 font-medium">Try again</button>
+                  <button type="button" onClick={readDetails} className="h-11 rounded-lg border border-orange-300 bg-background px-3 font-medium">Try again</button>
                   <button type="button" onClick={() => { setReadFail(null); document.getElementById("lc-store")?.focus(); }} className="h-9 rounded-lg px-3 font-medium underline">Type it in</button>
                 </div>
               </div>

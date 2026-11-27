@@ -32,7 +32,7 @@ export function SubLogoChoice({ name, library, logo, website, isNew, onChange }:
   useEffect(() => {
     if (match && pick === null && isNew && !startLogo.current) onChange({ logo: match.logo });
     if (!match && logo && library.some((l) => l.logo === logo) && pick !== "own") onChange({ logo: null });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-checks only when the matched logo changes, so a logo the person picked is never overwritten
   }, [matchId]);
 
   const selected: Pick = pick ?? (match && logo === match.logo ? "library" : logo ? "own" : "default");

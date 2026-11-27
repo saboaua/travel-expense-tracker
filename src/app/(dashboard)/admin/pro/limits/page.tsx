@@ -50,7 +50,7 @@ export default function ProLimitsPage() {
       else apply(json.limits);
       setLoading(false);
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- loads once on mount
   }, []);
 
   const setMode = (k: LimitKey, m: Mode) => {

@@ -192,7 +192,7 @@ export default function AdminHelpPage() {
                     {t.published ? "Published" : "Draft"}
                   </button>
                   <div className="flex items-center gap-1">
-                    <Link href={`/help/${t.slug}`} aria-label={`View ${t.title}`} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><ExternalLink className="h-4 w-4" /></Link>
+                    <Link href={`/help/${t.slug}`} aria-label={`View ${t.title}`} className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><ExternalLink className="h-4 w-4" /></Link>
                     <button type="button" onClick={() => edit(t)} aria-label={`Edit ${t.title}`} className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-accent"><Pencil className="h-4 w-4" /></button>
                     <button type="button" onClick={() => remove(t)} aria-label={`Delete ${t.title}`} className="flex h-9 w-9 items-center justify-center rounded-lg text-destructive hover:bg-accent"><Trash2 className="h-4 w-4" /></button>
                   </div>

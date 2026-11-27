@@ -54,7 +54,7 @@ export function ScanLauncher({ options: baseOptions, home, showNewTrip }: { opti
     window.history.replaceState(null, "", window.location.pathname);
     if (flag !== "1") return setNotice("Nothing usable was shared. Share a photo of a receipt, or a PDF.");
     void takeSharedFile().then((file) => (file ? processFile("upload", file) : setNotice("Nothing usable was shared. Share a photo of a receipt, or a PDF.")));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- takes the shared file once, guarded by shared
   }, []);
 
   // Free the preview URL when the sheet closes

@@ -34,7 +34,7 @@ export function TelegramCard() {
               <ul className="mt-2 divide-y">
                 {proOnly.map((f) => (<li key={f} className="flex items-center justify-between gap-3 py-2"><span>{FEATURE_LABEL[f]}</span><span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-extrabold text-amber-800 dark:bg-amber-950 dark:text-amber-200">Pro</span></li>))}
               </ul>
-              <Link href="/personal/pro" className="mt-2 inline-flex min-h-10 items-center text-sm font-bold text-primary underline">Get Pro</Link>
+              <Link href="/personal/pro" className="mt-2 inline-flex min-h-11 items-center text-sm font-bold text-primary underline">Get Pro</Link>
             </div>
           )}
           <p className="text-sm">

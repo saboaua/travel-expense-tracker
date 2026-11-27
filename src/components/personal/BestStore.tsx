@@ -148,7 +148,7 @@ export function BestStore() {
   const far = baskets.filter((b) => { const d = nearest(b.store); return d && d.km > radius && b.priced > 0; });
   const distMap = useMemo(() => new Map(baskets.flatMap((b) => { const d = nearest(b.store); return d ? [[b.store, d.km] as [string, number]] : []; })), [baskets, nearest]);
   const priced = useMemo(() => ranked.filter((b) => b.priced > 0), [ranked]);
-  const split = useMemo(() => splitAdvice(items, ranked, distMap), [items, inCur, ranked, distMap]);
+  const split = useMemo(() => splitAdvice(items, ranked, distMap), [items, ranked, distMap]);
   const shown = me ? ranked : pricedAll;
   const headline = useMemo(() => verdict(shown, items.length), [shown, items.length]);
   const noPrice = useMemo(() => unpricedStores(baskets, (st) => distMap.get(st) ?? null, radius, !!me), [baskets, distMap, radius, me]);
@@ -369,7 +369,7 @@ export function BestStore() {
                             {b.lines.map((l) => (
                               <div key={l.key} className="flex justify-between gap-2"><span className="min-w-0 truncate">{l.qty > 1 ? `${l.qty} × ` : ""}{l.name}{l.source === "community" && <span className="ml-1 text-xs text-amber-700 dark:text-amber-300">community</span>}{l.source === "online" && <span className="ml-1 text-xs text-sky-700 dark:text-sky-300">{l.similar ? "online, similar item" : "online"}</span>}{l.status === "old" && l.date && <span className="ml-1 text-xs text-muted-foreground">price from {l.date}</span>}</span><span className="shrink-0 tabular-nums">{l.total != null ? fmt(l.total) : "not counted"}</span></div>
                             ))}
-                            {d && <a href={`https://www.google.com/maps/dir/?api=1&destination=${d.loc.lat},${d.loc.lng}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 pt-1 text-xs font-medium text-primary">Directions <ExternalLink className="h-3 w-3" aria-hidden="true" /></a>}
+                            {d && <a href={`https://www.google.com/maps/dir/?api=1&destination=${d.loc.lat},${d.loc.lng}`} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 pt-1 text-xs font-medium text-primary">Directions <ExternalLink className="h-3 w-3" aria-hidden="true" /></a>}
                           </div>
                         )}
                       </CardContent>

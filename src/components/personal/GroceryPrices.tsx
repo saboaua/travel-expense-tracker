@@ -195,7 +195,7 @@ export function GroceryPrices() {
     <div className={`${PAGE_WIDTH.wide} space-y-4 p-4 pb-28 md:p-8`}>
       <LevelUpNotice />
       <div className="flex items-center justify-between gap-3">
-        <Link href="/personal/groceries" className="inline-flex min-h-8 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
+        <Link href="/personal/groceries" className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" aria-hidden="true" /> Groceries</Link>
       </div>
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -313,7 +313,7 @@ function OnlineRow({ m, best, cur, ask, onAnswer, online, max }: { m: OnlineMatc
         {FILE_STORES.includes(m.store)
           ? <span>From file, {formatDate(m.fetchedAt.slice(0, 10))}{Date.now() - Date.parse(m.fetchedAt) > OLD_FILE_DAYS * 86400000 && <b className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[12px] font-semibold text-amber-900 dark:bg-amber-900/40 dark:text-amber-200" data-testid="old-file">Old</b>}</span>
           : <span>Checked {formatDate(m.fetchedAt.slice(0, 10))}</span>}
-        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-8 items-center gap-1 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open in shop <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>}
+        {link && <a href={link} target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center gap-1 font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">Open in shop <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" /></a>}
       </div>
       {ask && (
         <div className="mt-2 flex gap-2">

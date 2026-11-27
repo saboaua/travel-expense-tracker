@@ -70,7 +70,7 @@ export function IconUpdateNotice() {
             <p className="mt-0.5 text-sm text-muted-foreground">Your home screen may still show the old one. Remove the app and install it again to see the new logo.</p>
           )}
         </div>
-        <button type="button" onClick={gotIt} aria-label="Dismiss" className="-mr-1 -mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+        <button type="button" onClick={gotIt} aria-label="Dismiss" className="-mr-1 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
       </div>
       <div className="mt-3 flex justify-end">
         <Button size="sm" onClick={gotIt}>Got it</Button>

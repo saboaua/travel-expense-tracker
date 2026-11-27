@@ -129,9 +129,9 @@ export function ReminderForm({ id }: { id?: string }) {
               ); })}
             </div>
             <div className="mt-1 flex gap-4 text-[13px] font-bold text-primary">
-              <button type="button" className="min-h-8" onClick={() => setDays([1, 2, 3, 4, 5])}>Weekdays</button>
-              <button type="button" className="min-h-8" onClick={() => setDays([6, 0])}>Weekends</button>
-              <button type="button" className="min-h-8" onClick={() => setDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button>
+              <button type="button" className="min-h-11" onClick={() => setDays([1, 2, 3, 4, 5])}>Weekdays</button>
+              <button type="button" className="min-h-11" onClick={() => setDays([6, 0])}>Weekends</button>
+              <button type="button" className="min-h-11" onClick={() => setDays([0, 1, 2, 3, 4, 5, 6])}>Every day</button>
             </div>
             <p className="mt-1 rounded-lg bg-primary/10 px-3 py-2 text-[13.5px] font-semibold" data-testid="repeat-days-text">{daysText(days.length ? days : [new Date(due).getDay()])} at {new Date(due).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</p>
           </div>

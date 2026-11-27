@@ -148,7 +148,7 @@ function Checklist() {
     if (!wantCopy || copied.current || state !== "ready" || total > 0 || !lists?.same.length) return;
     copied.current = true;
     void copyFrom([lists.same[0].tripId]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- copies the first matching list once, guarded by copied
   }, [wantCopy, state, total, lists]);
 
   const openSheet = async () => {
