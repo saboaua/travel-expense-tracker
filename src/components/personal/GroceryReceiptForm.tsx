@@ -57,6 +57,9 @@ const r2 = (n: number) => Math.round(n * 100) / 100;
 export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { receiptId?: string; area?: "shopping" | "other"; typeId?: string }) {
   const router = useRouter();
   const currencies = useCurrencies();
+  // The receipt loader reads the latest list without reloading (and wiping edits) when the list arrives
+  const currenciesRef = useRef(currencies);
+  currenciesRef.current = currencies;
   const groceryCategories = useGroceryCategories();
   const categoryNames = useMemo(() => groceryCategories.map((c) => c.name), [groceryCategories]);
   /** Map a guessed/scanned category onto the admin-managed list (falls back to Other, then the first). */
@@ -118,7 +121,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   // "Add by hand": no photo step, for when the camera or the scan does not work
   const [manual, setManual] = useState(false);
   // ?manual=1 opens the form straight on adding by hand (the Free way to add an online order)
-  useEffect(() => { if (!receiptId && new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); } }, [receiptId]);
+  useEffect(() => { if (!receiptId && new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); } }, [receiptId]); // eslint-disable-line react-hooks/exhaustive-deps -- opens the form on a blank row once, when it opens
   // "Just keeping the prices": a receipt for something you did not pay for. Its items feed the Price tracker, but it is never counted as spending.
   const [paidWith, setPaidWith] = useState<PaidWith | null>(null);
   const paidTouched = useRef(false);
@@ -134,7 +137,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
     setPaidWith((p) => p ?? (shopping ? lastPaid() : "debit"));
     // shopping: the default chosen for online orders, when there is one
     if (shopping) void createClient().from("online_order_prefs").select("paid_with").maybeSingle().then(({ data }) => { const v = normPaid((data as { paid_with?: string } | null)?.paid_with); if (v) setPaidWith((p) => (paidTouched.current ? p : v)); });
-  }, [receiptId]);
+  }, [receiptId, area]);
   useEffect(() => { if (!receiptId && !tripTouched.current) setTripRef(suggestedTrip); }, [receiptId, suggestedTrip]);
   const [pricesOnly, setPricesOnly] = useState(false);
   const wasPricesOnly = useRef(false);
@@ -178,7 +181,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
           if (isMissingColumn(err) || err) return;
           homeRef.current = (data as { home_country?: string | null } | null)?.home_country ?? null;
           const hc = homeCurrency(homeRef.current);
-          if (hc && !latest && !currencyChosen.current && currencies.some((x) => x.code === hc)) setCurrency(hc);
+          if (hc && !latest && !currencyChosen.current && currenciesRef.current.some((x) => x.code === hc)) setCurrency(hc);
         })().catch(() => {});
         return;
       }
