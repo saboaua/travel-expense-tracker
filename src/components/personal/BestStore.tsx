@@ -23,6 +23,7 @@ import { externalPrices } from "@/lib/personal/best-prices";
 import { ONLINE_CURRENCY, type OnlineMatch } from "@/lib/store-prices";
 import { searchCommunity } from "@/lib/personal/community";
 import { RADII, basketTotals, type ExternalPrice, bestStoreFor, distanceKm, LEVEL_LABEL, sameStore, splitAdvice, storeIndex, usualItems, type Level, type LatLng, type ListItem } from "@/lib/personal/basket";
+import { itemGrid, levelRows, levelWords, sourceNote, unpricedStores, verdict } from "@/lib/personal/best-store-view";
 import { useOnline } from "@/lib/use-online";
 import { useCountry, useCountryStats } from "@/components/personal/use-country";
 import { CountrySwitch } from "@/components/personal/CountrySwitch";
@@ -148,6 +149,12 @@ export function BestStore() {
   const distMap = useMemo(() => new Map(baskets.flatMap((b) => { const d = nearest(b.store); return d ? [[b.store, d.km] as [string, number]] : []; })), [baskets, nearest]);
   const priced = useMemo(() => ranked.filter((b) => b.priced > 0), [ranked]);
   const split = useMemo(() => splitAdvice(items, ranked, distMap), [items, inCur, ranked, distMap]);
+  const shown = me ? ranked : pricedAll;
+  const headline = useMemo(() => verdict(shown, items.length), [shown, items.length]);
+  const noPrice = useMemo(() => unpricedStores(baskets, (st) => distMap.get(st) ?? null, radius, !!me), [baskets, distMap, radius, me]);
+  const grid = useMemo(() => itemGrid(shown), [shown]);
+  const levels = useMemo(() => levelRows(index, baskets, items.length), [index, baskets, items.length]);
+  const [onlyDiff, setOnlyDiff] = useState(false);
 
   // Places the admin imported, plus supermarkets found on OpenStreetMap around you (a place seen in both counts once)
   const known = useMemo<Osm[]>(() => {
@@ -326,6 +333,14 @@ export function BestStore() {
                 <StoreMap me={me} km={radius} pins={mapPins} />
               )}
 
+              {headline && (
+                <div className="rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-100 to-emerald-50 p-3 dark:border-emerald-500/30 dark:from-emerald-500/20 dark:to-emerald-500/10" data-testid="best-verdict">
+                  <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-200">Cheapest for your list</p>
+                  <p className="text-base font-extrabold">{headline.rival ? (headline.gap > 0 ? `${headline.store}, ${fmt(headline.gap)} less than ${headline.rival}` : `${headline.store} and ${headline.rival} cost the same`) : `${headline.store} prices the most of your list`}</p>
+                  <p className="text-xs text-muted-foreground">{distMap.has(headline.store) ? `${(distMap.get(headline.store) as number).toFixed(1)} km away. ` : ""}{headline.rival ? `Compared on the ${headline.priced} item${headline.priced === 1 ? "" : "s"} both price.` : `${headline.priced} of ${headline.of} items priced.`}</p>
+                </div>
+              )}
+
               <div className="space-y-2" data-testid="store-ranking">
                 {(me ? ranked : pricedAll).map((b, i) => {
                   const d = nearest(b.store);
@@ -340,8 +355,9 @@ export function BestStore() {
                             <span className="flex flex-wrap items-center gap-1.5"><b>{b.store}</b>{best && <span className={`${chip} bg-emerald-600 text-white`}>Best price</span>}</span>
                             <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
                               {d && <span className="inline-flex items-center gap-0.5"><MapPin className="h-3 w-3" aria-hidden="true" />{d.km.toFixed(1)} km</span>}
-                              <Level level={b.level} pct={b.levelPct} />
-                              {b.unknown > 0 ? <span className={`${chip} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{b.priced} of {items.length} priced · {b.unknown} not counted</span> : <span className={`${chip} bg-muted`}>All items priced</span>}
+                              {b.level !== "nodata" && <Level level={b.level} pct={b.levelPct} />}
+                              {sourceNote(b, now) && <span className={`${chip} bg-muted`}>{sourceNote(b, now)}</span>}
+                              {b.unknown > 0 && <span className={`${chip} bg-amber-100 text-amber-900 dark:bg-amber-500/20 dark:text-amber-200`}>{b.priced} of {items.length} priced · {b.unknown} not counted</span>}
                               {b.old > 0 && <span className={`${chip} bg-muted`}>{b.old} old price{b.old === 1 ? "" : "s"}</span>}
                             </span>
                           </span>
@@ -364,6 +380,50 @@ export function BestStore() {
               </div>
 
               {split && <Alert data-testid="split-advice">Two stops can pay off: buying at {split.stores[1]} what is cheaper there saves about {fmt(split.saving)} after the trip, on top of {split.stores[0]}.</Alert>}
+              {noPrice.length > 0 && (
+                <Card data-testid="no-price-stores"><CardContent className="space-y-3 p-4">
+                  <div><h2 className="text-base font-bold">No price for your list yet</h2><p className="text-sm text-muted-foreground">These stores are nearby but have no price for what is on your list, so they cannot be totalled.</p></div>
+                  {noPrice.map((u) => (
+                    <div key={u.store} className="flex items-center gap-3 border-t pt-3 first:border-0 first:pt-0" data-testid="no-price-store">
+                      <div className="min-w-0 flex-1">
+                        <b className="text-sm">{u.store}</b>
+                        <p className="text-xs text-muted-foreground">{u.km != null ? `${u.km.toFixed(1)} km · ` : ""}No price for {u.missing.slice(0, 2).join(", ")}{u.missing.length > 2 ? ` and ${u.missing.length - 2} more` : ""}</p>
+                        {levelWords(u.levelPct) && <span className={`${chip} mt-1 ${LEVEL_CLS[u.level]}`}>{u.levelPct != null && u.levelPct > 0 && u.level !== "average" ? "Usually " : ""}{levelWords(u.levelPct)}</span>}
+                      </div>
+                      <Link href="/personal/groceries/new" className="inline-flex min-h-11 shrink-0 items-center rounded-xl border px-3 text-sm font-bold text-primary">Add a price</Link>
+                    </div>
+                  ))}
+                </CardContent></Card>
+              )}
+
+              {grid && (
+                <Card data-testid="item-grid"><CardContent className="space-y-3 p-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="flex-1 text-base font-bold">Item by item</h2>
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-xs text-muted-foreground">Only items that differ
+                      <input type="checkbox" role="switch" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} className="h-5 w-5 accent-primary" />
+                    </label>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-fixed border-collapse text-sm">
+                      <caption className="sr-only">Price of each item at each store, in {currency}</caption>
+                      <thead><tr><th scope="col" className="w-[34%] pb-1 text-left text-xs font-semibold text-muted-foreground"><span className="sr-only">Item</span></th>{grid.stores.map((st) => <th key={st} scope="col" className="px-1 pb-1 text-center text-xs font-bold leading-tight">{st}</th>)}</tr></thead>
+                      <tbody>
+                        {grid.rows.filter((r) => !onlyDiff || r.differs).map((r) => (
+                          <tr key={r.key} className="border-t" data-testid="grid-row">
+                            <th scope="row" className="py-2 pr-1 text-left text-[13px] font-semibold leading-tight">{r.qty > 1 ? `${r.qty} × ` : ""}{r.name}</th>
+                            {r.cells.map((c, ci) => <td key={ci} className={`min-h-11 px-1 py-2 text-center tabular-nums ${r.cheapest.includes(ci) ? "bg-emerald-100 font-extrabold text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200" : c == null ? "text-xs text-muted-foreground" : ""}`}>{c == null ? "No price" : c.toFixed(2)}</td>)}
+                          </tr>
+                        ))}
+                        {grid.sharedCount > 0 && <tr className="border-t-2" data-testid="grid-total"><th scope="row" className="py-2 pr-1 text-left text-[13px] font-extrabold leading-tight">Total, {grid.sharedCount} shared item{grid.sharedCount === 1 ? "" : "s"}</th>{grid.totals.map((t, ci) => <td key={ci} className={`px-1 py-2 text-center font-bold tabular-nums ${grid.leader?.index === ci ? "bg-emerald-100 text-emerald-900 dark:bg-emerald-500/20 dark:text-emerald-200" : ""}`}>{t.toFixed(2)}</td>)}</tr>}
+                        <tr className="border-t"><th scope="row" className="py-2 pr-1 text-left text-[13px] font-semibold">Items priced</th>{grid.priced.map((n, ci) => <td key={ci} className="px-1 py-2 text-center tabular-nums">{n} of {items.length}</td>)}</tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-muted-foreground">{grid.allShared ? "Every store prices every item." : `The total uses only the ${grid.sharedCount} item${grid.sharedCount === 1 ? "" : "s"} every store prices, so a store is never ahead only because it is missing items.`} Green is the cheapest price in each row.{grid.leader ? ` ${grid.stores[grid.leader.index]} is cheapest by ${fmt(grid.leader.gap)}.` : ""}</p>
+                </CardContent></Card>
+              )}
+
               {me && far.length > 0 && <p className="text-xs text-muted-foreground">{far.length} more store{far.length === 1 ? " is" : "s are"} outside {radius} km: {far.map((f) => f.store).join(", ")}.</p>}
 
               {(unplaced.length > 0 || me) && (
@@ -378,14 +438,27 @@ export function BestStore() {
 
               <Card data-testid="price-level"><CardContent className="space-y-3 p-4">
                 <h2 className={heading}>Price level</h2>
-                <p className="text-sm text-muted-foreground">How each store compares with the average store, on products you bought or saw in 2 or more stores.</p>
-                {index.map((s) => (
-                  <div key={s.store} className="space-y-1 border-t pt-2 first:border-0 first:pt-0">
+                <p className="text-sm text-muted-foreground">How each store compares with the average store, cheapest first. Based on products you bought or saw in 2 or more stores.</p>
+                {levels.rated.map((s) => (
+                  <div key={s.store} className="space-y-1 border-t pt-2 first:border-0 first:pt-0" data-testid="level-row">
                     <div className="flex items-center justify-between gap-2"><b className="text-sm">{s.store}</b><Level level={s.level} pct={null} /></div>
-                    {s.pct != null ? <div className="flex items-center gap-2"><div className="relative h-4 flex-1 rounded bg-muted" aria-hidden="true"><div className={`absolute top-0 h-full ${s.pct < 0 ? "rounded-l bg-emerald-600" : s.pct >= 3 ? "rounded-r bg-red-600" : s.pct > 2 ? "rounded-r bg-amber-500" : "rounded-r bg-slate-400"}`} style={s.pct < 0 ? { right: "50%", width: `${Math.min(50, Math.abs(s.pct) * 8)}%` } : { left: "50%", width: `${Math.min(50, s.pct * 8)}%` }} /><div className="absolute left-1/2 top-[-2px] h-[20px] w-0.5 bg-foreground/60" /></div><b className="w-14 text-right text-sm tabular-nums">{signed(s.pct)}</b></div> : <p className="text-xs text-muted-foreground">Not enough data: {s.shared} of {5} shared products so far.</p>}
-                    <p className="text-[11px] text-muted-foreground">{s.shared} products compared</p>
+                    {s.pct != null ? <div className="flex items-center gap-2"><div className="relative h-4 flex-1 rounded bg-muted" aria-hidden="true"><div className={`absolute top-0 h-full ${s.pct < 0 ? "rounded-l bg-emerald-600" : s.pct >= 3 ? "rounded-r bg-red-600" : s.pct > 2 ? "rounded-r bg-amber-500" : "rounded-r bg-slate-400"}`} style={s.pct < 0 ? { right: "50%", width: `${Math.min(50, Math.abs(s.pct) * 8)}%` } : { left: "50%", width: `${Math.min(50, s.pct * 8)}%` }} /><div className="absolute left-1/2 top-[-2px] h-[20px] w-0.5 bg-foreground/60" /></div><b className="w-14 text-right text-sm tabular-nums">{signed(s.pct)}</b></div> : null}
+                    <p className="text-[11px] text-muted-foreground">{s.shared} products compared{s.listNote ? ` · On your list: ${s.listNote}` : ""}</p>
                   </div>
                 ))}
+                {levels.needMore.length > 0 && (
+                  <details className="border-t pt-2" data-testid="level-need-more">
+                    <summary className="flex min-h-11 cursor-pointer items-center justify-between text-sm font-bold">Needs more prices<ChevronDown className="h-4 w-4" aria-hidden="true" /></summary>
+                    <p className="pb-2 text-xs text-muted-foreground">These stores share too few products to be rated yet.</p>
+                    {levels.needMore.map((s) => (
+                      <div key={s.store} className="space-y-1 border-t py-2">
+                        <div className="flex justify-between gap-2 text-sm"><b>{s.store}</b><span className="text-xs text-muted-foreground">{s.shared} of {levels.minShared} shared products</span></div>
+                        <div className="h-1.5 rounded bg-muted" aria-hidden="true"><div className="h-full rounded bg-primary" style={{ width: `${Math.min(100, (s.shared / levels.minShared) * 100)}%` }} /></div>
+                        {s.listNote && <p className="text-[11px] text-muted-foreground">On your list: {s.listNote}</p>}
+                      </div>
+                    ))}
+                  </details>
+                )}
                 <div className="flex gap-2 rounded-lg bg-muted/60 p-3 text-xs text-muted-foreground"><Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" /><span>Each price is compared with the middle price of the same product and size across stores, newer than 60 days, then weighted by what you spend. Needs 5 shared products. Cheapest and Most expensive need a 3% gap from average. Loyalty discounts are not included.</span></div>
               </CardContent></Card>
             </>

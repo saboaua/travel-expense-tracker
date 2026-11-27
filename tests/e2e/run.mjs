@@ -2123,6 +2123,9 @@ try {
       await cards.first().click();
       await page.getByTestId("store-detail").waitFor();
       await page.getByTestId("price-level").getByText("Cheapest").first().waitFor();
+      await page.getByTestId("best-verdict").waitFor();
+      await page.getByTestId("item-grid").getByText("Items priced").waitFor();
+      await page.getByTestId("level-row").first().getByText("On your list").waitFor();
       assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
     } finally {
       await ctx.close();
