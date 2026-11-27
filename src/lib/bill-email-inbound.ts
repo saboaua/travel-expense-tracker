@@ -127,8 +127,11 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
       const dup = await db.from("grocery_receipts").select("id").eq("user_id", userId).eq("order_ref", order.order_ref).maybeSingle();
       if (dup.data) { await log("skipped_duplicate", { summary: `Online order · ${label} ${order.order_ref}: already added` }); return { ok: true, status: "order_duplicate" }; }
     }
-    const pref = await db.from("online_order_prefs").select("paid_with").eq("user_id", userId).maybeSingle();
-    const row = { user_id: userId, store: `${label} order`, paid_with: onlinePaid((pref.data as { paid_with?: string } | null)?.paid_with), purchase_date: order.order_date, total: order.total, currency: order.currency, online_site: site, arrives_on: order.arrives_on, area: "shopping", order_ref: order.order_ref, source: "email", needs_check: true };
+    // The payment type chosen for this site, else the general one, else credit card
+    let pref = await db.from("online_order_prefs").select("paid_with, paid_by_site").eq("user_id", userId).maybeSingle();
+    if (pref.error) pref = await db.from("online_order_prefs").select("paid_with").eq("user_id", userId).maybeSingle();
+    const pv = (pref.data ?? null) as { paid_with?: string; paid_by_site?: Record<string, string> | null } | null;
+    const row = { user_id: userId, store: `${label} order`, paid_with: onlinePaid(pv?.paid_by_site?.[site] ?? pv?.paid_with), purchase_date: order.order_date, total: order.total, currency: order.currency, online_site: site, arrives_on: order.arrives_on, area: "shopping", order_ref: order.order_ref, source: "email", needs_check: true };
     const ins = await db.from("grocery_receipts").insert(row).select("id").single();
     if (ins.error || !ins.data) {
       const missing = ins.error && isMissingColumn(ins.error);

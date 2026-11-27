@@ -1,7 +1,6 @@
-import { ForwardOrders } from "@/components/personal/ForwardOrders";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Online orders" };
-
+/** The email pages are one Email inbox now; old links and bookmarks still land there. */
 export default function Page() {
-  return <ForwardOrders />;
+  redirect("/personal/email");
 }

@@ -1,7 +1,6 @@
-import { BillEmails } from "@/components/personal/BillEmails";
+import { redirect } from "next/navigation";
 
-export const metadata = { title: "Bill emails" };
-
+/** The email pages are one Email inbox now; old links and bookmarks still land there. */
 export default function Page() {
-  return <BillEmails />;
+  redirect("/personal/email");
 }

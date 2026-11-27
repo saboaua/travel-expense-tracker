@@ -184,7 +184,7 @@ export default function PersonalHubPage() {
     ...(wantsMyIptv && myIptv > 0 ? [{ href: "/my-subscription", title: "My IPTV subscription", icon: Tv, tone: "subscriptions" as const, text: "See your service and when it ends" }] : []),
   ];
   const auto: Row[] = [
-    { href: "/personal/utilities/emails", title: "Bills by email", icon: Mail, tone: "utilities", text: "Add your bills from your inbox (Pro)" },
+    { href: "/personal/email", title: "Email inbox", icon: Mail, tone: "utilities", text: "Bills and online orders from your inbox (Pro)" },
     { href: "/profile#telegram", title: "Telegram", icon: Send, tone: "notifications", text: "Reminders, and saving by chat (Pro)" },
   ];
 

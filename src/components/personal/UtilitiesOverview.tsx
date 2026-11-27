@@ -96,7 +96,7 @@ export function UtilitiesOverview() {
         <div className="order-2 min-w-0 space-y-3 lg:order-1">
           <div className="flex gap-2.5">
             <Link href="/personal/utilities/add" className="inline-flex h-12 flex-[1.4] items-center justify-center gap-2 rounded-xl bg-primary text-base font-semibold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-add"><Plus className="h-5 w-5" aria-hidden="true" />Add bill</Link>
-            <Link href="/personal/utilities/emails" className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-emails-link"><Mail className="h-4 w-4" aria-hidden="true" />From email</Link>
+            <Link href="/personal/email" className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl border bg-card text-sm font-semibold text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary" data-testid="util-emails-link"><Mail className="h-4 w-4" aria-hidden="true" />From email</Link>
           </div>
 
           {due.length > 0 && (

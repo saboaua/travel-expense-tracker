@@ -125,6 +125,7 @@ need_cols(tbl, col, fix) as (values
   ('price_checks','photo_path','migration_price_notes.sql'),
   -- Paid with
   ('grocery_receipts','paid_with','migration_paid_with.sql'),
+  ('online_order_prefs','paid_by_site','migration_online_order_pay_sites.sql'),
   ('grocery_receipts','trip_ref','migration_paid_with.sql'),
   ('personal_expenses','paid_with','migration_paid_with.sql'),
   ('subscriptions','paid_with','migration_subscription_paid_with.sql'),

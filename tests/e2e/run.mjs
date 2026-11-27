@@ -1269,7 +1269,7 @@ try {
     await ctx.close();
   });
 
-  await test("order emails: the forwarding page names the app, lists what arrived with Check it, and saving the receipt clears the mark", async () => {
+  await test("order emails: the Email inbox offers order senders with a payment type each, and saving a forwarded receipt clears the mark", async () => {
     const { ctx, page } = await newPage();
     const rid = "00000000-0000-4000-8000-0000000000e1";
     fake.table("pro_limits").push({ id: 1, starts_orders_email: null }); // the admin has switched the Pro limit off
@@ -1278,15 +1278,16 @@ try {
     await page.waitForURL((u) => u.pathname === "/");
     await page.goto(`${BASE}/personal/shopping/online`);
     await page.getByTestId("to-forward").click();
-    await page.getByTestId("forward-recent").waitFor({ timeout: 20_000 });
-    assert(/ready to check/.test(await page.getByTestId("forward-card").innerText()), "the steps say what happens");
-    assert((await page.getByTestId("online-paid-credit").getAttribute("aria-checked")) === "true", "forwarded orders default to credit card");
-    await page.getByTestId("online-paid-debit").click();
-    for (let i = 0; i < 40 && !fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_with === "debit"); i++) await new Promise((ok) => setTimeout(ok, 250));
-    assert(fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_with === "debit"), "the chosen default is saved");
-    await page.getByTestId("forward-check").waitFor();
-    await page.getByTestId("forward-recent").getByRole("link").first().click();
-    await page.getByTestId("needs-check").waitFor({ timeout: 20_000 });
+    await page.waitForURL((u) => u.pathname === "/personal/email", { timeout: 20_000 });
+    await page.getByTestId("email-connection").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("email-sender-kind").count()) + (await page.getByTestId("email-suggest-auto-confirm@amazon.com").count()) > 0, "Amazon is offered as an order sender");
+    assert((await page.getByTestId("paid-amazon").inputValue()) === "credit", "forwarded orders default to credit card");
+    await page.getByTestId("paid-ebay").selectOption("debit");
+    for (let i = 0; i < 40 && !fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_by_site?.ebay === "debit"); i++) await new Promise((ok) => setTimeout(ok, 250));
+    assert(fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_by_site?.ebay === "debit"), "the payment type chosen for eBay is saved");
+    assert((await page.getByTestId("paid-amazon").inputValue()) === "credit", "Amazon keeps credit card");
+    await page.goto(`${BASE}/personal/shopping/online/forward`);
+    await page.waitForURL((u) => u.pathname === "/personal/email", { timeout: 20_000 });
     await page.goto(`${BASE}/personal/shopping/${rid}/edit`);
     await page.locator("#gr-total").waitFor({ timeout: 20_000 });
     await page.waitForFunction(() => document.querySelector("#gr-store")?.value === "Amazon order", null, { timeout: 20_000 });
@@ -1302,10 +1303,12 @@ try {
     const { ctx, page } = await newPage();
     await signIn(page, "pat@example.com", "Correct-Horse-1");
     await page.waitForURL((u) => u.pathname === "/");
-    await page.goto(`${BASE}/personal/shopping/online/forward`);
-    await page.getByTestId("orders-email-locked").waitFor({ timeout: 20_000 });
-    assert((await page.getByTestId("forward-card").count()) === 0, "no forwarding address on Free");
-    assert((await page.getByTestId("orders-email-get-pro").getAttribute("href")) === "/personal/pro", "Get Pro goes to the Pro page");
+    fake.table("pro_limits").push({ id: 1, starts_bills_email: "2026-01-01", starts_orders_email: "2026-01-01" });
+    await page.goto(`${BASE}/personal/email`);
+    await page.getByTestId("email-locked").waitFor({ timeout: 20_000 });
+    assert((await page.getByTestId("forward-address").count()) === 0, "no forwarding address on Free");
+    assert((await page.getByTestId("email-get-pro").getAttribute("href")) === "/personal/pro", "Get Pro goes to the Pro page");
+    fake.table("pro_limits").length = 0;
     await page.getByTestId("free-manual").click();
     await page.waitForURL((u) => u.pathname === "/personal/shopping/new", { timeout: 20_000 });
     await page.getByText("Add receipt by hand").waitFor({ timeout: 20_000 });
@@ -4321,8 +4324,8 @@ try {
       fake.table("trip_papers").length = 0;
       // bill import by email is Pro
       await page.goto(`${BASE}/personal/utilities/emails`);
-      await page.getByTestId("bills-email-locked").waitFor();
-      await page.getByTestId("bills-email-get-pro").waitFor();
+      await page.getByTestId("email-locked").waitFor();
+      await page.getByTestId("email-get-pro").waitFor();
       // Telegram: Pro-only notice in settings
       await page.route("**/api/telegram/link", (route) => route.fulfill({ json: { linked: false, botUsername: "lifolio_test_bot", link: "https://t.me/lifolio_test_bot?start=x", prefs: {} } }));
       await page.goto(`${BASE}/settings`);

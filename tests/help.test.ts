@@ -87,8 +87,8 @@ eq("sql seeds are published", !/published\s*=\s*false/.test(sql), true);
     eq(`bill emails: ${slug} has headings and steps`, blocks.some((b) => b.kind === "heading") && blocks.some((b) => b.kind === "steps" || b.kind === "bullets"), true);
     eq(`bill emails: ${slug} has no code marks that would show as text`, body.includes("`"), false);
   }
-  const ui = readFileSync("src/components/personal/BillEmails.tsx", "utf8");
-  for (const phrase of ["Add this account", "Only add account", "Add as a sender", "Copy script", "Make a new key", "Add a sender", "Recent emails", "Allowed senders"]) eq(`bill emails: the screen has "${phrase}"`, ui.includes(phrase), true);
+  const ui = readFileSync("src/components/personal/EmailInbox.tsx", "utf8");
+  for (const phrase of ["Add this account", "Only add account", "Add as a sender", "Copy script", "Make a new key", "Add a sender", "Received", "Senders"]) eq(`bill emails: the screen has "${phrase}"`, ui.includes(phrase), true);
   eq("bill emails: the old Utilities guide sentence is only replaced when unedited", g.includes("where slug = 'utility-bills'") && g.includes("and body like"), true);
 }
 
