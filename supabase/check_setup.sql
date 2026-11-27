@@ -142,6 +142,7 @@ col_checks as (
     on c.table_schema = 'public' and c.table_name = n.tbl and c.column_name = n.col
 ),
 need_tables(tbl, fix) as (values
+  ('online_order_prefs','migration_online_order_pay.sql'),
   ('logo_library','migration_logo_library.sql'),
   ('receipt_types','migration_receipt_types.sql'),
   ('house_areas','migration_house_areas.sql'),

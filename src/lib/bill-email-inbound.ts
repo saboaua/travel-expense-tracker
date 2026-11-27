@@ -5,7 +5,7 @@ import { isMissingColumn } from "@/lib/columns";
 import { todayISO } from "@/lib/utils";
 import { UTILITY_KINDS } from "@/lib/personal/utilities";
 import { orderSiteInForward, orderSiteOfSender, parseOrderEmail } from "@/lib/personal/order-email";
-import { siteLabel } from "@/lib/personal/online-orders";
+import { onlinePaid, siteLabel } from "@/lib/personal/online-orders";
 import { normalizeItemName } from "@/lib/personal/grocery";
 
 /** What an email service hands us, in the shape Postmark's inbound webhook uses. */
@@ -127,7 +127,8 @@ export async function handleInbound(db: SupabaseClient, p: InboundPayload, notif
       const dup = await db.from("grocery_receipts").select("id").eq("user_id", userId).eq("order_ref", order.order_ref).maybeSingle();
       if (dup.data) { await log("skipped_duplicate", { summary: `Online order · ${label} ${order.order_ref}: already added` }); return { ok: true, status: "order_duplicate" }; }
     }
-    const row = { user_id: userId, store: `${label} order`, purchase_date: order.order_date, total: order.total, currency: order.currency, online_site: site, arrives_on: order.arrives_on, area: "shopping", order_ref: order.order_ref, source: "email", needs_check: true };
+    const pref = await db.from("online_order_prefs").select("paid_with").eq("user_id", userId).maybeSingle();
+    const row = { user_id: userId, store: `${label} order`, paid_with: onlinePaid((pref.data as { paid_with?: string } | null)?.paid_with), purchase_date: order.order_date, total: order.total, currency: order.currency, online_site: site, arrives_on: order.arrives_on, area: "shopping", order_ref: order.order_ref, source: "email", needs_check: true };
     const ins = await db.from("grocery_receipts").insert(row).select("id").single();
     if (ins.error || !ins.data) {
       const missing = ins.error && isMissingColumn(ins.error);

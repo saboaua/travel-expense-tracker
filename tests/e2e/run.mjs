@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types", "telegram_notify_prefs"]) fake.table(t);
+for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "online_order_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types", "telegram_notify_prefs"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -1280,6 +1280,10 @@ try {
     await page.getByTestId("to-forward").click();
     await page.getByTestId("forward-recent").waitFor({ timeout: 20_000 });
     assert(/ready to check/.test(await page.getByTestId("forward-card").innerText()), "the steps say what happens");
+    assert((await page.getByTestId("online-paid-credit").getAttribute("aria-checked")) === "true", "forwarded orders default to credit card");
+    await page.getByTestId("online-paid-debit").click();
+    for (let i = 0; i < 40 && !fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_with === "debit"); i++) await new Promise((ok) => setTimeout(ok, 250));
+    assert(fake.table("online_order_prefs").some((r) => r.user_id === PAT && r.paid_with === "debit"), "the chosen default is saved");
     await page.getByTestId("forward-check").waitFor();
     await page.getByTestId("forward-recent").getByRole("link").first().click();
     await page.getByTestId("needs-check").waitFor({ timeout: 20_000 });

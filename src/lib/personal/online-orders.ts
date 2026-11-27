@@ -51,3 +51,7 @@ export function mainCurrency(rows: OnlineOrder[], month: string): string | null 
   for (const r of rows) if (asSite(r.online_site) && r.purchase_date.startsWith(month)) n.set(r.currency, (n.get(r.currency) ?? 0) + 1);
   return [...n.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
 }
+
+/** The payment type a forwarded online order starts with. Credit card unless the person chose another. */
+export const DEFAULT_ONLINE_PAID = "credit" as const;
+export const onlinePaid = (v: unknown): "cash" | "debit" | "credit" => (v === "cash" || v === "debit" || v === "credit" ? v : DEFAULT_ONLINE_PAID);

@@ -121,13 +121,20 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
   useEffect(() => { if (!receiptId && new URLSearchParams(window.location.search).get("manual") === "1") { setManual(true); setRows((rs) => (rs.length ? rs : [blankRow()])); } }, [receiptId]);
   // "Just keeping the prices": a receipt for something you did not pay for. Its items feed the Price tracker, but it is never counted as spending.
   const [paidWith, setPaidWith] = useState<PaidWith | null>(null);
+  const paidTouched = useRef(false);
   const [tripRef, setTripRef] = useState<string | null>(null);
   const tripTouched = useRef(false);
   const trips = useTripChoices();
   const suggestedTrip = useMemo(() => suggestTrip(trips, date)?.ref ?? null, [trips, date]);
   // A new receipt starts with your last card and the trip that was on that day; an old one keeps what it has
   const wasSaved = useRef(false);
-  useEffect(() => { if (!receiptId && !wasSaved.current) setPaidWith((p) => p ?? (area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping" ? lastPaid() : "debit")); }, [receiptId]);
+  useEffect(() => {
+    if (receiptId || wasSaved.current) return;
+    const shopping = area === "shopping" || new URLSearchParams(window.location.search).get("area") === "shopping";
+    setPaidWith((p) => p ?? (shopping ? lastPaid() : "debit"));
+    // shopping: the default chosen for online orders, when there is one
+    if (shopping) void createClient().from("online_order_prefs").select("paid_with").maybeSingle().then(({ data }) => { const v = normPaid((data as { paid_with?: string } | null)?.paid_with); if (v) setPaidWith((p) => (paidTouched.current ? p : v)); });
+  }, [receiptId]);
   useEffect(() => { if (!receiptId && !tripTouched.current) setTripRef(suggestedTrip); }, [receiptId, suggestedTrip]);
   const [pricesOnly, setPricesOnly] = useState(false);
   const wasPricesOnly = useRef(false);
@@ -521,7 +528,7 @@ export function GroceryReceiptForm({ receiptId, area, typeId: typeProp }: { rece
             </div>
             <BoughtOnline site={onlineSite} arrives={arrivesOn} onSite={setOnlineSite} onArrives={setArrivesOn} />
             {!onlineSite && <BoughtIn value={boughtIn} detected={here.country} home={here.homeCountry} onChange={(c) => { countryChosen.current = true; setBoughtIn(c); }} />}
-            <PaidWithPicker value={paidWith} onChange={setPaidWith} />
+            <PaidWithPicker value={paidWith} onChange={(v) => { paidTouched.current = true; setPaidWith(v); }} />
             <TripPicker trips={trips} value={tripRef} suggested={suggestedTrip} onChange={(v) => { tripTouched.current = true; setTripRef(v); }} />
 
             <div className="space-y-3">

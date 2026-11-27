@@ -8,7 +8,8 @@ import { useBrand } from "@/lib/use-brand";
 import { BackLink } from "@/components/ui/page-header";
 import { Button } from "@/components/ui/button";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
-import { siteColor, siteLabel } from "@/lib/personal/online-orders";
+import { onlinePaid, siteColor, siteLabel } from "@/lib/personal/online-orders";
+import { PAID_WITH, type PaidWith } from "@/lib/paid-with";
 import { useLimits } from "@/lib/use-limits";
 import { featureLocked } from "@/lib/limits";
 import { todayISO } from "@/lib/utils";
@@ -23,6 +24,7 @@ export function ForwardOrders() {
   const [state, setState] = useState<"loading" | "ready" | "off" | "error">("loading");
   const [copied, setCopied] = useState(false);
   const [recent, setRecent] = useState<Recent[]>([]);
+  const [paid, setPaid] = useState<PaidWith>("credit");
   const lim = useLimits();
   const locked = !!lim && featureLocked(lim.limits, lim.who, "orders_email", todayISO());
 
@@ -31,9 +33,17 @@ export function ForwardOrders() {
     if (a.address) { setAddress(a.address); setState("ready"); } else setState(a.configured === false || a.setup ? "error" : "off");
     const { data } = await createClient().from("grocery_receipts").select("id, store, purchase_date, total, currency, online_site, needs_check").eq("source", "email").order("created_at", { ascending: false }).limit(8);
     setRecent((data ?? []) as unknown as Recent[]);
+    const pr = await createClient().from("online_order_prefs").select("paid_with").maybeSingle();
+    setPaid(onlinePaid((pr.data as { paid_with?: string } | null)?.paid_with));
   }, []);
   useEffect(() => { void load(); }, [load]);
 
+  const choosePaid = async (p: PaidWith) => {
+    setPaid(p);
+    const sb = createClient();
+    const { data: u } = await sb.auth.getUser();
+    if (u.user) await sb.from("online_order_prefs").upsert({ user_id: u.user.id, paid_with: p, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  };
   const copy = async () => { if (!address) return; try { await navigator.clipboard.writeText(address); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* the address is selectable */ } };
   const step = (n: number, t: string) => <div className="flex items-start gap-3 text-sm leading-snug"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-extrabold text-indigo-900">{n}</span><span>{t}</span></div>;
   return (
@@ -75,6 +85,15 @@ export function ForwardOrders() {
         {step(3, `The order shows up in ${appName} within a minute, ready to check.`)}
         <p className="text-[13px] leading-relaxed text-muted-foreground">Want it automatic? Set your email to forward messages from these senders and you never have to think about it.</p>
         <div className="flex flex-wrap gap-2 text-xs font-bold"><span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-900">amazon.com</span><span className="rounded-full bg-red-100 px-2.5 py-1 text-red-900">aliexpress.com</span><span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-900">ebay.com</span></div>
+      </section>
+      <section className="space-y-3 rounded-2xl border bg-card p-4" data-testid="online-paid">
+        <h2 className="font-bold">Paid with, for forwarded orders</h2>
+        <div role="radiogroup" aria-label="Paid with" className="grid grid-cols-3 gap-1 rounded-xl bg-muted p-1">
+          {[...PAID_WITH].sort((a, b) => ["credit", "debit", "cash"].indexOf(a.id) - ["credit", "debit", "cash"].indexOf(b.id)).map((o) => (
+            <button key={o.id} type="button" role="radio" aria-checked={paid === o.id} onClick={() => void choosePaid(o.id)} data-testid={`online-paid-${o.id}`} className={`min-h-11 rounded-lg px-2 text-sm font-bold ${paid === o.id ? "bg-background shadow-sm" : "text-muted-foreground"}`}>{o.id === "debit" ? "Debit card" : o.label}</button>
+          ))}
+        </div>
+        <p className="text-[13px] leading-relaxed text-muted-foreground">New orders are saved with this. You can still change it on any order.</p>
       </section>
       <section className="rounded-2xl border bg-card p-4" data-testid="forward-recent">
         <h2 className="font-bold">Recently forwarded</h2>

@@ -166,7 +166,11 @@ const webMail = (extra: Record<string, unknown> = {}) => ({
   r = await handleInbound(m.db, amazonMail(), notify, "strict");
   const rc = m.t.grocery_receipts[0];
   eq([r.ok && r.status, m.t.grocery_receipts.length, rc?.store, rc?.online_site, rc?.total, rc?.currency, rc?.arrives_on, rc?.area, rc?.source, rc?.needs_check, rc?.order_ref], ["order_added", 1, "Amazon order", "amazon", 31.79, "USD", "2026-12-03", "shopping", "email", true, "123-4567890-1234567"], "an Amazon order is added as an online receipt to check, with no sender list and no signature needed");
+  eq(rc?.paid_with, "credit", "a forwarded order is a credit card purchase unless the person chose otherwise");
   eq([m.t.grocery_items.length, m.t.grocery_items[0]?.name, m.t.grocery_items[0]?.receipt_id === rc?.id], [1, "Phone stand", true], "its items are saved with it");
+  const md = makeDb({ bill_email_addresses: [{ user_id: "u1", token: TOKEN }], online_order_prefs: [{ user_id: "u1", paid_with: "debit" }] });
+  await handleInbound(md.db, amazonMail({ MessageID: "d1" }), notify, "strict");
+  eq(md.t.grocery_receipts[0]?.paid_with, "debit", "the default the person chose (debit) is used for a forwarded order");
   r = await handleInbound(m.db, amazonMail({ MessageID: "a2" }), notify, "strict");
   eq([r.ok && r.status, m.t.grocery_receipts.length], ["order_duplicate", 1], "the same order is not added twice");
   r = await handleInbound(m.db, amazonMail({ TextBody: "Your package was delivered", MessageID: "a3" }), notify, "strict");
