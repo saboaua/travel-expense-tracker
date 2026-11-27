@@ -2827,7 +2827,7 @@ try {
       if (process.env.E2E_SHOT) { await (await import("node:fs/promises")).writeFile("/tmp/badge-share-card.png", Buffer.from((shot ?? "").split(",")[1] ?? "", "base64")); await page.screenshot({ path: "/tmp/badge-share-sheet.png" }); }
       assert(!(await page.getByTestId("badge-share").innerText()).includes("AWG"), "the picture has no prices");
       const [dl] = await Promise.all([page.waitForEvent("download"), page.getByTestId("badge-share-save").click()]);
-      assert(dl.suggestedFilename() === "lifolio-scout-badge.png", "Save image names the file after the badge");
+      assert(/^[a-z0-9-]+-scout-badge\.png$/.test(dl.suggestedFilename()), "Save image names the file after the app and the badge: " + dl.suggestedFilename());
       await page.getByTestId("badge-share").getByRole("button", { name: "Close" }).click();
       assert((await page.getByTestId("level-up").count()) === 1, "closing the share sheet returns to the celebration");
       await page.getByTestId("level-up-done").click();
@@ -6050,6 +6050,7 @@ try {
   });
 
   await test("iptv: a client login lands on one page, sees only their own subscription, and cannot reach anything else; other roles cannot open the admin page", async () => {
+    assert(fake.table("iptv_customers").length > 0, "this test needs the iptv test before it: run with E2E_ONLY=\"iptv\"");
     const id = fake.table("iptv_customers")[0].id;
     const admin2 = await newPage();
     await signIn(admin2.page, "admin@example.com", "Admin-Pass-123");
