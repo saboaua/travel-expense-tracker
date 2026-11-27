@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AlertTriangle, Activity, Globe, RefreshCw, Filter, X } from "lucide-react";
+import { actionText, actorName, changedText, groupOf, AUDIT_GROUPS, GROUP_HELP } from "@/lib/audit-view";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
 
 interface SecurityEvent {
@@ -73,7 +74,7 @@ export default function AdminSecurityPage() {
   const [eventType, setEventType] = useState("");
   const [severity, setSeverity] = useState("");
   const [action, setAction] = useState("");
-  const [entityType, setEntityType] = useState("");
+  const [group, setGroup] = useState("");
   const [email, setEmail] = useState("");
   const [ip, setIp] = useState("");
   const [testing, setTesting] = useState(false);
@@ -87,7 +88,7 @@ export default function AdminSecurityPage() {
       if (eventType) params.set("eventType", eventType);
       if (severity) params.set("severity", severity);
       if (action) params.set("action", action);
-      if (entityType) params.set("entityType", entityType);
+      if (group) params.set("group", group);
       if (email) params.set("email", email);
       if (ip) params.set("ip", ip);
       const res = await fetch(`/api/admin/security?${params}`);
@@ -103,7 +104,7 @@ export default function AdminSecurityPage() {
     } finally {
       setLoading(false);
     }
-  }, [from, to, eventType, severity, action, entityType, email, ip]);
+  }, [from, to, eventType, severity, action, group, email, ip]);
 
   useEffect(() => {
     load();
@@ -120,7 +121,7 @@ export default function AdminSecurityPage() {
     setEventType("");
     setSeverity("");
     setAction("");
-    setEntityType("");
+    setGroup("");
     setEmail("");
     setIp("");
   };
@@ -266,12 +267,11 @@ export default function AdminSecurityPage() {
               </div>
               <div>
                 <label htmlFor="log-filter-record" className="text-xs text-muted-foreground">Record</label>
-                <Select id="log-filter-record" value={entityType} onChange={(e) => setEntityType(e.target.value)} className="mt-1 h-9 px-2 py-0">
+                <Select id="log-filter-record" value={group} onChange={(e) => setGroup(e.target.value)} className="mt-1 h-9 px-2 py-0">
                   <option value="">All records</option>
-                  <option value="expenses">Expenses</option>
-                  <option value="trips">Trips</option>
-                  <option value="user">Users</option>
+                  {AUDIT_GROUPS.map((g) => <option key={g} value={g}>{g}</option>)}
                 </Select>
+                {group && <p className="mt-1 text-xs text-muted-foreground">{GROUP_HELP[group as keyof typeof GROUP_HELP]}</p>}
               </div>
             </div>
           )}
@@ -327,19 +327,26 @@ export default function AdminSecurityPage() {
               <p className="text-sm text-muted-foreground py-8 text-center">No audit entries match these filters.</p>
             ) : (
               <div className="space-y-2 max-h-[520px] overflow-y-auto">
-                {audits.map((a) => (
-                  <div key={a.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-xl border text-sm">
-                    <span className="font-medium shrink-0">{a.action}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-muted-foreground truncate">{a.actor_email || a.actor_id || "system"}</p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {a.details?.merchant ? String(a.details.merchant) : a.details?.name ? String(a.details.name) : a.entity_type || ""}
-                        {a.details?.amount != null ? ` \u00b7 ${String(a.details.amount)} ${String(a.details.currency || "")}` : ""}
-                      </p>
+                {audits.map((a) => {
+                  const g = groupOf(a.entity_type);
+                  const changed = changedText(a.details);
+                  return (
+                    <div key={a.id} className="flex flex-col sm:flex-row sm:items-start gap-2 p-3 rounded-xl border text-sm" data-testid="audit-row">
+                      <div className="flex-1 min-w-0">
+                        <p className="leading-snug"><span className="font-semibold break-all">{actorName(a)}</span> {actionText(a)}</p>
+                        {changed && <p className="text-xs text-muted-foreground">Changed: {changed}</p>}
+                        {(a.details?.merchant || a.details?.name || a.details?.amount != null) && (
+                          <p className="text-xs text-muted-foreground truncate">
+                            {a.details?.merchant ? String(a.details.merchant) : a.details?.name ? String(a.details.name) : ""}
+                            {a.details?.amount != null ? ` \u00b7 ${String(a.details.amount)} ${String(a.details.currency || "")}` : ""}
+                          </p>
+                        )}
+                        {g && <span className="mt-1.5 inline-flex rounded-full bg-muted px-2.5 py-0.5 text-xs font-bold">{g}</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground shrink-0">{new Date(a.created_at).toLocaleString()}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground shrink-0">{new Date(a.created_at).toLocaleString()}</p>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>

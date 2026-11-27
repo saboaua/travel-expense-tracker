@@ -73,6 +73,7 @@ fake.table("trips").push({ id: TRIP_ID, user_id: PAT, name: "Miami Conference", 
 fake.table("support_requests").push({ id: "b0a6a8a2-0000-4000-8000-000000000001", name: "Casey", email: "casey@example.com", subject: "Cannot log in", message: "Reset please", status: "new", created_at: new Date().toISOString() });
 fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000003", created_at: new Date().toISOString(), action: "expenses.created", entity_type: "expenses", entity_id: "e1", actor_id: PAT, actor_email: "pat@example.com", details: { merchant: "Uber", amount: 5.45, currency: "USD", category: "Transport" } });
 fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000002", created_at: new Date().toISOString(), action: "role.update", entity_type: "role", entity_id: "user", actor_id: ADMIN, actor_email: "admin@example.com", details: {} });
+fake.table("audit_logs").push({ id: "b0a6a8a2-0000-4000-8000-000000000004", created_at: new Date().toISOString(), action: "reminders.updated", entity_type: "reminders", entity_id: "r1", actor_id: PAT, actor_email: "pat@example.com", details: { owner_id: PAT, changed: ["title", "due_date"] } });
 
 /* ---------------- start everything ---------------- */
 // The sharing functions run as the real SQL from supabase/migration_sharing.sql on a real Postgres engine (PGlite)
@@ -5130,7 +5131,20 @@ try {
     await admin.page.getByRole("button", { name: /^Security events \([1-9]/ }).waitFor(); // the failed sign-in from the earlier test
     await admin.page.locator("span.font-medium", { hasText: "Login failed" }).first().waitFor();
     await admin.page.getByRole("button", { name: /Audit trail/ }).click();
-    await admin.page.getByText("role.update").first().waitFor();
+    await admin.page.getByText("role update").first().waitFor();
+    // entries read as sentences, with the group and what changed (names only)
+    const rem = admin.page.getByTestId("audit-row").filter({ hasText: "changed a reminder" });
+    await rem.waitFor();
+    assert(/pat@example\.com/.test(await rem.innerText()) && /Changed: title, due date/.test(await rem.innerText()) && /Personal/.test(await rem.innerText()), "a Personal entry says who, what and which fields changed");
+    // the Record filter lists one group at a time
+    await admin.page.getByLabel("Record").selectOption("Personal");
+    await rem.waitFor();
+    await admin.page.getByTestId("audit-row").filter({ hasText: "added an expense" }).waitFor({ state: "detached" });
+    await admin.page.getByLabel("Record").selectOption("Business");
+    await admin.page.getByTestId("audit-row").filter({ hasText: "added an expense" }).waitFor();
+    assert((await rem.count()) === 0, "Business hides Personal entries");
+    await admin.page.getByLabel("Record").selectOption("");
+    await admin.page.getByTestId("audit-row").filter({ hasText: "role update" }).first().waitFor();
     // amounts are masked: Uber · *.*5 USD, never 5.45
     await admin.page.getByText("Uber \u00b7 *.*5 USD").waitFor();
     assert((await admin.page.getByText("5.45").count()) === 0, "the real amount must not be on the page");

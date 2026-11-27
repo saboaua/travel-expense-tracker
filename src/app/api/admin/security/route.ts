@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { logSecurityEvent, getRequestMeta } from "@/lib/audit";
 import { writeSecurityEvent } from "@/lib/security-log";
 import { loadPermissions } from "@/lib/access-server";
+import { groupTypes } from "@/lib/audit-view";
 import { AUDIT_LOG_COLS, SECURITY_EVENT_COLS } from "@/lib/columns";
 
 export const dynamic = "force-dynamic";
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
     const severity = url.searchParams.get("severity");
     const action = url.searchParams.get("action");
     const entityType = url.searchParams.get("entityType");
+    const types = groupTypes(url.searchParams.get("group"));
     const email = url.searchParams.get("email");
     const ip = url.searchParams.get("ip");
 
@@ -73,7 +75,8 @@ export async function GET(request: Request) {
     if (email) eventsQuery = eventsQuery.ilike("email_attempted", `%${email}%`);
     if (ip) eventsQuery = eventsQuery.ilike("ip_address", `%${ip}%`);
     if (action) auditsQuery = auditsQuery.ilike("action", `%${action}%`);
-    if (entityType) auditsQuery = auditsQuery.eq("entity_type", entityType);
+    if (types) auditsQuery = auditsQuery.in("entity_type", types);
+    else if (entityType) auditsQuery = auditsQuery.eq("entity_type", entityType);
     if (email) auditsQuery = auditsQuery.ilike("actor_email", `%${email}%`);
 
     const [events, audits] = await Promise.all([eventsQuery, auditsQuery]);
