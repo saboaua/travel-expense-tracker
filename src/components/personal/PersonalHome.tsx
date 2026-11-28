@@ -21,6 +21,7 @@ const DocumentTiles = dynamic(() => import("@/components/documents/DocumentTiles
 import type { DashboardProject, DashboardRow } from "@/lib/personal/dashboard";
 
 import { BudgetCard } from "@/components/personal/BudgetCard";
+import { RecapCard } from "@/components/personal/RecapCard";
 import { PricesGlance } from "@/components/personal/PricesGlance";
 import { ActiveTrips, HomeProjects } from "@/components/personal/HomeActive";
 import { IconTile } from "@/components/ui/icon-tile";
@@ -162,6 +163,7 @@ export default function PersonalHome({ rows, projects, today, docs, docTotal, ca
       <KeepHandy testId="keep-handy" />
       <div className="space-y-4 lg:grid lg:grid-cols-[minmax(0,1fr)_360px] lg:items-start lg:gap-6 lg:space-y-0">
         <div className="min-w-0 space-y-4">
+          <RecapCard />
           <BudgetCard />
           <PricesGlance />
           <ActiveTrips rows={rows} projects={projects} today={today} />

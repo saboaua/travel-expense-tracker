@@ -3889,6 +3889,61 @@ try {
     }
   });
 
+  await test("recap: on the first days of a month Personal shows how last month went, it can be hidden, and the full page keeps it", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const stash = {};
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      for (const t of ["grocery_receipts", "personal_spends", "utility_bills", "personal_expenses", "personal_budgets"]) { stash[t] = fake.table(t).splice(0); }
+      const rc = (id, store, date, total) => ({ id: `7e000000-0000-4000-8000-00000000${id}`, user_id: PAT, store, purchase_date: date, total, currency: "AWG", prices_only: false, created_at: new Date().toISOString() });
+      fake.table("grocery_receipts").push(rc("e001", "Recap Market", "2026-09-10", 500), rc("e002", "Recap Market", "2026-10-12", 700));
+      fake.table("personal_spends").push({ id: "7e000000-0000-4000-8000-00000000e003", user_id: PAT, merchant: "Hinge", amount: 100, currency: "AWG", exchange_rate: 0.558659, amount_usd: 55.87, category: "House", expense_date: "2026-10-15", created_at: new Date().toISOString() });
+      fake.table("personal_budgets").push({ id: "7e000000-0000-4000-8000-00000000e004", user_id: PAT, month: null, amount: 1000, currency: "AWG", limits: {}, alert_at_80: false });
+
+      // the 3rd of November: the card is about October
+      await ctx.clock.setFixedTime(new Date("2026-11-03T12:00:00-04:00"));
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("recap-card").waitFor();
+      assert((await page.getByTestId("recap-card").getAttribute("data-state")) === "under", "800 of 1,000 is under budget");
+      assert(/Your October/.test(await page.getByTestId("recap-card").textContent()), "it is about October");
+      assert(/800/.test(await page.getByTestId("recap-spent").textContent()), "800 spent: " + (await page.getByTestId("recap-spent").textContent()));
+      const st = await page.getByTestId("recap-state").textContent();
+      assert(/200/.test(st) && /under budget/.test(st), "200 under budget: " + st);
+      const ch = await page.getByTestId("recap-change").textContent();
+      assert(/Groceries went up 40%/.test(ch), "groceries 700 against 500 is up 40%: " + ch);
+      assert((await page.getByTestId("recap-dismiss").boundingBox()).height >= 44, "the close button is a full tap target");
+      await page.getByTestId("recap-dismiss").click();
+      await page.getByTestId("recap-card").waitFor({ state: "detached" });
+      await page.reload();
+      await page.getByTestId("budget-card").waitFor();
+      assert((await page.getByTestId("recap-card").count()) === 0, "a hidden recap stays hidden after a reload");
+
+      // the 20th: no card, but the budget card links to the full page
+      await ctx.clock.setFixedTime(new Date("2026-11-20T12:00:00-04:00"));
+      await page.goto(`${BASE}/`);
+      await page.getByTestId("budget-card").waitFor();
+      assert((await page.getByTestId("recap-card").count()) === 0, "the card is only on the first days of the month");
+      await page.getByTestId("budget-recap-link").click();
+      await page.waitForURL((u) => u.pathname === "/personal/recap");
+      await page.getByTestId("recap-card").waitFor();
+      assert(/Groceries/.test(await page.getByTestId("recap-areas").textContent()), "the full page lists the areas");
+      assert((await page.getByTestId("recap-where").getAttribute("href")) === "/personal/reports", "Where it went opens the reports");
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+
+      // a month with nothing recorded says so
+      await ctx.clock.setFixedTime(new Date("2026-12-03T12:00:00-04:00"));
+      await page.goto(`${BASE}/personal/recap`);
+      await page.getByTestId("recap-empty").waitFor();
+      assert(/November/.test(await page.getByTestId("recap-empty").textContent()), "it names the empty month");
+    } finally {
+      await ctx.close();
+      for (const t of Object.keys(stash)) { const a = fake.table(t); a.splice(0); a.push(...stash[t]); }
+    }
+  });
+
   await test("savings: a plan starts from what is already saved, counts its months, can skip, add extra and pause, and shows in the budget", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);

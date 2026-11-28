@@ -25,6 +25,7 @@ export const PUSH_TEXT = {
   billEmail: { title: "Lifolio", body: "A new utility bill arrived by email." },
   budget: { title: "Lifolio", body: "A reminder about your monthly budget." },
   gambling: { title: "Lifolio", body: "A reminder about your gambling limit. Open the app to check it." },
+  recap: { title: "Lifolio", body: "Your monthly recap is ready." },
   fixedYearly: { title: "Lifolio", body: "A yearly bill is coming up. Open the app to check it." },
   fixedMonthly: { title: "Lifolio", body: "A payment is due tomorrow. Open the app to check it." },
   support: { title: "Lifolio", body: "A new support request arrived." },
@@ -137,6 +138,11 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
       return `New ${co} bill${month ? ` for ${month}` : ""}${d.date ? `, due ${shortDate(d.date, today)}` : ""}.`;
     }
     case "budget": return d.item === "over" ? "You are over this month's budget." : d.item === "near" ? "You have used most of this month's budget." : null;
+    case "recap": {
+      const month = clean(d.label, 20);
+      if (!month) return null;
+      return `Your ${month} recap is ready.${d.item === "under" ? " You finished under budget." : d.item === "over" ? " You went over budget." : ""}`;
+    }
     case "gambling": return d.item === "over" ? "You are over your gambling limit this month." : d.item === "near" ? "You have used 80% of your gambling limit this month." : null;
     case "fixedYearly": {
       const name = clean(d.item, 40);

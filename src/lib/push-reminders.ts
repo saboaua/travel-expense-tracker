@@ -10,6 +10,8 @@ import { REMINDER_DAYS, reminderDue } from "@/lib/trip-checklist";
 import { entryReminderDue, isConfirmationPaper, reminderDaysWindow } from "@/lib/entry-card";
 import { budgetState, budgetView, pickBudget, readBudget, spentByArea, spentByTypeId } from "@/lib/personal/budget";
 import { fetchMonthInputs } from "@/lib/personal/budget-data";
+import { fetchRecapState } from "@/lib/personal/recap-data";
+import { monthName, recapMonth } from "@/lib/personal/recap";
 import { gamblingState, KIND_LABEL, costName, paymentFallsOn, readCost, yearlyAlert, readEntry, type FixedCost } from "@/lib/personal/fixed-costs";
 import { convert, round2 } from "@/lib/personal/money";
 import { FIXED_COST_COLS } from "@/lib/columns";
@@ -180,6 +182,35 @@ export async function budgetAlerts(db: SupabaseClient, today: string): Promise<n
       if (!(await claimOnce(userId, `budget:${month}:${state}`))) continue;
       n += await sendPush(userId, "budget", "budget", { item: state }, { today });
     } catch (e) { console.error("[cron] budget alert for one person failed", e instanceof Error ? e.message : e); }
+  }
+  return n;
+}
+
+/**
+ * On the 1st (and the 2nd, in case the first run failed): one message per person about the month that just ended. It only says
+ * whether they finished under or over budget, never an amount; the amounts are in the app. Only people who can be reached
+ * (a phone with alerts on, or Telegram linked) are looked at, so nobody's month is added up for nothing.
+ */
+export async function monthlyRecaps(db: SupabaseClient, today: string): Promise<number> {
+  if (Number(today.slice(8, 10)) > 2) return 0;
+  const month = recapMonth(today);
+  const [phones, telegram] = await Promise.all([
+    db.from("push_subscriptions").select("user_id").limit(5000),
+    db.from("profiles").select("id").not("telegram_id", "is", null).limit(5000),
+  ]);
+  if (phones.error && !missing(phones.error.message)) throw new Error(phones.error.message);
+  const ids = new Set<string>([
+    ...((phones.error ? [] : phones.data ?? []) as { user_id: string }[]).map((r) => r.user_id),
+    ...((telegram.error ? [] : telegram.data ?? []) as { id: string }[]).map((r) => r.id),
+  ]);
+  let n = 0;
+  for (const id of ids) {
+    try {
+      const r = await fetchRecapState(db, id, month);
+      if (!r) continue;
+      if (!(await claimOnce(id, `recap:${month}`))) continue;
+      n += await sendPush(id, "recap", "recap", { item: r.state, label: monthName(month) }, { today });
+    } catch (e) { console.error("[cron] monthly recap for one person failed", e instanceof Error ? e.message : e); } // the others still get theirs
   }
   return n;
 }

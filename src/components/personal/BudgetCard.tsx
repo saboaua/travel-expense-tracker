@@ -207,6 +207,7 @@ export function BudgetCard() {
       <div className="mt-1 flex flex-wrap items-center justify-between gap-x-4">
         <Link href="/personal/budget" className="inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary" data-testid="budget-set-link"><Settings className="h-4 w-4" aria-hidden="true" /> Set or change budget</Link>
         <Link href="/personal/fixed" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary" data-testid="budget-fixed-link">Fixed costs <ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
+        <Link href="/personal/recap" className="inline-flex min-h-11 items-center gap-1 text-sm font-semibold text-primary" data-testid="budget-recap-link">Last month&apos;s recap <ChevronRight className="h-4 w-4" aria-hidden="true" /></Link>
       </div>
     </Card>
   );

@@ -9,7 +9,7 @@ import { TELEGRAM_KEYS, type TelegramKey } from "@/lib/telegram-kinds";
 export { DEFAULT_PUSH_PREFS, PUSH_TEXT };
 export type { PushPref, PushPrefs, PushSettings, PushData, PushKind };
 
-const PUSH_URL: Partial<Record<PushKind, string>> = { reminder: "/personal/reminders", subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", flight: "/trips", flightTomorrow: "/trips", afterTrip: "/trips", checklist: "/trips", entryCard: "/trips", document: "/documents", utility: "/personal/utilities", billEmail: "/personal/utilities", budget: "/personal/budget", gambling: "/personal/fixed/gambling", fixedYearly: "/personal/fixed", fixedMonthly: "/personal/fixed", support: "/admin/support", badge: "/profile/badges", accountRequest: "/admin/account-requests", invite: "/profile#sharing", accepted: "/profile#sharing", shared: "/trips", unshared: "/trips" };
+const PUSH_URL: Partial<Record<PushKind, string>> = { reminder: "/personal/reminders", subscription: "/personal/subscriptions", iptv: "/admin/iptv", trip: "/trips", flight: "/trips", flightTomorrow: "/trips", afterTrip: "/trips", checklist: "/trips", entryCard: "/trips", document: "/documents", utility: "/personal/utilities", billEmail: "/personal/utilities", budget: "/personal/budget", gambling: "/personal/fixed/gambling", recap: "/personal/recap", fixedYearly: "/personal/fixed", fixedMonthly: "/personal/fixed", support: "/admin/support", badge: "/profile/badges", accountRequest: "/admin/account-requests", invite: "/profile#sharing", accepted: "/profile#sharing", shared: "/trips", unshared: "/trips" };
 
 export function pushConfigured(): boolean {
   return Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);

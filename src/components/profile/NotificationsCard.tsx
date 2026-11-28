@@ -122,6 +122,7 @@ export function NotificationsCard() {
     ] },
     { title: "Budget and fixed costs", rows: [
       { key: "budget", title: "Budget alerts", hint: "At 80% of your monthly budget, and again if you go over.", example: "\u201cYou have used most of this month's budget.\u201d", isNew: true },
+      { key: "recap", title: "Monthly recap", hint: "Once a month, on the 1st. It says whether you finished under budget. The amounts are in the app.", example: "\u201cYour October recap is ready. You finished under budget.\u201d", isNew: true },
       { key: "gambling", title: "Gambling limit", hint: "At 80% of your limit, and again when you pass it. Once a month each.", example: "\u201cYou have used 80% of your gambling limit this month.\u201d", isNew: true },
       { key: "yearlyBills", title: "Yearly bills coming up", hint: "30 days and 7 days before car insurance or the license plate is due.", example: "\u201cLicense plate is due in 7 days (Jun 30).\u201d", isNew: true },
       { key: "paymentDay", title: "Monthly payment day", hint: "The day before a mortgage, loan, insurance or card payment. Off until you turn it on.", example: "\u201cHome mortgage is due tomorrow (Dec 1).\u201d", isNew: true },
