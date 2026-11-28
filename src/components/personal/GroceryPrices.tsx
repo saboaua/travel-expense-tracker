@@ -11,7 +11,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowDown, ArrowLeft, ArrowUp, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
+import { ArrowDown, ArrowLeft, ArrowUp, Bell, BellRing, ChevronDown, ChevronUp, ExternalLink, Globe, Link2, Minus, Plus, Search, Store, Tag } from "lucide-react";
 import { Sparkline } from "@/components/personal/Sparkline";
 import { PriceChart, STORE_COLORS } from "@/components/personal/PriceChart";
 import type { TrackerRow } from "@/lib/personal/grocery";
@@ -28,6 +28,9 @@ import { LevelUpNotice } from "@/components/profile/LevelUpNotice";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { compareOnline, FILE_STORES, OLD_FILE_DAYS, ONLINE_CURRENCY, STORE_IDS, STORES, type OnlineMatch, type OnlineVerdict, type StoreId } from "@/lib/store-prices";
 import { PAGE_WIDTH } from "@/components/layout/PageShell";
+import { WatchSheet } from "@/components/personal/WatchSheet";
+import { usePriceWatches } from "@/lib/use-price-watches";
+import { lastPaid, ruleWords, type Watch } from "@/lib/personal/price-watch";
 
 type Sort = "saving" | "increase" | "recent" | "purchases" | "name";
 
@@ -65,6 +68,9 @@ export function GroceryPrices() {
   const [note, setNote] = useState<string | null>(null);
   const [onlineData, setOnlineData] = useState<OnlineData | null>(null);
   const [onlineTick, setOnlineTick] = useState(0);
+  const watchesQ = usePriceWatches();
+  const watches = useMemo(() => watchesQ.data ?? [], [watchesQ.data]);
+  const [watching, setWatching] = useState<Product | null>(null);
 
   const { products, suggestions } = useMemo(() => buildProducts(rows, decisions), [rows, decisions]);
   const currencies = useMemo(() => [...new Set(products.map((p) => p.currency))], [products]);
@@ -201,6 +207,7 @@ export function GroceryPrices() {
         <div>
           <h1 className="flex items-center gap-3 text-2xl font-bold md:text-3xl"><TileButton id="prices" icon={TrendingUp} tone="groceries" />Price tracker</h1>
           <p className="mt-1 text-sm text-muted-foreground">{inCur.length} item{inCur.length === 1 ? "" : "s"} · {summary.stores} store{summary.stores === 1 ? "" : "s"}{onlineData && onlineData.enabled.length > 0 && cur === ONLINE_CURRENCY ? ` · ${onlineData.enabled.length} online` : ""} · {cur}</p>
+          <Link href="/personal/groceries/watches" className="mt-1 inline-flex min-h-11 items-center gap-1.5 text-sm font-semibold text-primary" data-testid="tracker-watches"><Bell className="h-4 w-4" aria-hidden="true" />Price watches{watches.length > 0 ? ` (${watches.length})` : ""}</Link>
         </div>
         <div className="flex gap-2">
           <Link href="/personal/groceries/price-check"><Button variant="outline" className="h-11 gap-2" data-testid="tracker-price-check"><Plus className="h-4 w-4" /> <span className="sm:hidden">Price</span><span className="hidden sm:inline">Add a price</span></Button></Link>
@@ -264,10 +271,18 @@ export function GroceryPrices() {
         <Card><CardContent className="py-12 text-center text-sm text-muted-foreground">{products.length === 0 ? "Scan a grocery receipt and its items will appear here." : "No items match."}</CardContent></Card>
       )}
 
+      {watching && (
+        <WatchSheet
+          target={{ key: watching.key, name: watching.size ? `${watching.name} ${watching.size}` : watching.name, currency: watching.currency, last: (() => { const l = lastPaid(watching); return l ? { price: l.price, store: l.store } : null; })(), now: watching.stores[0] ? { price: watching.stores[0].latest.price, store: watching.stores[0].store } : null }}
+          existing={watches.find((w) => w.product_key === watching.key) ?? null} count={watches.length}
+          onClose={() => setWatching(null)} onSaved={() => { setWatching(null); void watchesQ.reload(); }}
+        />
+      )}
       <div className="space-y-3">
         {list.map((p) => (
           <ProductCard key={p.key} p={p} fmt={fmt} cur={cur} isOpen={open === p.key} onToggle={() => setOpen(open === p.key ? null : p.key)} online={online}
             onlineMatches={cur === ONLINE_CURRENCY ? onlineData?.matches[p.key] ?? null : null} verdict={verdicts.get(p.key) ?? null} community={community.get(p.key) ?? null} onlineReady={cur === ONLINE_CURRENCY && !!onlineData && onlineData.enabled.length > 0 && !onlineData.setup}
+            watch={watches.find((w) => w.product_key === p.key) ?? null} onWatch={() => setWatching(p)}
             onAnswerOnline={(m, same) => answerOnline(p.key, m, same)}
             onSeparate={(atomKey) => answer(p.atomKeys.filter((k) => k !== atomKey).map((k) => [atomKey, k] as [string, string]), false)} />
         ))}
@@ -345,7 +360,7 @@ function StoreRow({ s, i, max, fmt, cur, unit }: { s: StoreSummary; i: number; m
   );
 }
 
-function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline }: { p: Product; fmt: (n: number) => string; cur: string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number; confirmed: boolean } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
+function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, onlineMatches, verdict, community, onlineReady, onAnswerOnline, watch, onWatch }: { watch: Watch | null; onWatch: () => void; p: Product; fmt: (n: number) => string; cur: string; isOpen: boolean; onToggle: () => void; onSeparate: (atomKey: string) => void; online: boolean; onlineMatches: OnlineMatch[] | null; verdict: OnlineVerdict | null; community: { store: string; price: number; reporters: number; confirmed: boolean } | null; onlineReady: boolean; onAnswerOnline: (m: OnlineMatch, same: boolean) => void }) {
   const multi = p.stores.length > 1;
   const best = p.stores[0];
   const max = Math.max(...p.stores.map((s) => s.latest.price));
@@ -368,6 +383,7 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
               <span className="text-[13px] text-muted-foreground">Only seen at one store</span>
             )}
           </div>
+          {watch && <p className="mt-1.5" data-testid="price-watching"><span className={`${chipBase} ${watch.last_alert_price != null ? GREEN : "bg-muted text-muted-foreground"}`}>{watch.last_alert_price != null ? <BellRing className="mr-1 h-3 w-3" aria-hidden="true" /> : <Bell className="mr-1 h-3 w-3" aria-hidden="true" />}{watch.last_alert_price != null ? "Dropped" : "Watching"}</span></p>}
           {/* On a phone the store sits under the green line, so it can never run into the price on the right */}
           {multi && <p className="mt-1.5 text-[13px] text-muted-foreground sm:hidden" data-testid="price-best-store">Best price at {best.store}</p>}
           {community && (
@@ -400,6 +416,11 @@ function ProductCard({ p, fmt, cur, isOpen, onToggle, onSeparate, online, online
 
       {isOpen && (
         <div className="border-t" data-testid="price-detail">
+          <div className="px-3.5 pt-3 sm:px-4">
+            <button type="button" onClick={onWatch} data-testid="price-watch-button" className="inline-flex min-h-11 items-center gap-2 rounded-xl border px-3 text-sm font-semibold hover:bg-accent">
+              <Bell className="h-4 w-4" aria-hidden="true" />{watch ? `Watching. ${ruleWords(watch, fmt)}` : "Watch this price"}
+            </button>
+          </div>
           <div className="grid gap-x-8 gap-y-4 px-3.5 pb-4 pt-3 sm:px-4 md:grid-cols-2">
             <div className="min-w-0">
               {onlineReady && onlineMatches && onlineMatches.length > 0 && (

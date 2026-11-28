@@ -139,7 +139,7 @@ eq("row round trip", readLimits(limitsRow(on)), on);
 
 // The table on the Get Pro page follows the limits that have a start day
 eq("table follows the starts", proComparison({ ...on, starts: starts("2026-12-01", ["ai_scans", "documents"]) }).map((r) => r.label), ["AI receipt scans", "Documents", "Share a reminder with someone", "Photos on a reminder", "Excel and PDF reports"]);
-eq("full table", proComparison(on).length, 14);
+eq("full table", proComparison(on).length, 15);
 eq("table numbers", proComparison(on)[0], { label: "AI receipt scans", free: "10 a month", pro: "No limit" });
 eq("new rows", proComparison({ ...on, starts: starts("2026-12-01", ["card_sharing", "trip_papers"]) }).slice(0, 2), [{ label: "Shared loyalty cards", free: "1", pro: "No limit" }, { label: "Papers per trip", free: "3", pro: "50" }]);
 

@@ -10,6 +10,7 @@ const PROTECTED = ["pro_limits", "user_plans", "plan_payments", "payment_setting
 const REVIEWED: Record<string, string> = {
   "migration_limit_starts.sql": "moves the old single start day into the per-feature columns once, then clears it; runs only while the old column still exists",
   "migration_projects.sql": "starts the new projects limit today, only the first time its column is added",
+  "migration_price_watches.sql": "starts the new price watches limit today, only the first time its column is added",
   "migration_pro_trial.sql": "gives new accounts the free month from a trigger; never touches existing plans",
 };
 

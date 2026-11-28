@@ -112,6 +112,7 @@ export function NotificationsCard() {
     { title: "Money and papers", rows: [
       { key: "reminders", title: "Subscription payments", hint: "Before a payment is due, in the days you chose.", example: "\u201cNetflix is due in 3 days (Nov 14).\u201d" },
       { key: "documents", title: "Document expiry", hint: "Passport, visa and ID, well before they expire.", example: "\u201cYour passport expires in 60 days (Jan 9, 2027).\u201d", isNew: true },
+      { key: "priceDrops", title: "Price drops", hint: "When a product you watch gets cheaper. One message a morning at most. It names the product and store, never the price.", example: "\u201cGouda 500g is cheaper at Super Food Plaza now.\u201d", isNew: true },
       { key: "summary", title: "Weekly summary", hint: "Telegram only. A short summary every Monday.", example: "\u201cYour week: 3 trips coming up, 2 documents to renew.\u201d" },
     ] },
     { title: "Sharing", rows: [

@@ -26,6 +26,7 @@ export const PUSH_TEXT = {
   budget: { title: "Lifolio", body: "A reminder about your monthly budget." },
   gambling: { title: "Lifolio", body: "A reminder about your gambling limit. Open the app to check it." },
   recap: { title: "Lifolio", body: "Your monthly recap is ready." },
+  priceDrop: { title: "Lifolio", body: "A price you watch dropped. Open the app to see it." },
   fixedYearly: { title: "Lifolio", body: "A yearly bill is coming up. Open the app to check it." },
   fixedMonthly: { title: "Lifolio", body: "A payment is due tomorrow. Open the app to check it." },
   support: { title: "Lifolio", body: "A new support request arrived." },
@@ -142,6 +143,12 @@ function detailed(kind: PushKind, d: PushData, today?: string): string | null {
       const month = clean(d.label, 20);
       if (!month) return null;
       return `Your ${month} recap is ready.${d.item === "under" ? " You finished under budget." : d.item === "over" ? " You went over budget." : ""}`;
+    }
+    case "priceDrop": {
+      const n = d.count ?? 0;
+      const item = clean(d.item, 60), store = clean(d.label, 40);
+      if (n === 1 && item && store) return `${item} is cheaper at ${store} now.`;
+      return n > 1 ? `${n} prices you watch dropped. Open the app to see them.` : null;
     }
     case "gambling": return d.item === "over" ? "You are over your gambling limit this month." : d.item === "near" ? "You have used 80% of your gambling limit this month." : null;
     case "fixedYearly": {

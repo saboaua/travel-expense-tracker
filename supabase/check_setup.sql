@@ -34,6 +34,9 @@ need_cols(tbl, col, fix) as (values
   ('pro_limits','starts_orders_email','migration_orders_email_limit.sql'),
   ('pro_limits','free_projects','migration_projects.sql'),
   ('pro_limits','pro_projects','migration_projects.sql'),
+  ('pro_limits','starts_price_watches','migration_price_watches.sql'),
+  ('pro_limits','free_price_watches','migration_price_watches.sql'),
+  ('pro_limits','pro_price_watches','migration_price_watches.sql'),
   ('business_projects','status','migration_projects.sql'),
   ('business_project_receipts','amount_usd','migration_projects.sql'),
   ('business_projects','client_name','migration_projects.sql'),
@@ -144,6 +147,7 @@ col_checks as (
 ),
 need_tables(tbl, fix) as (values
   ('online_order_prefs','migration_online_order_pay.sql'),
+  ('price_watches','migration_price_watches.sql'),
   ('logo_library','migration_logo_library.sql'),
   ('receipt_types','migration_receipt_types.sql'),
   ('house_areas','migration_house_areas.sql'),
@@ -267,6 +271,13 @@ other_checks as (
               then 'OK' else 'MISSING' end,
          'migration_help_recap.sql'
   from (values ('monthly-recap')) as s(slug)
+  union all
+  select 'help topic', s.slug,
+         case when to_regclass('public.help_topics') is not null
+              and (xpath('/row/c/text()', query_to_xml(format('select count(*) as c from public.help_topics where slug = %L', s.slug), false, true, '')))[1]::text::int > 0
+              then 'OK' else 'MISSING' end,
+         'migration_help_price_watches.sql'
+  from (values ('price-watches')) as s(slug)
   union all
   select 'function', f.fn,
          case when exists (select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = f.fn) then 'OK' else 'MISSING' end,

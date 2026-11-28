@@ -52,7 +52,7 @@ fake.seed("currencies", [
   { code: "AWG", name: "Aruban Florin", usd_rate: 0.558659, enabled: true, sort_order: 2 },
   { code: "EUR", name: "Euro", usd_rate: 1.1, enabled: true, sort_order: 3 },
 ]);
-for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "online_order_prefs", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types", "telegram_notify_prefs"]) fake.table(t);
+for (const t of ["store_categories", "accounting_settings", "accounting_exports", "profiles", "trips", "expenses", "personal_projects", "personal_expenses", "personal_spends", "house_areas", "utility_bills", "utility_prefs", "personal_budgets", "fixed_costs", "fixed_entries", "savings_plans", "savings_events", "price_checks", "grocery_receipts", "grocery_items", "travel_documents", "loyalty_cards", "security_events", "audit_logs", "support_requests", "subscriptions", "iptv_customers", "iptv_clients", "iptv_renewals", "trip_flights", "trip_papers", "entry_card_details", "trip_entry_cards", "price_imports", "shared_prices", "fuel_fillups", "grocery_price_matches", "grocery_online_matches", "grocery_online_prefs", "online_order_prefs", "price_watches", "store_catalog", "shopping_list_items", "grocery_item_rules", "store_locations", "bill_email_addresses", "bill_email_senders", "bill_email_log", "user_plans", "payment_settings", "plan_payments", "btc_addresses", "btc_wallet", "pro_limits", "business_projects", "business_project_receipts", "ai_scan_usage", "bill_email_held", "supermarket_places", "supermarket_places_removed", "logo_library", "receipt_types", "telegram_notify_prefs"]) fake.table(t);
 
 const PAT = fake.addUser({ email: "pat@example.com", password: "Correct-Horse-1", role: "user", full_name: "Pat Tester" });
 fake.addUser({ email: "newbie@example.com", password: "Temp-Pass-1", role: "user", full_name: "New Person" });
@@ -3944,6 +3944,79 @@ try {
     }
   });
 
+  await test("price watches: start a watch from the tracker, see it in the list, pause it, and the Free limit stops a fourth", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+    ctx.setDefaultTimeout(60_000);
+    const page = await ctx.newPage();
+    const R = ["9e000000-0000-4000-8000-00000000f001", "9e000000-0000-4000-8000-00000000f002"];
+    const mk = (id, store, days) => ({ id, user_id: PAT, store, purchase_date: addDays(today, days), total: 6, currency: "AWG", receipt_path: null, notes: null, created_at: new Date().toISOString() });
+    const names = ["Gouda Watchcheese", "Kale Watchgreens", "Oat Watchmilk", "Rice Watchgrain"];
+    const items = names.map((n, i) => ({ id: `9f000000-0000-4000-8000-00000000f10${i}`, receipt_id: R[0], user_id: PAT, name: n, normalized_name: n.toLowerCase(), category: "Other", quantity: 1, unit_price: 5 + i, line_total: 5 + i, unit: null, created_at: new Date().toISOString() }));
+    fake.table("grocery_receipts").push(mk(R[0], "Watch Market", -3));
+    fake.table("grocery_items").push(...items);
+    const plans = fake.table("user_plans"); const planStash = plans.splice(0);
+    try {
+      await signIn(page, "pat@example.com", "Correct-Horse-1");
+      await page.waitForURL((u) => u.pathname === "/");
+      await page.goto(`${BASE}/personal/groceries/prices`);
+      const card = page.getByTestId("price-product").filter({ hasText: "Gouda Watchcheese" }).first();
+      await card.waitFor({ timeout: 60000 });
+      await card.click();
+      await card.getByTestId("price-watch-button").click();
+      await page.getByTestId("watch-sheet").waitFor();
+      await page.getByTestId("watch-rule-below").check();
+      await page.getByTestId("watch-save").click();
+      await page.getByTestId("watch-sheet").waitFor({ state: "detached" });
+      assert(fake.table("price_watches").length === 1 && fake.table("price_watches")[0].rule === "below_last", "the watch is saved");
+      assert(Number(fake.table("price_watches")[0].target) === 5, "it compares with the 5 last paid");
+      await page.getByTestId("tracker-watches").click();
+      await page.waitForURL((u) => u.pathname === "/personal/groceries/watches");
+      const row = page.getByTestId("watch-row").first();
+      await row.waitFor();
+      assert(/Waiting for under/.test(await row.getByTestId("watch-rule").textContent()), "the row says what it waits for");
+      assert(/1 of 3 on Free/.test(await page.getByTestId("watch-count").textContent()), "usage on Free: " + (await page.getByTestId("watch-count").textContent()));
+      assert((await row.getByTestId("watch-pause").boundingBox()).height >= 44, "pause is a full tap target");
+      await row.getByTestId("watch-pause").click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="watch-row"]')?.getAttribute("data-state") === "paused");
+      assert(fake.table("price_watches")[0].paused === true, "paused is saved");
+      await row.getByTestId("watch-pause").click();
+      await page.waitForFunction(() => document.querySelector('[data-testid="watch-row"]')?.getAttribute("data-state") === "waiting");
+
+      // two more fill the Free limit, the fourth is stopped
+      for (const n of [names[1], names[2]]) {
+        await page.getByTestId("watch-add").click();
+        await page.getByTestId("watch-search").fill(n);
+        await page.getByTestId("watch-choice").first().click();
+        await page.getByTestId("watch-rule-at").check();
+        await page.getByTestId("watch-price").fill("3.50");
+        await page.getByTestId("watch-save").click();
+        await page.getByTestId("watch-sheet").waitFor({ state: "detached" });
+      }
+      await page.waitForFunction(() => document.querySelectorAll('[data-testid="watch-row"]').length === 3);
+      await page.getByTestId("watch-add").click();
+      await page.getByTestId("watch-search").fill(names[3]);
+      await page.getByTestId("watch-choice").first().click();
+      await page.getByTestId("watch-full").waitFor();
+      assert((await page.getByTestId("watch-save").count()) === 0, "no save button at the limit");
+      await page.getByTestId("watch-cancel").click();
+      assert((await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)), "no sideways scroll");
+
+      // Pro lifts the limit
+      plans.push({ user_id: PAT, plan: "pro", period: "monthly", ends_on: null });
+      await page.reload();
+      await page.getByTestId("watch-add").click();
+      await page.getByTestId("watch-search").fill(names[3]);
+      await page.getByTestId("watch-choice").first().click();
+      await page.getByTestId("watch-save").waitFor();
+      assert((await page.getByTestId("watch-full").count()) === 0, "Pro can add a fourth");
+    } finally {
+      await ctx.close();
+      plans.splice(0); plans.push(...planStash);
+      fake.table("price_watches").splice(0);
+      for (const t of ["grocery_receipts", "grocery_items"]) { const a = fake.table(t); for (let i = a.length - 1; i >= 0; i--) if (String(a[i].id).includes("00000000f")) a.splice(i, 1); }
+    }
+  });
+
   await test("savings: a plan starts from what is already saved, counts its months, can skip, add extra and pause, and shows in the budget", async () => {
     const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
     ctx.setDefaultTimeout(60_000);
@@ -5490,7 +5563,7 @@ try {
     await card.waitFor();
     await card.getByText(/not set up on the server/).waitFor();
     assert(!(await card.getByRole("switch", { name: "Alerts on this device" }).isEnabled()), "the device switch cannot be turned on without keys");
-    assert((await card.locator("[role=switch]:not([aria-label$=\" on Telegram\"])").count()) === 18, "device switch, sixteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
+    assert((await card.locator("[role=switch]:not([aria-label$=\" on Telegram\"])").count()) === 20, "device switch, eighteen kinds of alert and quiet hours (no admin-only rows for a normal person)");
     const key = await (await d.page.request.get(`${BASE}/api/push/key`)).json();
     assert(key.configured === false && !("key" in key), "the key route says not set up and gives no key");
     await d.page.goto(`${BASE}/profile#your-data`);
